@@ -14,11 +14,17 @@ import {
   DollarSign,
   Users,
   Settings,
-  X
+  X,
+  FileSpreadsheet,
+  RefreshCw
 } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
 import api from '../lib/professionalApi';
-import { safeArray } from '../lib/safe-math';
+import { extractArray, extractPaginatedData, extractData } from '../lib/apiHelpers';
+import { customerSchema, CustomerFormData } from '../lib/validation';
+import { ValidatedForm } from '../components/forms/ValidatedForm';
+import { FormField, FormActions } from '../components/forms/FormField';
+import { useToast, toast } from '../components/ui/Toast';
 
 interface Customer {
   id: string;
@@ -27,8 +33,12 @@ interface Customer {
   phone?: string;
   address?: string;
   category: string;
-  balance: number;
-  debt: number;
+  balance: number;  // UZS (backward compatibility)
+  balanceUZS: number;
+  balanceUSD: number;
+  debt: number;  // UZS (backward compatibility)
+  debtUZS: number;
+  debtUSD: number;
   createdAt: string;
   // Qo'shimcha maydonlar
   monthlySales?: number; // Oylik savdo ($)
@@ -42,20 +52,21 @@ export default function CustomersModern() {
   const navigate = useNavigate();
   const location = useLocation();
   const isCashier = location.pathname.startsWith('/cashier');
+  const { addToast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({
-    name: '',
-    phone: '',
-    address: '',
-    category: 'NORMAL'
-  });
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  
+  // Form validation states
+  const [customerFormLoading, setCustomerFormLoading] = useState(false);
+  const [customerFormError, setCustomerFormError] = useState<string | null>(null);
+  const [customerFormSuccess, setCustomerFormSuccess] = useState<string | null>(null);
 
-  // Rang sozlamalari - localStorage dan yuklash
+  // Rang sozlamalari - faqat memory da (localStorage o'chirildi)
   const [colorSettings, setColorSettings] = useState({
     greenThreshold: 600,    // Yashil uchun minimum
     yellowThreshold: 100,   // Sariq uchun minimum, undan kam = qizil
@@ -63,17 +74,8 @@ export default function CustomersModern() {
   });
   const [showSettings, setShowSettings] = useState(false);
 
-  // Sozlamalarni localStorage dan yuklash
-  useEffect(() => {
-    const saved = localStorage.getItem('customerColorSettings');
-    if (saved) {
-      setColorSettings(JSON.parse(saved));
-    }
-  }, []);
-
-  // Sozlamalarni saqlash
+  // Sozlamalarni saqlash - faqat memory da
   const saveSettings = () => {
-    localStorage.setItem('customerColorSettings', JSON.stringify(colorSettings));
     setShowSettings(false);
     // Mijozlarni qayta yuklash
     loadCustomers();
@@ -98,13 +100,13 @@ export default function CustomersModern() {
     try {
       setLoading(true);
       
-      // Mijozlarni olish
+      // Mijozlarni olish - handle standardized API response format
       const customersResponse = await api.get('/customers');
-      const customersData = safeArray(customersResponse.data, []);
+      const customersData = extractArray(customersResponse, []);
       
-      // Sales ma'lumotlarini olish
+      // Sales ma'lumotlarini olish - handle standardized API response format
       const salesResponse = await api.get('/sales?limit=1000');
-      const salesData = safeArray(salesResponse.data?.sales || salesResponse.data, []);
+      const { data: salesData } = extractPaginatedData<any>(salesResponse, 'sales', []);
       
       // Har bir mijoz uchun hisoblash
       const enrichedCustomers = customersData.map((c: any) => {
@@ -135,20 +137,22 @@ export default function CustomersModern() {
         const lastSale: any = customerSales
           .sort((a: any, b: any) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime())[0];
         
-        // Qarz muddati (oxirgi to'lovdan beri)
+        // ✅ TUZATILDI: debtUZS ishlatildi
         let debtPeriod = 0;
-        if (c.debt > 0 && lastSale) {
+        const totalDebt = (c.debtUZS || c.debt || 0) + (c.debtUSD || 0) * 12500;
+        if (totalDebt > 0 && lastSale) {
           const lastSaleDate = new Date(lastSale.createdAt || lastSale.date);
           const daysSinceLastSale = Math.floor((new Date().getTime() - lastSaleDate.getTime()) / (1000 * 60 * 60 * 24));
           debtPeriod = daysSinceLastSale;
         }
         
-        // Balansni hisoblash (agar serverdan 0 kelsa)
-        let balance = c.balance || 0;
-        if (balance === 0 && customerSales.length > 0) {
-          // Sotuvlardan balansni hisoblash
-          balance = totalSales - (c.debt || 0);
-        }
+        // ✅ TUZATILDI: API dan kelgan balanceUZS/balanceUSD ishlatiladi
+        const balanceUZS = c.balanceUZS || c.balance || 0;
+        const balanceUSD = c.balanceUSD || 0;
+        const debtUZS = c.debtUZS || c.debt || 0;
+        const debtUSD = c.debtUSD || 0;
+        // Ko'rsatish uchun UZS balansini ishlatamiz (asosiy valyuta)
+        const balance = balanceUZS;
         
         // Rangni hisoblash
         const statusColor = calculateStatusColor(monthlySales, debtPeriod);
@@ -162,8 +166,12 @@ export default function CustomersModern() {
           phone: c.phone,
           address: c.address,
           category: c.category,
-          balance: balance,
-          debt: c.debt || 0,
+          balance: balance,  // UZS
+          balanceUZS,
+          balanceUSD,
+          debt: debtUZS,  // UZS for backward compatibility
+          debtUZS,
+          debtUSD,
           createdAt: c.createdAt,
           monthlySales,
           totalSales,
@@ -174,9 +182,10 @@ export default function CustomersModern() {
       });
       
       setCustomers(enrichedCustomers);
+      setLastUpdated(new Date());
       
     } catch (error) {
-      console.error('Error loading customers:', error);
+      // Error handled by empty customers state
     } finally {
       setLoading(false);
     }
@@ -184,6 +193,23 @@ export default function CustomersModern() {
 
   useEffect(() => {
     loadCustomers();
+
+    // Avto-yangilash har 30 soniyada
+    const intervalId = setInterval(() => {
+      loadCustomers();
+    }, 30000);
+
+    // Oyna fokusga kelganda yangilash
+    const handleFocus = () => {
+      loadCustomers();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    // Tozalash
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   useEffect(() => {
@@ -207,44 +233,45 @@ export default function CustomersModern() {
     setFilteredCustomers(filtered);
   }, [customers, selectedCategory, searchTerm]);
 
-  const handleAddCustomer = async () => {
-  console.log('handleAddCustomer funksiyasi chaqirildi!');
-  console.log('New customer data:', newCustomer);
-  
-  try {
-    if (!newCustomer.name || !newCustomer.phone) {
-      console.log('Validation failed: missing name or phone');
-      alert(latinToCyrillic('Ism va telefon raqami kiritilishi shart!'));
-      return;
+  const handleAddCustomer = async (data: CustomerFormData) => {
+    setCustomerFormLoading(true);
+    setCustomerFormError(null);
+    setCustomerFormSuccess(null);
+    
+    try {
+      const response = await api.post('/customers', data);
+      const createdCustomer = extractData<any>(response, null);
+      
+      if (createdCustomer) {
+        const customer: Customer = {
+          id: createdCustomer.id,
+          name: createdCustomer.name,
+          email: createdCustomer.email,
+          phone: createdCustomer.phone,
+          address: createdCustomer.address,
+          category: createdCustomer.category,
+          balance: createdCustomer.balanceUZS || createdCustomer.balance || 0,
+          balanceUZS: createdCustomer.balanceUZS || createdCustomer.balance || 0,
+          balanceUSD: createdCustomer.balanceUSD || 0,
+          debt: createdCustomer.debtUZS || createdCustomer.debt || 0,
+          debtUZS: createdCustomer.debtUZS || createdCustomer.debt || 0,
+          debtUSD: createdCustomer.debtUSD || 0,
+          createdAt: createdCustomer.createdAt
+        };
+
+        setCustomers([...customers, customer]);
+        setShowAddForm(false);
+        
+        // Show success message
+        addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic('Mijoz muvaffaqiyatli qo\'shildi!')));
+      }
+    } catch (error: any) {
+      console.error('Customer creation error:', error);
+      addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || latinToCyrillic('Mijoz qo\'shishda xatolik yuz berdi')));
+    } finally {
+      setCustomerFormLoading(false);
     }
-
-    console.log('API ga so\'rov yuborilmoqda...');
-    const response = await api.post('/customers', newCustomer);
-    console.log('API javobi:', response.data);
-    
-    const createdCustomer = {
-      id: response.data.id,
-      name: response.data.name,
-      email: response.data.email,
-      phone: response.data.phone,
-      address: response.data.address,
-      category: response.data.category,
-      balance: response.data.balance,
-      debt: response.data.debt,
-      createdAt: response.data.createdAt
-    };
-
-    console.log('Customer list yangilanmoqda...');
-    setCustomers([...customers, createdCustomer]);
-    setNewCustomer({ name: '', phone: '', address: '', category: 'NORMAL' });
-    setShowAddForm(false);
-    
-    alert(latinToCyrillic('Mijoz muvaffaqiyatli qo\'shildi!'));
-  } catch (error: any) {
-    console.error('Customer creation error:', error);
-    alert(error.response?.data?.error || latinToCyrillic('Mijoz qo\'shishda xatolik yuz berdi'));
-  }
-};
+  };
 
   const getCategoryBadgeColor = (category: string) => {
     switch (category) {
@@ -255,19 +282,110 @@ export default function CustomersModern() {
     }
   };
 
+  // Barcha mijozlarni Excel formatida eksport qilish
+  const handleExportAllCustomers = () => {
+    try {
+      if (customers.length === 0) {
+        alert(latinToCyrillic('Mijozlar ro\'yxati bo\'sh!'));
+        return;
+      }
+
+      // CSV sarlavhalari
+      const headers = [
+        latinToCyrillic('No'),
+        latinToCyrillic('Mijoz nomi'),
+        latinToCyrillic('Telefon'),
+        latinToCyrillic('Kategoriya'),
+        latinToCyrillic('Balans (UZS)'),
+        latinToCyrillic('Balans (USD)'),
+        latinToCyrillic('Qarz (UZS)'),
+        latinToCyrillic('Qarz (USD)'),
+        latinToCyrillic('Oylik savdo ($)'),
+        latinToCyrillic('Jami savdo ($)'),
+        latinToCyrillic('Manzil')
+      ];
+
+      // Ma'lumotlarni qatorlarga aylantirish
+      const rows = customers.map((customer, index) => {
+        return [
+          (index + 1).toString(),
+          customer.name,
+          customer.phone || '-',
+          customer.category,
+          (customer.balance || 0).toLocaleString(),
+          ((customer.balance || 0) / 12500).toFixed(2), // USD da taxminiy konvertatsiya
+          (customer.debt || 0).toLocaleString(),
+          ((customer.debt || 0) / 12500).toFixed(2),
+          (customer.monthlySales || 0).toFixed(2),
+          (customer.totalSales || 0).toFixed(2),
+          customer.address || '-'
+        ];
+      });
+
+      // CSV yaratish
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row =>
+          row.map(cell => {
+            const cellStr = String(cell);
+            if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+              return `"${cellStr.replace(/"/g, '""')}"`;
+            }
+            return cellStr;
+          }).join(',')
+        )
+      ].join('\n');
+
+      // BOM (Byte Order Mark) qo'shish
+      const BOM = '\uFEFF';
+      const fullContent = BOM + csvContent;
+
+      // Faylni yuklab olish
+      const blob = new Blob([fullContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+
+      const date = new Date().toISOString().split('T')[0];
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${latinToCyrillic('Mijozlar_Royxati')}_${date}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      alert(latinToCyrillic(`✅ ${customers.length} ta mijoz muvaffaqiyatli eksport qilindi!`));
+    } catch (error) {
+      console.error('Export xatolik:', error);
+      alert(latinToCyrillic('❌ Eksport qilishda xatolik yuz berdi'));
+    }
+  };
+
   return (
     <div className="min-h-screen p-6 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 bg-dots-pattern">
       {/* Header */}
       <div className="mb-8 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-gradient mb-2">
-              {latinToCyrillic("Mijozlar")}
-            </h1>
-            <p className="text-gray-600">
-              {filteredCustomers.length} {latinToCyrillic("ta mijoz")}
-            </p>
-          </div>
+          <h1 className="text-4xl font-bold text-gradient mb-2">
+            {latinToCyrillic("Mijozlar")}
+          </h1>
+          <p className="text-gray-600">
+            {filteredCustomers.length} {latinToCyrillic("ta mijoz")}
+            {lastUpdated && (
+              <span className="text-xs text-gray-400 ml-2">
+                ({latinToCyrillic("Oxirgi yangilanish")}: {lastUpdated.toLocaleTimeString()})
+              </span>
+            )}
+          </p>
+        </div>
+          <button
+            onClick={loadCustomers}
+            disabled={loading}
+            className="p-2 bg-white rounded-lg shadow-sm hover:shadow-md transition-all border border-gray-200"
+            title={latinToCyrillic("Yangilash")}
+          >
+            <RefreshCw className={`w-5 h-5 text-blue-600 ${loading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </div>
 
@@ -312,6 +430,17 @@ export default function CustomersModern() {
           
           {/* Buttons */}
           <div className="flex gap-2">
+            {/* Export All Customers Button */}
+            <button
+              onClick={handleExportAllCustomers}
+              className="btn-gradient-secondary px-4 py-3 flex items-center gap-2 hover:scale-105 transition-transform bg-gradient-to-r from-blue-500 to-blue-600 text-white"
+              title={latinToCyrillic("Barcha mijozlarni eksport qilish")}
+              aria-label={latinToCyrillic("Barcha mijozlarni eksport qilish")}
+            >
+              <FileSpreadsheet className="w-5 h-5" />
+              <span>{latinToCyrillic("Excel")}</span>
+            </button>
+
             {/* Settings Button */}
             <button
               onClick={() => setShowSettings(true)}
@@ -324,10 +453,7 @@ export default function CustomersModern() {
             
             {/* Add Customer Button */}
             <button
-              onClick={() => {
-                console.log('Yangi mijoz tugmasi bosildi!');
-                setShowAddForm(true);
-              }}
+              onClick={() => setShowAddForm(true)}
               className="btn-gradient-primary px-6 py-3 flex items-center gap-2 hover:scale-105 transition-transform"
             >
               <Plus className="w-5 h-5" />
@@ -463,8 +589,8 @@ export default function CustomersModern() {
                   <div>
                     <p className="text-xs text-gray-500">{latinToCyrillic("Oylik savdo")}</p>
                     <p className={`text-sm font-bold ${
-                      (customer.monthlySales || 0) >= 600 ? 'text-emerald-600' :
-                      (customer.monthlySales || 0) >= 100 ? 'text-yellow-600' : 'text-rose-600'
+                      (customer.monthlySales || 0) >= colorSettings.greenThreshold ? 'text-emerald-600' :
+                      (customer.monthlySales || 0) >= colorSettings.yellowThreshold ? 'text-yellow-600' : 'text-rose-600'
                     }`}>
                       ${(customer.monthlySales || 0).toFixed(2)}
                     </p>
@@ -472,7 +598,7 @@ export default function CustomersModern() {
                   <div>
                     <p className="text-xs text-gray-500">{latinToCyrillic("Qarz muddati")}</p>
                     <p className={`text-sm font-bold ${
-                      (customer.debtPeriod || 0) > 30 ? 'text-rose-600' : 'text-gray-600'
+                      (customer.debtPeriod || 0) > colorSettings.debtPeriodThreshold ? 'text-rose-600' : 'text-gray-600'
                     }`}>
                       {customer.debtPeriod || 0} {latinToCyrillic("kun")}
                     </p>
@@ -488,6 +614,16 @@ export default function CustomersModern() {
                     <span className="text-sm">{latinToCyrillic("Ko'rish")}</span>
                   </button>
                   <button
+                    onClick={async () => {
+                      if (!confirm(latinToCyrillic('Rostdan ham ushbu mijozni o\'chirmoqchimisiz?'))) return;
+                      try {
+                        await api.delete(`/customers/${customer.id}`);
+                        setCustomers(customers.filter(c => c.id !== customer.id));
+                        alert(latinToCyrillic('Mijoz muvaffaqiyatli o\'chirildi!'));
+                      } catch (error) {
+                        alert(latinToCyrillic('Mijozni o\'chirishda xatolik yuz berdi!'));
+                      }
+                    }}
                     className="btn-gradient-danger p-2 flex items-center justify-center"
                     aria-label="Mijozni o'chirish"
                   >
@@ -675,72 +811,71 @@ export default function CustomersModern() {
             <div className="glass-card p-6 w-full max-w-md mx-4 rounded-2xl">
               <h3 className="text-xl font-bold mb-4">{latinToCyrillic("Yangi mijoz qo'shish")}</h3>
               
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">{latinToCyrillic("Ism")}</label>
-                  <input
-                    type="text"
-                    value={newCustomer.name}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder={latinToCyrillic("Mijoz ismi")}
-                  />
-                </div>
+              <ValidatedForm
+                schema={customerSchema}
+                defaultValues={{
+                  name: '',
+                  phone: '',
+                  email: '',
+                  address: '',
+                  category: 'NORMAL'
+                }}
+                onSubmit={handleAddCustomer}
+                loading={customerFormLoading}
+                error={customerFormError}
+                success={customerFormSuccess}
+              >
+                <FormField
+                  name="name"
+                  label={latinToCyrillic("Ism")}
+                  placeholder={latinToCyrillic("Mijoz ismi")}
+                  required
+                />
                 
-                <div>
-                  <label className="block text-sm font-medium mb-1">{latinToCyrillic("Telefon")}</label>
-                  <input
-                    type="tel"
-                    value={newCustomer.phone}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="+998901234567"
-                  />
-                </div>
+                <FormField
+                  name="phone"
+                  label={latinToCyrillic("Telefon")}
+                  type="tel"
+                  placeholder="+998901234567"
+                  required
+                />
                 
-                <div>
-                  <label className="block text-sm font-medium mb-1">{latinToCyrillic("Manzil")}</label>
-                  <input
-                    type="text"
-                    value={newCustomer.address}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder={latinToCyrillic("Manzil (ixtiyoriy)")}
-                  />
-                </div>
+                <FormField
+                  name="email"
+                  label={latinToCyrillic("Email")}
+                  type="email"
+                  placeholder={latinToCyrillic("Email (ixtiyoriy)")}
+                />
                 
-                <div>
-                  <label htmlFor="customer-category" className="block text-sm font-medium mb-1">{latinToCyrillic("Kategoriya")}</label>
-                  <select
-                    id="customer-category"
-                    value={newCustomer.category}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, category: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="NORMAL">{latinToCyrillic("Oddiy")}</option>
-                    <option value="VIP">VIP</option>
-                    <option value="WHOLESALE">{latinToCyrillic("Ulgurji")}</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={handleAddCustomer}
-                  className="btn-gradient-primary flex-1"
-                >
-                  {latinToCyrillic("Qo'shish")}
-                </button>
-                <button
-                  onClick={() => {
+                <FormField
+                  name="address"
+                  label={latinToCyrillic("Manzil")}
+                  placeholder={latinToCyrillic("Manzil (ixtiyoriy)")}
+                />
+                
+                <FormField
+                  name="category"
+                  label={latinToCyrillic("Kategoriya")}
+                  type="select"
+                  options={[
+                    { value: 'NORMAL', label: latinToCyrillic('Oddiy') },
+                    { value: 'VIP', label: 'VIP' },
+                    { value: 'PROBLEMATIC', label: latinToCyrillic('Muammodor') },
+                    { value: 'NEW', label: latinToCyrillic('Yangi') }
+                  ]}
+                />
+                
+                <FormActions
+                  onCancel={() => {
                     setShowAddForm(false);
-                    setNewCustomer({ name: '', phone: '', address: '', category: 'NORMAL' });
+                    setCustomerFormError(null);
+                    setCustomerFormSuccess(null);
                   }}
-                  className="btn flex-1 bg-gray-200 text-gray-700 hover:bg-gray-300"
-                >
-                  {latinToCyrillic("Bekor qilish")}
-                </button>
-              </div>
+                  submitText={latinToCyrillic("Qo'shish")}
+                  cancelText={latinToCyrillic("Bekor qilish")}
+                  loading={customerFormLoading}
+                />
+              </ValidatedForm>
             </div>
           </div>
         )}

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Search, 
   Filter, 
@@ -9,14 +9,19 @@ import {
   Calendar,
   User,
   Eye,
-  Download,
-  ArrowLeft,
   Plus,
   BarChart3,
-  Edit2
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw
 } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
+import api from '../lib/professionalApi';
+import { extractPaginatedData } from '../lib/apiHelpers';
 import ModernLayout from '../components/ModernLayout';
+import { TableSkeleton } from '../components/ui/LoadingSpinner';
+import { Button } from '../components/ui/Button';
+import { useToast, toast } from '../components/ui/Toast';
 
 interface Sale {
   id: string;
@@ -31,78 +36,96 @@ interface Sale {
 
 export default function SalesModern() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { addToast } = useToast();
   const [sales, setSales] = useState<Sale[]>([]);
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedPeriod, setSelectedPeriod] = useState('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const statuses = ['all', 'completed', 'pending', 'cancelled'];
   const periods = ['all', 'today', 'week', 'month', 'year'];
 
-  useEffect(() => {
-    const loadSales = async () => {
-      try {
-        setLoading(true);
-        
-        // Mock data for now
-        const mockSales: Sale[] = [
-          {
-            id: '1',
-            date: '2024-04-13',
-            customerName: 'Azizbek Karimov',
-            totalAmount: 1250000,
-            paymentType: 'cash',
-            status: 'completed',
-            items: 5,
-            cashier: 'Admin'
-          },
-          {
-            id: '2',
-            date: '2024-04-13',
-            customerName: 'Gulnora Sobirova',
-            totalAmount: 850000,
-            paymentType: 'card',
-            status: 'completed',
-            items: 3,
-            cashier: 'Admin'
-          },
-          {
-            id: '3',
-            date: '2024-04-12',
-            customerName: 'Jahongir To\'xtayev',
-            totalAmount: 2100000,
-            paymentType: 'cash',
-            status: 'pending',
-            items: 8,
-            cashier: 'Kassir'
-          },
-          {
-            id: '4',
-            date: '2024-04-11',
-            customerName: 'Dilfuza Rahmatova',
-            totalAmount: 650000,
-            paymentType: 'click',
-            status: 'completed',
-            items: 2,
-            cashier: 'Kassir'
-          }
-        ];
-        
-        setSales(mockSales);
-        
-      } catch (error) {
-        console.error('Error loading sales:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadSales = async (pageNum = 1) => {
+    try {
+      setLoading(true);
+      
+      const response = await api.get(`/sales?limit=${pageSize}&page=${pageNum}`);
+      
+      // Handle standardized API response format
+      const { data: salesData, pagination } = extractPaginatedData<any>(
+        response,
+        'sales',
+        []
+      );
+      
+      const mappedSales: Sale[] = salesData.map((s: any) => ({
+        id: s.id,
+        date: s.createdAt || s.date || new Date().toISOString().split('T')[0],
+        customerName: s.manualCustomerName || s.customer?.name || s.customerName || 'Noma\'lum',
+        totalAmount: s.totalAmount || s.amount || 0,
+        paymentType: s.paymentMethod || s.paymentType || 'cash',
+        status: s.paymentStatus?.toLowerCase() || 'completed',
+        items: s.itemCount || s.items?.length || 0,
+        cashier: s.user?.name || s.cashier?.name || s.cashierName || 'Admin'
+      }));
+      
+      setSales(mappedSales);
+      setTotalPages(pagination?.totalPages || 1);
+      setTotal(pagination?.total || 0);
+      
+    } catch (error) {
+      console.error('Sotuvlarni yuklashda xatolik:', error);
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Sotuvlarni yuklashda xatolik yuz berdi')));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
-    loadSales();
-  }, []);
-
+  // Sahifa pathname o'zgarganda sotuvlarni yangilash
   useEffect(() => {
+    loadSales(1);
+    setPage(1);
+  }, [location.pathname]);
+
+  // Page o'zgarganda sotuvlarni yangilash
+  useEffect(() => {
+    if (page > 1) {
+      loadSales(page);
+    }
+  }, [page]);
+
+  // Page size o'zgarganda sotuvlarni yangilash
+  useEffect(() => {
+    setPage(1);
+    loadSales(1);
+  }, [pageSize]);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadSales(page);
+  };
+
+  // Memoized filtered sales for better performance
+  const memoizedFilteredSales = useMemo(() => {
     let filtered = sales;
     
     // Filter by status
@@ -112,39 +135,58 @@ export default function SalesModern() {
     
     // Filter by period
     if (selectedPeriod !== 'all') {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const today = new Date();
+      const saleDate = new Date();
       
-      filtered = filtered.filter(sale => {
-        const saleDate = new Date(sale.date);
-        
-        switch (selectedPeriod) {
-          case 'today':
+      switch (selectedPeriod) {
+        case 'today':
+          filtered = filtered.filter(sale => {
+            saleDate.setTime(new Date(sale.date).getTime());
             return saleDate.toDateString() === today.toDateString();
-          case 'week':
-            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          });
+          break;
+        case 'week':
+          const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+          filtered = filtered.filter(sale => {
+            saleDate.setTime(new Date(sale.date).getTime());
             return saleDate >= weekAgo;
-          case 'month':
-            return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
-          case 'year':
-            return saleDate.getFullYear() === now.getFullYear();
-          default:
-            return true;
-        }
-      });
+          });
+          break;
+        case 'month':
+          const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+          filtered = filtered.filter(sale => {
+            saleDate.setTime(new Date(sale.date).getTime());
+            return saleDate >= monthAgo;
+          });
+          break;
+        case 'year':
+          const yearAgo = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
+          filtered = filtered.filter(sale => {
+            saleDate.setTime(new Date(sale.date).getTime());
+            return saleDate >= yearAgo;
+          });
+          break;
+      }
     }
     
-    // Filter by search term
-    if (searchTerm) {
+    // Search (using debounced term)
+    if (debouncedSearchTerm) {
+      const searchLower = debouncedSearchTerm.toLowerCase();
       filtered = filtered.filter(sale => 
-        sale.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sale.id.includes(searchTerm) ||
-        sale.paymentType.toLowerCase().includes(searchTerm.toLowerCase())
+        sale.customerName.toLowerCase().includes(searchLower) ||
+        sale.totalAmount.toString().includes(debouncedSearchTerm) ||
+        sale.paymentType.toLowerCase().includes(searchLower) ||
+        sale.cashier.toLowerCase().includes(searchLower)
       );
     }
     
-    setFilteredSales(filtered);
-  }, [sales, selectedStatus, selectedPeriod, searchTerm]);
+    return filtered;
+  }, [sales, selectedStatus, selectedPeriod, debouncedSearchTerm]);
+
+  // Update filtered sales state when memoized value changes
+  useEffect(() => {
+    setFilteredSales(memoizedFilteredSales);
+  }, [memoizedFilteredSales]);
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
@@ -250,15 +292,25 @@ export default function SalesModern() {
             </div>
           </div>
           
-          {/* Add Sale Button */}
-          <button
-            type="button"
-            onClick={() => navigate('/cashier/sales/add-simple')}
-            className="btn-gradient-primary px-6 py-3 flex items-center gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            {latinToCyrillic("Янги Сотув")}
-          </button>
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            <Button
+              variant="secondary"
+              onClick={handleRefresh}
+              isLoading={refreshing}
+              loadingText={latinToCyrillic("Yangilanmoqda...")}
+              leftIcon={<RefreshCw className="w-4 h-4" />}
+            >
+              {latinToCyrillic("Yangilash")}
+            </Button>
+            
+            <Button
+              onClick={() => navigate('/cashier/sales/add')}
+              leftIcon={<Plus className="w-4 h-4" />}
+            >
+              {latinToCyrillic("Янги Сотув")}
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -321,13 +373,8 @@ export default function SalesModern() {
 
         {/* Loading State */}
         {loading && (
-          <div className="glass-card-light p-12">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16">
-                <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
-              </div>
-              <p className="text-lg font-semibold text-primary mb-4">{latinToCyrillic("Хатолик Юз Берди")}</p>
-            </div>
+          <div className="glass-card-light p-6">
+            <TableSkeleton rows={10} cols={8} />
           </div>
         )}
 
@@ -384,7 +431,7 @@ export default function SalesModern() {
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => navigate(`/sales/${sale.id}`)}
+                            onClick={() => alert(`Sotuv ID: ${sale.id}\nMijoz: ${sale.customerName}\nSumma: ${sale.totalAmount.toLocaleString()} UZS\nSana: ${sale.date}`)}
                             className="btn-gradient-secondary p-1"
                             aria-label="Sotuvni ko'rish"
                           >
@@ -392,11 +439,11 @@ export default function SalesModern() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => navigate(`/sales/${sale.id}/edit`)}
+                            onClick={() => navigate('/cashier/sales/add')}
                             className="btn-gradient-primary p-1"
-                            aria-label="Sotuvni tahrirlash"
+                            aria-label="Yangi sotuv"
                           >
-                            <Edit2 className="w-4 h-4" />
+                            <Plus className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -404,6 +451,83 @@ export default function SalesModern() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!loading && filteredSales.length > 0 && (
+          <div className="flex items-center justify-between glass-card-light p-4">
+            <div className="flex items-center gap-4">
+              <p className="text-sm text-secondary">
+                {latinToCyrillic(`Jami: ${total} ta | Sahifa ${page}/${totalPages}`)}
+              </p>
+              
+              {/* Page Size Selector */}
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span className="text-sm text-secondary">
+                {latinToCyrillic('ta/sahifa')}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1 || loading}
+                leftIcon={<ChevronLeft className="w-4 h-4" />}
+              >
+                {latinToCyrillic('Oldingi')}
+              </Button>
+              
+              {/* Page Number Buttons */}
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (page <= 3) {
+                    pageNum = i + 1;
+                  } else if (page >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = page - 2 + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPage(pageNum)}
+                      className={`w-8 h-8 text-sm font-medium rounded ${
+                        pageNum === page
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages || loading}
+                rightIcon={<ChevronRight className="w-4 h-4" />}
+              >
+                {latinToCyrillic('Keyingi')}
+              </Button>
             </div>
           </div>
         )}
