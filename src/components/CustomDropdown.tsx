@@ -174,6 +174,8 @@ export default function CustomDropdown({
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 transition-transform group-focus-within:rotate-180"
+          aria-label={isOpen ? 'Yopish' : 'Ochish'}
+          title={isOpen ? 'Yopish' : 'Ochish'}
         >
           <ChevronDown className="w-4 h-4" />
         </button>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../lib/api';
+import api from '../lib/professionalApi';
 import { ArrowLeft, Plus, Package, Save } from 'lucide-react';
 
 export default function CashierAddStock() {
@@ -18,7 +18,8 @@ export default function CashierAddStock() {
   const loadProducts = async () => {
     try {
       const response = await api.get('/products');
-      setProducts(response.data);
+      // ✅ Handle new API response format
+      setProducts(response.data?.data || response.data);
     } catch (error) {
       console.error('Mahsulotlarni yuklashda xatolik:', error);
       setMessage('❌ Mahsulotlarni yuklashda xatolik!');

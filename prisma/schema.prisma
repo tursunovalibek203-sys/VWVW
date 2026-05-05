@@ -128,7 +128,7 @@ model Customer {
 
 model Sale {
   id             String   @id @default(uuid())
-  receiptNumber  Int      @default(0) // Ketma-ket chek raqami
+  receiptNumber  Int      @default(autoincrement()) @unique // Ketma-ket chek raqami (unique, auto-increment)
   customerId     String?
   customer       Customer? @relation(fields: [customerId], references: [id])
   productId      String?
@@ -143,6 +143,7 @@ model Sale {
   totalAmount    Float
   paidAmount     Float    @default(0)
   currency       String   @default("USD") // USD asosiy valyuta
+  paymentMethod  String   @default("CASH") // CASH, CARD, CLICK
   paymentStatus  String   @default("UNPAID") // PAID, PARTIAL, UNPAID
   paymentDetails String?  // JSON: {uzs, usd, eur}
   driverPaymentStatus String @default("PENDING") // PENDING, COLLECTED, DELIVERED
@@ -318,10 +319,16 @@ model CashierShift {
   userId          String
   openingBalance  Float
   closingBalance  Float?
+  // UZS sales
   cashSales       Float    @default(0)
   cardSales       Float    @default(0)
   clickSales      Float    @default(0)
   totalSales      Float    @default(0)
+  // USD sales
+  cashSalesUSD    Float    @default(0)
+  cardSalesUSD    Float    @default(0)
+  clickSalesUSD   Float    @default(0)
+  totalSalesUSD   Float    @default(0)
   shortage        Float    @default(0)
   overage         Float    @default(0)
   startTime       DateTime @default(now())
@@ -866,20 +873,28 @@ model ProductionTask {
 
 // Mashina (Transport)
 model Vehicle {
-  id              String   @id @default(uuid())
-  plateNumber     String   @unique // Davlat raqami
-  type            String   // TRUCK, VAN, CAR
-  model           String   // Mashina modeli
-  capacity        Float    // Yuk sig'imi (kg)
-  status          String   @default("AVAILABLE") // AVAILABLE, IN_USE, MAINTENANCE, OUT_OF_SERVICE
-  fuelType        String   // PETROL, DIESEL, GAS, ELECTRIC
+  id              String    @id @default(uuid())
+  name            String    // Mashina nomi (masalan: "Yuk mashina 01")
+  plateNumber     String    @unique // Davlat raqami
+  type            String    // TRUCK, VAN, CAR
+  model           String    // Mashina modeli
+  capacity        Float     // Yuk sig'imi (kg)
+  status          String    @default("AVAILABLE") // AVAILABLE, IN_USE, MAINTENANCE, OUT_OF_SERVICE
+  active          Boolean   @default(true) // Faol/yangi holat
+  fuelType        String    // PETROL, DIESEL, GAS, ELECTRIC
   lastMaintenance DateTime?
   notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Haydovchi ID (ixtiyoriy)
+  driverId        String?
 
   deliveriesNew   DeliveryNew[]
   expenses        VehicleExpense[]
+
+  @@index([driverId])
+  @@index([active])
 }
 
 // Haydovchi (yangi)
@@ -960,20 +975,23 @@ model VehicleExpense {
 
 // Kassa tranzaksiyalari
 model CashboxTransaction {
-  id          String   @id @default(uuid())
-  type        String   // INCOME, EXPENSE
-  amount      Float
-  category    String   // SALE, PAYMENT, EXPENSE, ADJUSTMENT, OTHER
-  description String?
-  userId      String
-  userName    String
-  reference   String?  // Sale ID, Payment ID, etc.
-  createdAt   DateTime @default(now())
+  id            String   @id @default(uuid())
+  type          String   // INCOME, EXPENSE
+  amount        Float
+  currency      String   @default("UZS") // UZS, USD
+  category      String   // SALE, PAYMENT, EXPENSE, ADJUSTMENT, OTHER
+  paymentMethod String   @default("CASH") // CASH, CARD, CLICK
+  description   String?
+  userId        String
+  userName      String
+  reference     String?  // Sale ID, Payment ID, etc.
+  createdAt     DateTime @default(now())
 
   @@index([type])
   @@index([category])
   @@index([userId])
   @@index([createdAt])
+  @@index([paymentMethod])
 }
 
 // Mijoz bilan chat
@@ -1646,3 +1664,28 @@ model KitSale {
   @@index([kitId])
   @@index([customerId])
 }
+
+// ============ LOAN (QARZ) SYSTEM ============
+
+model Loan {
+  id                String   @id @default(uuid())
+  employeeName      String   // Xodim ismi
+  employeeId        String?  // Xodim ID (agar bor bo'lsa)
+  amount            Float    // Qarz summasi
+  currency          String   @default("UZS") // Valyuta
+  purpose           String?  // Qarz maqsadi
+  loanDate          DateTime @default(now()) // Berilgan sana
+  dueDate           DateTime? // Qaytarish sanasi
+  repaymentType     String   @default("SALARY_DEDUCTION") // Qaytarish turi
+  monthlyDeduction  Float?   // Oylik ushlab qolish summasi
+  notes             String?  // Izohlar
+  remainingAmount   Float    // Qolgan qarz summasi
+  status            String   @default("ACTIVE") // ACTIVE, PAID, CANCELLED
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([loanDate])
+}
+

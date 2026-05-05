@@ -45,6 +45,7 @@ import type { Order, Customer, Product } from '../types';
 export default function Orders() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const isCashier = window.location.pathname.startsWith('/cashier');
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -53,7 +54,7 @@ export default function Orders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  
+ 
   // Advanced filters
   const [advancedFilters, setAdvancedFilters] = useState({
     dateRange: 'all' as 'all' | 'today' | 'week' | 'month',
@@ -181,8 +182,9 @@ export default function Orders() {
       }
       
       setOrders(ordersRes.data);
-      setCustomers(customersRes.data);
-      setProducts(productsRes.data);
+      // ✅ Handle new API response format
+      setCustomers(customersRes.data?.data || customersRes.data || []);
+      setProducts(productsRes.data?.data || productsRes.data || []);
       
       console.log('✅ Data loaded and state updated');
     } catch (error) {
@@ -499,10 +501,10 @@ export default function Orders() {
       }
       
       // To'g'ridan-to'g'ri sotuv sahifasiga yo'naltirish
-      navigate('/cashier/sales/add', { 
-        state: { 
-          orderData: selectedOrder 
-        } 
+      navigate('/cashier/sales/add', {
+        state: {
+          orderData: selectedOrder
+        }
       });
       
       setShowPaymentModal(false);
@@ -803,8 +805,8 @@ ID: SLS-${selectedOrder.id}
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <Package className="w-16 h-16 text-primary mx-auto mb-4 animate-pulse" />
-          <p className="text-lg font-semibold">Yuklanmoqda...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto mb-4"></div>
+          <p className="text-lg font-semibold text-gray-700">{t('Yuklanmoqda...')}</p>
         </div>
       </div>
     );

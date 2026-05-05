@@ -1,6 +1,6 @@
-import { initSuperCustomerBot } from './super-customer-bot';
 import { DriverBotManager } from './driver-bot';
 import { initAdminBot } from './admin-bot';
+import { initCustomerBot } from './customer-bot';
 
 export class BotManager {
   private static instance: BotManager;
@@ -22,7 +22,7 @@ export class BotManager {
       // 1. Mijoz Bot (Customer Bot)
       if (process.env.TELEGRAM_CUSTOMER_BOT_TOKEN) {
         try {
-          const customerBot = initSuperCustomerBot();
+          const customerBot = initCustomerBot();
           if (customerBot) {
             this.bots.set('customer', customerBot);
             console.log('✅ Mijoz Bot ishga tushdi (@luxpetplastbot)');
@@ -193,7 +193,7 @@ export class BotManager {
         let newBot;
         switch (botName) {
           case 'customer':
-            newBot = initSuperCustomerBot();
+            newBot = initCustomerBot();
             break;
           case 'driver':
             newBot = DriverBotManager.initDriverBot('default', process.env.TELEGRAM_DRIVER_BOT_TOKEN || '');

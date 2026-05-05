@@ -1,65 +1,8 @@
-// Polyfill for Buffer in browser
+// Polyfill for Buffer in browser (only for modules that need it)
 import { Buffer } from 'buffer'
+(window as any).Buffer = Buffer
 
-// Buffer ni ko'p joyda qo'shamiz
-;(globalThis as any).Buffer = Buffer
-;(globalThis as any).global = globalThis
-
-// Node.js modullari uchun mocklar
-if (typeof (globalThis as any).require === 'undefined') {
-  ;(globalThis as any).require = (id: string) => {
-    console.log('Mock require:', id)
-    return {}
-  }
-}
-
-// Mock for FastText to prevent import errors
-;(globalThis as any).FastText = {
-  loadModel: async () => ({
-    getWordVector: () => [],
-    getSentenceVector: () => [],
-    getNearestNeighbors: () => [],
-  }),
-}
-
-// Mock for FastEmbed to prevent import errors
-;(globalThis as any).FastEmbed = {
-  init: async () => ({
-    embed: async () => [],
-    embedBatch: async () => [],
-  }),
-}
-
-// Mock for Node.js modules to prevent import errors
-;(globalThis as any).fs = {
-  readFile: async () => Buffer.from(''),
-  writeFile: async () => {},
-  createReadStream: () => ({
-    on: () => {},
-    pipe: () => {},
-  }),
-  createWriteStream: () => ({
-    on: () => {},
-    write: () => true,
-    end: () => {},
-  }),
-  promises: {
-    readFile: async () => Buffer.from(''),
-    writeFile: async () => {},
-  },
-}
-
-;(globalThis as any)['node:fs'] = (globalThis as any).fs
-
-;(globalThis as any).path = {
-  resolve: (...args: any[]) => args.join('/'),
-  join: (...args: any[]) => args.join('/'),
-  basename: (path: any) => path.split('/').pop(),
-}
-
-// Note: crypto already exists in browser, we can't override it
-// Node.js crypto methods will be handled by mocks
-
+// React imports
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'

@@ -1,182 +1,103 @@
-import { prisma } from '../server/utils/prisma';
+import { PrismaClient } from '@prisma/client';
 
-async function addCapsAndHandlesProducts() {
-  console.log('Adding caps and handles products...');
-  
-  try {
-    // First, let's check existing product types and categories
-    const productTypes = await prisma.productType.findMany();
-    const productCategories = await prisma.productCategory.findMany();
-    const productSizes = await prisma.productSize.findMany();
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log('🌱 Qopqoq va tutqich mahsulotlarini qo\'shish...');
+
+  const products = [
+    // 28mm Qopqoqlar (Кришка) - 5,000 dona
+    { name: 'Кришка 28 кук газ', pricePerBag: 5000, unitsPerBag: 5000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 28 галубой газ', pricePerBag: 5000, unitsPerBag: 5000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 28 сарик газ', pricePerBag: 5000, unitsPerBag: 5000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 28 яшил газ', pricePerBag: 5000, unitsPerBag: 5000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 28 кизил газ', pricePerBag: 5000, unitsPerBag: 5000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 28 ок', pricePerBag: 5000, unitsPerBag: 5000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 28 кора газ', pricePerBag: 5000, unitsPerBag: 5000, bagType: 'Qopqoq', currentStock: 100 },
     
-    console.log('Existing product types:', productTypes.map(t => t.name));
-    console.log('Existing product categories:', productCategories.map(c => c.name));
-    console.log('Existing product sizes:', productSizes.map(s => s.name));
+    // 38mm Qopqoqlar (Кришка) - 3,000 dona
+    { name: 'Кришка 38 сарик', pricePerBag: 3000, unitsPerBag: 3000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 38 ок', pricePerBag: 3000, unitsPerBag: 3000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 38 кук', pricePerBag: 3000, unitsPerBag: 3000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 38 яшил', pricePerBag: 3000, unitsPerBag: 3000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 38 кизил', pricePerBag: 3000, unitsPerBag: 3000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 38 олов ранг', pricePerBag: 3000, unitsPerBag: 3000, bagType: 'Qopqoq', currentStock: 100 },
     
-    // Find or create necessary types, categories, and sizes
-    let capsType = productTypes.find(t => t.name === 'Qopqoq');
-    let handlesType = productTypes.find(t => t.name === 'Ruchka');
-    let dkmCategory = productCategories.find(c => c.name === 'DKM');
-    let standardCategory = productCategories.find(c => c.name === 'Standard');
+    // 48mm Qopqoqlar (Кришка) - 1,000 dona
+    { name: 'Кришка 48 кук', pricePerBag: 1000, unitsPerBag: 1000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 48 галубой', pricePerBag: 1000, unitsPerBag: 1000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 48 сарик', pricePerBag: 1000, unitsPerBag: 1000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 48 Доня', pricePerBag: 1000, unitsPerBag: 1000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 48 Бекажон', pricePerBag: 1000, unitsPerBag: 1000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 48 яшил', pricePerBag: 1000, unitsPerBag: 1000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 48 апелсин', pricePerBag: 1000, unitsPerBag: 1000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 48 кизил', pricePerBag: 1000, unitsPerBag: 1000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 48 сайхун', pricePerBag: 1000, unitsPerBag: 1000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 48 салат', pricePerBag: 1000, unitsPerBag: 1000, bagType: 'Qopqoq', currentStock: 100 },
+    { name: 'Кришка 48 ок', pricePerBag: 1000, unitsPerBag: 1000, bagType: 'Qopqoq', currentStock: 100 },
     
-    // Create types if they don't exist
-    if (!capsType) {
-      capsType = await prisma.productType.create({
-        data: { name: 'Qopqoq' }
-      });
-      console.log('Created Qopqoq type');
-    }
-    
-    if (!handlesType) {
-      handlesType = await prisma.productType.create({
-        data: { name: 'Ruchka' }
-      });
-      console.log('Created Ruchka type');
-    }
-    
-    if (!dkmCategory) {
-      dkmCategory = await prisma.productCategory.create({
-        data: { 
-          name: 'DKM',
-          productTypeId: capsType.id
+    // 48mm Tutqichlar (Ручка) - 1,500 dona
+    { name: 'Ручка 48 кук', pricePerBag: 1500, unitsPerBag: 1500, bagType: 'Ruchka', currentStock: 100 },
+    { name: 'Ручка 48 сарик', pricePerBag: 1500, unitsPerBag: 1500, bagType: 'Ruchka', currentStock: 100 },
+    { name: 'Ручка 48 яшил', pricePerBag: 1500, unitsPerBag: 1500, bagType: 'Ruchka', currentStock: 100 },
+    { name: 'Ручка 48 кизил', pricePerBag: 1500, unitsPerBag: 1500, bagType: 'Ruchka', currentStock: 100 },
+    { name: 'Ручка 48 олов ранг', pricePerBag: 1500, unitsPerBag: 1500, bagType: 'Ruchka', currentStock: 100 },
+    { name: 'Ручка 48 ок', pricePerBag: 1500, unitsPerBag: 1500, bagType: 'Ruchka', currentStock: 100 },
+    { name: 'Ручка 48 хаво ранг', pricePerBag: 1500, unitsPerBag: 1500, bagType: 'Ruchka', currentStock: 100 },
+    { name: 'Ручка 48 жигар ранг', pricePerBag: 1500, unitsPerBag: 1500, bagType: 'Ruchka', currentStock: 100 },
+  ];
+
+  let created = 0;
+  let updated = 0;
+
+  for (const product of products) {
+    const existing = await prisma.product.findUnique({
+      where: { name: product.name }
+    });
+
+    if (existing) {
+      await prisma.product.update({
+        where: { name: product.name },
+        data: {
+          pricePerBag: product.pricePerBag,
+          unitsPerBag: product.unitsPerBag,
+          bagType: product.bagType,
+          currentStock: product.currentStock,
+          currentUnits: product.currentStock * product.unitsPerBag,
+          minStockLimit: 20,
+          optimalStock: 150,
+          maxCapacity: 500
         }
       });
-      console.log('Created DKM category');
-    }
-    
-    if (!standardCategory) {
-      standardCategory = await prisma.productCategory.create({
-        data: { 
-          name: 'Standard',
-          productTypeId: capsType.id
+      updated++;
+    } else {
+      await prisma.product.create({
+        data: {
+          ...product,
+          currentUnits: product.currentStock * product.unitsPerBag,
+          minStockLimit: 20,
+          optimalStock: 150,
+          maxCapacity: 500
         }
       });
-      console.log('Created Standard category');
+      created++;
     }
-    
-    // Create sizes if they don't exist
-    const sizes = ['28mm', '38mm', '48mm', '55mm'];
-    const createdSizes = {};
-    
-    for (const sizeName of sizes) {
-      let size = productSizes.find(s => s.name === sizeName);
-      if (!size) {
-        size = await prisma.productSize.create({
-          data: { name: sizeName }
-        });
-        console.log(`Created ${sizeName} size`);
-      }
-      createdSizes[sizeName] = size;
-    }
-    
-    // 28mm Products
-    console.log('\n=== Creating 28mm Products ===');
-    
-    // 28mm Caps - Standard (6000 dona)
-    const caps28mm = [
-      { name: 'Qopqoq 28 Ko\'k gaz', category: standardCategory.id, stock: 6000 },
-      { name: 'Qopqoq 28 Havo rang (Galuboy) gaz', category: standardCategory.id, stock: 6000 },
-      { name: 'Qopqoq 28 Sariq gaz', category: standardCategory.id, stock: 6000 },
-      { name: 'Qopqoq 28 Yashil gaz', category: standardCategory.id, stock: 6000 },
-      { name: 'Qopqoq 28 Qizil gaz', category: standardCategory.id, stock: 6000 },
-      { name: 'Qopqoq 28 Oq', category: standardCategory.id, stock: 6000 },
-      { name: 'Qopqoq 28 Qora gaz', category: standardCategory.id, stock: 6000 }
-    ];
-    
-    // 28mm Caps - DKM
-    const caps28mmDkm = [
-      { name: 'Qopqoq 28 DKM Sariq', category: dkmCategory.id, stock: 4000 },
-      { name: 'Qopqoq 28 DKM Ko\'k', category: dkmCategory.id, stock: 10000 },
-      { name: 'Qopqoq 28 DKM Ko\'k (2)', category: dkmCategory.id, stock: 6000 },
-      { name: 'Qopqoq 28 DKM Yashil', category: dkmCategory.id, stock: 4000 }
-    ];
-    
-    // 28mm Handles
-    const handles28mm = [
-      { name: 'Ruchka 28 Sariq', category: standardCategory.id, stock: 1500 },
-      { name: 'Ruchka 28 Sariq (2)', category: standardCategory.id, stock: 2500 }
-    ];
-    
-    // Create 28mm products
-    for (const product of [...caps28mm, ...caps28mmDkm]) {
-      const existingProduct = await prisma.product.findFirst({
-        where: { name: product.name }
-      });
-      
-      if (!existingProduct) {
-        const newProduct = await prisma.product.create({
-          data: {
-            name: product.name,
-            typeId: capsType.id,
-            categoryId: product.category,
-            sizeId: createdSizes['28mm'].id,
-            currentStock: product.stock,
-            currentUnits: product.stock,
-            pricePerBag: 1000, // Default price
-            unitsPerBag: product.stock
-          }
-        });
-        
-        // Create stock movement
-        await prisma.stockMovement.create({
-          data: {
-            productId: newProduct.id,
-            type: 'IN',
-            quantity: product.stock,
-            units: product.stock,
-            notes: 'Initial stock'
-          }
-        });
-        
-        console.log(`Created: ${product.name} - Stock: ${product.stock}`);
-      } else {
-        console.log(`Already exists: ${product.name}`);
-      }
-    }
-    
-    for (const product of handles28mm) {
-      const existingProduct = await prisma.product.findFirst({
-        where: { name: product.name }
-      });
-      
-      if (!existingProduct) {
-        const newProduct = await prisma.product.create({
-          data: {
-            name: product.name,
-            typeId: handlesType.id,
-            categoryId: product.category,
-            sizeId: createdSizes['28mm'].id,
-            currentStock: product.stock,
-            currentUnits: product.stock,
-            pricePerBag: 500, // Default price for handles
-            unitsPerBag: product.stock
-          }
-        });
-        
-        // Create stock movement
-        await prisma.stockMovement.create({
-          data: {
-            productId: newProduct.id,
-            type: 'IN',
-            quantity: product.stock,
-            units: product.stock,
-            notes: 'Initial stock'
-          }
-        });
-        
-        console.log(`Created: ${product.name} - Stock: ${product.stock}`);
-      } else {
-        console.log(`Already exists: ${product.name}`);
-      }
-    }
-    
-    console.log('\n=== 28mm Products Completed ===');
-    
-  } catch (error) {
-    console.error('Error adding products:', error);
-  } finally {
-    await prisma.$disconnect();
   }
+
+  console.log(`✅ ${created} ta yangi mahsulot qo'shildi`);
+  console.log(`✅ ${updated} ta mahsulot yangilandi`);
+  console.log(`🎉 Jami: ${products.length} ta mahsulot`);
+  console.log(`   - 28mm Qopqoqlar: 7 ta`);
+  console.log(`   - 38mm Qopqoqlar: 6 ta`);
+  console.log(`   - 48mm Qopqoqlar: 11 ta`);
+  console.log(`   - 48mm Tutqichlar: 8 ta`);
 }
 
-addCapsAndHandlesProducts();
+main()
+  .catch((e) => {
+    console.error('❌ Xatolik:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

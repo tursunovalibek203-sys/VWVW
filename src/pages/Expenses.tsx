@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import Button from '../components/Button';   
 import Input from '../components/Input';
-import api from '../lib/api';
+import api from '../lib/professionalApi';
 import { formatCurrency, formatDate } from '../lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { 
@@ -319,6 +319,8 @@ export default function Expenses() {
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.2em]">{t("Barcha maydonlarni to'ldiring")}</p>
               </div>
               <button 
+                title="Yopish"
+                aria-label="Yopish"
                 onClick={() => setShowForm(false)} 
                 className="w-12 h-12 flex items-center justify-center rounded-lg bg-white dark:bg-gray-900 text-gray-400 hover:text-rose-500 hover:rotate-90 transition-all shadow-sm border border-gray-100 dark:border-gray-800"
               >
@@ -383,6 +385,8 @@ export default function Expenses() {
                   <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.2em] ml-1">{t("Valyuta")}</label>
                   <div className="relative">
                     <select
+                      title="Valyutani tanlash"
+                      aria-label="Valyutani tanlash"
                       value={form.currency}
                       onChange={(e) => setForm({ ...form, currency: e.target.value })}
                       className="w-full h-16 rounded-lg border-2 border-gray-50 dark:bg-gray-800 dark:border-gray-800 px-6 font-bold text-base focus:border-rose-500 outline-none transition-all appearance-none cursor-pointer"

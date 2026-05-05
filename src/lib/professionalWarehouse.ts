@@ -45,6 +45,49 @@ export enum Priority {
   CRITICAL = 'critical',
 }
 
+// Warehouse Zone
+export interface WarehouseZone {
+  id: string;
+  name: string;
+  type: 'storage' | 'picking' | 'packing' | 'shipping' | 'receiving';
+  temperature: {
+    min: number;
+    max: number;
+    current?: number;
+  };
+  humidity: {
+    min: number;
+    max: number;
+    current?: number;
+  };
+  security: 'low' | 'medium' | 'high';
+  access: {
+    required: boolean;
+    authorized: string[];
+  };
+}
+
+// Warehouse Equipment
+export interface WarehouseEquipment {
+  id: string;
+  type: 'forklift' | 'pallet_jack' | 'conveyor' | 'crane' | 'shelving';
+  name: string;
+  status: 'available' | 'in_use' | 'maintenance' | 'out_of_service';
+  location?: string;
+  capacity?: number;
+  lastMaintenance?: Date;
+}
+
+// Warehouse Staff
+export interface WarehouseStaff {
+  id: string;
+  name: string;
+  role: 'manager' | 'supervisor' | 'operator' | 'picker' | 'packer';
+  shift: 'day' | 'night' | 'flexible';
+  status: 'active' | 'inactive' | 'on_leave';
+  certifications: string[];
+}
+
 // Warehouse Information
 export interface Warehouse {
   id: string;
@@ -73,43 +116,9 @@ export interface Warehouse {
     maxWeight: number; // kg
     currentWeight: number; // kg
   };
-  zones: Array<{
-    id: string;
-    name: string;
-    type: 'storage' | 'picking' | 'packing' | 'shipping' | 'receiving';
-    temperature: {
-      min: number;
-      max: number;
-      current?: number;
-    };
-    humidity: {
-      min: number;
-      max: number;
-      current?: number;
-    };
-    security: 'low' | 'medium' | 'high';
-    access: {
-      required: boolean;
-      authorized: string[];
-    };
-  }>;
-  equipment: Array<{
-    id: string;
-    type: 'forklift' | 'pallet_jack' | 'conveyor' | 'crane' | 'shelving';
-    name: string;
-    status: 'available' | 'in_use' | 'maintenance' | 'out_of_service';
-    location?: string;
-    capacity?: number;
-    lastMaintenance?: Date;
-  }>;
-  staff: Array<{
-    id: string;
-    name: string;
-    role: 'manager' | 'supervisor' | 'operator' | 'picker' | 'packer';
-    shift: 'day' | 'night' | 'flexible';
-    status: 'active' | 'inactive' | 'on_leave';
-    certifications: string[];
-  }>;
+  zones: WarehouseZone[];
+  equipment: WarehouseEquipment[];
+  staff: WarehouseStaff[];
   operatingHours: {
     monday: { open: string; close: string };
     tuesday: { open: string; close: string };

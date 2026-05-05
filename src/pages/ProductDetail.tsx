@@ -4,29 +4,30 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import Modal from '../components/Modal';
-import api from '../lib/api';
-import { formatDateTime, formatSmartDate, formatRelativeTime } from '../lib/dateUtils';
+import api from '../lib/professionalApi';
+import { extractData, extractArray } from '../lib/apiHelpers';
 import { 
   Package, 
   Plus,
   Minus, 
   ArrowLeft, 
-  History,
   TrendingUp,
-  TrendingDown,
   AlertCircle,
   CheckCircle,
-  Clock,
   Settings,
   DollarSign,
   ShoppingCart,
   BarChart3,
-  Users
+  Users,
+  Puzzle,
+  X,
+  Search
 } from 'lucide-react';
 
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const isCashier = window.location.pathname.startsWith('/cashier');
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showPriceModal, setShowPriceModal] = useState(false);
@@ -55,6 +56,12 @@ export default function ProductDetail() {
     pricePerPiece: '',
   });
 
+  // Komplekt state
+  const [showKomplektModal, setShowKomplektModal] = useState(false);
+  const [komplektItems, setKomplektItems] = useState<Array<{productId: string, productName: string, quantity: number}>>([]);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [komplektSearch, setKomplektSearch] = useState('');
+
   useEffect(() => {
     loadProduct();
     loadExchangeRate();
@@ -63,18 +70,56 @@ export default function ProductDetail() {
   const loadExchangeRate = async () => {
     try {
       const response = await api.get('/settings');
-      if (response.data && response.data.USD_TO_UZS_RATE) {
-        setExchangeRates({ USD_TO_UZS: parseFloat(response.data.USD_TO_UZS_RATE) });
+      const settingsData = extractData<any>(response, {});
+      if (settingsData && settingsData.USD_TO_UZS_RATE) {
+        setExchangeRates({ USD_TO_UZS: parseFloat(settingsData.USD_TO_UZS_RATE) });
       }
     } catch (error) {
       console.error('Kursni yuklashda xatolik:', error);
     }
   };
 
+  const loadAllProducts = async () => {
+    try {
+      const response = await api.get('/products');
+      const productsData = extractArray<any>(response, []);
+      if (productsData.length > 0) {
+        // O'zidan boshqa mahsulotlarni filtrlash
+        const filtered = productsData.filter((p: any) => p.id !== id);
+        setAllProducts(filtered);
+      }
+    } catch (error) {
+      console.error('Mahsulotlarni yuklashda xatolik:', error);
+    }
+  };
+
+  const handleSaveKomplekt = async () => {
+    try {
+      // Komplektni saqlash
+      await api.post(`/products/${id}/komplekt`, {
+        items: komplektItems
+      });
+      
+      // Modalni yopish
+      setShowKomplektModal(false);
+      setKomplektItems([]);
+      setKomplektSearch('');
+      
+      // Mahsulotni qayta yuklash
+      loadProduct();
+      
+      alert('Komplekt muvaffaqiyatli saqlandi!');
+    } catch (error) {
+      console.error('Komplektni saqlashda xatolik:', error);
+      alert('Komplektni saqlashda xatolik yuz berdi');
+    }
+  };
+
   const loadProduct = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/products/${id}`);
+      const response = await api.get(`/products/${id}`);
+      const data = extractData<any>(response, null);
       setProduct(data);
       setSettingsForm({
         unitsPerBag: (data.unitsPerBag || '').toString(),
@@ -87,7 +132,7 @@ export default function ProductDetail() {
       // Sotuv statistikasini yuklash
       try {
         const salesResponse = await api.get(`/sales?productId=${id}`);
-        const sales = salesResponse.data;
+        const sales = extractArray<any>(salesResponse, []);
         
         // Statistikani hisoblash
         const totalSold = sales.reduce((sum: number, sale: any) => {
@@ -126,7 +171,7 @@ export default function ProductDetail() {
     try {
       await api.delete(`/products/${id}`);
       alert('✅ Mahsulot muvaffaqiyatli o\'chirildi!');
-      navigate('/products'); // Mahsulotlar sahifasiga qaytish
+      navigate(isCashier ? '/cashier/products' : '/products');
     } catch (error) {
       console.error('Mahsulotni o\'chirishda xatolik:', error);
       alert('❌ Xatolik yuz berdi!');
@@ -135,10 +180,22 @@ export default function ProductDetail() {
 
   const handleUpdateSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation
+    const pBag = parseFloat(settingsForm.pricePerBag);
+    const pPiece = parseFloat(settingsForm.pricePerPiece);
+    const units = parseInt(settingsForm.unitsPerBag);
+    
+    if (isNaN(units) || units <= 0) {
+      alert('Qopdagi donalar soni musbat bo\'lishi kerak');
+      return;
+    }
+    if (!isNaN(pBag) && pBag < 0) {
+      alert('Narx manfiy bo\'lishi mumkin emas');
+      return;
+    }
+    
     try {
-      const pBag = parseFloat(settingsForm.pricePerBag);
-      const pPiece = parseFloat(settingsForm.pricePerPiece);
-
       await api.put(`/products/${id}`, {
         unitsPerBag: parseInt(settingsForm.unitsPerBag),
         minStockLimit: parseInt(settingsForm.minStockLimit),
@@ -146,6 +203,7 @@ export default function ProductDetail() {
         pricePerBag: isNaN(pBag) ? 0 : pBag,
         pricePerPiece: isNaN(pPiece) ? 0 : pPiece,
       });
+      
       setShowSettingsModal(false);
       loadProduct();
       alert('✅ Sozlamalar yangilandi!');
@@ -160,57 +218,25 @@ export default function ProductDetail() {
     }
   };
 
-  const updatePriceLogic = (type: 'bag' | 'piece', currency: 'USD' | 'UZS', value: string) => {
-    const rawVal = value.replace(/[^0-9.]/g, '');
-    
-    // Agar bo'sh bo'lsa, shunchaki bo'sh qoldirish
-    if (rawVal === '' || rawVal === '.') {
-      if (type === 'bag') {
-        setSettingsForm(prev => ({ ...prev, pricePerBag: '' }));
-      } else {
-        setSettingsForm(prev => ({ ...prev, pricePerPiece: '' }));
-      }
-      return;
-    }
-    
-    const numVal = parseFloat(rawVal);
-    const upb = parseInt(settingsForm.unitsPerBag) || 1000;
-    const rate = exchangeRates.USD_TO_UZS;
-
-    let newPricePerBag = parseFloat(settingsForm.pricePerBag) || 0;
-    let newPricePerPiece = parseFloat(settingsForm.pricePerPiece) || 0;
-
-    if (type === 'bag') {
-      if (currency === 'USD') {
-        newPricePerBag = numVal * rate; // USD -> UZS
-      } else {
-        newPricePerBag = numVal; // UZS -> UZS
-      }
-      newPricePerPiece = newPricePerBag / upb;
-    } else {
-      if (currency === 'USD') {
-        newPricePerPiece = numVal * rate; // USD -> UZS
-      } else {
-        newPricePerPiece = numVal; // UZS -> UZS
-      }
-      newPricePerBag = newPricePerPiece * upb;
-    }
-
-    setSettingsForm(prev => ({
-      ...prev,
-      pricePerBag: newPricePerBag > 0 ? newPricePerBag.toString() : '',
-      pricePerPiece: newPricePerPiece > 0 ? newPricePerPiece.toString() : ''
-    }));
-  };
 
   const handleAdjust = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validation
+    const value = parseInt(adjustForm.value);
+    if (isNaN(value) || value <= 0) {
+      alert('Iltimos, musbat son kiriting');
+      return;
+    }
+    
+    // Agar sabab tanlanmagan bo'lsa, "Boshqa" deb o'rnatish
+    const reason = adjustForm.reason || 'Boshqa';
+    
     try {
       const endpoint = adjustType === 'units' ? 'adjust-units' : 'adjust-bags';
       const payload = adjustType === 'units' 
-        ? { units: parseInt(adjustForm.value), ...adjustForm }
-        : { bags: parseInt(adjustForm.value), ...adjustForm };
+        ? { units: value, type: adjustForm.type, reason, notes: adjustForm.notes }
+        : { bags: value, type: adjustForm.type, reason, notes: adjustForm.notes };
       
       await api.post(`/products/${id}/${endpoint}`, payload);
       
@@ -230,15 +256,6 @@ export default function ProductDetail() {
     return { color: 'text-green-500', label: 'Yaxshi', icon: CheckCircle };
   };
 
-  const getMovementIcon = (type: string) => {
-    if (type === 'ADD' || type === 'PRODUCTION') return <TrendingUp className="w-4 h-4 text-green-500" />;
-    return <TrendingDown className="w-4 h-4 text-red-500" />;
-  };
-
-  const getMovementColor = (type: string) => {
-    if (type === 'ADD' || type === 'PRODUCTION') return 'text-green-600';
-    return 'text-red-600';
-  };
 
   if (loading) {
     return (
@@ -256,7 +273,7 @@ export default function ProductDetail() {
       <div className="text-center py-12">
         <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4 rounded-lg" />
         <p className="text-muted-foreground">Mahsulot topilmadi</p>
-        <Button onClick={() => navigate('/products')} className="mt-4">
+        <Button onClick={() => navigate(isCashier ? '/cashier/products' : '/products')} className="mt-4">
           Orqaga
         </Button>
       </div>
@@ -271,7 +288,7 @@ export default function ProductDetail() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => navigate('/products')}>
+          <Button variant="outline" onClick={() => navigate(isCashier ? '/cashier/products' : '/products')}>
             <ArrowLeft className="w-4 h-4 mr-2 rounded-lg" />
             Orqaga
           </Button>
@@ -325,12 +342,24 @@ export default function ProductDetail() {
             Narx Belgilash
           </Button>
           <Button 
+            variant="outline"
+            onClick={() => {
+              setShowKomplektModal(true);
+              loadAllProducts();
+            }}
+            className="border-orange-500 text-orange-500 hover:bg-orange-50"
+          >
+            <Puzzle className="w-4 h-4 mr-2 rounded-lg" />
+            Komplekt
+          </Button>
+          <Button 
             onClick={() => {
               setAdjustType('bags');
               setAdjustForm({ ...adjustForm, type: 'ADD' });
               setShowAdjustModal(true);
             }}
             className="bg-green-600 hover:bg-green-700"
+            title="Omborga qop qo'shish (ishlab chiqarish, import)"
           >
             <Plus className="w-4 h-4 mr-2 rounded-lg" />
             Qop Qo'shish
@@ -343,9 +372,10 @@ export default function ProductDetail() {
             }}
             variant="outline"
             className="border-red-500 text-red-500 hover:bg-red-50"
+            title="Ombordan qop ayirish (yaroqsiz, yo'qotish)"
           >
             <Minus className="w-4 h-4 mr-2 rounded-lg" />
-            Qop Kamaytirish
+            Qop Ayirish
           </Button>
         </div>
       </div>
@@ -563,7 +593,7 @@ export default function ProductDetail() {
       <Modal
         isOpen={showAdjustModal}
         onClose={() => setShowAdjustModal(false)}
-        title={`${adjustType === 'units' ? 'Dona' : 'Qop'} ${adjustForm.type === 'ADD' ? 'Qo\'shish' : 'Kamaytirish'}`}
+        title={`${adjustType === 'units' ? 'Dona' : 'Qop'} ${adjustForm.type === 'ADD' ? 'Qo\'shish' : 'Ayirish'}`}
       >
         <form onSubmit={handleAdjust} className="space-y-4">
           <Input
@@ -576,7 +606,43 @@ export default function ProductDetail() {
             autoFocus
           />
 
-          <div className="flex gap-2">
+          {/* Sabab tanlash (ixtiyoriy) */}
+          <div>
+            <label htmlFor="adjust-reason" className="block text-sm font-medium text-gray-700 mb-1">
+              Sabab (ixtiyoriy)
+            </label>
+            <select
+              id="adjust-reason"
+              value={adjustForm.reason}
+              onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              aria-label="Sabab tanlash"
+            >
+              <option value="">-- Boshqa --</option>
+              <option value="Ishlab chiqarish">Ishlab chiqarish</option>
+              <option value="Import">Import</option>
+              <option value="Yaroqsiz">Yaroqsiz (brak)</option>
+              <option value="Yo'qotish">Yo'qotish</option>
+              <option value="Tuzatish">Tuzatish</option>
+              <option value="Sotuv qaytarish">Sotuv qaytarish</option>
+            </select>
+          </div>
+
+          {/* Izoh (ixtiyoriy) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Izoh (ixtiyoriy)
+            </label>
+            <textarea
+              value={adjustForm.notes}
+              onChange={(e) => setAdjustForm({ ...adjustForm, notes: e.target.value })}
+              placeholder="Qo'shimcha ma'lumot..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              rows={2}
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2">
             <Button type="submit" className="flex-1">
               Tasdiqlash
             </Button>
@@ -710,6 +776,121 @@ export default function ProductDetail() {
           <PriceModalInner />
         </Modal>
       )}
+
+      {/* Komplekt Modal */}
+      {showKomplektModal && (
+        <Modal
+          isOpen={showKomplektModal}
+          onClose={() => {
+            setShowKomplektModal(false);
+            setKomplektItems([]);
+            setKomplektSearch('');
+          }}
+          title={`${product.name} - Komplekt qo'shish`}
+        >
+          <div className="space-y-4">
+            {/* Qidiruv */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={komplektSearch}
+                onChange={(e) => setKomplektSearch(e.target.value)}
+                placeholder="Mahsulot qidirish..."
+                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none"
+              />
+            </div>
+
+            {/* Tanlangan mahsulotlar */}
+            {komplektItems.length > 0 && (
+              <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+                <h4 className="font-semibold text-orange-800 mb-2">Komplekt tarkibi:</h4>
+                <div className="space-y-2">
+                  {komplektItems.map((item, index) => (
+                    <div key={item.productId} className="flex items-center justify-between bg-white p-3 rounded-lg">
+                      <span className="font-medium">{item.productName}</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const newQty = parseInt(e.target.value) || 1;
+                            setKomplektItems(prev => prev.map((it, i) => 
+                              i === index ? { ...it, quantity: newQty } : it
+                            ));
+                          }}
+                          min="1"
+                          aria-label="Quantity"
+                          className="w-20 px-2 py-1 border rounded text-center"
+                        />
+                        <span className="text-sm text-gray-500">dona</span>
+                        <button
+                          onClick={() => setKomplektItems(prev => prev.filter((_, i) => i !== index))}
+                          className="p-1 text-red-500 hover:bg-red-50 rounded"
+                          aria-label="Remove item"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Mahsulotlar ro'yxati */}
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {allProducts
+                .filter(p => p.name.toLowerCase().includes(komplektSearch.toLowerCase()))
+                .filter(p => !komplektItems.some(k => k.productId === p.id))
+                .map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setKomplektItems(prev => [...prev, {
+                        productId: p.id,
+                        productName: p.name,
+                        quantity: 1
+                      }]);
+                      setKomplektSearch('');
+                    }}
+                    className="w-full flex items-center justify-between p-3 border rounded-lg hover:bg-orange-50 hover:border-orange-300 transition-colors text-left"
+                  >
+                    <div>
+                      <span className="font-medium">{p.name}</span>
+                      <p className="text-sm text-gray-500">{p.currentStock} qop qoldiq</p>
+                    </div>
+                    <Plus className="w-5 h-5 text-orange-500" />
+                  </button>
+                ))}
+            </div>
+
+            {/* Tugmalar */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowKomplektModal(false);
+                  setKomplektItems([]);
+                  setKomplektSearch('');
+                }}
+                className="flex-1"
+              >
+                Bekor qilish
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSaveKomplekt}
+                disabled={komplektItems.length === 0}
+                className="flex-1 bg-orange-600 hover:bg-orange-700"
+              >
+                Saqlash
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 
@@ -730,13 +911,14 @@ export default function ProductDetail() {
       setLoading(true);
       try {
         console.log('📥 Mijozlar yuklanmoqda...');
-        const { data } = await api.get('/customers');
-        console.log('✅ Mijozlar yuklandi:', data.length, 'ta');
-        setLocalCustomers(data);
+        const customersResponse = await api.get('/customers');
+        const customersData = extractArray<any>(customersResponse, []);
+        console.log('✅ Mijozlar yuklandi:', customersData.length, 'ta');
+        setLocalCustomers(customersData);
         
         // Mijozlarning productPrices maydonidan ushbu mahsulot uchun narxni olish
         const prices: Record<string, string> = {};
-        data.forEach((customer: any) => {
+        customersData.forEach((customer: any) => {
           if (customer.productPrices && id) {
             try {
               const productPrices = JSON.parse(customer.productPrices);
@@ -753,7 +935,7 @@ export default function ProductDetail() {
         
         // Har bir mijoz uchun chegirma shablonini hisoblash
         const discounts: Record<string, number> = {};
-        data.forEach((customer: any) => {
+        customersData.forEach((customer: any) => {
           if (customer.productPrices && id && product?.pricePerBag) {
             try {
               const productPrices = JSON.parse(customer.productPrices);

@@ -46,6 +46,7 @@ import {
   } from 'recharts';
 import { exportToExcel } from '../lib/excelUtils';
 import { Input } from '../components/Input';
+import { extractData, extractArray } from '../lib/apiHelpers';
 import '../styles/ultra-modern-design.css';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b'];
@@ -92,10 +93,14 @@ export default function Cashbox() {
     description: ''
   });
   const [exchangeRate, setExchangeRate] = useState(() => {
-    const saved = localStorage.getItem('exchangeRate');
-    return saved ? parseInt(saved) : 12500;
+    // Load from localStorage on init
+    const saved = localStorage.getItem('cashboxExchangeRate');
+    return saved ? parseInt(saved, 10) : 12500;
   });
-  const [exchangeRateInput, setExchangeRateInput] = useState('12500');
+  const [exchangeRateInput, setExchangeRateInput] = useState(() => {
+    const saved = localStorage.getItem('cashboxExchangeRate');
+    return saved || '12500';
+  });
   const [showExchangeRateModal, setShowExchangeRateModal] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
     amount: '',
@@ -107,9 +112,9 @@ export default function Cashbox() {
     date: new Date().toISOString().split('T')[0]
   });
 
-  // Xarajat kategoriyalari (default + custom)
+  // Xarajat kategoriyalari (default + custom) - with localStorage
   const [customCategories, setCustomCategories] = useState<{id: string, name: string, icon: any, color: string}[]>(() => {
-    const saved = localStorage.getItem('customExpenseCategories');
+    const saved = localStorage.getItem('cashboxCustomCategories');
     return saved ? JSON.parse(saved) : [];
   });
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -143,16 +148,17 @@ export default function Cashbox() {
   ];
   const handleDeleteCategory = (categoryId: string) => {
     if (!confirm('Bu kategoriyani o\'chirmoqchimisiz?')) return;
-    
+
     // Faqat custom kategoriyalarni o'chirish mumkin
     if (defaultCategories.find(c => c.id === categoryId)) {
       alert('Standart kategoriyalarni o\'chirib bo\'lmaydi!');
       return;
     }
-    
+
     const updated = customCategories.filter(c => c.id !== categoryId);
     setCustomCategories(updated);
-    localStorage.setItem('customExpenseCategories', JSON.stringify(updated));
+    // Save to localStorage
+    localStorage.setItem('cashboxCustomCategories', JSON.stringify(updated));
   };
 
   const handleAddCategory = () => {
@@ -160,24 +166,25 @@ export default function Cashbox() {
       alert('Kategoriya nomini kiriting!');
       return;
     }
-    
+
     const newCategory = {
       id: `CUSTOM_${Date.now()}`,
       name: newCategoryName.trim(),
       icon: 'MoreHorizontal',
       color: newCategoryColor
     };
-    
+
     const updated = [...customCategories, newCategory];
     setCustomCategories(updated);
-    localStorage.setItem('customExpenseCategories', JSON.stringify(updated));
+    // Save to localStorage
+    localStorage.setItem('cashboxCustomCategories', JSON.stringify(updated));
     setNewCategoryName('');
     setShowCategoryModal(false);
   };
 
   // Byudjet state
-  const [budgets, setBudgets] = useState<any[]>([]);
-  const [budgetLoading, setBudgetLoading] = useState(false);
+  const [, setBudgets] = useState<any[]>([]);
+  const [, setBudgetLoading] = useState(false);
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [budgetForm, setBudgetForm] = useState({
     category: '',
@@ -189,8 +196,8 @@ export default function Cashbox() {
   });
 
   // Qarzlar state
-  const [loans, setLoans] = useState<any[]>([]);
-  const [loansLoading, setLoansLoading] = useState(false);
+  const [, setLoans] = useState<any[]>([]);
+  const [, setLoansLoading] = useState(false);
   const [showLoanModal, setShowLoanModal] = useState(false);
   const [loanForm, setLoanForm] = useState({
     employeeName: '',
@@ -205,11 +212,17 @@ export default function Cashbox() {
     notes: ''
   });
 
-  const [limits, setLimits] = useState({
-    cashLimit: 50000,
-    cardLimit: 100000,
-    clickLimit: 100000,
-    alertEnabled: true
+  const [limits, setLimits] = useState(() => {
+    const saved = localStorage.getItem('cashboxLimits');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    return {
+      cashLimit: 50000,
+      cardLimit: 100000,
+      clickLimit: 100000,
+      alertEnabled: true
+    };
   });
   const [showLimits, setShowLimits] = useState(false);
 
@@ -234,7 +247,8 @@ export default function Cashbox() {
   const saveExchangeRate = () => {
     const rate = parseInt(exchangeRateInput) || 12500;
     setExchangeRate(rate);
-    localStorage.setItem('exchangeRate', rate.toString());
+    // Save to localStorage for persistence
+    localStorage.setItem('cashboxExchangeRate', rate.toString());
     setShowExchangeRateModal(false);
   };
 
@@ -255,13 +269,18 @@ export default function Cashbox() {
         api.get('/expenses?limit=100')
       ]);
       
-      console.log('Transactions received:', transactionsRes.data);
-      console.log('Transactions count:', transactionsRes.data?.length || 0);
-      console.log('Income transactions:', transactionsRes.data?.filter((t: any) => t.type === 'INCOME').length || 0);
+      // ✅ Handle standardized API response format
+      const cashboxData = extractData<any>(cashboxRes, null);
+      const transactionsData = extractArray<any>(transactionsRes, []);
+      const expensesData = extractArray<any>(expensesRes, []);
       
-      setCashbox(cashboxRes.data);
-      setTransactions(transactionsRes.data || []);
-      setExpenses(expensesRes.data || []);
+      console.log('Transactions received:', transactionsData);
+      console.log('Transactions count:', transactionsData.length);
+      console.log('Income transactions:', transactionsData.filter((t: any) => t.type === 'INCOME').length);
+      
+      setCashbox(cashboxData);
+      setTransactions(transactionsData);
+      setExpenses(expensesData);
     } catch (error) {
       console.error('Kassa ma\'lumotlarini yuklashda xatolik', error);
     } finally {
@@ -275,8 +294,9 @@ export default function Cashbox() {
     try {
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
-      const { data } = await api.get(`/budgets?month=${currentMonth}&year=${currentYear}`);
-      setBudgets(data || []);
+      const budgetsResponse = await api.get(`/budgets?month=${currentMonth}&year=${currentYear}`);
+      const budgetsData = extractArray<any>(budgetsResponse, []);
+      setBudgets(budgetsData);
     } catch (error) {
       console.error('Byudjetlarni yuklashda xatolik:', error);
       setBudgets([]);
@@ -289,8 +309,8 @@ export default function Cashbox() {
   const loadLoans = async () => {
     setLoansLoading(true);
     try {
-      const { data } = await api.get('/loans');
-      setLoans(data || []);
+      // Loans API hali yo'q, mock data ishlatamiz
+      setLoans([]);
     } catch (error) {
       console.error('Qarzlarni yuklashda xatolik:', error);
       setLoans([]);
@@ -423,7 +443,8 @@ export default function Cashbox() {
         from: transferForm.from,
         to: transferForm.to,
         amount: parseFloat(transferForm.amount),
-        description: transferForm.description || 'Тўлов усуллари оқсида трансфер'
+        description: transferForm.description || 'Тўлов усуллари оқсида трансфер',
+        exchangeRate: exchangeRate
       });
       setShowTransfer(false);
       setTransferForm({ from: 'CASH', to: 'CARD', amount: '', description: '' });
@@ -1809,7 +1830,10 @@ export default function Cashbox() {
               </div>
 
               <button
-                onClick={() => setShowLimits(false)}
+                onClick={() => {
+                  localStorage.setItem('cashboxLimits', JSON.stringify(limits));
+                  setShowLimits(false);
+                }}
                 className="w-full h-16 bg-gray-900 dark:bg-white dark:text-black text-white rounded-[2rem] font-bold text-xs tracking-[0.2em] shadow-2xl transition-all active:scale-95"
               >
                 {t("SOZLAMALARNI SAQLASH")}

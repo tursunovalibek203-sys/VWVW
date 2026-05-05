@@ -1,6 +1,7 @@
 ﻿import { Router } from 'express';
 import { prisma } from '../utils/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { DecimalHelper } from '../utils/decimal-helper';
 
 const router = Router();
 
@@ -15,28 +16,29 @@ router.get('/summary', async (req, res) => {
     // Kassa tranzaksiyalaridan hisoblash (asosiy manba)
     const cashboxTransactions = await prisma.cashboxTransaction.findMany();
     
+    // ✅ DECIMAL FIX: Use DecimalHelper for sum calculations
     const cashboxIncome = cashboxTransactions
       .filter(t => t.type === 'INCOME')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => DecimalHelper.add(sum, t.amount), 0);
     const cashboxExpense = cashboxTransactions
       .filter(t => t.type === 'EXPENSE')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => DecimalHelper.add(sum, t.amount), 0);
     
     // Bugungi tranzaksiyalar
     const todayCashboxIncome = cashboxTransactions
       .filter(t => t.type === 'INCOME' && new Date(t.createdAt) >= today)
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => DecimalHelper.add(sum, t.amount), 0);
     const todayCashboxExpense = cashboxTransactions
       .filter(t => t.type === 'EXPENSE' && new Date(t.createdAt) >= today)
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => DecimalHelper.add(sum, t.amount), 0);
     
     // Oylik tranzaksiyalar
     const monthlyCashboxIncome = cashboxTransactions
       .filter(t => t.type === 'INCOME' && new Date(t.createdAt) >= monthStart)
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => DecimalHelper.add(sum, t.amount), 0);
     const monthlyCashboxExpense = cashboxTransactions
       .filter(t => t.type === 'EXPENSE' && new Date(t.createdAt) >= monthStart)
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => DecimalHelper.add(sum, t.amount), 0);
 
     // Backup: Sales, expenses, payments jadvallaridan ham hisoblash
     const sales = await prisma.sale.findMany({
@@ -158,30 +160,24 @@ router.get('/summary', async (req, res) => {
     });
 
     // CashboxTransaction dan valyuta bo'yicha hisoblash
-    // Description dan valyutani aniqlaymiz (masalan: "Sotuv: Naqd UZS" yoki "Sotuv: Karta USD")
+    // ✅ YANGILANGAN: Database currency maydonidan foydalanish
     cashboxTransactions.forEach(tx => {
       if (tx.type === 'INCOME') {
-        const desc = tx.description || '';
-        const category = tx.category || '';
-        
-        // Description dan valyutani aniqlash
-        let currency = 'UZS'; // Default
-        if (desc.includes('USD') || desc.includes('usd')) {
-          currency = 'USD';
-        }
+        const txCurrency = tx.currency || 'UZS'; // Database dan olish
+        const paymentMethod = tx.paymentMethod || 'CASH';
         
         // Click to'lovlari
-        if (category === 'SALE' && desc.includes('Click')) {
+        if (paymentMethod === 'CLICK' || tx.category === 'SALE' && tx.description?.includes('Click')) {
           clickUZS += tx.amount;
         } 
         // Karta to'lovlari
-        else if (category === 'SALE' && (desc.includes('Karta') || desc.includes('CARD'))) {
+        else if (paymentMethod === 'CARD' || tx.category === 'SALE' && (tx.description?.includes('Karta') || tx.description?.includes('CARD'))) {
           cardUSD += tx.amount;
         }
-        // Naqd to'lovlari
-        else if (currency === 'UZS') {
+        // Naqd to'lovlari - valyuta bo'yicha
+        else if (txCurrency === 'UZS') {
           cashUZS += tx.amount;
-        } else if (currency === 'USD') {
+        } else if (txCurrency === 'USD') {
           cashUSD += tx.amount;
         }
       }
@@ -265,15 +261,15 @@ router.get('/transactions', async (req, res) => {
 router.post('/add', async (req: AuthRequest, res) => {
   try {
     const { amount, currency, type, description } = req.body;
-    // Kassa kirim - manfiy expense yaratamiz (chunki expense xarajat)
-    await prisma.expense.create({ 
-      data: { 
-        category: 'KASSA_KIRIM', 
-        amount: -Math.abs(amount), 
-        currency, 
-        description: description || 'Kassa kirim', 
-        userId: req.user!.id 
-      } 
+    await prisma.cashboxTransaction.create({
+      data: {
+        type: 'INCOME',
+        amount: Math.abs(amount),
+        category: 'DEPOSIT',
+        description: description || `Kassa kirim: ${type || 'CASH'} ${currency || 'UZS'}`,
+        userId: req.user!.id,
+        userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
+      }
     });
     res.json({ success: true, message: 'Kassa muvaffaqiyatli toldirildi' });
   } catch (error) {
@@ -285,15 +281,15 @@ router.post('/add', async (req: AuthRequest, res) => {
 router.post('/withdraw', async (req: AuthRequest, res) => {
   try {
     const { amount, currency, type, description } = req.body;
-    // Kassa chiqim - musbat expense yaratamiz
-    await prisma.expense.create({ 
-      data: { 
-        category: 'KASSA_CHIQIM', 
-        amount: Math.abs(amount), 
-        currency, 
-        description: description || 'Kassa chiqim', 
-        userId: req.user!.id 
-      } 
+    await prisma.cashboxTransaction.create({
+      data: {
+        type: 'EXPENSE',
+        amount: Math.abs(amount),
+        category: 'WITHDRAWAL',
+        description: description || `Kassa chiqim: ${type || 'CASH'} ${currency || 'UZS'}`,
+        userId: req.user!.id,
+        userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
+      }
     });
     res.json({ success: true, message: 'Chiqim muvaffaqiyatli amalga oshirildi' });
   } catch (error) {
@@ -304,52 +300,109 @@ router.post('/withdraw', async (req: AuthRequest, res) => {
 
 router.post('/transfer', async (req: AuthRequest, res) => {
   try {
-    const { from, to, amount, description } = req.body;
-    
+    const { from, to, amount, description, exchangeRate } = req.body;
+
     if (from === to) return res.status(400).json({ error: 'Bir xil tolov usullariga transfer qilib bolmaydi' });
-    
+
     if (!amount || amount <= 0) return res.status(400).json({ error: 'Transfer miqdori musbat bolishi kerak' });
-    
-    // Convert amount based on payment methods
-    let fromAmount = amount;
-    let toAmount = amount;
-    let fromCurrency = 'USD';
-    let toCurrency = 'USD';
-    
-    // Handle currency conversion
-    if (from === 'CASH' || to === 'CASH' || from === 'CLICK' || to === 'CLICK') {
-      fromCurrency = 'UZS';
-      toCurrency = 'UZS';
-      fromAmount = amount * 12600; // USD to UZS conversion
-      toAmount = amount * 12600;
-    }
-    
+
+    // Use provided exchange rate or default
+    const rate = exchangeRate || 12600;
+
     // Create withdrawal record (from)
-    await prisma.expense.create({
+    await prisma.cashboxTransaction.create({
       data: {
-        category: 'TRANSFER_OUT',
-        amount: fromAmount,
-        currency: fromCurrency,
-        description: description || `Transfer: ${from} to ${to} (${amount} USD)`,
-        userId: req.user!.id
+        type: 'EXPENSE',
+        amount: amount,
+        category: 'TRANSFER',
+        description: description || `Transfer: ${from} -> ${to}`,
+        userId: req.user!.id,
+        userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
       }
     });
-    
-    // Create deposit record (to) - manfiy expense sifatida
-    await prisma.expense.create({
+
+    // Create deposit record (to)
+    await prisma.cashboxTransaction.create({
       data: {
-        category: 'TRANSFER_IN',
-        amount: -toAmount, // Manfiy qiymat - kassa kirim
-        currency: toCurrency,
-        description: description || `Transfer: ${from} to ${to} (${amount} USD)`,
-        userId: req.user!.id
+        type: 'INCOME',
+        amount: amount,
+        category: 'TRANSFER',
+        description: description || `Transfer: ${from} -> ${to}`,
+        userId: req.user!.id,
+        userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
       }
     });
-    
+
     res.json({ success: true, message: 'Transfer muvaffaqiyatli amalga oshirildi' });
   } catch (error) {
     console.error('Transfer error:', error);
     res.status(500).json({ error: 'Transfer amalga oshirishda xatolik' });
+  }
+});
+
+// Valyuta ayirboshlash endpointi
+router.post('/exchange', async (req: AuthRequest, res) => {
+  try {
+    const { fromCurrency, toCurrency, amount, fromType, toType, exchangeRate, description } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Miqdor musbat bolishi kerak' });
+    }
+
+    if (fromCurrency === toCurrency) {
+      return res.status(400).json({ error: 'Bir xil valyutalarni ayirboshlab bolmaydi' });
+    }
+
+    const rate = exchangeRate || 12600;
+    let receivedAmount: number;
+
+    // Ayirboshlash hisoblash
+    if (fromCurrency === 'USD' && toCurrency === 'UZS') {
+      receivedAmount = amount * rate;
+    } else if (fromCurrency === 'UZS' && toCurrency === 'USD') {
+      receivedAmount = amount / rate;
+    } else {
+      return res.status(400).json({ error: 'Qo\'llab-quvvatlanmaydigan valyuta juftligi' });
+    }
+
+    // 1. Chiqim tranzaksiyasi (fromCurrency)
+    await prisma.cashboxTransaction.create({
+      data: {
+        type: 'EXPENSE',
+        amount: amount,
+        category: 'EXCHANGE',
+        description: description || `Ayirboshlash: ${amount} ${fromCurrency} -> ${receivedAmount.toFixed(2)} ${toCurrency} (kurs: ${rate})`,
+        userId: req.user!.id,
+        userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
+      }
+    });
+
+    // 2. Kirim tranzaksiyasi (toCurrency)
+    await prisma.cashboxTransaction.create({
+      data: {
+        type: 'INCOME',
+        amount: receivedAmount,
+        category: 'EXCHANGE',
+        description: description || `Ayirboshlash: ${amount} ${fromCurrency} -> ${receivedAmount.toFixed(2)} ${toCurrency} (kurs: ${rate})`,
+        userId: req.user!.id,
+        userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Valyuta ayirboshlash muvaffaqiyatli amalga oshirildi',
+      data: {
+        fromAmount: amount,
+        fromCurrency,
+        toAmount: receivedAmount,
+        toCurrency,
+        exchangeRate: rate
+      }
+    });
+  } catch (error) {
+    console.error('Exchange error:', error);
+    res.status(500).json({ error: 'Valyuta ayirboshlashda xatolik' });
   }
 });
 
@@ -366,6 +419,140 @@ router.get('/export/excel', async (req: AuthRequest, res) => {
     res.json({ message: 'Excel eksport tez orada qoshiladi' });
   } catch (error) {
     res.status(500).json({ error: 'Excel eksport xatolik' });
+  }
+});
+
+// ==================== LOANS API ====================
+
+// Qarzlarni olish
+router.get('/loans', async (req: AuthRequest, res) => {
+  try {
+    const loans = await prisma.loan.findMany({
+      include: { employee: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(loans);
+  } catch (error) {
+    console.error('Get loans error:', error);
+    res.status(500).json({ error: 'Qarzlarni olishda xatolik' });
+  }
+});
+
+// Yangi qarz yaratish
+router.post('/loans', async (req: AuthRequest, res) => {
+  try {
+    const {
+      employeeName,
+      employeeId,
+      amount,
+      currency,
+      purpose,
+      loanDate,
+      dueDate,
+      repaymentType,
+      monthlyDeduction,
+      notes
+    } = req.body;
+
+    const loan = await prisma.loan.create({
+      data: {
+        employeeName,
+        employeeId: employeeId || null,
+        amount: parseFloat(amount),
+        currency: currency || 'UZS',
+        purpose: purpose || '',
+        loanDate: loanDate ? new Date(loanDate) : new Date(),
+        dueDate: dueDate ? new Date(dueDate) : null,
+        repaymentType: repaymentType || 'SALARY_DEDUCTION',
+        monthlyDeduction: monthlyDeduction ? parseFloat(monthlyDeduction) : null,
+        notes: notes || '',
+        remainingAmount: parseFloat(amount),
+        status: 'ACTIVE'
+      }
+    });
+
+    res.json({ success: true, loan });
+  } catch (error) {
+    console.error('Create loan error:', error);
+    res.status(500).json({ error: 'Qarz yaratishda xatolik' });
+  }
+});
+
+// ==================== BUDGETS API ====================
+
+// Byudjetlarni olish
+router.get('/budgets', async (req: AuthRequest, res) => {
+  try {
+    const { month, year } = req.query;
+
+    const where: any = {};
+    if (month) where.month = parseInt(month as string);
+    if (year) where.year = parseInt(year as string);
+
+    const budgets = await prisma.budget.findMany({
+      where,
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Har bir byudjet uchun sarflangan summani hisoblash
+    const budgetsWithSpent = await Promise.all(
+      budgets.map(async (budget) => {
+        const startOfMonth = new Date(budget.year, budget.month - 1, 1);
+        const endOfMonth = new Date(budget.year, budget.month, 0);
+
+        const expenses = await prisma.expense.aggregate({
+          where: {
+            category: budget.category,
+            createdAt: {
+              gte: startOfMonth,
+              lte: endOfMonth
+            }
+          },
+          _sum: { amount: true }
+        });
+
+        return {
+          ...budget,
+          spent: expenses._sum.amount || 0,
+          remaining: budget.amount - (expenses._sum.amount || 0)
+        };
+      })
+    );
+
+    res.json(budgetsWithSpent);
+  } catch (error) {
+    console.error('Get budgets error:', error);
+    res.status(500).json({ error: 'Byudjetlarni olishda xatolik' });
+  }
+});
+
+// Yangi byudjet yaratish
+router.post('/budgets', async (req: AuthRequest, res) => {
+  try {
+    const {
+      category,
+      amount,
+      currency,
+      month,
+      year,
+      alertThreshold
+    } = req.body;
+
+    const budget = await prisma.budget.create({
+      data: {
+        category,
+        amount: parseFloat(amount),
+        currency: currency || 'UZS',
+        month: parseInt(month),
+        year: parseInt(year),
+        alertThreshold: alertThreshold ? parseFloat(alertThreshold) : 80
+      }
+    });
+
+    res.json({ success: true, budget });
+  } catch (error) {
+    console.error('Create budget error:', error);
+    res.status(500).json({ error: 'Byudjet yaratishda xatolik' });
   }
 });
 

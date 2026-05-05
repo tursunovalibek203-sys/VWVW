@@ -163,11 +163,10 @@ export const errorHandler = (
     // e.g., Sentry, PagerDuty, etc.
   }
 
-  // Send response (hide details in production)
+  // Send response with standard format
   const response: any = {
-    status: 'error',
-    type: error.errorType,
-    message: error.message,
+    success: false,
+    error: error.message,
   };
 
   // Only include details for operational errors in development

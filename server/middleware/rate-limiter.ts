@@ -8,18 +8,13 @@ export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 daqiqa
   max: 5, // 5 ta urinish
   message: {
-    error: 'Juda ko\'p urinish',
-    message: '15 daqiqadan keyin qayta urinib ko\'ring',
-    retryAfter: 15 * 60
+    success: false,
+    error: 'Too many login attempts, please try again after 15 minutes'
   },
   standardHeaders: true,
   legacyHeaders: false,
-  // IP address olish
-  keyGenerator: (req) => {
-    return req.ip || req.socket.remoteAddress || 'unknown';
-  },
   // Skip successful requests
-  skipSuccessfulRequests: true
+  skipSuccessfulRequests: true,
 });
 
 /**
@@ -30,8 +25,8 @@ export const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 soat
   max: 3,
   message: {
-    error: 'Juda ko\'p ro\'yxatdan o\'tish urinishi',
-    message: '1 soatdan keyin qayta urinib ko\'ring'
+    success: false,
+    error: 'Too many registration attempts, please try again after 1 hour'
   },
   standardHeaders: true,
   legacyHeaders: false
@@ -45,8 +40,8 @@ export const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 daqiqa
   max: 100,
   message: {
-    error: 'Juda ko\'p so\'rov',
-    message: 'Iltimos, biroz kuting'
+    success: false,
+    error: 'Too many requests, please slow down'
   },
   standardHeaders: true,
   legacyHeaders: false
@@ -60,8 +55,8 @@ export const criticalOperationLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 daqiqa
   max: 20,
   message: {
-    error: 'Juda ko\'p o\'zgartirish',
-    message: 'Iltimos, sekinroq ishlang'
+    success: false,
+    error: 'Too many operations, please slow down'
   },
   standardHeaders: true,
   legacyHeaders: false
@@ -75,8 +70,8 @@ export const uploadLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 daqiqa
   max: 10,
   message: {
-    error: 'Juda ko\'p fayl yuklash',
-    message: '10 daqiqadan keyin qayta urinib ko\'ring'
+    success: false,
+    error: 'Too many file uploads, please try again later'
   },
   standardHeaders: true,
   legacyHeaders: false

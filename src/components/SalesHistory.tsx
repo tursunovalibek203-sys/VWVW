@@ -9,12 +9,13 @@ interface SalesHistoryLog {
   user: {
     id: string;
     name: string;
-    email: string;
+    login: string;
     role: string;
   };
   action: string;
+  entity: string;
   entityId: string;
-  details: {
+  changes: {
     userName: string;
     customerId?: string;
     customerName?: string;
@@ -326,9 +327,9 @@ export default function SalesHistory() {
                       <p className="text-sm text-gray-600">
                         👤 {log.user.name} ({log.user.role})
                       </p>
-                      {log.details.customerName && (
+                      {log.changes.customerName && (
                         <p className="text-sm text-gray-600">
-                          👥 Mijoz: {log.details.customerName}
+                          👥 Mijoz: {log.changes.customerName}
                         </p>
                       )}
                     </div>
@@ -337,52 +338,52 @@ export default function SalesHistory() {
                     </div>
                   </div>
 
-                  {log.details.details.totalAmount && (
+                  {log.changes.details.totalAmount && (
                     <div className="mt-2 text-sm">
                       <p className="text-gray-700">
-                        💰 Jami: {formatCurrency(log.details.details.totalAmount, log.details.details.currency)}
+                        💰 Jami: {formatCurrency(log.changes.details.totalAmount, log.changes.details.currency)}
                       </p>
-                      {log.details.details.paidAmount !== undefined && (
+                      {log.changes.details.paidAmount !== undefined && (
                         <p className="text-gray-700">
-                          💳 To'langan: {formatCurrency(log.details.details.paidAmount, log.details.details.currency)}
+                          💳 To'langan: {formatCurrency(log.changes.details.paidAmount, log.changes.details.currency)}
                         </p>
                       )}
-                      {log.details.details.paymentStatus && (
+                      {log.changes.details.paymentStatus && (
                         <p className="text-gray-700">
-                          📊 Holat: {log.details.details.paymentStatus}
+                          📊 Holat: {log.changes.details.paymentStatus}
                         </p>
                       )}
                     </div>
                   )}
 
-                  {log.details.details.products && log.details.details.products.length > 0 && (
+                  {log.changes.details.products && log.changes.details.products.length > 0 && (
                     <div className="mt-2">
                       <p className="text-sm font-medium text-gray-700">📦 Mahsulotlar:</p>
                       <ul className="text-sm text-gray-600 ml-4">
-                        {log.details.details.products.map((product, idx) => (
+                        {log.changes.details.products.map((product, idx) => (
                           <li key={idx}>
-                            {product.productName} - {product.quantity} qop × {formatCurrency(product.price, log.details.details.currency)}
+                            {product.productName} - {product.quantity} qop × {formatCurrency(product.price, log.changes.details.currency)}
                           </li>
                         ))}
                       </ul>
                     </div>
                   )}
 
-                  {log.details.details.notes && (
+                  {log.changes.details.notes && (
                     <p className="mt-2 text-sm text-gray-600">
-                      📝 {log.details.details.notes}
+                      📝 {log.changes.details.notes}
                     </p>
                   )}
 
-                  {log.details.details.reason && (
+                  {log.changes.details.reason && (
                     <p className="mt-2 text-sm text-red-600">
-                      ❌ Sabab: {log.details.details.reason}
+                      ❌ Sabab: {log.changes.details.reason}
                     </p>
                   )}
 
-                  {log.details.ipAddress && (
+                  {log.changes.ipAddress && (
                     <p className="mt-2 text-xs text-gray-400">
-                      🌐 IP: {log.details.ipAddress}
+                      🌐 IP: {log.changes.ipAddress}
                     </p>
                   )}
                 </div>

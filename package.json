@@ -54,7 +54,10 @@
     "test:api": "jest --testPathPattern='api/' --testTimeout=30000",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --maxWorkers=2"
+    "test:ci": "jest --ci --coverage --maxWorkers=2",
+    "verify:production": "tsx scripts/verify-production-safety.ts",
+    "test:stress": "tsx scripts/stress-test-concurrency.ts",
+    "db:constraints": "psql $DATABASE_URL -f scripts/apply-safety-constraints.sql"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^6.0.0",
@@ -62,6 +65,7 @@
     "@capacitor/core": "^6.0.0",
     "@capacitor/ios": "^6.0.0",
     "@capacitor/preferences": "^6.0.0",
+    "@hookform/resolvers": "^5.2.2",
     "@langchain/core": "^1.1.39",
     "@langchain/openai": "^1.4.4",
     "@prisma/client": "^5.22.0",
@@ -100,6 +104,7 @@
     "postgres": "^3.4.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-hook-form": "^7.75.0",
     "react-i18next": "^14.0.1",
     "react-router-dom": "^6.22.0",
     "recharts": "^2.12.0",

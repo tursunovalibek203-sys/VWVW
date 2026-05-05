@@ -16,7 +16,18 @@ router.get('/export', authenticate, async (req: AuthRequest, res) => {
       exportDate: new Date().toISOString(),
       version: '1.0',
       data: {
-        users: await prisma.user.findMany(),
+        users: await prisma.user.findMany({
+          select: {
+            id: true,
+            login: true,
+            name: true,
+            role: true,
+            active: true,
+            createdAt: true,
+            updatedAt: true,
+            // ✅ password excluded
+          }
+        }),
         customers: await prisma.customer.findMany(),
         products: await prisma.product.findMany(),
         sales: await prisma.sale.findMany(),

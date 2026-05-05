@@ -12,11 +12,12 @@ import {
   RefreshCw,
   TrendingUp,
   Wallet,
-  Trash2
+  Trash2,
+  Coins
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import Button from '../components/Button';
-import api from '../lib/api';
+import api from '../lib/professionalApi';
 import { formatCurrency, formatDate } from '../lib/utils';
 import { exportToExcel } from '../lib/excelUtils';
 import { latinToCyrillic } from '../lib/transliterator';
@@ -31,6 +32,14 @@ export default function CustomerProfile() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '',
+    currency: 'USD',
+    type: 'CASH',
+    notes: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     loadCustomerData();
@@ -43,7 +52,10 @@ export default function CustomerProfile() {
         api.get(`/sales?customerId=${id}`)
       ]);
       setCustomer(customerRes.data);
-      setSales(salesRes.data);
+      
+      // ✅ API dan kelgan ma'lumotni to'g'ri parse qilish
+      const salesData = salesRes.data?.sales || salesRes.data || [];
+      setSales(Array.isArray(salesData) ? salesData : []);
     } catch (error) {
       console.error('Mijoz ma\'lumotlarini yuklashda xatolik');
     } finally {
@@ -74,12 +86,43 @@ export default function CustomerProfile() {
     }
   };
 
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+
+    const amount = parseFloat(paymentForm.amount);
+    if (!amount || amount <= 0) {
+      alert('❌ Iltimos, to\'lov summasini kiriting');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await api.post(`/customers/${id}/payment`, {
+        amount,
+        currency: paymentForm.currency,
+        type: paymentForm.type,
+        notes: paymentForm.notes
+      });
+
+      alert('✅ To\'lov muvaffaqiyatli amalga oshirildi! Kassaga qo\'shildi.');
+      setShowPaymentModal(false);
+      setPaymentForm({ amount: '', currency: 'USD', type: 'CASH', notes: '' });
+      loadCustomerData(); // Refresh customer data
+    } catch (error: any) {
+      console.error('To\'lov xatolik:', error);
+      alert('❌ To\'lov amalga oshirishda xatolik: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-gray-600">{latinToCyrillic('Yuklanmoqda...')}</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 text-lg">{latinToCyrillic('Yuklanmoqda...')}</p>
         </div>
       </div>
     );
@@ -103,19 +146,49 @@ export default function CustomerProfile() {
   }
 
   const totalPurchases = sales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0);
-  const totalPaid = sales.reduce((sum, sale) => sum + (sale.paidAmount || 0), 0);
-  const totalDebt = sales.reduce((sum, sale) => sum + ((sale.debtAmount || 0)), 0);
+  // totalPaid va totalDebt hisoblash (kelajakda statistika uchun)
+  // const totalPaid = sales.reduce((sum, sale) => sum + (sale.paidAmount || 0), 0);
+  // const totalDebt = sales.reduce((sum, sale) => sum + ((sale.debtAmount || 0)), 0);
 
   const handleExportExcel = () => {
     const historyData = sales.map(sale => ({
       'Sana': formatDate(sale.createdAt),
-      'Mahsulotlar': sale.items?.map((i: any) => `${i.name} (${i.quantity})`).join(', '),
+      'Mahsulotlar': sale.items?.map((i: any) => `${i.product?.name || i.productName || 'N/A'} (${i.quantity})`).join(', ') || sale.product?.name || 'N/A',
       'Jami': sale.totalAmount,
       'To\'langan': sale.paidAmount,
       'Qarz': sale.debtAmount,
       'Valyuta': sale.currency,
     }));
     exportToExcel(historyData, { fileName: `Mijoz_${customer.name}_Tarixi` });
+  };
+
+  // Faqat naqd (cash) savdolarni eksport qilish
+  const handleExportCashSales = () => {
+    // Faqat CASH to'lov turidagi savdolarni filtrlash
+    const cashSales = sales.filter(sale => 
+      sale.paymentMethod === 'CASH' || 
+      sale.paymentType === 'CASH' ||
+      (sale.notes && sale.notes.toLowerCase().includes('naqd'))
+    );
+
+    if (cashSales.length === 0) {
+      alert(latinToCyrillic('Naqd pul savdolari topilmadi!'));
+      return;
+    }
+
+    const cashSalesData = cashSales.map(sale => ({
+      [latinToCyrillic('Sana')]: formatDate(sale.createdAt),
+      [latinToCyrillic('Mahsulotlar')]: sale.items?.map((i: any) => `${i.product?.name || i.productName || 'N/A'} (${i.quantity})`).join(', ') || sale.product?.name || 'N/A',
+      [latinToCyrillic('Jami summa')]: sale.totalAmount,
+      [latinToCyrillic('To\'langan')]: sale.paidAmount,
+      [latinToCyrillic('Qarz')]: sale.debtAmount,
+      [latinToCyrillic('Valyuta')]: sale.currency,
+      [latinToCyrillic('To\'lov turi')]: latinToCyrillic('Naqd pul'),
+    }));
+
+    exportToExcel(cashSalesData, { 
+      fileName: `Mijoz_${customer.name}_Naqd_Savdolari` 
+    });
   };
 
   return (
@@ -149,6 +222,23 @@ export default function CustomerProfile() {
           >
             <FileSpreadsheet className="w-4 h-4" />
             Excel
+          </button>
+          <button
+            onClick={handleExportCashSales}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg text-sm"
+            title={latinToCyrillic("Faqat naqd pul savdolari")}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            {latinToCyrillic("Naqd savdolar")}
+          </button>
+          <button
+            onClick={() => setShowPaymentModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm"
+          >
+            <Coins className="w-4 h-4" />
+            {latinToCyrillic("To'lov qilish")}
           </button>
           <button
             type="button"
@@ -283,11 +373,18 @@ export default function CustomerProfile() {
                         {sale.items?.map((i: any, idx: number) => (
                           <div key={idx} className="flex items-center gap-2">
                             <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                            <span className="font-medium">{i.name}</span>
+                            <span className="font-medium">{i.product?.name || i.productName || 'N/A'}</span>
                             <span className="text-gray-400">×</span>
                             <span className="bg-gray-100 px-2 py-0.5 rounded text-xs font-semibold">{i.quantity}</span>
                           </div>
-                        )) || '-'}
+                        )) || (sale.product?.name ? (
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            <span className="font-medium">{sale.product.name}</span>
+                            <span className="text-gray-400">×</span>
+                            <span className="bg-gray-100 px-2 py-0.5 rounded text-xs font-semibold">{sale.quantity}</span>
+                          </div>
+                        ) : '-')}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
@@ -370,6 +467,135 @@ export default function CustomerProfile() {
               </Button>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* To'lov Qilish Modal */}
+      {showPaymentModal && customer && (
+        <Modal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          title={latinToCyrillic("Mijozdan To'lov Qilish")}
+          size="md"
+        >
+          <form onSubmit={handlePaymentSubmit} className="space-y-4">
+            {/* Mijoz ma'lumoti */}
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+              <div className="flex items-center gap-3">
+                <Wallet className="w-6 h-6 text-blue-600" />
+                <div>
+                  <h3 className="font-semibold text-blue-800 dark:text-blue-200">{customer.name}</h3>
+                  <p className="text-sm text-blue-600 dark:text-blue-400">
+                    {latinToCyrillic("Qarz")}: ${customer.debtUSD?.toFixed(2) || '0.00'} | {latinToCyrillic("Balans")}: ${customer.balanceUSD?.toFixed(2) || '0.00'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Summa */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {latinToCyrillic("To'lov summasi")} *
+              </label>
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={paymentForm.amount}
+                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                className="w-full h-12 px-3 text-lg font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                placeholder="0.00"
+                required
+              />
+            </div>
+
+            {/* Valyuta */}
+            <div>
+              <label htmlFor="payment-currency" className="block text-sm font-medium text-gray-700 mb-1">
+                {latinToCyrillic("Valyuta")}
+              </label>
+              <select
+                id="payment-currency"
+                value={paymentForm.currency}
+                onChange={(e) => setPaymentForm({ ...paymentForm, currency: e.target.value })}
+                className="w-full h-12 px-3 border-2 border-gray-300 rounded-lg focus:border-blue-500"
+                aria-label={latinToCyrillic("Valyuta tanlash")}
+              >
+                <option value="USD">USD ($)</option>
+                <option value="UZS">UZS (so'm)</option>
+              </select>
+            </div>
+
+            {/* To'lov turi */}
+            <div>
+              <label htmlFor="payment-type" className="block text-sm font-medium text-gray-700 mb-1">
+                {latinToCyrillic("To'lov turi")}
+              </label>
+              <select
+                id="payment-type"
+                value={paymentForm.type}
+                onChange={(e) => setPaymentForm({ ...paymentForm, type: e.target.value })}
+                className="w-full h-12 px-3 border-2 border-gray-300 rounded-lg focus:border-blue-500"
+                aria-label={latinToCyrillic("To'lov turini tanlash")}
+              >
+                <option value="CASH">{latinToCyrillic("Naqd pul")}</option>
+                <option value="CARD">{latinToCyrillic("Karta")}</option>
+                <option value="CLICK">Click</option>
+                <option value="TRANSFER">{latinToCyrillic("Bank o'tkazmasi")}</option>
+              </select>
+            </div>
+
+            {/* Izoh */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {latinToCyrillic("Izoh")} ({latinToCyrillic("ixtiyoriy")})
+              </label>
+              <textarea
+                value={paymentForm.notes}
+                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500"
+                rows={2}
+                placeholder={latinToCyrillic("Qo'shimcha ma'lumot...")}
+              />
+            </div>
+
+            {/* Ogohlantirish */}
+            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                <strong>{latinToCyrillic("Diqqat:")}</strong> {latinToCyrillic("Bu to'lov avtomatik ravishda kassaga qo'shiladi va mijoz balansi yangilanadi.")}
+              </p>
+            </div>
+
+            {/* Tugmalar */}
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowPaymentModal(false)}
+                className="flex-1"
+                disabled={isSubmitting}
+              >
+                {latinToCyrillic("Bekor qilish")}
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                    {latinToCyrillic("Saqlanmoqda...")}
+                  </>
+                ) : (
+                  <>
+                    <Coins className="w-4 h-4 mr-2" />
+                    {latinToCyrillic("To'lovni qabul qilish")}
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
         </Modal>
       )}
     </div>

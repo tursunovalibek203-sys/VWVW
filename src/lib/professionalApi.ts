@@ -91,18 +91,9 @@ class ProfessionalApi {
         // Add timestamp
         config.headers['X-Request-Time'] = new Date().toISOString();
 
-        // Log request in development
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, {
-            headers: config.headers,
-            data: config.data,
-          });
-        }
-
         return config;
       },
       (error) => {
-        console.error('[API Request Error]', error);
         return Promise.reject(this.enhanceError(error));
       }
     );
@@ -110,14 +101,6 @@ class ProfessionalApi {
     // Response Interceptor
     this.instance.interceptors.response.use(
       (response) => {
-        // Log response in development
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[API Response] ${response.status} ${response.config.url}`, {
-            data: response.data,
-            headers: response.headers,
-          });
-        }
-
         return response;
       },
       async (error) => {
@@ -153,7 +136,7 @@ class ProfessionalApi {
         return parsed.state?.token || null;
       }
     } catch (error) {
-      console.error('Failed to get auth token:', error);
+      // Failed to get auth token
     }
     return null;
   }
@@ -189,7 +172,6 @@ class ProfessionalApi {
     
     // Faqat agar login sahifasida bo'lmasa, redirect qilish
     if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
-      console.log('🔐 Unauthorized - redirecting to login...');
       window.location.href = '/';
     }
   }

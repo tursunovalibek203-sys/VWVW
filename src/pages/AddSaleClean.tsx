@@ -1,3 +1,20 @@
+/**
+ * AddSaleClean.tsx - Sotuv qo'shish sahifasi (yangilangan versiya)
+ * 
+ * Xususiyatlar:
+ * 1. Komplekt rejimi: Preform tanlanganda avtomatik ravishda mos keluvchi krishka va ruchka qo'shiladi
+ * 2. 48 ruchka: 1000 dona/qop, dona narxi: $0.016
+ * 3. 48 krishka: 2000 dona/qop, dona narxi: $0.016
+ * 4. 28 krishka (bezgaz): dona narxi $0.007, (gazlik): $0.008
+ * 5. 38 ruchka: 1000 dona/qop, dona narxi: $0.010
+ * 
+ * Komplekt qoidalari:
+ * - 15, 21, 26, 30gr preform → 28 krishka (faqat krishka)
+ * - 36gr preform → 28 krishka + 28 ruchka
+ * - 52, 70gr preform → 38 krishka + 38 ruchka
+ * - 75, 80, 85, 86, 135gr preform → 48 krishka + 48 ruchka
+ */
+
 import { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, Package, ShoppingCart, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -5,7 +22,9 @@ import { latinToCyrillic } from '../lib/transliterator';
 import { useSaleForm } from '../hooks/useSaleForm';
 import { ProductTypeCard, CartItem, CustomerSelector, PaymentSection } from '../components/sales';
 import { filterProductsByCategory, getCurrencySymbol, getDisplayAmount } from '../lib/saleUtils';
+import { useRealtime } from '../hooks/useRealtime';
 import api from '../lib/professionalApi';
+import { extractArray } from '../lib/apiHelpers';
 import type { Product } from '../types';
 
 // Product Section Component - Yangi tip kartochkalar
@@ -17,6 +36,7 @@ const ProductSection = ({
   latinToCyrillic,
   onSearchChange,
   onCategoryChange,
+  onSelectProduct,
   onQuickAdd,
 }: {
   filteredProducts: Product[];
@@ -26,6 +46,7 @@ const ProductSection = ({
   latinToCyrillic: (text: string) => string;
   onSearchChange: (val: string) => void;
   onCategoryChange: (cat: string) => void;
+  onSelectProduct: (product: Product) => void;
   onQuickAdd: (product: Product) => void;
 }) => {
   const categories = [
@@ -43,15 +64,28 @@ const ProductSection = ({
     return warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|гр|г)/.test(name);
   });
 
-  // Preformlarni gram bo'yicha guruhlash
-  const gramSizes = [15, 21, 26, 28, 30, 32, 36, 38, 43, 48, 52, 70, 75, 80, 85, 86, 135, 250];
+  // Preformlarni gram bo'yicha dinamik guruhlash - ma'lumotdan avtomatik olish
+  const gramSizeMap = new Map<number, Product[]>();
+  
+  allPreforms.forEach((p) => {
+    const name = p.name?.toLowerCase() || '';
+    // Gramajni nomdan olish (96g, 96gr, 96 g, va h.k.)
+    const gramMatch = name.match(/(\d+)\s*(gr|g|гр|г)\b/i);
+    if (gramMatch) {
+      const gramSize = parseInt(gramMatch[1]);
+      if (!gramSizeMap.has(gramSize)) {
+        gramSizeMap.set(gramSize, []);
+      }
+      gramSizeMap.get(gramSize)!.push(p);
+    }
+  });
+  
+  // Gram o'lchamlarini tartiblash va guruhlarni yaratish
+  const sortedGramSizes = Array.from(gramSizeMap.keys()).sort((a, b) => a - b);
   const preformGroups: { key: string; title: string; products: Product[] }[] = [];
-
-  gramSizes.forEach((gram) => {
-    const groupProducts = allPreforms.filter((p) => {
-      const name = p.name?.toLowerCase() || '';
-      return name.includes(gram.toString()) || name.includes(`${gram}gr`) || name.includes(`${gram}g`);
-    });
+  
+  sortedGramSizes.forEach((gram) => {
+    const groupProducts = gramSizeMap.get(gram)!;
     if (groupProducts.length > 0) {
       preformGroups.push({
         key: `${gram}gr`,
@@ -61,16 +95,161 @@ const ProductSection = ({
     }
   });
 
-  const krishkaProducts = filteredProducts.filter((p) => {
+  // Gramaj aniqlanmagan preformlar uchun alohida guruh
+  const undefinedGramPreforms = allPreforms.filter((p) => {
+    const name = p.name?.toLowerCase() || '';
+    return !/\d+\s*(gr|g|гр|г)\b/i.test(name);
+  });
+  if (undefinedGramPreforms.length > 0) {
+    preformGroups.push({
+      key: 'nomsiz',
+      title: 'Boshqa Preformlar',
+      products: undefinedGramPreforms,
+    });
+  }
+
+  // Krishkalarni o'lchami (mm) bo'yicha guruhlash
+  const allKrishka = filteredProducts.filter((p) => {
     const name = p.name?.toLowerCase() || '';
     const warehouse = p.warehouse?.toLowerCase() || '';
     return warehouse === 'krishka' || name.includes('krishka') || name.includes('qopqoq') || name.includes('cap');
   });
+  
+  const krishkaSizeMap = new Map<number, Product[]>();
+  
+  allKrishka.forEach((p) => {
+    const name = p.name?.toLowerCase() || '';
+    // O'lchamni nomdan olish (28mm, 28 mm, 28-mm, va h.k.)
+    let sizeMatch = name.match(/(\d+)\s*(mm|ml|мм|мл)/i);
+    if (!sizeMatch) {
+      // Agar mm yo'q bo'lsa, krishka yoki qopqoq dan keyingi/o'ndingi raqamni qidirish
+      sizeMatch = name.match(/(?:krishka|qopqoq|cap).*?(\d{2})|(\d{2}).*?(?:krishka|qopqoq|cap)/i);
+    }
+    if (sizeMatch) {
+      const size = parseInt(sizeMatch[1] || sizeMatch[2]);
+      // Krishka o'lchamlari: 28, 30, 38, 48, 52
+      if ([28, 30, 38, 48, 52].includes(size)) {
+        if (!krishkaSizeMap.has(size)) {
+          krishkaSizeMap.set(size, []);
+        }
+        krishkaSizeMap.get(size)!.push(p);
+      }
+    }
+  });
+  
+  // O'lchamlarni tartiblash va guruhlarni yaratish
+  const sortedKrishkaSizes = Array.from(krishkaSizeMap.keys()).sort((a, b) => a - b);
+  const krishkaGroups: { key: string; title: string; products: Product[] }[] = [];
+  
+  sortedKrishkaSizes.forEach((size) => {
+    const groupProducts = krishkaSizeMap.get(size)!;
+    if (groupProducts.length > 0) {
+      krishkaGroups.push({
+        key: `${size}mm`,
+        title: `${size}mm Krishkalar`,
+        products: groupProducts,
+      });
+    }
+  });
+  
+  // O'lcham aniqlanmagan krishkalar uchun alohida guruh
+  const undefinedSizeKrishka = allKrishka.filter((p) => {
+    const name = p.name?.toLowerCase() || '';
+    const hasSize = /(\d+)\s*(mm|ml|мм|мл)/i.test(name) || 
+                    /(?:krishka|qopqoq|cap).*?(\d{2})|(\d{2}).*?(?:krishka|qopqoq|cap)/i.test(name);
+    return !hasSize;
+  });
+  if (undefinedSizeKrishka.length > 0) {
+    krishkaGroups.push({
+      key: 'nomsiz-krishka',
+      title: 'Boshqa Krishkalar',
+      products: undefinedSizeKrishka,
+    });
+  }
 
-  const ruchkaProducts = filteredProducts.filter((p) => {
+  // Ruchkalarni o'lchami (mm) bo'yicha guruhlash
+  const allRuchka = filteredProducts.filter((p) => {
     const name = p.name?.toLowerCase() || '';
     const warehouse = p.warehouse?.toLowerCase() || '';
     return warehouse === 'ruchka' || name.includes('ruchka') || name.includes('handle');
+  });
+  
+  const ruchkaSizeMap = new Map<number, Product[]>();
+  
+  allRuchka.forEach((p) => {
+    const name = p.name?.toLowerCase() || '';
+    // O'lchamni nomdan olish (28mm, 28 mm, 28-mm, va h.k.)
+    let sizeMatch = name.match(/(\d+)\s*(mm|ml|мм|мл)/i);
+    if (!sizeMatch) {
+      // Agar mm yo'q bo'lsa, ruchka yoki handle dan keyingi/o'ndingi raqamni qidirish
+      sizeMatch = name.match(/(?:ruchka|handle).*?(\d{2})|(\d{2}).*?(?:ruchka|handle)/i);
+    }
+    if (sizeMatch) {
+      const size = parseInt(sizeMatch[1] || sizeMatch[2]);
+      // Ruchka o'lchamlari: 28, 30, 38, 48, 52
+      if ([28, 30, 38, 48, 52].includes(size)) {
+        if (!ruchkaSizeMap.has(size)) {
+          ruchkaSizeMap.set(size, []);
+        }
+        ruchkaSizeMap.get(size)!.push(p);
+      }
+    }
+  });
+  
+  // O'lchamlarni tartiblash va guruhlarni yaratish
+  const sortedRuchkaSizes = Array.from(ruchkaSizeMap.keys()).sort((a, b) => a - b);
+  const ruchkaGroups: { key: string; title: string; products: Product[] }[] = [];
+  
+  sortedRuchkaSizes.forEach((size) => {
+    const groupProducts = ruchkaSizeMap.get(size)!;
+    if (groupProducts.length > 0) {
+      ruchkaGroups.push({
+        key: `${size}mm-ruchka`,
+        title: `${size}mm Ruchkalar`,
+        products: groupProducts,
+      });
+    }
+  });
+  
+  // O'lcham aniqlanmagan ruchkalar uchun alohida guruh
+  const undefinedSizeRuchka = allRuchka.filter((p) => {
+    const name = p.name?.toLowerCase() || '';
+    const hasSize = /(\d+)\s*(mm|ml|мм|мл)/i.test(name) || 
+                    /(?:ruchka|handle).*?(\d{2})|(\d{2}).*?(?:ruchka|handle)/i.test(name);
+    return !hasSize;
+  });
+  if (undefinedSizeRuchka.length > 0) {
+    ruchkaGroups.push({
+      key: 'nomsiz-ruchka',
+      title: 'Boshqa Ruchkalar',
+      products: undefinedSizeRuchka,
+    });
+  }
+
+  // Custom turlarni alohida guruhlash (custom- boshlangan warehouse ID lar)
+  const customGroups: { key: string; title: string; products: Product[] }[] = [];
+  const customProducts = filteredProducts.filter((p) => {
+    const warehouse = p.warehouse || '';
+    return warehouse.startsWith('custom-');
+  });
+  
+  // Custom turlarni guruhlash
+  const customWarehouses = Array.from(new Set(customProducts.map(p => p.warehouse)));
+  customWarehouses.forEach(warehouse => {
+    const safeWarehouse = warehouse || '';
+    const groupProducts = customProducts.filter(p => p.warehouse === warehouse);
+    if (groupProducts.length > 0) {
+      // Mahsulot nomidan tur nomini olish (masalan: "ETIKETKA OQ" -> "ETIKETKA")
+      const firstProduct = groupProducts[0];
+      const productName = (firstProduct.name || safeWarehouse) as string;
+      const nameParts = productName.split(' ');
+      const title = nameParts[0].toUpperCase();
+      customGroups.push({
+        key: safeWarehouse,
+        title: title,
+        products: groupProducts,
+      });
+    }
   });
 
   const otherProducts = filteredProducts.filter((p) => {
@@ -79,7 +258,8 @@ const ProductSection = ({
     const isPreform = warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|гр|г)/.test(name);
     const isKrishka = warehouse === 'krishka' || name.includes('krishka') || name.includes('qopqoq') || name.includes('cap');
     const isRuchka = warehouse === 'ruchka' || name.includes('ruchka') || name.includes('handle');
-    return !isPreform && !isKrishka && !isRuchka;
+    const isCustom = warehouse.startsWith('custom-');
+    return !isPreform && !isKrishka && !isRuchka && !isCustom;
   });
 
   return (
@@ -147,37 +327,56 @@ const ProductSection = ({
                   color="blue"
                   products={group.products}
                   currency={currency}
-                  onAddProduct={onQuickAdd}
+                  onSelectProduct={onSelectProduct}
+                  onQuickAdd={onQuickAdd}
                   latinToCyrillic={latinToCyrillic}
                 />
               ))}
-              {krishkaProducts.length > 0 && (
+              {krishkaGroups.map((group) => (
                 <ProductTypeCard
-                  title={latinToCyrillic('Krishkalar')}
+                  key={group.key}
+                  title={latinToCyrillic(group.title)}
                   color="purple"
-                  products={krishkaProducts}
+                  products={group.products}
                   currency={currency}
-                  onAddProduct={onQuickAdd}
+                  onSelectProduct={onSelectProduct}
+                  onQuickAdd={onQuickAdd}
                   latinToCyrillic={latinToCyrillic}
                 />
-              )}
-              {ruchkaProducts.length > 0 && (
+              ))}
+              {ruchkaGroups.map((group) => (
                 <ProductTypeCard
-                  title={latinToCyrillic('Ruchkalar')}
+                  key={group.key}
+                  title={latinToCyrillic(group.title)}
                   color="pink"
-                  products={ruchkaProducts}
+                  products={group.products}
                   currency={currency}
-                  onAddProduct={onQuickAdd}
+                  onSelectProduct={onSelectProduct}
+                  onQuickAdd={onQuickAdd}
                   latinToCyrillic={latinToCyrillic}
                 />
-              )}
+              ))}
+              {/* Custom turlar */}
+              {customGroups.map((group) => (
+                <ProductTypeCard
+                  key={group.key}
+                  title={group.title}
+                  color="green"
+                  products={group.products}
+                  currency={currency}
+                  onSelectProduct={onSelectProduct}
+                  onQuickAdd={onQuickAdd}
+                  latinToCyrillic={latinToCyrillic}
+                />
+              ))}
               {otherProducts.length > 0 && (
                 <ProductTypeCard
                   title={latinToCyrillic('Boshqa mahsulotlar')}
                   color="orange"
                   products={otherProducts}
                   currency={currency}
-                  onAddProduct={onQuickAdd}
+                  onSelectProduct={onSelectProduct}
+                  onQuickAdd={onQuickAdd}
                   latinToCyrillic={latinToCyrillic}
                 />
               )}
@@ -199,7 +398,58 @@ export default function AddSaleClean() {
   const saleForm = useSaleForm({ editSale, orderData });
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
 
-  // Load initial data
+  // Real-time product sync
+  const handleProductUpdate = useCallback((updatedProduct: Product) => {
+    // Update products list
+    saleForm.setProducts((prev: Product[]) => {
+      const exists = prev.find(p => p.id === updatedProduct.id);
+      if (exists) {
+        return prev.map(p => p.id === updatedProduct.id ? { ...p, ...updatedProduct } : p);
+      }
+      return [...prev, updatedProduct];
+    });
+
+    // Sync cart items with updated inventory
+    if (saleForm.form.items.length > 0) {
+      const updatedItems = saleForm.form.items.map(item => {
+        if (item.productId === updatedProduct.id) {
+          console.log('🔄 Realtime sync updating item:', item.productName, 'Old price:', item.pricePerBag, 'New price:', updatedProduct.pricePerBag);
+          return {
+            ...item,
+            // Faqat ombor qoldig'ini yangilaymiz, narxni yo'q
+            // pricePerBag: updatedProduct.pricePerBag,
+            // pricePerPiece: updatedProduct.pricePerPiece,
+            unitsPerBag: updatedProduct.unitsPerBag,
+            productName: updatedProduct.name,
+          };
+        }
+        return item;
+      });
+      
+      // Update cart with new product data
+      if (JSON.stringify(updatedItems) !== JSON.stringify(saleForm.form.items)) {
+        console.log('🔄 Realtime sync: Updating cart items');
+        saleForm.form.items = updatedItems;
+      }
+    }
+  }, [saleForm.setProducts]);
+
+  const handleProductDelete = useCallback((deletedProduct: { id: string }) => {
+    saleForm.setProducts((prev: Product[]) => 
+      prev.filter(p => p.id !== deletedProduct.id)
+    );
+  }, [saleForm.setProducts]);
+
+  // Initialize real-time connection
+  useRealtime({
+    onProductCreated: handleProductUpdate,
+    onProductUpdated: handleProductUpdate,
+    onStockAdjusted: handleProductUpdate,
+    onProductDeleted: handleProductDelete,
+    onSettingsChanged: handleProductUpdate,
+  });
+
+  // Load initial data - to'g'ridan-to'g'ri API dan
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -208,65 +458,97 @@ export default function AddSaleClean() {
           api.get('/customers'),
         ]);
 
-        if (productsRes.data) {
-          saleForm.setProducts(productsRes.data);
+        // ✅ Handle standardized API response format
+        const productsData = extractArray<Product>(productsRes, []);
+        const customersData = extractArray<any>(customersRes, []);
+        
+        if (productsData.length > 0) {
+          saleForm.setProducts(productsData);
         }
-        if (customersRes.data) {
-          saleForm.setCustomers(customersRes.data);
+        if (customersData.length > 0) {
+          saleForm.setCustomers(customersData);
         }
       } catch (error) {
-        console.error('Error loading data:', error);
+        // Silently handle error - UI shows empty state
       }
     };
 
     loadData();
   }, []);
 
-  // Refresh products periodically
+  // Sahifa ko'rinib qolganda maxsulotlarni yangilash (bir xil tabda)
   useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await api.get('/products');
-        if (res.data) {
-          saleForm.setProducts(res.data);
-        }
-      } catch (error) {
-        console.error('Error refreshing products:', error);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const reloadProducts = async () => {
+          try {
+            const res = await api.get('/products');
+            // ✅ Handle standardized API response format
+            const productsData = extractArray<Product>(res, []);
+            if (productsData.length > 0) {
+              saleForm.setProducts(productsData);
+            }
+          } catch (error) {
+            // Silently handle error
+          }
+        };
+        reloadProducts();
       }
-    }, 30000);
+    };
 
-    return () => clearInterval(interval);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   // Filter products
-  const filteredProducts = filterProductsByCategory(
-    saleForm.products.filter((p) =>
-      p.name?.toLowerCase().includes(saleForm.productSearch.toLowerCase())
-    ),
-    saleForm.activeCategory
+  const searchFiltered = saleForm.products.filter((p) =>
+    p.name?.toLowerCase().includes(saleForm.productSearch.toLowerCase())
   );
+  const filteredProducts = filterProductsByCategory(searchFiltered, saleForm.activeCategory);
+  
+  // Faqat kerakli mahsulotlarni ko'rsatish
 
   // Handlers
+  
   const handleSelectProduct = useCallback(
-    (product: Product) => {
+    async (product: Product) => {
+      // Tezlashtirilgan - endi API chaqiruvi yo'q
       saleForm.selectProduct(product, saleForm.products, saleForm.selectedCustomer, saleForm.customerPrices);
+      // Avtomatik savatga qo'shish (komplekt bilan)
+      await saleForm.addItem();
     },
     [saleForm]
   );
 
   const handleQuickAdd = useCallback(
-    (product: Product) => {
-      handleSelectProduct(product);
-      setTimeout(() => saleForm.addItem(), 100);
+    async (product: Product) => {
+      // Tezlashtirilgan - endi API chaqiruvi yo'q
+      saleForm.selectProduct(product, saleForm.products, saleForm.selectedCustomer, saleForm.customerPrices);
+      await saleForm.addItem();
     },
-    [handleSelectProduct, saleForm]
+    [saleForm]
   );
+
 
   const handleSubmit = useCallback(async () => {
     try {
       await saleForm.submitSale();
-    } catch (error) {
-      // Error handled in hook
+    } catch (error: any) {
+      console.error('❌ Sotuv yaratishda xatolik:', error);
+      // Extract detailed error message from server response
+      let errorMessage = 'Sotuv yaratib bo\'lmadi';
+      if (error.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = typeof error.response.data.error === 'string' 
+          ? error.response.data.error 
+          : JSON.stringify(error.response.data.error);
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      alert('Xatolik: ' + errorMessage);
     }
   }, [saleForm]);
 
@@ -330,6 +612,7 @@ export default function AddSaleClean() {
               latinToCyrillic={latinToCyrillic}
               onCategoryChange={(cat) => saleForm.setActiveCategory(cat as any)}
               onSearchChange={saleForm.setProductSearch}
+              onSelectProduct={handleSelectProduct}
               onQuickAdd={handleQuickAdd}
             />
 
@@ -446,28 +729,26 @@ export default function AddSaleClean() {
               />
 
               {/* Payment Section */}
-              {saleForm.form.items.length > 0 && (
-                <PaymentSection
-                  form={saleForm.form}
-                  totalAmount={saleForm.totalAmount}
-                  paidAmount={saleForm.paidAmount}
-                  debtAmount={saleForm.debtAmount}
-                  exchangeRate={saleForm.exchangeRate}
-                  currency={saleForm.form.currency}
-                  isSubmitting={saleForm.isSubmitting}
-                  isEditMode={saleForm.isEditMode}
-                  latinToCyrillic={latinToCyrillic}
-                  onUpdateForm={(updates) => {
-                    Object.entries(updates).forEach(([key, value]) => {
-                      saleForm.updateFormField(key as any, value);
-                    });
-                  }}
-                  onExchangeRateChange={saleForm.setExchangeRate}
-                  onSubmit={handleSubmit}
-                  onCancel={() => navigate('/cashier/sales')}
-                  onReset={saleForm.resetForm}
-                />
-              )}
+              <PaymentSection
+                form={saleForm.form}
+                totalAmount={saleForm.totalAmount}
+                paidAmount={saleForm.paidAmount}
+                debtAmount={saleForm.debtAmount}
+                exchangeRate={saleForm.exchangeRate}
+                currency={saleForm.form.currency}
+                isSubmitting={saleForm.isSubmitting}
+                isEditMode={saleForm.isEditMode}
+                latinToCyrillic={latinToCyrillic}
+                onUpdateForm={(updates) => {
+                  Object.entries(updates).forEach(([key, value]) => {
+                    saleForm.updateFormField(key as any, value);
+                  });
+                }}
+                onExchangeRateChange={saleForm.setExchangeRate}
+                onSubmit={handleSubmit}
+                onCancel={() => navigate('/cashier/sales')}
+                onReset={saleForm.resetForm}
+              />
             </div>
           </div>
         </div>

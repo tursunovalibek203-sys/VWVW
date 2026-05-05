@@ -160,6 +160,7 @@ export default function ProfessionalSecurityMonitor({
             onClick={handleRefresh}
             disabled={refreshing}
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            title="Refresh data"
           >
             <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
@@ -419,6 +420,7 @@ export default function ProfessionalSecurityMonitor({
                 <button
                   onClick={() => setSelectedEvent(null)}
                   className="text-gray-400 hover:text-gray-500"
+                  title="Close"
                 >
                   <AlertTriangle className="w-5 h-5" />
                 </button>

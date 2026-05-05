@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Package, ShoppingCart, Calculator, LogOut, User, Users, ClipboardList, Plus, Clock, MessageCircle } from 'lucide-react';
+import { Package, ShoppingCart, Calculator, LogOut, User, Users, ClipboardList, Plus, MessageCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/utils';
@@ -30,7 +30,6 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
     { path: '/cashier/customers', icon: Users, label: 'Mijozlar', color: 'bg-purple-500' },
     { path: '/cashier/cashbox', icon: Calculator, label: 'Kassa', color: 'bg-orange-500' },
     { path: '/cashier/orders', icon: ClipboardList, label: 'Buyurtma', color: 'bg-indigo-500' },
-    { path: '/cashier/shift', icon: Clock, label: 'Smena', color: 'bg-cyan-500' },
     { path: '/cashier/bot', icon: MessageCircle, label: 'Bot', color: 'bg-pink-500' },
     { path: '/cashier/chat', icon: MessageCircle, label: 'Chat', color: 'bg-green-500' },
   ];

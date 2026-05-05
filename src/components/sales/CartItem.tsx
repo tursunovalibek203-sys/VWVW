@@ -33,7 +33,17 @@ export const CartItem = ({
     }
 
     const bagQuantity = parseFloat(cleanVal) || 0;
-    const unitsPerBag = parseFloat(item.unitsPerBag?.toString() || '2000') || 2000;
+    
+    // Stock tekshiruvi
+    const availableStock = cartProduct?.currentStock || 0;
+    if (bagQuantity > availableStock) {
+      alert(`⚠️ ${item.productName} uchun yetarli mahsulot yo'q!\nMavjud: ${availableStock} qop\nSo'ralgan: ${bagQuantity} qop`);
+      return;
+    }
+    
+    // unitsPerBag calculation - agar bo'sh bo'lsa 2000 ishlatiladi
+    const unitsPerBagValue = item.unitsPerBag?.toString() || '';
+    const unitsPerBag = unitsPerBagValue === '' ? 2000 : parseFloat(unitsPerBagValue) || 2000;
     const pricePerBag = item.pricePerBag || 0;
     const pricePerPiece = item.pricePerPiece || pricePerBag / unitsPerBag;
     const totalPieces = bagQuantity * unitsPerBag;
@@ -54,6 +64,8 @@ export const CartItem = ({
 
   const handlePriceChange = (val: string) => {
     const cleanVal = val.replace(/[^0-9.]/g, '');
+    console.log('💰 handlePriceChange:', { val, cleanVal, saleType: item.saleType });
+    
     if (cleanVal === '') {
       onUpdate(index, { pricePerBag: 0, pricePerPiece: 0, subtotal: 0 });
       return;
@@ -62,6 +74,8 @@ export const CartItem = ({
     const newPrice = parseFloat(cleanVal) || 0;
     const bagQuantity = parseFloat(item.bagDisplayValue || item.quantity?.toString() || '0') || 0;
     const unitsPerBag = parseFloat(item.unitsPerBag?.toString() || '2000') || 2000;
+
+    console.log('💰 Calculating:', { newPrice, bagQuantity, unitsPerBag, currentPricePerBag: item.pricePerBag, currentPricePerPiece: item.pricePerPiece });
 
     const updateData: Partial<SaleItemForm> = {};
 
@@ -76,6 +90,7 @@ export const CartItem = ({
       updateData.subtotal = bagQuantity * newPrice;
     }
 
+    console.log('💰 Update data:', updateData);
     onUpdate(index, updateData);
   };
 
@@ -223,15 +238,18 @@ export const CartItem = ({
               id={`units-${index}`}
               type="text"
               placeholder="2000"
-              value={item.unitsPerBag?.toString() || '2000'}
+              value={item.unitsPerBag?.toString() || ''}
               onChange={(e) => {
+                console.log('🔄 unitsPerBag onChange:', e.target.value, '| index:', index);
                 const val = e.target.value.replace(/[^0-9.]/g, '');
-                const units = parseFloat(val) || 2000;
+                const units = val === '' ? 0 : parseFloat(val) || 2000;
                 const quantity = parseFloat(item.bagDisplayValue || item.quantity?.toString() || '0') || 0;
                 const pricePerBag = item.pricePerBag || 0;
-                const pricePerPiece = pricePerBag / units;
+                // Narxni qayta hisoblash - yangi unitsPerBag asosida
+                const pricePerPiece = units > 0 ? pricePerBag / units : 0;
                 const subtotal = quantity * pricePerBag;
 
+                console.log('   Updating:', { unitsPerBag: units, pricePerPiece, subtotal });
                 onUpdate(index, { unitsPerBag: units, pricePerPiece, subtotal });
               }}
               className="w-full h-8 px-2 text-sm font-medium border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-200"

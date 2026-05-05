@@ -55,45 +55,30 @@ export default function CashierBot() {
 
   const loadBotData = async () => {
     try {
-      // Mock data for demo - real implementation would call API
-      const mockMessages: CustomerMessage[] = [
-        {
-          id: '1',
-          customerName: 'Ali Valiyev',
-          message: 'Cement M500 narxi qancha? 20 qop kerak.',
-          telegramChatId: '123456',
-          timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-          status: 'new'
-        },
-        {
-          id: '2',
-          customerName: 'Bekzod Karimov',
-          message: 'Gips 50kg borimi? Qachon yetkazib berasizlar?',
-          telegramChatId: '789012',
-          timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-          status: 'answered'
-        },
-        {
-          id: '3',
-          customerName: 'Dilnoza Ruzimova',
-          message: 'Buyurtma berishim mumkinmi?',
-          telegramChatId: '345678',
-          timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-          status: 'pending'
-        }
-      ];
-
-      const mockStats: BotStats = {
-        totalCustomers: 156,
-        activeChats: 8,
-        todayMessages: 42,
-        pendingOrders: 5
-      };
-
-      setMessages(mockMessages);
-      setStats(mockStats);
+      setLoading(true);
+      // Real API call
+      const [messagesRes, statsRes] = await Promise.all([
+        api.get('/bot/messages').catch(() => ({ data: [] })),
+        api.get('/bot/stats').catch(() => ({ 
+          data: { totalCustomers: 0, activeChats: 0, todayMessages: 0, pendingOrders: 0 }
+        }))
+      ]);
+      
+      const apiMessages = messagesRes.data || [];
+      const mappedMessages: CustomerMessage[] = apiMessages.map((msg: any) => ({
+        id: msg.id,
+        customerName: msg.customer?.name || msg.customerName || 'Noma\'lum',
+        message: msg.message || msg.content || '',
+        telegramChatId: msg.telegramChatId || msg.chatId || '',
+        timestamp: msg.timestamp || msg.createdAt || new Date().toISOString(),
+        status: msg.status || 'new'
+      }));
+      
+      setMessages(mappedMessages);
+      setStats(statsRes.data || { totalCustomers: 0, activeChats: 0, todayMessages: 0, pendingOrders: 0 });
     } catch (error) {
       console.error('Bot data yuklashda xatolik:', error);
+      setMessages([]);
     } finally {
       setLoading(false);
     }
@@ -108,10 +93,11 @@ export default function CashierBot() {
 
     setSending(true);
     try {
-      // Mock API call - real implementation would send to backend
-      console.log('Sending reply:', {
+      // Real API call
+      await api.post('/bot/reply', {
         chatId: selectedMessage.telegramChatId,
-        message: replyText
+        message: replyText,
+        originalMessageId: selectedMessage.id
       });
 
       // Update message status
@@ -124,7 +110,6 @@ export default function CashierBot() {
       setReplyText('');
       setSelectedMessage(null);
       
-      // Show success message
       alert(latinToCyrillic('Javob yuborildi!'));
     } catch (error) {
       console.error('Javob yuborishda xatolik:', error);

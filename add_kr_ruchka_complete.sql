@@ -1,3 +1,0 @@
-INSERT INTO Product (id, name, bagType, unitsPerBag, minStockLimit, optimalStock, maxCapacity, currentStock, currentUnits, pricePerBag, pricePerPiece, productionCost, isParent, parentProductId, variantName, productTypeId, warehouse, categoryId, sizeId, subType, active, createdAt, updatedAt) VALUES
-('krishka-standart', 'Krishka standart', 'SMALL', 1000, 500, 2000, 5000, 1000, 0.50, 0, 0.20, false, NULL, NULL, 'kapsula-type', 'preform', 'kapsula-15gr', 'size-15gr', NULL, true, datetime('now'), datetime('now')),
-('ruchka-standart', 'Ruchka standart', 'SMALL', 1000, 500, 2000, 5000, 1000, 0.30, 0, 0.15, false, NULL, NULL, 'kapsula-type', 'preform', 'kapsula-15gr', 'size-15gr', NULL, true, datetime('now'), datetime('now'));

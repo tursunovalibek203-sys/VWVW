@@ -17,7 +17,8 @@ export default function DebugInfo() {
 
     // Check products
     api.get('/products').then(response => {
-      setProducts(response.data);
+      // ✅ Handle new API response format
+      setProducts(response.data?.data || response.data);
     }).catch(error => {
       console.error('Products error:', error);
     });

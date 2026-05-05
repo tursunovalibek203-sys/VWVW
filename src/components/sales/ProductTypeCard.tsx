@@ -17,7 +17,8 @@ interface ProductTypeCardProps {
   color: 'blue' | 'purple' | 'pink' | 'orange' | 'green';
   products: Product[];
   currency: string;
-  onAddProduct: (product: Product) => void;
+  onSelectProduct: (product: Product) => void;
+  onQuickAdd: (product: Product) => void;
   latinToCyrillic: (text: string) => string;
 }
 
@@ -86,7 +87,8 @@ export const ProductTypeCard = ({
   color,
   products,
   currency,
-  onAddProduct,
+  onSelectProduct,
+  onQuickAdd,
   latinToCyrillic,
 }: ProductTypeCardProps) => {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -145,7 +147,7 @@ export const ProductTypeCard = ({
           {variants.map((variant) => (
             <div
               key={variant.id}
-              onClick={() => onAddProduct(products.find((p) => p.id === variant.id)!)}
+              onClick={() => onSelectProduct(products.find((p) => p.id === variant.id)!)}
               className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 ${colors.light} border ${colors.border} ${colors.hover} hover:shadow-lg hover:scale-[1.02]`}
             >
               <div className="flex items-center gap-3">
@@ -179,18 +181,18 @@ export const ProductTypeCard = ({
                 <span className={`font-bold ${colors.text}`}>
                   {getCurrencySymbol(currency)}
                   {getDisplayAmount(variant.pricePerBag, currency)}
-              </span>
+                </span>
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onAddProduct(products.find((p) => p.id === variant.id)!);
+                    onQuickAdd(products.find((p) => p.id === variant.id)!);
                   }}
-                  aria-label="Add product"
-                  title="Add product"
-                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${colors.light} ${colors.text} ${colors.border} border-2 hover:bg-white hover:shadow-md`}
+                  aria-label={latinToCyrillic("Tez qo'shish")}
+                  title={latinToCyrillic("Tez qo'shish")}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-all transform hover:scale-110 active:scale-95 bg-gradient-to-br ${colors.header} text-white hover:shadow-xl`}
                 >
-                  <Plus className="w-5 h-5" />
+                  <Plus className="w-6 h-6 stroke-[3]" />
                 </button>
               </div>
             </div>

@@ -3,9 +3,36 @@ import crypto from 'crypto';
 
 // CSRF Token store (production'da Redis ishlatish kerak)
 const csrfTokens = new Map<string, { token: string; expires: number }>();
+const MAX_CSRF_TOKENS = 10000; // Memory leak oldini olish uchun
+
+// LRU cleanup - eng eski tokenlarni o'chirish
+const cleanupOldTokens = () => {
+  if (csrfTokens.size <= MAX_CSRF_TOKENS) return;
+  
+  const now = Date.now();
+  const entries = Array.from(csrfTokens.entries());
+  
+  // 1. Muddati o'tgan tokenlarni o'chirish
+  for (const [key, value] of entries) {
+    if (value.expires < now) {
+      csrfTokens.delete(key);
+    }
+  }
+  
+  // 2. Agar hali ham ko'p bo'lsa, eng eskilarini o'chirish
+  if (csrfTokens.size > MAX_CSRF_TOKENS) {
+    const sorted = entries.sort((a, b) => a[1].expires - b[1].expires);
+    const toDelete = sorted.slice(0, csrfTokens.size - MAX_CSRF_TOKENS);
+    for (const [key] of toDelete) {
+      csrfTokens.delete(key);
+    }
+  }
+};
 
 // CSRF Token yaratish
 export const generateCsrfToken = (sessionId: string): string => {
+  cleanupOldTokens(); // Har yangi token da cleanup
+  
   const token = crypto.randomBytes(32).toString('hex');
   const expires = Date.now() + 24 * 60 * 60 * 1000; // 24 soat
   csrfTokens.set(sessionId, { token, expires });

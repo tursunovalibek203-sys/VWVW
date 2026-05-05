@@ -59,6 +59,7 @@ export default function QuickActions() {
             ? 'bg-red-500 hover:bg-red-600 rotate-45' 
             : 'bg-blue-500 hover:bg-blue-600'
         }`}
+        title={isOpen ? 'Yopish' : 'Tezkor harakatlar'}
       >
         <Plus className="w-6 h-6 text-white" />
       </button>

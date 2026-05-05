@@ -68,6 +68,7 @@ export default function KeyboardShortcutsHelp() {
               <button
                 onClick={() => setIsOpen(false)}
                 className="text-muted-foreground hover:text-foreground transition-colors"
+                title="Close"
               >
                 <X className="w-5 h-5" />
               </button>

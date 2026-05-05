@@ -1,69 +1,66 @@
+/**
+ * Standard API Response Format
+ * All endpoints MUST use this format for consistency
+ */
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
-  error?: {
-    code: string;
-    message: string;
-    details?: any;
-  };
-  meta?: {
-    page?: number;
-    limit?: number;
-    total?: number;
-    totalPages?: number;
+  error?: string;
+  message?: string;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
   };
 }
 
-export class ResponseHelper {
-  
-  static success<T>(data: T, meta?: ApiResponse['meta']): ApiResponse<T> {
-    return {
-      success: true,
-      data,
-      meta
-    };
-  }
-
-  static error(code: string, message: string, details?: any): ApiResponse {
-    return {
-      success: false,
-      error: {
-        code,
-        message,
-        details
-      }
-    };
-  }
-
-  // Common error responses
-  static badRequest(message: string, details?: any) {
-    return this.error('BAD_REQUEST', message, details);
-  }
-
-  static notFound(entity: string) {
-    return this.error('NOT_FOUND', `${entity} topilmadi`);
-  }
-
-  static unauthorized() {
-    return this.error('UNAUTHORIZED', 'Ruxsat yo\'q');
-  }
-
-  static forbidden() {
-    return this.error('FORBIDDEN', 'Amalga oshirish taqiqlangan');
-  }
-
-  static internalError(message?: string) {
-    return this.error('INTERNAL_ERROR', message || 'Server xatosi');
-  }
-
-  static validationError(errors: any[]) {
-    return this.error('VALIDATION_ERROR', 'Validatsiya xatosi', errors);
-  }
+/**
+ * Success response helper
+ */
+export function successResponse<T>(data: T, message?: string): ApiResponse<T> {
+  return {
+    success: true,
+    data,
+    ...(message && { message })
+  };
 }
 
-// Legacy support - for backward compatibility
-export const formatSuccess = <T>(data: T, meta?: ApiResponse['meta']) => 
-  ResponseHelper.success(data, meta);
+/**
+ * Success response with pagination
+ */
+export function paginatedResponse<T>(
+  data: T,
+  pagination: { page: number; limit: number; total: number; totalPages: number },
+  message?: string
+): ApiResponse<T> {
+  return {
+    success: true,
+    data,
+    pagination,
+    ...(message && { message })
+  };
+}
 
-export const formatError = (code: string, message: string, details?: any) => 
-  ResponseHelper.error(code, message, details);
+/**
+ * Error response helper
+ */
+export function errorResponse(error: string, details?: any): ApiResponse {
+  return {
+    success: false,
+    error,
+    ...(details && process.env.NODE_ENV === 'development' && { data: details })
+  };
+}
+
+/**
+ * Validation error response
+ */
+export function validationErrorResponse(errors: Record<string, string>): ApiResponse {
+  return {
+    success: false,
+    error: 'Validation failed',
+    data: { errors }
+  };
+}

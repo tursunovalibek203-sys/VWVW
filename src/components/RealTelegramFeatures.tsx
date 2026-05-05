@@ -1,56 +1,42 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './Card';
+import { useState } from 'react';
+import { Card, CardContent } from './Card';
+import { Progress } from './Progress';
 import { Button } from './Button';
 import { Badge } from './Badge';
-import { 
-  ShoppingCart, 
-  Wallet, 
-  Gift, 
-  User, 
-  TrendingUp, 
-  Package, 
-  Star, 
+import {
+  ShoppingCart,
+  Wallet,
+  Gift,
+  User,
+  TrendingUp,
+  Package,
+  Star,
   Crown,
   Trophy,
   CreditCard,
-  Truck,
-  HelpCircle,
   Settings,
-  Bell,
   Download,
   Share2,
   Target,
   Zap,
   Shield,
-  Headphones,
   Bot,
   MessageCircle,
   Phone,
   MapPin,
   Calendar,
   Clock,
-  CheckCircle,
-  AlertCircle,
   Info,
   Send,
   RefreshCw,
-  Filter,
   Search,
-  Plus,
-  Minus,
-  Edit,
-  Trash2,
   Eye,
-  Copy,
   ExternalLink,
   FileText,
-  Image,
   Video,
-  Music,
   Mic,
   Camera,
-  Paperclip,
-  Link as LinkIcon
+  Paperclip
 } from 'lucide-react';
 
 interface TelegramFeature {
@@ -254,7 +240,7 @@ const telegramFeatures: TelegramFeature[] = [
     id: 'inline_buttons',
     name: 'Inline Tugmalar',
     description: 'Interaktiv tugmalar',
-    icon: <Button className="w-5 h-5" />,
+    icon: <div className="w-5 h-5 bg-blue-500 rounded flex items-center justify-center text-white text-xs font-bold">Btn</div>,
     category: 'interaktiv',
     available: true
   },
@@ -455,6 +441,7 @@ export default function RealTelegramFeatures() {
                   className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
+                  title="Select category"
                 >
                   <option value="all">Barcha kategoriyalar</option>
                   {categories.map((category) => (
@@ -490,7 +477,7 @@ export default function RealTelegramFeatures() {
                     </div>
                     <div>
                       <h3 className="font-semibold">{feature.name}</h3>
-                      <Badge variant={feature.available ? 'default' : 'secondary'}>
+                      <Badge variant={feature.available ? 'default' : 'warning'}>
                         {feature.available ? 'Faol' : 'Rejada'}
                       </Badge>
                     </div>

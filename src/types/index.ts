@@ -421,6 +421,8 @@ export interface NewItemForm {
   priceDisplayValue: string;
   unitsPerBag: string;
   saleType: 'bag' | 'piece' | 'komplekt';
+  maxQuantity?: number; // Ombordagi maksimal miqdor
+  product?: Product; // To'liq mahsulot ma'lumotlari
 }
 
 export type ProductCategory = 'all' | 'preform' | 'krishka' | 'ruchka' | 'other';

@@ -52,14 +52,6 @@ export const useSales = () => {
     loadData();
   }, [loadData]);
 
-  // Auto refresh every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadData();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [loadData]);
-
   // Filter sales
   const filteredSales = useMemo(() => {
     return sales.filter((sale) => {

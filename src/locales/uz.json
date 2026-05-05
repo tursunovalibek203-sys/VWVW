@@ -138,5 +138,28 @@
     "add": "Қўшиш",
     "cancel": "Бекор қилиш",
     "createOrder": "Буюртма яратиш"
+  },
+  "navigation": {
+    "dashboard": "Бош саҳифа",
+    "sales": "Сотувлар",
+    "orders": "Буюртмалар",
+    "products": "Маҳсулотлар",
+    "customers": "Мижозлар",
+    "cashbox": "Касса",
+    "cashierManagement": "Кассир бошқаруви",
+    "reports": "Ҳисоботлар",
+    "settings": "Созламалар",
+    "analytics": "Аналитика",
+    "revenueCalculator": "Даромад ҳисоблагич",
+    "activityMonitor": "Фаолият монитори",
+    "inventory": "Омбор",
+    "suppliers": "Етказиб берувчилар",
+    "production": "Ишлаб чиқариш",
+    "qualityControl": "Сифат назорати",
+    "logistics": "Логистика",
+    "aiAssistant": "Ёрдамчи AI",
+    "bots": "Ботлар",
+    "cloudBackup": "Булутли захира",
+    "shortcuts": "Тезкор тугмалар"
   }
 }

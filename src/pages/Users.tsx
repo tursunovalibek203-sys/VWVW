@@ -4,7 +4,7 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import Modal from '../components/Modal';
 import Badge, { type BadgeVariant } from '../components/Badge';
-import api from '../lib/api';
+import api from '../lib/professionalApi';
 import { Users as UsersIcon, Shield, Edit, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 

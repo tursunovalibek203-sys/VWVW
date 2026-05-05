@@ -17,7 +17,7 @@ async function main() {
   console.log(`Topildi: ${ruchka48Products.length} ta 48 ruchka`);
 
   for (const product of ruchka48Products) {
-    const newPricePerPiece = 0.017;
+    const newPricePerPiece = 0.16;
     const newPricePerBag = newPricePerPiece * product.unitsPerBag;
 
     await prisma.product.update({

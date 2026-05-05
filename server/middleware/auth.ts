@@ -1,50 +1,66 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { redis } from '../utils/redis';
 
 // FIXED: JWT secret har doim bir xil bo'lishi kerak
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// JWT_SECRET tekshiruvi
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required');
-}
-
-if (JWT_SECRET.length < 32) {
-  throw new Error('JWT_SECRET must be at least 32 characters long');
-}
-
-// Production da zaif secret tekshiruvi
-if (process.env.NODE_ENV === 'production') {
-  const weakSecrets = ['secret', 'dev-secret', 'test', 'password', '123456'];
-  if (weakSecrets.some(weak => JWT_SECRET.toLowerCase().includes(weak))) {
-    throw new Error('JWT_SECRET is too weak for production');
+// JWT_SECRET tekshiruvi - graceful shutdown
+function validateJwtSecret(): string {
+  if (!JWT_SECRET) {
+    console.error('❌ JWT_SECRET environment variable is required');
+    console.error('Please set JWT_SECRET in your .env file');
+    process.exit(1);
   }
+
+  if (JWT_SECRET.length < 32) {
+    console.error('❌ JWT_SECRET must be at least 32 characters long');
+    console.error(`Current length: ${JWT_SECRET.length}`);
+    process.exit(1);
+  }
+
+  // Production da zaif secret tekshiruvi
+  if (process.env.NODE_ENV === 'production') {
+    const weakSecrets = ['secret', 'dev-secret', 'test', 'password', '123456'];
+    if (weakSecrets.some(weak => JWT_SECRET.toLowerCase().includes(weak))) {
+      console.error('❌ JWT_SECRET is too weak for production');
+      process.exit(1);
+    }
+  }
+
+  return JWT_SECRET;
 }
+
+const VALIDATED_JWT_SECRET = validateJwtSecret();
 
 export interface AuthRequest extends Request {
   user?: { id: string; role: string; name?: string; email?: string };
 }
 
-export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.split(' ')[1];
-  
-  console.log('🔐 Auth check:', req.url);
-  console.log('🔐 Token exists:', !!token);
-  
+
   if (!token) {
-    console.log('❌ No token');
     return res.status(401).json({ error: 'No token provided' });
   }
 
+  // Check if token is blacklisted (revoked)
   try {
-    console.log('🔐 Verifying token...');
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; role: string; name?: string; email?: string };
-    console.log('✅ Token valid, user:', decoded.id);
+    const isBlacklisted = await redis.get(`blacklist:${token}`);
+    if (isBlacklisted) {
+      return res.status(401).json({ error: 'Token has been revoked' });
+    }
+  } catch (redisError) {
+    // If Redis is down, log the error but continue with JWT verification
+    console.error('Redis blacklist check failed:', redisError);
+  }
+
+  try {
+    const decoded = jwt.verify(token, VALIDATED_JWT_SECRET) as { id: string; role: string; name?: string; email?: string };
     req.user = decoded;
     next();
   } catch (error) {
-    console.log('❌ Token invalid:', error instanceof Error ? error.message : 'Unknown');
     return res.status(401).json({ error: 'Invalid token', details: error instanceof Error ? error.message : 'Unknown' });
   }
 };

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
   Filter, 
@@ -10,7 +9,6 @@ import {
   Calendar,
   BarChart3,
   PieChart,
-  ArrowLeft,
   Plus,
   Eye,
   Printer,
@@ -18,7 +16,7 @@ import {
 } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
 import ModernLayout from '../components/ModernLayout';
-import api from '../lib/api';
+import api from '../lib/professionalApi';
 
 interface Report {
   id: string;
@@ -31,7 +29,6 @@ interface Report {
 }
 
 export default function ReportsModern() {
-  const navigate = useNavigate();
   const [reports, setReports] = useState<Report[]>([]);
   const [filteredReports, setFilteredReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,7 +48,7 @@ export default function ReportsModern() {
       const [salesRes, inventoryRes, customersRes, financialRes] = await Promise.all([
         api.get('/reports/sales').catch(() => ({ data: [] })),
         api.get('/reports/inventory').catch(() => ({ data: [] })),
-        api.get('/reports/customers').catch(() => ({ data: [] })),
+        api.get('/reports/customer-analysis').catch(() => ({ data: [] })),
         api.get('/reports/profit-loss').catch(() => ({ data: null }))
       ]);
       
@@ -266,8 +263,9 @@ export default function ReportsModern() {
             {/* Generate Report Button */}
             <button
               type="button"
-              onClick={() => navigate('/reports/generate')}
-              className="btn-gradient-primary px-6 py-3 flex items-center gap-2"
+              onClick={loadReports}
+              disabled={loading}
+              className="btn-gradient-primary px-6 py-3 flex items-center gap-2 disabled:opacity-50"
             >
               <Plus className="w-5 h-5" />
               {latinToCyrillic("Янги Ҳисбот")}
@@ -339,7 +337,7 @@ export default function ReportsModern() {
               <div className="inline-flex items-center justify-center w-16 h-16">
                 <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
               </div>
-              <p className="text-lg font-semibold text-primary mb-4">{latinToCyrillic("Хатолик Юз Берди")}</p>
+              <p className="text-lg font-semibold text-primary mb-4">{latinToCyrillic("Yuklanmoqda...")}</p>
             </div>
           </div>
         )}
@@ -395,7 +393,7 @@ export default function ReportsModern() {
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => navigate(`/reports/${report.id}`)}
+                            onClick={() => alert(`${report.name}\n${latinToCyrillic('Turi')}: ${getTypeText(report.type)}\n${latinToCyrillic('Sana')}: ${report.date}\n${latinToCyrillic('Hajmi')}: ${formatFileSize(report.size)}`)}
                             className="btn-gradient-secondary p-1"
                             aria-label="Hisobotni ko'rish"
                           >
@@ -403,7 +401,7 @@ export default function ReportsModern() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => navigate(`/reports/${report.id}/download`)}
+                            onClick={() => alert(latinToCyrillic('Yuklab olish funksiyasi tez orada qo\'shiladi!'))}
                             className="btn-gradient-primary p-1"
                             aria-label="Hisobotni yuklab olish"
                           >

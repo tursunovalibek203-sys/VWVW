@@ -287,7 +287,7 @@ export class ProfessionalAPIGateway {
   }
 
   // Resolve service from path
-  private resolveService(path: string): ServiceConfig | null {
+  private resolveService(path: string): ServiceConfig | undefined | null {
     // Simple path-based routing
     if (path.startsWith('/api/users')) return this.services.get('user-service');
     if (path.startsWith('/api/products')) return this.services.get('product-service');
@@ -592,7 +592,7 @@ export class ProfessionalAPIGateway {
     }
 
     // Reset to half-open after timeout
-    if (circuitBreaker.state === CircuitBreaker.OPEN && 
+    if (circuitBreaker.state === CircuitBreakerState.OPEN && 
         circuitBreaker.lastFailureTime &&
         now.getTime() - circuitBreaker.lastFailureTime.getTime() > circuitBreaker.timeout) {
       circuitBreaker.state = CircuitBreakerState.HALF_OPEN;
@@ -637,6 +637,7 @@ export class ProfessionalAPIGateway {
           state: circuitBreaker.state,
           failures: circuitBreaker.failures,
           successCount: circuitBreaker.successCount,
+          threshold: circuitBreaker.threshold,
         },
         rateLimiter: {
           requests: rateLimiter.requests,
@@ -685,7 +686,12 @@ export class ProfessionalAPIGateway {
       error?: string;
     }>;
   }> {
-    const serviceStatuses = [];
+    const serviceStatuses: Array<{
+      name: string;
+      status: 'healthy' | 'unhealthy';
+      responseTime?: number;
+      error?: string;
+    }> = [];
     
     for (const service of this.services.values()) {
       try {

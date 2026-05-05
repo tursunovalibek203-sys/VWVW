@@ -820,18 +820,24 @@ export function generateDeliveryStatementHTML(data: ReceiptData): string {
 
 // 80mm (8cm) thermal qog'oz uchun Yuk va Balans Xati
 export function generateDeliveryStatementThermalHTML(data: ReceiptData): string {
+  const totalBags = data.items.reduce((sum, item) => sum + item.quantity, 0);
+
   const itemsHTML = data.items.map((item, index) => `
     <tr class="item-row">
       <td class="col-no">${index + 1}</td>
-      <td class="col-name">
-        <div class="product-name">${item.name}</div>
-        <div class="product-meta">${item.piecesPerBag ? item.piecesPerBag + ' dona/qop' : ''}</div>
-      </td>
+      <td class="col-name">${item.name}</td>
       <td class="col-qty">${item.quantity}</td>
+      <td class="col-perbag">${item.piecesPerBag || '-'}</td>
       <td class="col-price">${item.pricePerUnit.toLocaleString()}</td>
       <td class="col-total">${item.subtotal.toLocaleString()}</td>
     </tr>
   `).join('');
+
+  // Mijoz qarzini formatlash
+  const hasUZSDebt = (data.customer.totalDebtUZS || 0) > 0;
+  const hasUSDDebt = (data.customer.totalDebtUSD || 0) > 0;
+  const hasPrevUZS = (data.customer.previousBalanceUZS || 0) > 0;
+  const hasPrevUSD = (data.customer.previousBalanceUSD || 0) > 0;
 
   return `
 <!DOCTYPE html>
@@ -847,7 +853,7 @@ export function generateDeliveryStatementThermalHTML(data: ReceiptData): string 
             font-weight: 400;
             src: local('Arial');
         }
-        
+
         * {
             box-sizing: border-box;
             -webkit-print-color-adjust: exact;
@@ -856,9 +862,9 @@ export function generateDeliveryStatementThermalHTML(data: ReceiptData): string 
         }
 
         @media print {
-            @page { 
-                size: 80mm auto; 
-                margin: 0 !important; 
+            @page {
+                size: 80mm auto;
+                margin: 0 !important;
             }
             html, body {
                 margin: 0 !important;
@@ -869,338 +875,392 @@ export function generateDeliveryStatementThermalHTML(data: ReceiptData): string 
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Courier New', 'Courier', ' monospace', 'Arial Black', sans-serif;
             font-size: 11px;
-            line-height: 1.3;
-            width: 80mm;
-            padding: 4mm 4mm 10mm 4mm;
+            line-height: 1.5;
+            width: 76mm;
+            padding: 2mm 2mm 6mm 2mm;
             background: white;
             color: #000;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .container {
             width: 100%;
         }
 
-        /* Logo & Header */
+        /* Phone Number - 8 6 5 */
+        .phone-header {
+            text-align: center;
+            font-size: 20px;
+            font-weight: 900;
+            letter-spacing: 10px;
+            padding: 8px 0;
+            border-bottom: 2px solid #000;
+            margin-bottom: 4px;
+            font-family: 'Courier New', monospace;
+            text-shadow: 1px 1px 0 #ccc;
+        }
+
+        /* Header */
         .header {
             text-align: center;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             padding-bottom: 8px;
             border-bottom: 2px solid #000;
-            position: relative;
-            padding-top: 8px;
-        }
-
-        /* Yuqori yuk xati chizig'i */
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: linear-gradient(90deg, #2563eb 0%, #3b82f6 25%, #60a5fa 50%, #3b82f6 75%, #2563eb 100%);
-            opacity: 0.8;
-        }
-
-        .header::after {
-            content: '';
-            position: absolute;
-            top: 4px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: linear-gradient(90deg, transparent 0%, #93c5fd 50%, transparent 100%);
-            opacity: 0.6;
         }
 
         .brand-name {
-            font-size: 20px;
+            font-size: 24px;
             font-weight: 900;
-            letter-spacing: -0.5px;
+            letter-spacing: 1px;
             text-transform: uppercase;
-            line-height: 1;
+            line-height: 1.1;
             margin-bottom: 4px;
+            font-family: 'Courier New', 'Arial Black', sans-serif;
+            text-shadow: 1px 1px 0 #ddd;
         }
 
         .brand-sub {
-            font-size: 9px;
+            font-size: 11px;
             font-weight: 700;
             letter-spacing: 2px;
-            color: #333;
-            text-transform: uppercase;
+            color: #000;
+            font-family: 'Courier New', monospace;
         }
 
         /* Document Title */
-        .doc-badge {
-            background: #000;
-            color: #fff;
+        .doc-title {
             text-align: center;
-            padding: 6px 0;
             font-weight: 900;
-            font-size: 14px;
-            margin-bottom: 12px;
+            font-size: 16px;
+            margin: 10px 0;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
+            border-top: 2px solid #000;
+            border-bottom: 2px solid #000;
+            padding: 8px 0;
+            font-family: 'Courier New', 'Arial Black', sans-serif;
+            background: #f9f9f9;
         }
 
-        /* Info Grid */
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-
-        .info-box {
-            border: 1px solid #e0e0e0;
-            padding: 6px;
-            border-radius: 4px;
-        }
-
-        .info-label {
-            font-size: 8px;
-            font-weight: 800;
-            color: #666;
-            text-transform: uppercase;
-            margin-bottom: 2px;
-        }
-
-        .info-value {
-            font-size: 11px;
-            font-weight: 700;
-        }
-
-        .full-width {
-            grid-column: span 2;
-        }
-
-        /* Table Styles */
+        /* Items Table */
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
+            font-size: 10px;
         }
 
         .items-table th {
+            border-top: 2px solid #000;
             border-bottom: 2px solid #000;
-            padding: 6px 2px;
-            font-size: 9px;
+            padding: 6px 3px;
             font-weight: 900;
-            text-align: left;
-            text-transform: uppercase;
+            text-align: center;
+            background: #e0e0e0;
+            font-size: 10px;
+            font-family: 'Courier New', 'Arial Black', sans-serif;
+            letter-spacing: 0.5px;
         }
 
-        .item-row td {
-            padding: 6px 2px;
-            border-bottom: 1px solid #eee;
+        .items-table td {
+            padding: 5px 3px;
+            border-bottom: 1px solid #bbb;
             vertical-align: top;
         }
 
-        .col-no { width: 20px; text-align: center; color: #666; font-size: 9px; }
-        .col-qty { width: 35px; text-align: center; font-weight: 700; }
-        .col-price { width: 60px; text-align: right; }
-        .col-total { width: 70px; text-align: right; font-weight: 800; }
+        .col-no { width: 20px; text-align: center; font-weight: 700; }
+        .col-name { width: auto; text-align: left; font-weight: 700; }
+        .col-qty { width: 32px; text-align: center; font-weight: 700; }
+        .col-perbag { width: 40px; text-align: center; font-size: 9px; font-weight: 600; }
+        .col-price { width: 50px; text-align: right; font-weight: 700; }
+        .col-total { width: 55px; text-align: right; font-weight: 800; }
 
-        .product-name {
-            font-weight: 700;
-            font-size: 11px;
-            margin-bottom: 1px;
+        /* Total Row */
+        .total-row {
+            border-top: 2px solid #000;
+            border-bottom: 2px solid #000;
+            background: #e0e0e0;
         }
 
-        .product-meta {
-            font-size: 8px;
-            color: #666;
+        .total-row td {
+            font-weight: 900;
+            padding: 6px 3px;
+            border-bottom: none;
+            font-size: 11px;
         }
 
         /* Summary Section */
-        .summary-box {
-            margin-bottom: 12px;
+        .summary-section {
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 2px solid #000;
         }
 
-        .summary-row {
+        .summary-line {
             display: flex;
             justify-content: space-between;
-            padding: 4px 0;
+            margin: 4px 0;
+            font-size: 12px;
+        }
+
+        .summary-line.grand-total {
+            font-weight: 900;
+            font-size: 14px;
+            border-top: 2px solid #000;
+            border-bottom: 2px solid #000;
+            padding: 6px 0;
+            margin-top: 6px;
+        }
+
+        /* Debt Section */
+        .debt-section {
+            margin: 10px 0;
+            padding: 8px;
+            border: 2px solid #000;
+            background: #f5f5f5;
+        }
+
+        .debt-title {
+            text-align: center;
+            font-weight: 900;
+            font-size: 14px;
+            margin-bottom: 6px;
+            padding-bottom: 4px;
+            border-bottom: 2px dashed #000;
+            font-family: 'Courier New', 'Arial Black', sans-serif;
+            letter-spacing: 1px;
+        }
+
+        .debt-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
             font-size: 11px;
         }
 
-        .summary-row.total {
+        .debt-row.prev {
+            color: #444;
+            font-weight: 600;
+        }
+
+        .debt-row.current {
+            font-weight: 800;
+            color: #d32f2f;
             border-top: 2px solid #000;
-            border-bottom: 2px solid #000;
+            padding-top: 4px;
             margin-top: 4px;
-            padding: 8px 0;
-            font-weight: 900;
-            font-size: 15px;
+            font-size: 12px;
         }
 
-        /* Balance Box */
-        .balance-container {
-            background: #f9f9f9;
-            border: 1px dashed #000;
-            padding: 8px;
-            margin-bottom: 12px;
-            border-radius: 4px;
+        /* Info Section - pastda */
+        .info-section {
+            margin: 12px 0;
+            padding-top: 10px;
+            border-top: 2px solid #000;
         }
 
-        .balance-title {
-            text-align: center;
-            font-weight: 900;
-            font-size: 10px;
-            text-transform: uppercase;
-            margin-bottom: 6px;
-            padding-bottom: 4px;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .balance-item {
+        .info-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 3px;
-            font-size: 10px;
+            margin: 5px 0;
+            font-size: 12px;
         }
 
-        .balance-item.final {
-            margin-top: 6px;
-            padding-top: 4px;
-            border-top: 1px solid #000;
-            font-weight: 900;
-            font-size: 12px;
-            color: #d32f2f;
+        .info-label {
+            font-weight: 700;
+        }
+
+        .info-value {
+            font-weight: 800;
         }
 
         /* Signatures */
-        .sig-grid {
+        .signatures {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 15px;
+            gap: 25px;
             margin-top: 25px;
-            padding-top: 15px;
+            padding-top: 20px;
         }
 
         .sig-line {
-            border-top: 1px solid #000;
+            border-top: 2px solid #000;
             text-align: center;
-            font-size: 9px;
+            font-size: 11px;
             font-weight: 700;
-            padding-top: 4px;
-            text-transform: uppercase;
+            padding-top: 5px;
         }
 
+        /* Footer */
         .footer {
             text-align: center;
             margin-top: 20px;
-            font-size: 8px;
-            color: #666;
-            border-top: 1px solid #eee;
+            font-size: 11px;
+            color: #333;
+            border-top: 2px solid #000;
             padding-top: 10px;
         }
 
-        .divider {
-            height: 1px;
-            background: #eee;
-            margin: 10px 0;
+        .footer-brand {
+            font-size: 16px;
+            font-weight: 900;
+            margin-bottom: 4px;
+            font-family: 'Courier New', 'Arial Black', sans-serif;
+            letter-spacing: 1px;
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Phone Number -->
+        <div class="phone-header">
+            8 6 5
+        </div>
+
+        <!-- Header -->
         <div class="header">
             <div class="brand-name">LUX PET PLAST</div>
-            <div class="brand-sub">Premium Quality Products</div>
+            <div class="brand-sub">Производство ПЭТ преформ</div>
         </div>
 
-        <div class="doc-badge">Yuk Xati № ${data.receiptNumber}</div>
+        <!-- Document Title -->
+        <div class="doc-title">YUK XATI № ${data.receiptNumber}</div>
 
-        <div class="info-grid">
-            <div class="info-box">
-                <div class="info-label">Sana / Vaqt</div>
-                <div class="info-value">${data.date} ${data.time}</div>
-            </div>
-            <div class="info-box">
-                <div class="info-label">Kassir</div>
-                <div class="info-value">${data.cashier}</div>
-            </div>
-            <div class="info-box full-width">
-                <div class="info-label">Mijoz (Qabul qiluvchi)</div>
-                <div class="info-value" style="font-size: 13px;">${data.customer.name}</div>
-                ${data.customer.phone ? `<div style="font-size: 9px; color: #444; margin-top: 2px;">📞 ${data.customer.phone}</div>` : ''}
-            </div>
-            ${data.driver ? `
-            <div class="info-box full-width">
-                <div class="info-label">Yuk tashuvchi (Haydovchi)</div>
-                <div class="info-value">🚚 ${data.driver.name}</div>
-            </div>
-            ` : ''}
-        </div>
-
+        <!-- Items Table -->
         <table class="items-table">
             <thead>
                 <tr>
                     <th class="col-no">№</th>
-                    <th>Mahsulot</th>
-                    <th class="col-qty">Soni</th>
+                    <th class="col-name">Maxsulot</th>
+                    <th class="col-qty">Qop</th>
+                    <th class="col-perbag">1 qopda</th>
+                    <th class="col-price">Narx</th>
                     <th class="col-total">Jami</th>
                 </tr>
             </thead>
             <tbody>
                 ${itemsHTML}
+                <tr class="total-row">
+                    <td colspan="2" style="text-align: left; padding-left: 4px;">JAMI:</td>
+                    <td style="text-align: center;">${totalBags}</td>
+                    <td colspan="2"></td>
+                    <td style="text-align: right;">${data.total.toLocaleString()}</td>
+                </tr>
             </tbody>
         </table>
 
-        <div class="summary-box">
-            <div class="summary-row">
-                <span>Mahsulotlar summasi:</span>
-                <span style="font-weight:700;">${data.total.toLocaleString()} UZS</span>
+        <!-- Summary -->
+        <div class="summary-section">
+            <div class="summary-line">
+                <span>Jami qop:</span>
+                <span style="font-weight:700;">${totalBags} ta</span>
             </div>
-            <div class="summary-row">
-                <span>To'langan (Kirim):</span>
-                <span style="font-weight:700;">${data.totalPaid.toLocaleString()} UZS</span>
+            <div class="summary-line">
+                <span>Jami narx:</span>
+                <span style="font-weight:700;">${data.total.toLocaleString()} so'm</span>
+            </div>
+            <div class="summary-line">
+                <span>To'langan:</span>
+                <span style="font-weight:700;">${data.totalPaid.toLocaleString()} so'm</span>
             </div>
             ${data.debt > 0 ? `
-            <div class="summary-row" style="color:#d32f2f;">
+            <div class="summary-line" style="color:#d32f2f;">
                 <span style="font-weight:700;">Ushbu yukdan qarz:</span>
-                <span style="font-weight:900;">${data.debt.toLocaleString()} UZS</span>
+                <span style="font-weight:900;">${data.debt.toLocaleString()} so'm</span>
             </div>
             ` : ''}
-            <div class="summary-row total">
-                <span>JAMI SUMMA:</span>
-                <span>${data.total.toLocaleString()}</span>
-            </div>
         </div>
 
-        <div class="balance-container">
-            <div class="balance-title">Mijoz Balansi (Umumiy)</div>
-            <div class="balance-item">
-                <span>Eski qarz:</span>
-                <span>${(data.customer.previousBalanceUZS || 0).toLocaleString()} so'm / $${(data.customer.previousBalanceUSD || 0).toLocaleString()}</span>
+        <!-- Customer Debt -->
+        ${(hasPrevUZS || hasPrevUSD || hasUZSDebt || hasUSDDebt) ? `
+        <div class="debt-section">
+            <div class="debt-title">MIJOZ QARZI</div>
+            ${hasPrevUZS ? `
+            <div class="debt-row prev">
+                <span>Oldingi qarz (so'm):</span>
+                <span>${data.customer.previousBalanceUZS?.toLocaleString()} so'm</span>
             </div>
-            <div class="balance-item final">
-                <span>YANGI JAMI QARZ:</span>
-                <span>${(data.customer.newBalanceUZS || 0).toLocaleString()} so'm / $${(data.customer.newBalanceUSD || 0).toLocaleString()}</span>
+            ` : ''}
+            ${hasPrevUSD ? `
+            <div class="debt-row prev">
+                <span>Oldingi qarz ($):</span>
+                <span>$${data.customer.previousBalanceUSD?.toLocaleString()}</span>
+            </div>
+            ` : ''}
+            ${data.customer.previousDebtDays ? `
+            <div class="debt-row prev" style="font-size: 8px; color: #666;">
+                <span>Qarz sanasi:</span>
+                <span>${data.customer.previousDebtDays} kun o'tgan</span>
+            </div>
+            ` : ''}
+            ${(hasUZSDebt || hasUSDDebt) ? `
+            <div class="debt-row current">
+                <span>JAMI QARZ:</span>
+                <span>
+                    ${hasUZSDebt ? `<span>${data.customer.totalDebtUZS?.toLocaleString()} so'm</span>` : ''}
+                    ${(hasUZSDebt && hasUSDDebt) ? '<br>' : ''}
+                    ${hasUSDDebt ? `<span>$${data.customer.totalDebtUSD?.toLocaleString()}</span>` : ''}
+                </span>
+            </div>
+            ` : ''}
+        </div>
+        ` : ''}
+
+        <!-- Info Section - Pastda -->
+        <div class="info-section">
+            <div class="info-row">
+                <span class="info-label">Mijoz:</span>
+                <span class="info-value">${data.customer.name}</span>
+            </div>
+            ${data.customer.phone ? `
+            <div class="info-row">
+                <span class="info-label">Telefon:</span>
+                <span class="info-value">${data.customer.phone}</span>
+            </div>
+            ` : ''}
+            <div class="info-row">
+                <span class="info-label">Kassir:</span>
+                <span class="info-value">${data.cashier}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Sana:</span>
+                <span class="info-value">${data.date} ${data.time}</span>
             </div>
         </div>
 
         ${data.driver ? `
-        <div class="info-box full-width" style="margin-top: 8px; border-style: solid; border-width: 1px; border-color: #000;">
-            <div class="info-label" style="text-align: center; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px;">Xizmat haqi</div>
-            <div style="display: flex; justify-content: space-between; font-size: 10px;">
-                <span>Zavod: ${data.driver.factoryShare.toLocaleString()}</span>
-                <span>Mijoz: ${data.driver.customerShare.toLocaleString()}</span>
+        <!-- Driver Info -->
+        <div class="info-section" style="border-top: 1px dashed #000; margin-top: 8px;">
+            <div class="info-row">
+                <span class="info-label">Haydovchi:</span>
+                <span class="info-value">${data.driver.name}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Zavod to'laydi:</span>
+                <span class="info-value">${data.driver.factoryShare.toLocaleString()} so'm</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Mijoz to'laydi:</span>
+                <span class="info-value">${data.driver.customerShare.toLocaleString()} so'm</span>
             </div>
         </div>
         ` : ''}
 
-        <div class="sig-grid">
-            <div class="sig-line">Topshirdi</div>
-            <div class="sig-line">Qabul qildi</div>
+        <!-- Signatures -->
+        <div class="signatures">
+            <div class="sig-line">Topshirdi (Kassir)</div>
+            <div class="sig-line">Qabul qildi (Mijoz)</div>
         </div>
 
+        <!-- Footer -->
         <div class="footer">
-            <div style="font-weight: 800; margin-bottom: 4px;">RAHMAT! XARIDINGIZ UCHUN TASHAKKUR!</div>
-            <div>ID: ${data.saleId.slice(0, 8)} | ${new Date().toLocaleTimeString()}</div>
-            <div style="margin-top: 4px; font-weight: 700;">LUX PET PLAST ERP</div>
+            <div class="footer-brand">LUX PET PLAST</div>
+            <div>Производство ПЭТ преформ</div>
+            <div style="margin-top: 8px; font-size: 12px; font-weight: 700; font-style: italic;">Xaridingiz uchun rahmat!</div>
+            <div style="margin-top: 4px; font-size: 7px;">ID: ${data.saleId.slice(0, 8)}</div>
         </div>
     </div>
 

@@ -138,5 +138,28 @@
     "add": "Добавить",
     "cancel": "Отмена",
     "createOrder": "Создать заказ"
+  },
+  "navigation": {
+    "dashboard": "Главная",
+    "sales": "Продажи",
+    "orders": "Заказы",
+    "products": "Продукты",
+    "customers": "Клиенты",
+    "cashbox": "Касса",
+    "cashierManagement": "Управление кассирами",
+    "reports": "Отчеты",
+    "settings": "Настройки",
+    "analytics": "Аналитика",
+    "revenueCalculator": "Калькулятор дохода",
+    "activityMonitor": "Монитор активности",
+    "inventory": "Склад",
+    "suppliers": "Поставщики",
+    "production": "Производство",
+    "qualityControl": "Контроль качества",
+    "logistics": "Логистика",
+    "aiAssistant": "AI Помощник",
+    "bots": "Боты",
+    "cloudBackup": "Облачный бэкап",
+    "shortcuts": "Горячие клавиши"
   }
 }

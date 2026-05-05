@@ -269,6 +269,7 @@ export default function CloudBackupComponent({ className = '' }: CloudBackupComp
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            title="Toggle advanced settings"
           >
             <Settings className="w-5 h-5" />
           </button>
@@ -438,6 +439,8 @@ export default function CloudBackupComponent({ className = '' }: CloudBackupComp
                   min="1"
                   max="1440"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="Backup interval in minutes"
+                  placeholder="60"
                 />
               </div>
             )}
@@ -554,6 +557,7 @@ export default function CloudBackupComponent({ className = '' }: CloudBackupComp
                           <button
                             onClick={() => window.open(backup.downloadUrl, '_blank')}
                             className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            title="View backup"
                           >
                             <Eye className="w-4 h-4 text-blue-600" />
                           </button>
@@ -561,6 +565,7 @@ export default function CloudBackupComponent({ className = '' }: CloudBackupComp
                         <button
                           onClick={() => navigator.clipboard.writeText(backup.downloadUrl || '')}
                           className="p-1 hover:bg-gray-100 rounded transition-colors"
+                          title="Copy URL"
                         >
                           <Copy className="w-4 h-4 text-gray-600" />
                         </button>

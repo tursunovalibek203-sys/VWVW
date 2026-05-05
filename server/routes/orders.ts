@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import { prisma } from '../utils/prisma';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
+
+// Exchange rate - should come from environment or settings
+const exchangeRates = {
+  USD_TO_UZS: parseInt(process.env.EXCHANGE_RATE_USD_TO_UZS || '12500', 10)
+};
 import { OrderWorkflow } from '../services/order-workflow';
 import {
   OrderCreateSchema,
@@ -465,20 +470,22 @@ router.post('/:id/sell', authorize('ADMIN', 'CASHIER', 'MANAGER'), async (req: A
           console.log(`✅ Kassa (UZS): ${paymentDetails.uzs} so'm`);
         }
         
-        // USD (Dollar)
+        // USD (Dollar) - Convert to UZS for consistent cashbox tracking
         if (paymentDetails.usd && paymentDetails.usd > 0) {
+          const usdInUZS = paymentDetails.usd * exchangeRates.USD_TO_UZS;
           await prisma.cashboxTransaction.create({
             data: {
               type: 'INCOME',
-              amount: paymentDetails.usd,
+              amount: usdInUZS,  // Store in UZS for consistency
+              currency: 'UZS',     // Explicitly set currency
               category: 'SALE',
-              description: `Buyurtma #${order.orderNumber} (Dollar)`,
+              description: `Buyurtma #${order.orderNumber} (Dollar ${paymentDetails.usd} USD)`,
               userId: req.user!.id,
               userName: req.user!.name || 'Admin',
               reference: order.id
             }
           });
-          console.log(`✅ Kassa (USD): $${paymentDetails.usd}`);
+          console.log(`✅ Kassa (USD): $${paymentDetails.usd} = ${usdInUZS} UZS`);
         }
         
         // CLICK

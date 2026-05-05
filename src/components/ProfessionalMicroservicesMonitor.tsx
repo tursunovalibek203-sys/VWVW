@@ -1,25 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Server, 
   Activity, 
-  Zap, 
+  Zap,
   AlertTriangle, 
   CheckCircle, 
   Clock, 
   Users, 
   Database, 
   Globe, 
-  Shield, 
   BarChart3,
-  TrendingUp,
-  TrendingDown,
   RefreshCw,
   Settings,
   Eye,
   Router,
   Cpu,
-  HardDrive,
-  Wifi
+  HardDrive
 } from 'lucide-react';
 import { apiGateway, CircuitBreakerState } from '../lib/professionalAPIGateway';
 
@@ -43,6 +39,7 @@ interface ServiceHealth {
     state: CircuitBreakerState;
     failures: number;
     successCount: number;
+    threshold: number;
   };
   rateLimiter: {
     requests: number;
@@ -79,11 +76,11 @@ export default function ProfessionalMicroservicesMonitor({
       setRefreshing(true);
       
       // Get service status from API Gateway
-      const serviceStatus = apiGateway.getInstance().getServiceStatus();
-      const gatewayMetrics = apiGateway.getInstance().getMetrics();
+      const serviceStatus = apiGateway().getServiceStatus();
+      const gatewayMetrics = apiGateway().getMetrics();
       
       // Transform to ServiceHealth format
-      const servicesHealth: ServiceHealth[] = serviceStatus.map(service => ({
+      const servicesHealth: ServiceHealth[] = serviceStatus.map((service) => ({
         name: service.name,
         status: service.circuitBreaker.state === CircuitBreakerState.OPEN ? 'unhealthy' :
                 service.circuitBreaker.failures > 0 ? 'degraded' : 'healthy',
@@ -168,7 +165,7 @@ export default function ProfessionalMicroservicesMonitor({
   };
 
   const resetCircuitBreaker = (serviceName: string) => {
-    apiGateway.getInstance().resetCircuitBreaker(serviceName);
+    apiGateway().resetCircuitBreaker(serviceName);
     loadMicroservicesData();
   };
 
@@ -208,6 +205,7 @@ export default function ProfessionalMicroservicesMonitor({
             onClick={handleRefresh}
             disabled={refreshing}
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            title="Refresh data"
           >
             <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
@@ -411,6 +409,7 @@ export default function ProfessionalMicroservicesMonitor({
                 <button
                   onClick={() => setSelectedService(null)}
                   className="text-gray-400 hover:text-gray-500"
+                  title="Close"
                 >
                   <AlertTriangle className="w-5 h-5" />
                 </button>

@@ -1,33 +1,63 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { useThemeStore } from './store/themeStore';
-import { useEffect, useState, Suspense, lazy } from 'react';
+import { useEffect, Suspense, lazy } from 'react';
 import './i18n';
 import { LanguageProvider } from './contexts/LanguageContext';
-import ErrorBoundary from './components/ErrorBoundary';
+import ErrorBoundary from './components/ui/ErrorBoundary';
+import { ToastProvider } from './components/ui/Toast';
 
-// Lazy loading for better performance
+// ========== LAZY LOADED PAGES ==========
+// Auth pages
 const Login = lazy(() => import('./pages/Login'));
 const CashierLogin = lazy(() => import('./pages/CashierLogin'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-import Products from './pages/Products';
-const Customers = lazy(() => import('./pages/CustomersModern'));
-const Reports = lazy(() => import('./pages/ReportsModern'));
-const Settings = lazy(() => import('./pages/Settings'));
 
-// Core pages
-import ProductDetail from './pages/ProductDetail';
-import SimplifiedInventory from './pages/SimplifiedInventory';
-import CustomerProfile from './pages/CustomerProfile';
-import Orders from './pages/Orders';
-import Cashbox from './pages/Cashbox';
-import Sales from './pages/SalesClean';
-const AddSale = lazy(() => import('./pages/AddSaleClean'));
+// Dashboard & Main
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const DashboardModern = lazy(() => import('./pages/DashboardModern'));
+
+// Inventory
+const SimplifiedInventory = lazy(() => import('./pages/SimplifiedInventory'));
+const ProductDetail = lazy(() => import('./pages/ProductDetail'));
 const AddProduct = lazy(() => import('./pages/AddProduct'));
+
+// Sales
+const Sales = lazy(() => import('./pages/SalesModern'));
+const AddSale = lazy(() => import('./pages/AddSaleClean'));
+
+// Customers
+const Customers = lazy(() => import('./pages/CustomersModern'));
+const CustomerProfile = lazy(() => import('./pages/CustomerProfile'));
+const CustomerProfileModern = lazy(() => import('./pages/CustomerProfileModern'));
+
+// Orders & Cashbox
+const Orders = lazy(() => import('./pages/Orders'));
+const Cashbox = lazy(() => import('./pages/Cashbox'));
+
+// Finance
+const Expenses = lazy(() => import('./pages/Expenses'));
+const Revenue = lazy(() => import('./pages/Revenue'));
+
+// Reports & Analytics
+const Reports = lazy(() => import('./pages/ReportsModern'));
+const Analytics = lazy(() => import('./pages/Analytics'));
+const Activity = lazy(() => import('./pages/Activity'));
+
+// Management
 const CashierManagement = lazy(() => import('./pages/CashierManagement'));
-const CashierShift = lazy(() => import('./pages/CashierShift'));
-const CashierBot = lazy(() => import('./pages/CashierBot'));
+const Suppliers = lazy(() => import('./pages/Suppliers'));
+const Production = lazy(() => import('./pages/Production'));
+const Quality = lazy(() => import('./pages/Quality'));
+const Logistics = lazy(() => import('./pages/Logistics'));
+
+// Tools
+const AIAssistant = lazy(() => import('./pages/AIAssistant'));
+const Bots = lazy(() => import('./pages/Bots'));
+const CloudBackup = lazy(() => import('./pages/CloudBackup'));
+const Shortcuts = lazy(() => import('./pages/Shortcuts'));
 const ModernChat = lazy(() => import('./pages/ModernChat'));
+const CashierBot = lazy(() => import('./pages/CashierBot'));
+const Settings = lazy(() => import('./pages/Settings'));
 
 // Layouts
 const ProfessionalLayout = lazy(() => import('./components/ProfessionalLayout'));
@@ -68,184 +98,133 @@ const LoadingSpinner = () => (
 );
 
 function App() {
-  const { token: storeToken, user } = useAuthStore();
+  const { token, user } = useAuthStore();
   const { theme } = useThemeStore();
-  const [isRehydrated, setIsRehydrated] = useState(false);
-  const [localToken, setLocalToken] = useState<string | null>(null);
   
-  useEffect(() => {
-    // Rehydrate auth state from localStorage
-    const storage = localStorage.getItem('auth-storage');
-    if (storage) {
-      try {
-        const parsed = JSON.parse(storage);
-        if (parsed.state?.token) {
-          setLocalToken(parsed.state.token);
-        }
-      } catch (e) {
-        console.error('Failed to parse auth-storage:', e);
-      }
-    }
-    setIsRehydrated(true);
-  }, []);
-
   useEffect(() => {
     // Apply theme
     document.documentElement.classList.remove('dark');
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  const token = storeToken || localToken;
+  return (
+    <ErrorBoundary>
+      <ToastProvider>
+        <LanguageProvider>
+          <BrowserRouter>
+            <Suspense fallback={<LoadingSpinner />}>
+              <AppRoutes token={token} user={user} />
+            </Suspense>
+          </BrowserRouter>
+        </LanguageProvider>
+      </ToastProvider>
+    </ErrorBoundary>
+  );
+}
+
+// Separate component for routes to use hooks inside Router context
+function AppRoutes({ token, user }: { token: string | null; user: any }) {
+  const location = useLocation();
   const isCashier = user?.role?.toUpperCase() === 'CASHIER' || user?.role?.toUpperCase() === 'SELLER';
-
-  if (!isRehydrated) {
-    return <LoadingSpinner />;
-  }
-
-  // Cashier routes
-  if (window.location.pathname.startsWith('/cashier') || (token && isCashier)) {
-    if (!token) {
-      return (
-        <LanguageProvider>
-          <BrowserRouter>
-            <Suspense fallback={<LoadingSpinner />}>
-              <Routes>
-                <Route path="/cashier/login" element={<CashierLogin />} />
-                <Route path="*" element={<Navigate to="/cashier/login" replace />} />
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
-        </LanguageProvider>
-      );
-    }
-
-    if (isCashier && !window.location.pathname.startsWith('/cashier')) {
-      return (
-        <LanguageProvider>
-          <BrowserRouter>
-            <Suspense fallback={<LoadingSpinner />}>
-              <Routes>
-                <Route path="*" element={<Navigate to="/cashier/sales" replace />} />
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
-        </LanguageProvider>
-      );
-    }
-
-    return (
-      <LanguageProvider>
-        <BrowserRouter>
-          <Suspense fallback={<LoadingSpinner />}>
-            <CashierLayout>
-              <Routes>
-                <Route path="/cashier/sales" element={<Sales />} />
-                <Route path="/cashier/sales/add" element={<AddSale />} />
-                <Route path="/cashier/products" element={<Products />} />
-                <Route path="/cashier/products/:id" element={<ProductDetail />} />
-                <Route path="/cashier/add-product" element={<AddProduct />} />
-                <Route path="/cashier/inventory" element={<SimplifiedInventory />} />
-                                <Route path="/cashier/orders" element={<Orders />} />
-                <Route path="/cashier/customers" element={<Customers />} />
-                <Route path="/cashier/customers/:id" element={<CustomerProfile />} />
-                <Route path="/cashier/cashbox" element={<Cashbox />} />
-                <Route path="/cashier/shift" element={<CashierShift />} />
-                <Route path="/cashier/bot" element={<CashierBot />} />
-                <Route path="/cashier/chat" element={<ModernChat />} />
-                <Route path="/cashier/expenses" element={<div className="p-8 text-center"><h2 className="text-2xl font-bold">Xarajatlar</h2><p className="text-gray-500">Tez kunda...</p></div>} />
-                <Route path="*" element={<Navigate to="/cashier/sales" />} />
-              </Routes>
-            </CashierLayout>
-          </Suspense>
-        </BrowserRouter>
-      </LanguageProvider>
-    );
-  }
-
-  // Public routes
-  if (window.location.pathname === '/order' || 
-      window.location.pathname === '/customer-portal' || 
-      window.location.pathname === '/telegram-features') {
-    return (
-      <LanguageProvider>
-        <BrowserRouter>
-          <Suspense fallback={<LoadingSpinner />}>
-            <Routes>
-              <Route path="/order" element={<div className="min-h-screen flex items-center justify-center text-2xl">Public Order Page</div>} />
-              <Route path="/customer-portal" element={<div className="min-h-screen flex items-center justify-center text-2xl">Customer Portal</div>} />
-              <Route path="/telegram-features" element={<div className="min-h-screen flex items-center justify-center text-2xl">Telegram Features</div>} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
-      </LanguageProvider>
-    );
-  }
-
-  // Auth required routes
-  if (!token) {
-    return (
-      <LanguageProvider>
-        <BrowserRouter>
-          <Suspense fallback={<LoadingSpinner />}>
-            <Routes>
-              <Route path="/" element={<Login />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="*" element={<Login />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
-      </LanguageProvider>
-    );
+  
+  const isCashierRoute = location.pathname.startsWith('/cashier');
+  
+  // Redirect cashier to /cashier if trying to access professional routes
+  if (token && isCashier && !isCashierRoute) {
+    return <Navigate to="/cashier/sales" replace />;
   }
 
   return (
-    <ErrorBoundary>
-      <LanguageProvider>
-        <BrowserRouter>
-          <Suspense fallback={<LoadingSpinner />}>
-            <ProfessionalLayout>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/products/:id" element={<ProductDetail />} />
-                <Route path="/add-product" element={<AddProduct />} />
-                <Route path="/inventory" element={<SimplifiedInventory />} />
-                <Route path="/sales" element={<Sales />} />
-                <Route path="/sales/add" element={<AddSale />} />
-                <Route path="/orders" element={<Orders />} />
-                <Route path="/customers" element={<Customers />} />
-                <Route path="/customers/:id" element={<CustomerProfile />} />
-                <Route path="/cashbox" element={<Cashbox />} />
-                <Route path="/expenses" element={<div className="p-8 text-center"><h2 className="text-2xl font-bold">Xarajatlar</h2><p className="text-gray-500">Tez kunda...</p></div>} />
-                <Route path="/cashiers" element={<CashierManagement />} />
-                <Route path="/reports" element={<Reports />} />
-              <Route path="/settings" element={<Settings />} />
+    <Routes>
+      {/* ========== PUBLIC ROUTES ========== */}
+      <Route path="/" element={<Login />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/cashier/login" element={<CashierLogin />} />
+      
+      {/* ========== CASHIER ROUTES (Protected) ========== */}
+      <Route path="/cashier/*" element={
+        token ? (
+          <CashierLayout>
+            <Routes>
+              <Route path="sales" element={<Sales />} />
+              <Route path="sales/add" element={<AddSale />} />
+              <Route path="products" element={<SimplifiedInventory />} />
+              <Route path="products/:id" element={<ProductDetail />} />
+              <Route path="add-product" element={<AddProduct />} />
+              <Route path="inventory" element={<SimplifiedInventory />} />
+              <Route path="orders" element={<Orders />} />
+              <Route path="customers" element={<Customers />} />
+              <Route path="customers/:id" element={<CustomerProfileModern />} />
+              <Route path="cashbox" element={<Cashbox />} />
+              <Route path="bot" element={<CashierBot />} />
+              <Route path="chat" element={<ModernChat />} />
+              <Route path="expenses" element={<Expenses />} />
+              <Route path="*" element={<Navigate to="/cashier/sales" />} />
+            </Routes>
+          </CashierLayout>
+        ) : (
+          <Navigate to="/cashier/login" replace />
+        )
+      } />
+      
+      {/* ========== PROFESSIONAL ROUTES (Protected) ========== */}
+      <Route path="*" element={
+        token ? (
+          <ProfessionalLayout>
+            <Routes>
+              {/* Dashboard */}
+              <Route path="dashboard" element={<Dashboard />} />
               
-              {/* Analytics routes */}
-              <Route path="/analytics" element={<div className="p-8 text-center"><h2 className="text-2xl font-bold">CEO Analytics</h2><p className="text-gray-500">Tez kunda...</p></div>} />
-              <Route path="/revenue" element={<div className="p-8 text-center"><h2 className="text-2xl font-bold">Revenue Calculator</h2><p className="text-gray-500">Tez kunda...</p></div>} />
-              <Route path="/activity" element={<div className="p-8 text-center"><h2 className="text-2xl font-bold">Activity Monitor</h2><p className="text-gray-500">Tez kunda...</p></div>} />
+              {/* Inventory */}
+              <Route path="products" element={<SimplifiedInventory />} />
+              <Route path="products/:id" element={<ProductDetail />} />
+              <Route path="add-product" element={<AddProduct />} />
+              <Route path="inventory" element={<SimplifiedInventory />} />
               
-              {/* Management routes */}
-              <Route path="/suppliers" element={<div className="p-8 text-center"><h2 className="text-2xl font-bold">Suppliers</h2><p className="text-gray-500">Tez kunda...</p></div>} />
-              <Route path="/production" element={<div className="p-8 text-center"><h2 className="text-2xl font-bold">Production</h2><p className="text-gray-500">Tez kunda...</p></div>} />
-              <Route path="/quality" element={<div className="p-8 text-center"><h2 className="text-2xl font-bold">Quality Control</h2><p className="text-gray-500">Tez kunda...</p></div>} />
-              <Route path="/logistics" element={<div className="p-8 text-center"><h2 className="text-2xl font-bold">Logistics</h2><p className="text-gray-500">Tez kunda...</p></div>} />
+              {/* Sales */}
+              <Route path="sales" element={<Sales />} />
+              <Route path="sales/add" element={<AddSale />} />
               
-              {/* Tools routes */}
-              <Route path="/ai-assistant" element={<div className="p-8 text-center"><h2 className="text-2xl font-bold">AI Assistant</h2><p className="text-gray-500">Tez kunda...</p></div>} />
-              <Route path="/bots" element={<div className="p-8 text-center"><h2 className="text-2xl font-bold">Bot Management</h2><p className="text-gray-500">Tez kunda...</p></div>} />
-              <Route path="/cloud-backup" element={<div className="p-8 text-center"><h2 className="text-2xl font-bold">Cloud Backup</h2><p className="text-gray-500">Tez kunda...</p></div>} />
-              <Route path="/shortcuts" element={<div className="p-8 text-center"><h2 className="text-2xl font-bold">Keyboard Shortcuts</h2><p className="text-gray-500">Tez kunda...</p></div>} />
+              {/* Customers */}
+              <Route path="customers" element={<Customers />} />
+              <Route path="customers/:id" element={<CustomerProfile />} />
               
-              <Route path="*" element={<Navigate to="/" />} />
+              {/* Orders & Cashbox */}
+              <Route path="orders" element={<Orders />} />
+              <Route path="cashbox" element={<Cashbox />} />
+              
+              {/* Finance */}
+              <Route path="expenses" element={<Expenses />} />
+              <Route path="revenue" element={<Revenue />} />
+              
+              {/* Reports */}
+              <Route path="reports" element={<Reports />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="activity" element={<Activity />} />
+              
+              {/* Management */}
+              <Route path="cashiers" element={<CashierManagement />} />
+              <Route path="suppliers" element={<Suppliers />} />
+              <Route path="production" element={<Production />} />
+              <Route path="quality" element={<Quality />} />
+              <Route path="logistics" element={<Logistics />} />
+              
+              {/* Tools */}
+              <Route path="ai-assistant" element={<AIAssistant />} />
+              <Route path="bots" element={<Bots />} />
+              <Route path="cloud-backup" element={<CloudBackup />} />
+              <Route path="shortcuts" element={<Shortcuts />} />
+              <Route path="settings" element={<Settings />} />
+              
+              {/* Default redirect */}
+              <Route path="*" element={<Navigate to="/dashboard" />} />
             </Routes>
           </ProfessionalLayout>
-        </Suspense>
-      </BrowserRouter>
-    </LanguageProvider>
-    </ErrorBoundary>
+        ) : (
+          <Navigate to="/login" replace />
+        )
+      } />
+    </Routes>
   );
 }
 

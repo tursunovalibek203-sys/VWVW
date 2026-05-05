@@ -28,22 +28,24 @@ export const ProductCard = ({
           : 'bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-blue-400 hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-1'
       }`}
     >
-      {/* Quick Add Button */}
-      <div className="absolute top-1 right-1 z-10">
+      {/* Quick Add Button - Kattaroq va ko'zga tashlanarli */}
+      <div className="absolute top-2 right-2 z-10">
         <button
           type="button"
           onClick={onQuickAdd}
-          className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+          aria-label={isSelected ? 'Tanlangan' : 'Savatga qoshish'}
+          title={isSelected ? 'Tanlangan' : 'Savatga qoshish'}
+          className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all transform hover:scale-110 active:scale-95 ${
             isSelected
-              ? 'bg-white/30 text-white hover:bg-white/50'
-              : 'bg-blue-100 text-blue-600 hover:bg-blue-500 hover:text-white'
+              ? 'bg-white text-blue-600 hover:bg-gray-100 shadow-white/50'
+              : 'bg-gradient-to-br from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 hover:shadow-blue-500/40'
           }`}
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-6 h-6 stroke-[3]" />
         </button>
       </div>
 
-      <div className="pr-10">
+      <div className="pr-14">
         <span
           className={`font-bold text-sm line-clamp-2 leading-snug ${
             isSelected ? 'text-white drop-shadow-sm' : 'text-gray-800'

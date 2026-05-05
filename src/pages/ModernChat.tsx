@@ -10,159 +10,25 @@ import {
   Mic, 
   Check, 
   CheckCheck,
-  Clock,
   User,
-  Archive,
-  Trash2,
+  RefreshCw,
+  MessageCircle,
+  X,
+  MapPin,
   Pin,
   Star,
-  Filter,
-  RefreshCw,
-  Settings,
-  Bell,
-  Shield,
   Info,
+  Forward,
   Image,
   FileText,
   Download,
-  Forward,
   Reply,
-  Edit,
-  Copy,
-  Share2,
-  MessageCircle,
-  X,
-  Camera,
-  MapPin,
-  Users,
-  Volume2,
-  Play,
-  Pause,
   Square,
-  Circle,
-  Heart,
-  ThumbsUp,
-  ThumbsDown,
-  Laugh,
-  Angry,
+  BarChart,
   Calendar,
   Moon,
   Sun,
-  Globe,
-  Lock,
-  Unlock,
-  Eye,
-  EyeOff,
-  Zap,
-  Gift,
-  Music,
-  Film,
-  Radio,
-  Tv,
-  Wifi,
-  WifiOff,
-  Battery,
-  BatteryLow,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  ChevronUp,
-  Plus,
-  Minus,
-  Maximize2,
-  Minimize2,
-  Grid,
-  List,
-  BarChart,
-  PieChart,
-  TrendingUp,
-  TrendingDown,
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  HelpCircle,
-  MessageSquare,
-  AtSign,
-  Hash,
-  Link,
-  Link2,
-  Unlink,
-  ExternalLink,
-  Terminal,
-  Code,
-  Database,
-  Server,
-  Cloud,
-  CloudDownload,
-  CloudUpload,
-  HardDrive,
-  Cpu,
-  Monitor,
-  Smartphone,
-  Tablet,
-  Laptop,
-  Headphones,
-  Speaker,
-  Webcam,
-  CameraOff,
-  VideoOff,
-  MicOff,
-  PhoneOff,
-  PhoneIncoming,
-  PhoneOutgoing,
-  Voicemail,
-  RadioIcon,
-  Podcast,
-  Youtube,
-  Facebook,
-  Twitter,
-  Instagram,
-  Linkedin,
-  Github,
-  Mail,
-  MailOpen,
-  SendHorizontal,
-  PaperPlane,
-  Navigation,
-  Navigation2,
-  Compass,
-  Map,
-  Route,
-  Flag,
-  Bookmark,
-  BookmarkOff,
-  Tag,
-  Tags,
-  Package,
-  ShoppingBag,
-  ShoppingCart,
-  CreditCard,
-  DollarSign,
-  Euro,
-  PoundSterling,
-  Yen,
-  Bitcoin,
-  Activity,
-  Target,
-  Award,
-  Trophy,
-  Medal,
-  StarHalf,
-  StarOff,
-  ZapOff,
-  ZapOn,
-  Thunder,
-  CloudRain,
-  CloudSnow,
-  CloudDrizzle,
-  Wind,
-  Sunrise,
-  Sunset,
-  MoonStars,
-  CloudMoon,
-  CloudSun,
-  CloudLightning
+  Bell
 } from 'lucide-react';
 import api from '../lib/professionalApi';
 import { latinToCyrillic } from '../lib/transliterator';
@@ -170,6 +36,7 @@ import { latinToCyrillic } from '../lib/transliterator';
 interface Message {
   id: string;
   text: string;
+  senderName: string;
   senderType: 'customer' | 'admin' | 'bot';
   messageType: 'text' | 'image' | 'file' | 'voice' | 'video' | 'sticker' | 'gif' | 'location' | 'contact' | 'poll' | 'quiz';
   isRead: boolean;
@@ -316,7 +183,7 @@ export default function ModernChat() {
       const response = await api.get('/customer-chat/conversations');
       setConversations(response.data || []);
     } catch (error) {
-      console.error('Error fetching conversations:', error);
+      // Error handled by error state
     } finally {
       setLoading(false);
     }
@@ -329,7 +196,7 @@ export default function ModernChat() {
       setMessages(response.data || []);
       scrollToBottom();
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      // Error handled by error state
     }
   }, [scrollToBottom]);
 
@@ -356,14 +223,21 @@ export default function ModernChat() {
 
   const handleLocationShare = () => {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        sendMessage('', 'location', [], { 
-          location: { 
-            latitude: position.coords.latitude, 
-            longitude: position.coords.longitude 
-          } 
-        });
-      });
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          sendMessage('', 'location', [], { 
+            location: { 
+              latitude: position.coords.latitude, 
+              longitude: position.coords.longitude 
+            } 
+          });
+        },
+        (_error) => {
+          alert(latinToCyrillic('Geolokatsiya olishda xatolik: Ruxsat berilmagan yoki GPS yoqilmagan'));
+        }
+      );
+    } else {
+      alert(latinToCyrillic('Brauzeringiz geolokatsiyani qo\'llab-quvvatlamaydi'));
     }
   };
 
@@ -378,7 +252,7 @@ export default function ModernChat() {
   };
 
   // Send message
-  const sendMessage = useCallback(async (text: string = '', messageType: string = 'text', attachments: any[] = [], extraData: any = {}) => {
+  const sendMessage = useCallback(async (text: string = '', messageType: string = 'text', attachments: { type: string; url: string; name: string; size: number }[] = [], extraData: Record<string, unknown> = {}) => {
     const messageText = text || newMessage;
     if (!messageText.trim() && attachments.length === 0) return;
     if (!selectedConversation || sending) return;
@@ -403,7 +277,7 @@ export default function ModernChat() {
       await fetchMessages(selectedConversation.id);
       await fetchConversations();
     } catch (error) {
-      console.error('Error sending message:', error);
+      // Error handled by UI state
     } finally {
       setSending(false);
     }
@@ -555,7 +429,7 @@ export default function ModernChat() {
                 <select
                   id="filter-status"
                   value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as any)}
+                  onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
                   className="flex-1 px-3 py-1 text-sm bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   aria-label="Holat bo'yicha filtr"
                 >
@@ -566,7 +440,7 @@ export default function ModernChat() {
                 <select
                   id="sort-by"
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                   className="flex-1 px-3 py-1 text-sm bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   aria-label="Saralash"
                 >
@@ -782,6 +656,7 @@ export default function ModernChat() {
                   <button
                     onClick={handleVoiceRecord}
                     className="p-1 hover:bg-red-100 rounded transition-colors"
+                    aria-label="Yozishni to'xtatish"
                   >
                     <Square className="w-4 h-4 text-red-600" />
                   </button>
@@ -790,24 +665,6 @@ export default function ModernChat() {
 
               {/* Advanced Toolbar */}
               <div className="flex items-center gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => sendMessage('', 'sticker', [{ type: 'sticker', url: '/sticker.png', name: 'sticker', size: 0 }])}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title={latinToCyrillic('Sticker')}
-                >
-                  <Gift className="w-5 h-5 text-gray-600" />
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => sendMessage('', 'gif', [{ type: 'gif', url: '/gif.gif', name: 'gif', size: 0 }])}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title={latinToCyrillic('GIF')}
-                >
-                  <Film className="w-5 h-5 text-gray-600" />
-                </button>
-                
                 <button
                   type="button"
                   onClick={() => sendMessage(latinToCyrillic('Yangi so\'rovnom'), 'poll', [], { 

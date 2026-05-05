@@ -4,7 +4,9 @@ import { prisma } from '../utils/prisma';
 
 import { authenticate } from '../middleware/auth';
 
-import { sendEnhancedPaymentConfirmation } from '../bot/enhanced-bot';
+import { sendEnhancedPaymentConfirmation } from '../bot/archive/enhanced-bot';
+import { successResponse, errorResponse } from '../utils/response';
+import { DecimalHelper } from '../utils/decimal-helper';
 
 
 
@@ -132,19 +134,21 @@ router.get('/', async (req, res) => {
 
       );
 
-      return res.json(filtered);
+      // ✅ STANDARD API RESPONSE FORMAT
+      return res.json(successResponse(filtered));
 
     }
 
     
 
-    res.json(customers);
+    // ✅ STANDARD API RESPONSE FORMAT
+    res.json(successResponse(customers));
 
   } catch (error) {
 
     console.error('❌ GET /customers xatolik:', error);
 
-    res.status(500).json({ error: 'Failed to fetch customers' });
+    res.status(500).json(errorResponse('Failed to fetch customers'));
 
   }
 
@@ -774,33 +778,48 @@ router.post('/:id/payment', async (req, res) => {
 
 
 
-      // Mijoz balansini yangilash
-
-      const updateData: any = {};
-
+      // Mijoz balansini yangilash - har bir valyuta uchun alohida
+      const updateData: any = {
+        lastPayment: new Date()
+      };
+      
       if (currency === 'UZS') {
-
-        updateData.balanceUZS = { increment: amount };
-
+        // Qarzni qoplash (agar qarz bor bo'lsa)
         if (customer.debtUZS && customer.debtUZS > 0) {
-
-          updateData.debtUZS = { decrement: amount };
-
+          // ✅ DECIMAL FIX: Use DecimalHelper for min calculation
+          const debtToDeduct = DecimalHelper.min(amount, customer.debtUZS);
+          updateData.debtUZS = { decrement: debtToDeduct };
+          // Balansni ham oshirish (manfiy balansni kamaytirish)
+          updateData.balanceUZS = { increment: debtToDeduct };
+          // Qoplangandan keyingi qoldiq balansga qo'shiladi
+          // ✅ DECIMAL FIX: Use DecimalHelper for subtraction
+          const remainingAmount = DecimalHelper.subtract(amount, debtToDeduct);
+          if (remainingAmount > 0) {
+            updateData.balanceUZS = { increment: remainingAmount };
+          }
+        } else {
+          // Qarz yo'q - hammasi balansga qo'shiladi
+          updateData.balanceUZS = { increment: amount };
         }
-
-      } else {
-
-        updateData.balanceUSD = { increment: amount };
-
+      } else if (currency === 'USD') {
+        // Qarzni qoplash (agar qarz bor bo'lsa)
         if (customer.debtUSD && customer.debtUSD > 0) {
-
-          updateData.debtUSD = { decrement: amount };
-
+          // ✅ DECIMAL FIX: Use DecimalHelper for min calculation
+          const debtToDeduct = DecimalHelper.min(amount, customer.debtUSD);
+          updateData.debtUSD = { decrement: debtToDeduct };
+          // Balansni ham oshirish (manfiy balansni kamaytirish)
+          updateData.balanceUSD = { increment: debtToDeduct };
+          // Qoplangandan keyingi qoldiq balansga qo'shiladi
+          // ✅ DECIMAL FIX: Use DecimalHelper for subtraction
+          const remainingAmount = DecimalHelper.subtract(amount, debtToDeduct);
+          if (remainingAmount > 0) {
+            updateData.balanceUSD = { increment: remainingAmount };
+          }
+        } else {
+          // Qarz yo'q - hammasi balansga qo'shiladi
+          updateData.balanceUSD = { increment: amount };
         }
-
       }
-
-
 
       const updatedCustomer = await tx.customer.update({
 

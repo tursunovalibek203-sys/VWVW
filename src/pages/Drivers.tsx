@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../lib/api';
+import api from '../lib/professionalApi';
 import { Truck, Phone, Star, MessageSquare, Plus, RefreshCw, FileText, Search, User, MapPin, Send, Sparkles } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
 import { exportToExcel } from '../lib/excelUtils';

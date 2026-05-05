@@ -12,21 +12,26 @@ export const parseMoney = (value: unknown): number => {
 
 export const SaleItemSchema = z.object({
   productId: z.string().min(1, 'Mahsulot ID kiritilishi shart'),
+  productName: z.string().optional(),
   quantity: z.union([z.string(), z.number()]).transform((v) => parseFloat(String(v))),
   pricePerBag: z.union([z.string(), z.number()]).transform(parseMoney),
   pricePerPiece: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
   variantId: z.string().optional(),
   unitsPerBag: z.union([z.string(), z.number()]).transform((v) => parseInt(String(v), 10)).optional(),
-  saleType: z.enum(['bag', 'piece']).optional().default('bag'),
+  saleType: z.enum(['bag', 'piece', 'komplekt']).optional().default('bag'),
+  // Frontenddan keladigan qo'shimcha maydonlar (optional)
+  subtotal: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
+  warehouse: z.string().optional(),
 });
 
 export const SaleCreateSchema = z.object({
-  customerId: z.string().min(1, 'Mijoz tanlanishi shart'),
+  customerId: z.string().optional(),
   items: z.array(SaleItemSchema).min(1, 'Kamida bitta mahsulot kiritilishi shart'),
   totalAmount: z.union([z.string(), z.number()]).transform(parseMoney),
   paidAmount: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
   debtAmount: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
   currency: z.enum(['USD', 'UZS']).default('USD'),
+  paymentMethod: z.enum(['CASH', 'CARD', 'CLICK']).default('CASH'),
   paymentDetails: z.object({
     uzs: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
     usd: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
@@ -38,6 +43,22 @@ export const SaleCreateSchema = z.object({
   isKocha: z.boolean().optional(),
   manualCustomerName: z.string().optional(),
   manualCustomerPhone: z.string().optional(),
+  // Frontenddan keladigan qo'shimcha maydonlar (optional)
+  customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
+  exchangeRate: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
+  createdAt: z.string().or(z.date()).optional(),
+  status: z.string().optional(),
+}).refine((data) => {
+  // Agar isKocha true bo'lsa, customerId talab qilinmaydi
+  if (data.isKocha) {
+    return true;
+  }
+  // Aks holda customerId bo'lishi shart
+  return !!data.customerId && data.customerId.length > 0;
+}, {
+  message: 'Mijoz tanlanishi shart yoki Ko\'chaga sotishni tanlang',
+  path: ['customerId']
 });
 
 export const SaleUpdateSchema = z.object({

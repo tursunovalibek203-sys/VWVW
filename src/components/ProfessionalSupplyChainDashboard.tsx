@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Package, 
   Truck, 
   Users, 
-  TrendingUp, 
-  TrendingDown,
   Clock,
   CheckCircle,
   XCircle,
@@ -14,23 +12,18 @@ import {
   Edit,
   Eye,
   Download,
-  Filter,
   Search,
   BarChart3,
-  Target,
   Activity,
-  DollarSign,
-  Calendar,
-  MapPin,
   Phone,
   Mail,
   Star,
-  Award,
-  FileText,
   ShoppingCart,
   Warehouse,
   Shield,
-  Timer
+  Timer,
+  Minus,
+  Settings
 } from 'lucide-react';
 import { 
   supplyChain, 
@@ -40,10 +33,7 @@ import {
   Shipment,
   QualityInspection,
   SupplierStatus,
-  OrderStatus,
-  getSupplierPerformance,
-  getOrderStatistics,
-  getInventoryAnalytics
+  OrderStatus
 } from '../lib/professionalSupplyChain';
 
 interface SupplyChainDashboardProps {
@@ -86,7 +76,7 @@ export default function ProfessionalSupplyChainDashboard({
     try {
       setRefreshing(true);
       
-      const sc = supplyChain.getInstance();
+      const sc = supplyChain();
       const suppliersData = sc.getSuppliers();
       const ordersData = sc.getPurchaseOrders();
       const movementsData = sc.getInventoryMovements();
@@ -196,6 +186,7 @@ export default function ProfessionalSupplyChainDashboard({
             onClick={handleRefresh}
             disabled={refreshing}
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            title="Refresh data"
           >
             <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
@@ -478,10 +469,10 @@ export default function ProfessionalSupplyChainDashboard({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-2">
-                        <button className="text-blue-600 hover:text-blue-900">
+                        <button className="text-blue-600 hover:text-blue-900" title="View">
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button className="text-gray-600 hover:text-gray-900">
+                        <button className="text-gray-600 hover:text-gray-900" title="Edit">
                           <Edit className="w-4 h-4" />
                         </button>
                       </div>
@@ -500,7 +491,7 @@ export default function ProfessionalSupplyChainDashboard({
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900">Purchase Orders</h3>
             <div className="flex items-center gap-3">
-              <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" title="Filter by status">
                 <option value="">All Status</option>
                 <option value="draft">Draft</option>
                 <option value="pending_approval">Pending Approval</option>
@@ -541,7 +532,7 @@ export default function ProfessionalSupplyChainDashboard({
                   {Object.entries(orderStatistics?.ordersByStatus || {}).map(([status, count]) => (
                     <div key={status} className="flex justify-between">
                       <span className="text-sm text-gray-600 capitalize">{status.replace('_', ' ')}</span>
-                      <span className="text-sm font-bold text-gray-900">{count}</span>
+                      <span className="text-sm font-bold text-gray-900">{count as number}</span>
                     </div>
                   ))}
                 </div>
@@ -625,7 +616,7 @@ export default function ProfessionalSupplyChainDashboard({
                   {Object.entries(inventoryAnalytics?.movementsByType || {}).map(([type, count]) => (
                     <div key={type} className="flex justify-between">
                       <span className="text-sm text-gray-600 capitalize">{type.replace('_', ' ')}</span>
-                      <span className="text-sm font-bold text-gray-900">{count}</span>
+                      <span className="text-sm font-bold text-gray-900">{count as number}</span>
                     </div>
                   ))}
                 </div>
@@ -701,7 +692,7 @@ export default function ProfessionalSupplyChainDashboard({
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900">Shipments</h3>
             <div className="flex items-center gap-3">
-              <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" title="Filter by status">
                 <option value="">All Status</option>
                 <option value="preparing">Preparing</option>
                 <option value="in_transit">In Transit</option>

@@ -65,18 +65,26 @@ export default function SimplifiedProductSelector({
         }
       }
       
+      // Yangi custom turlarni alohida guruhlash (custom- boshlangan ID lar)
+      if (warehouse.startsWith('custom-')) {
+        key = warehouse;
+      }
+      
       if (!groups[key]) groups[key] = [];
       groups[key].push(product);
     });
     
     // Guruhlarni tartiblangan holda qaytarish
     const sortedKeys = Object.keys(groups).sort((a, b) => {
-      const order = ['preform-15', 'preform-21', 'preform-28', 'preform-32', 'preform-38', 'preform-43', 'preform-48', 'preform-boshqa', 'krishka', 'ruchka', 'etiketka', 'Boshqa'];
+      const order = ['preform-15', 'preform-21', 'preform-28', 'preform-32', 'preform-38', 'preform-43', 'preform-48', 'preform-boshqa', 'krishka', 'ruchka', 'etiketka'];
       const aIndex = order.indexOf(a);
       const bIndex = order.indexOf(b);
       if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
       if (aIndex !== -1) return -1;
       if (bIndex !== -1) return 1;
+      // Custom turlarni oxirida ko'rsatish
+      if (a.startsWith('custom-') && !b.startsWith('custom-')) return 1;
+      if (!a.startsWith('custom-') && b.startsWith('custom-')) return -1;
       return a.localeCompare(b);
     });
     
@@ -89,19 +97,39 @@ export default function SimplifiedProductSelector({
   };
 
   const productGroups = groupProducts();
-  const groupNames: { [key: string]: string } = {
-    'preform-15': '15 gr Preformlar',
-    'preform-21': '21 gr Preformlar',
-    'preform-28': '28 gr Preformlar',
-    'preform-32': '32 gr Preformlar',
-    'preform-38': '38 gr Preformlar',
-    'preform-43': '43 gr Preformlar',
-    'preform-48': '48 gr Preformlar',
-    'preform-boshqa': 'Boshqa Preformlar',
-    'krishka': 'Krishka',
-    'ruchka': 'Ruchka',
-    'etiketka': 'Etiketka',
-    'Boshqa': 'Boshqa'
+  
+  // Guruh nomlarini olish - custom turlar uchun mahsulot nomidan nom yasash
+  const getGroupName = (key: string, products: Product[]): string => {
+    const predefinedNames: { [key: string]: string } = {
+      'preform-15': '15 gr Preformlar',
+      'preform-21': '21 gr Preformlar',
+      'preform-28': '28 gr Preformlar',
+      'preform-32': '32 gr Preformlar',
+      'preform-38': '38 gr Preformlar',
+      'preform-43': '43 gr Preformlar',
+      'preform-48': '48 gr Preformlar',
+      'preform-boshqa': 'Boshqa Preformlar',
+      'krishka': 'Krishka',
+      'ruchka': 'Ruchka',
+      'etiketka': 'Etiketka',
+      'Boshqa': 'Boshqa'
+    };
+    
+    if (predefinedNames[key]) {
+      return predefinedNames[key];
+    }
+    
+    // Custom turlar uchun - mahsulot nomidan tur nomini olish
+    if (key.startsWith('custom-') && products.length > 0) {
+      // Mahsulot nomidan tur nomini aniqlash (masalan: "ETIKETKA OQ" -> "ETIKETKA")
+      const firstProduct = products[0];
+      const nameParts = firstProduct.name.split(' ');
+      if (nameParts.length > 0) {
+        return nameParts[0].toUpperCase();
+      }
+    }
+    
+    return key.charAt(0).toUpperCase() + key.slice(1);
   };
 
   // Narxni ko'rsatish
@@ -197,7 +225,7 @@ export default function SimplifiedProductSelector({
             </div>
           ) : (
             Object.entries(productGroups).map(([warehouse, groupProducts]) => {
-              const displayName = groupNames[warehouse] || warehouse;
+              const displayName = getGroupName(warehouse, groupProducts);
               
               return (
                 <div key={warehouse} className="border-2 border-gray-300 rounded-2xl overflow-hidden bg-white shadow-lg shadow-gray-200/50">

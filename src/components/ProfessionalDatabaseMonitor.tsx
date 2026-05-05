@@ -1,20 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Database, 
-  Activity, 
-  HardDrive, 
   Clock, 
-  TrendingUp, 
-  TrendingDown, 
   AlertTriangle,
   CheckCircle,
   RefreshCw,
   Download,
   Settings,
   BarChart3,
-  PieChart,
-  Zap,
-  Shield
+  Zap
 } from 'lucide-react';
 import { databaseManager, DatabaseMetrics } from '../lib/professionalDatabase';
 
@@ -61,7 +55,7 @@ export default function ProfessionalDatabaseMonitor({
       setRefreshing(true);
       
       // Get database metrics
-      const dbMetrics = databaseManager.getInstance().getMetrics();
+      const dbMetrics = databaseManager().getMetrics();
       setMetrics(dbMetrics);
 
       // Simulate system health metrics
@@ -179,6 +173,7 @@ export default function ProfessionalDatabaseMonitor({
             onClick={handleRefresh}
             disabled={refreshing}
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            title="Refresh data"
           >
             <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
@@ -268,10 +263,7 @@ export default function ProfessionalDatabaseMonitor({
           </div>
           <p className="text-sm font-medium text-gray-600">Slow Queries</p>
           <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className={`h-2 rounded-full transition-all duration-500 ${getProgressBarColor(metrics.slowQueries, { warning: 5, critical: 10 })}`}
-              style={{ width: `${Math.min(100, (metrics.slowQueries / 20) * 100)}%` }}
-            />
+             7 7 7 7 7N7N8N8N8N8N8N8M9MM9M9M9M9M90,0,0,0,0,M8M8N76BV5C43XZ2 9YYYYYYYTTTRRRREEEWWQ
           </div>
         </div>
       </div>

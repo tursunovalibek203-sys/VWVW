@@ -3,6 +3,7 @@ import { salesService, SaleFilters } from '../services/SalesService';
 import { ResponseHelper } from '../utils/response';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { validate, schemas } from '../middleware/validator';
+import { DecimalHelper } from '../utils/decimal-helper';
 
 const router = Router();
 
@@ -107,8 +108,8 @@ router.post('/',
       const sale = await salesService.createSale({
         customerId,
         items,
-        totalAmount: parseFloat(totalAmount),
-        paidAmount: parseFloat(paidAmount),
+        totalAmount: DecimalHelper.round(totalAmount, 2),
+        paidAmount: DecimalHelper.round(paidAmount, 2),
         currency: currency || 'USD',
         paymentDetails,
         driverId,
@@ -122,18 +123,23 @@ router.post('/',
       res.status(201).json(ResponseHelper.success(sale));
     } catch (error: any) {
       console.error('Create sale error:', error);
+      console.error('Error stack:', error.stack);
+      console.error('Request body:', req.body);
       
-      if (error.message.includes('topilmadi')) {
+      if (error.message?.includes('topilmadi')) {
         return res.status(404).json(ResponseHelper.notFound('Mahsulot'));
       }
-      if (error.message.includes('yetarli')) {
+      if (error.message?.includes('yetarli')) {
         return res.status(400).json(ResponseHelper.badRequest(error.message));
       }
-      if (error.message.includes('Kamida')) {
+      if (error.message?.includes('Kamida')) {
         return res.status(400).json(ResponseHelper.badRequest(error.message));
       }
       
-      res.status(500).json(ResponseHelper.internalError(error.message));
+      // Return detailed error message for debugging
+      res.status(500).json(ResponseHelper.internalError(
+        error.message || 'Sotuv yaratishda server xatosi'
+      ));
     }
   }
 );

@@ -1,22 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
-  Warehouse, 
+  Warehouse as WarehouseIcon, 
   Package, 
-  MapPin, 
   BarChart3, 
-  TrendingUp, 
-  TrendingDown,
   Clock,
   CheckCircle,
   XCircle,
   AlertTriangle,
   RefreshCw,
   Plus,
-  Edit,
-  Eye,
   Download,
   Search,
-  Filter,
   Activity,
   Users,
   Settings,
@@ -25,21 +19,17 @@ import {
   Shield,
   Truck,
   Box,
-  ArrowUpRight,
-  ArrowDownRight,
   Target,
-  Timer,
-  Zap,
   Navigation,
   Layers
 } from 'lucide-react';
-import { 
-  warehouse, 
+import type {
+  Warehouse,
+} from '../lib/professionalWarehouse';
+import {
+  ProfessionalWarehouseManager,
   WarehouseType,
   BinStatus,
-  MovementType,
-  Priority,
-  getWarehouseAnalytics
 } from '../lib/professionalWarehouse';
 
 interface WarehouseDashboardProps {
@@ -51,8 +41,8 @@ interface WarehouseDashboardProps {
 
 export default function ProfessionalWarehouseDashboard({
   refreshInterval = 15000,
-  showCharts = true,
-  showDetails = true,
+  showCharts: _showCharts = true,
+  showDetails: _showDetails = true,
   className = '',
 }: WarehouseDashboardProps) {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -77,7 +67,7 @@ export default function ProfessionalWarehouseDashboard({
     try {
       setRefreshing(true);
       
-      const wm = warehouse.getInstance();
+      const wm = ProfessionalWarehouseManager.getInstance();
       const warehousesData = wm.getWarehouses();
       
       setWarehouses(warehousesData);
@@ -102,53 +92,17 @@ export default function ProfessionalWarehouseDashboard({
     loadWarehouseData();
   };
 
-  const handleWarehouseSelect = (warehouse: Warehouse) => {
-    setSelectedWarehouse(warehouse);
-    const wm = warehouse.getInstance();
-    const analyticsData = wm.getWarehouseAnalytics(warehouse.id);
+  const handleWarehouseSelect = (wh: Warehouse) => {
+    setSelectedWarehouse(wh);
+    const wm = ProfessionalWarehouseManager.getInstance();
+    const analyticsData = wm.getWarehouseAnalytics(wh.id);
     setAnalytics(analyticsData);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case BinStatus.AVAILABLE:
-        return 'text-green-600';
-      case BinStatus.OCCUPIED:
-        return 'text-blue-600';
-      case BinStatus.RESERVED:
-        return 'text-yellow-600';
-      case BinStatus.LOCKED:
-      case BinStatus.BLOCKED:
-        return 'text-red-600';
-      case BinStatus.MAINTENANCE:
-        return 'text-orange-600';
-      default:
-        return 'text-gray-600';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case BinStatus.AVAILABLE:
-        return <CheckCircle className="w-4 h-4" />;
-      case BinStatus.OCCUPIED:
-        return <Package className="w-4 h-4" />;
-      case BinStatus.RESERVED:
-        return <Clock className="w-4 h-4" />;
-      case BinStatus.LOCKED:
-      case BinStatus.BLOCKED:
-        return <Shield className="w-4 h-4" />;
-      case BinStatus.MAINTENANCE:
-        return <AlertTriangle className="w-4 h-4" />;
-      default:
-        return <XCircle className="w-4 h-4" />;
-    }
   };
 
   const getWarehouseTypeIcon = (type: WarehouseType) => {
     switch (type) {
       case WarehouseType.MAIN:
-        return <Warehouse className="w-5 h-5" />;
+        return <WarehouseIcon className="w-5 h-5" />;
       case WarehouseType.DISTRIBUTION:
         return <Truck className="w-5 h-5" />;
       case WarehouseType.RETAIL:
@@ -162,7 +116,7 @@ export default function ProfessionalWarehouseDashboard({
       case WarehouseType.QUARANTINE:
         return <Shield className="w-5 h-5" />;
       default:
-        return <Warehouse className="w-5 h-5" />;
+        return <WarehouseIcon className="w-5 h-5" />;
     }
   };
 
@@ -190,7 +144,7 @@ export default function ProfessionalWarehouseDashboard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-            <Warehouse className="w-6 h-6 text-blue-600" />
+            <WarehouseIcon className="w-6 h-6 text-blue-600" />
           </div>
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Warehouse Dashboard</h2>
@@ -210,6 +164,7 @@ export default function ProfessionalWarehouseDashboard({
             onClick={handleRefresh}
             disabled={refreshing}
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            title="Refresh data"
           >
             <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
@@ -506,7 +461,7 @@ export default function ProfessionalWarehouseDashboard({
                       {Object.entries(analytics.inventory.itemsByStatus).map(([status, count]) => (
                         <div key={status} className="flex justify-between">
                           <span className="text-sm text-gray-600 capitalize">{status}</span>
-                          <span className="text-sm font-bold text-gray-900">{count}</span>
+                          <span className="text-sm font-bold text-gray-900">{count as number}</span>
                         </div>
                       ))}
                     </div>
@@ -519,7 +474,7 @@ export default function ProfessionalWarehouseDashboard({
                     <h4 className="text-sm font-medium text-gray-900 mb-3">Low Stock Items</h4>
                   </div>
                   <div className="space-y-3">
-                    {analytics.inventory.lowStockItems.slice(0, 5).map((item) => (
+                    {analytics.inventory.lowStockItems.slice(0, 5).map((item: any) => (
                       <div key={item.id} className="border border-red-200 rounded-lg p-4">
                         <div className="flex items-center justify-between mb-2">
                           <div>
@@ -556,7 +511,7 @@ export default function ProfessionalWarehouseDashboard({
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-gray-900">Movement Orders</h3>
                 <div className="flex items-center gap-3">
-                  <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" title="Filter by type">
                     <option value="">All Types</option>
                     <option value="receiving">Receiving</option>
                     <option value="putaway">Putaway</option>
@@ -597,7 +552,7 @@ export default function ProfessionalWarehouseDashboard({
                       {Object.entries(analytics.movements.movementsByType).map(([type, count]) => (
                         <div key={type} className="flex justify-between">
                           <span className="text-sm text-gray-600 capitalize">{type.replace('_', ' ')}</span>
-                          <span className="text-sm font-bold text-gray-900">{count}</span>
+                          <span className="text-sm font-bold text-gray-900">{count as number}</span>
                         </div>
                       ))}
                     </div>

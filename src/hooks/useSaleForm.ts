@@ -3,10 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { SaleFormData, NewItemForm, SaleItemForm, Product, Customer } from '../types';
 import {
   DEFAULT_EXCHANGE_RATE,
-  getDefaultPiecePrice,
   getDefaultUnitsPerBag,
-  getPiecePrice,
-  getKomplektTargets,
   calculateTotal,
   calculatePaidAmount,
   calculateDebt,
@@ -14,12 +11,13 @@ import {
 } from '../lib/saleUtils';
 import api from '../lib/professionalApi';
 import { errorHandler } from '../lib/professionalErrorHandler';
+import { extractData, extractArray } from '../lib/apiHelpers';
+import { printReceipt, prepareSaleReceipt } from '../lib/receiptPrinter';
 
 export interface UseSaleFormOptions {
   editSale?: any;
   orderData?: any;
-}
-
+}  
 export const useSaleForm = (options: UseSaleFormOptions = {}) => {
   const navigate = useNavigate();
   const { editSale, orderData: initialOrderData } = options;
@@ -47,7 +45,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     quantity: '',
     pricePerBag: '',
     priceDisplayValue: '',
-    unitsPerBag: '2000',
+    unitsPerBag: '',
     saleType: 'bag',
   });
 
@@ -136,14 +134,18 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     }
   }, [initialOrderData, products]);
 
-  // Update prices when currency changes
+  // Update prices when currency changes only (not exchange rate)
+  // Note: This approach has floating point precision issues. Better to store base price in USD always.
   useEffect(() => {
+    if (exchangeRateNum <= 0) return; // Prevent division by zero
+    
     setForm((prev) => ({
       ...prev,
       items: prev.items.map((item) => {
+        // Round to avoid floating point issues
         const newPricePerBag = form.currency === 'UZS'
-          ? item.pricePerBag * exchangeRateNum
-          : item.pricePerBag / exchangeRateNum;
+          ? Math.round(item.pricePerBag * exchangeRateNum)
+          : Math.round((item.pricePerBag / exchangeRateNum) * 100) / 100;
         const newSubtotal = typeof item.quantity === 'number'
           ? item.quantity * newPricePerBag
           : parseFloat(item.quantity as string || '0') * newPricePerBag;
@@ -168,59 +170,128 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
   }, []);
 
   const selectProduct = useCallback((product: Product, _allProducts: Product[], selectedCustomer: Customer | undefined, customerPrices: Record<string, string>) => {
-    let basePrice = parseFloat(product.pricePerBag?.toString() || '0') || 0;
+    // Stock tekshiruvi - mahalliy ma'lumotlardan (API chaqiruvini olib tashladik - tezlashtirish)
+    const currentStock = product.currentStock || 0;
+    if (currentStock <= 0) {
+      alert(`⚠️ ${product.name} - omborda yetarli mahsulot yo'q! (Qoldiq: ${currentStock})`);
+    }
+    
+    let updatedProduct = product;
+
+    let basePrice = parseFloat(updatedProduct.pricePerBag?.toString() || '0') || 0;
 
     // Check for customer specific price
-    const customerPrice = selectedCustomer && customerPrices[product.id];
+    const customerPrice = selectedCustomer && customerPrices[updatedProduct.id];
     if (customerPrice) {
       basePrice = parseFloat(customerPrice) || 0;
     } else if (selectedCustomer?.pricePerBag) {
       basePrice = parseFloat(selectedCustomer.pricePerBag.toString()) || 0;
     }
 
-    // Check for default piece price
-    const defaultPiecePrice = getDefaultPiecePrice(product.name);
-    const defaultUnits = getDefaultUnitsPerBag(product.name);
-    const unitsPerBag = defaultUnits || product.unitsPerBag || 2000;
-
-    let displayPrice: number;
-    let piecePrice: number;
-
-    if (defaultPiecePrice && !customerPrice && !selectedCustomer?.pricePerBag) {
-      piecePrice = defaultPiecePrice;
-      displayPrice = piecePrice * unitsPerBag;
-    } else {
-      piecePrice = basePrice / unitsPerBag;
-      displayPrice = basePrice;
+    // Mahsulot narxi (sozlamalardan yangilangan)
+    const productPrice = updatedProduct.pricePerBag;
+    if (productPrice) {
+      basePrice = parseFloat(productPrice.toString()) || basePrice;
     }
 
-    // Determine if preform for sale type
-    const isPreform = product.warehouse === 'preform' ||
-      product.name?.toLowerCase().includes('preform') ||
-      /\d+\s*(gr|g|гр|г)/i.test(product.name || '');
+    // Default unitsPerBag - agar mahsulotda yo'q bo'lsa
+    const defaultUnits = getDefaultUnitsPerBag(updatedProduct.name);
+    const unitsPerBag = updatedProduct.unitsPerBag || defaultUnits || 2000;
+
+    // Narxni hisoblash - basePrice dan (sozlamalardan olingan)
+    const displayPrice = basePrice;
+
+    // Determine if preform for sale type - kuchaytirilgan tekshiruv
+    const name = product.name?.toLowerCase() || '';
+    const warehouse = product.warehouse?.toLowerCase() || '';
+    const hasGram = /\d+\s*(gr|g|гр|г)\b/i.test(name);
+    const isKrishka = name.includes('krishka') || name.includes('qopqoq') || name.includes('cap') || warehouse === 'krishka';
+    const isRuchka = name.includes('ruchka') || name.includes('handle') || warehouse === 'ruchka';
+    const isKapsula = name.includes('kapsula') || name.includes('capsule') || name.includes('капсула');
+    // Agar warehouse preform bo'lsa yoki gram bor va krishka/ruchka bo'lmasa - komplekt
+    const isPreform = warehouse === 'preform' ||
+                       name.includes('preform') ||
+                       isKapsula ||
+                       (hasGram && !isKrishka && !isRuchka);
 
     setNewItem({
-      productId: product.id,
-      productName: product.name,
+      productId: updatedProduct.id,
+      productName: updatedProduct.name,
       quantity: '1',
       pricePerBag: displayPrice.toString(),
       priceDisplayValue: displayPrice.toString(),
       unitsPerBag: unitsPerBag.toString(),
       saleType: isPreform ? 'komplekt' : 'bag',
+      // Stock ma'lumotlarini saqlash
+      maxQuantity: updatedProduct.currentStock || 0,
+      product: updatedProduct, // To'liq mahsulot ma'lumotlari
     });
-  }, []);
+  }, [products, getDefaultUnitsPerBag]);
 
-  const addItem = useCallback(() => {
+  const addItem = useCallback(async () => {
     if (!newItem.productId || !newItem.quantity) return;
 
     const product = products.find((p) => p.id === newItem.productId);
     if (!product) return;
 
     const quantity = parseFloat(newItem.quantity) || 0;
+    if (quantity <= 0) return;
 
-    // Komplekt mode
-    if (newItem.saleType === 'komplekt') {
-      const { krishkaGram, ruchkaGram, needsRuchka } = getKomplektTargets(product.name);
+    // Stock tekshiruvi
+    const availableStock = product.currentStock || 0;
+    // Savatdagi mavjud miqdorni hisobga olish
+    const existingItem = form.items.find(item => item.productId === newItem.productId);
+    const existingQuantity = existingItem ? (typeof existingItem.quantity === 'number' ? existingItem.quantity : parseFloat(existingItem.quantity || '0')) : 0;
+    const totalRequested = quantity + existingQuantity;
+
+    if (totalRequested > availableStock) {
+      alert(`⚠️ ${product.name} uchun yetarli mahsulot yo'q!\nMavjud: ${availableStock} qop\nSo'ralgan: ${totalRequested} qop`);
+      return;
+    }
+
+    // Mahsulot preform ekanligini tekshirish
+    const name = product.name?.toLowerCase() || '';
+    const warehouse = product.warehouse?.toLowerCase() || '';
+    const hasGram = /\d+\s*(gr|g|гр|г)\b/i.test(name);
+    const isKrishka = name.includes('krishka') || name.includes('qopqoq') || name.includes('cap') || warehouse === 'krishka';
+    const isRuchka = name.includes('ruchka') || name.includes('handle') || warehouse === 'ruchka';
+    const isPreform = warehouse === 'preform' || name.includes('preform') || (hasGram && !isKrishka && !isRuchka);
+
+    // Komplektni tekshirish - faqat preformlar uchun
+    let komplektConfigs: Array<{size: number; type: 'krishka' | 'ruchka'; quantity: number}> = [];
+    
+    // Cache bo'lmasa va preform bo'lsa - local dan generatsiya (tez)
+    if (isPreform) {
+      const gramMatch = product.name?.toLowerCase().match(/(\d+)\s*(gr|g|гр|г)/);
+      const gramSize = gramMatch ? parseInt(gramMatch[1]) : 0;
+      
+      // Komplekt qoidalari asosida konfiguratsiya
+      if (gramSize >= 15 && gramSize <= 35) {
+        // 15-35gr preformlar -> 28 krishka
+        komplektConfigs = [{ size: 28, type: 'krishka', quantity: 1 }];
+      } else if (gramSize === 36) {
+        // 36gr preform -> 28 krishka + 28 ruchka
+        komplektConfigs = [
+          { size: 28, type: 'krishka', quantity: 1 },
+          { size: 28, type: 'ruchka', quantity: 1 }
+        ];
+      } else if (gramSize >= 52 && gramSize <= 70) {
+        // 52-70gr preform -> 38 krishka + 38 ruchka
+        komplektConfigs = [
+          { size: 38, type: 'krishka', quantity: 1 },
+          { size: 38, type: 'ruchka', quantity: 1 }
+        ];
+      } else if (gramSize >= 75) {
+        // 75gr+ preform -> 48 krishka + 48 ruchka
+        komplektConfigs = [
+          { size: 48, type: 'krishka', quantity: 1 },
+          { size: 48, type: 'ruchka', quantity: 1 }
+        ];
+      }
+    }
+
+    // Agar komplekt bo'lsa, komplekt mahsulotlarini ham qo'shish
+    if (komplektConfigs.length > 0) {
       const pricePerBag = parseFloat(newItem.pricePerBag || '0') || product.pricePerBag || 0;
       const unitsPerBag = parseFloat(newItem.unitsPerBag || '0') || product.unitsPerBag || 2000;
       const pricePerPiece = pricePerBag / unitsPerBag;
@@ -235,75 +306,49 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
         pricePerPiece,
         unitsPerBag,
         subtotal,
-        warehouse: product.warehouse || 'other',
-        saleType: 'bag',
+        warehouse: (product.warehouse as 'preform' | 'krishka' | 'ruchka' | 'other') || 'other',
+        saleType: 'bag' as const,
       }];
 
-      const totalPieces = quantity * unitsPerBag;
-
-      // Find krishka
-      if (krishkaGram) {
-        const krishkaProduct = products.find((p) => {
-          const name = p.name?.toLowerCase() || '';
-          const isKrishka = p.warehouse === 'krishka' || name.includes('krishka') || name.includes('qopqoq');
-          return isKrishka && name.includes(krishkaGram.toString());
+      // Komplekt mahsulotlarini qo'shish - mahsulotlarni nom/warehouse bo'yicha qidirish
+      for (const config of komplektConfigs) {
+        // Mos keluvchi mahsulotni topish (masalan: 28 krishka)
+        const komplektProduct = products.find((p) => {
+          const pName = p.name?.toLowerCase() || '';
+          const pWarehouse = p.warehouse?.toLowerCase() || '';
+          const sizeMatch = pName.match(new RegExp(`\\b${config.size}\\s*(mm|мм)?\\b`));
+          const isType = config.type === 'krishka' 
+            ? (pName.includes('krishka') || pName.includes('qopqoq') || pName.includes('крышка') || pWarehouse === 'krishka')
+            : (pName.includes('ruchka') || pName.includes('ручка') || pName.includes('handle') || pWarehouse === 'ruchka');
+          return sizeMatch && isType;
         });
-
-        if (krishkaProduct) {
-          const krishkaUnits = 2000; // Krishka uchun doimiy 2000 dona
-          const krishkaPiecePrice = getPiecePrice(krishkaProduct.name) || 
-            (parseFloat(krishkaProduct.pricePerBag?.toString() || '0') / (krishkaProduct.unitsPerBag || 2000));
-          const krishkaPricePerBag = krishkaPiecePrice * krishkaUnits;
-          const krishkaQuantity = Math.ceil(totalPieces / krishkaUnits);
+        
+        if (komplektProduct) {
+          const komplektQuantity = quantity * config.quantity;
+          const komplektUnits = komplektProduct.unitsPerBag || 2000;
+          const komplektPricePerBag = parseFloat(komplektProduct.pricePerBag?.toString() || '0') || 0;
+          const komplektPricePerPiece = komplektPricePerBag / komplektUnits;
+          const komplektSubtotal = komplektQuantity * komplektPricePerBag;
 
           itemsToAdd.push({
-            productId: krishkaProduct.id,
-            productName: krishkaProduct.name,
-            quantity: krishkaQuantity.toString(),
-            bagDisplayValue: krishkaQuantity.toString(),
-            pricePerBag: krishkaPricePerBag,
-            pricePerPiece: krishkaPiecePrice,
-            unitsPerBag: krishkaUnits,
-            subtotal: krishkaQuantity * krishkaPricePerBag,
-            warehouse: krishkaProduct.warehouse || 'krishka',
-            saleType: 'bag',
-          });
-        }
-      }
-
-      // Find ruchka
-      if (needsRuchka && ruchkaGram) {
-        const ruchkaProduct = products.find((p) => {
-          const name = p.name?.toLowerCase() || '';
-          const isRuchka = p.warehouse === 'ruchka' || name.includes('ruchka') || name.includes('handle');
-          return isRuchka && name.includes(ruchkaGram.toString());
-        });
-
-        if (ruchkaProduct) {
-          const ruchkaUnits = 1000; // Ruchka uchun doimiy 1000 dona
-          const ruchkaPiecePrice = getPiecePrice(ruchkaProduct.name) ||
-            (parseFloat(ruchkaProduct.pricePerBag?.toString() || '0') / (ruchkaProduct.unitsPerBag || 1000));
-          const ruchkaPricePerBag = ruchkaPiecePrice * ruchkaUnits;
-          const ruchkaQuantity = Math.ceil(totalPieces / ruchkaUnits);
-
-          itemsToAdd.push({
-            productId: ruchkaProduct.id,
-            productName: ruchkaProduct.name,
-            quantity: ruchkaQuantity.toString(),
-            bagDisplayValue: ruchkaQuantity.toString(),
-            pricePerBag: ruchkaPricePerBag,
-            pricePerPiece: ruchkaPiecePrice,
-            unitsPerBag: ruchkaUnits,
-            subtotal: ruchkaQuantity * ruchkaPricePerBag,
-            warehouse: ruchkaProduct.warehouse || 'ruchka',
-            saleType: 'bag',
+            productId: komplektProduct.id,
+            productName: komplektProduct.name,
+            quantity: komplektQuantity.toString(),
+            bagDisplayValue: komplektQuantity.toString(),
+            pricePerBag: komplektPricePerBag,
+            pricePerPiece: komplektPricePerPiece,
+            unitsPerBag: komplektUnits,
+            subtotal: komplektSubtotal,
+            warehouse: (komplektProduct.warehouse as 'preform' | 'krishka' | 'ruchka' | 'other') || 'other',
+            saleType: 'bag' as const,
           });
         }
       }
 
       setForm((prev) => ({ ...prev, items: [...prev.items, ...itemsToAdd] }));
     } else {
-      // Regular mode
+      // Regular mode - komplektsiz
+      
       const existingIndex = form.items.findIndex((item) => item.productId === newItem.productId);
 
       const pricePerBag = parseFloat(newItem.pricePerBag || '0') || product.pricePerBag || 0;
@@ -352,16 +397,16 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
       quantity: '',
       pricePerBag: '',
       priceDisplayValue: '',
-      unitsPerBag: '2000',
+      unitsPerBag: '',
       saleType: 'bag',
     });
   }, [newItem, products, form.items]);
 
   const updateItem = useCallback((index: number, updates: Partial<SaleItemForm>) => {
-    setForm((prev) => ({
-      ...prev,
-      items: prev.items.map((item, i) => (i === index ? { ...item, ...updates } : item)),
-    }));
+    setForm((prev) => {
+      const newItems = prev.items.map((item, i) => (i === index ? { ...item, ...updates } : item));
+      return { ...prev, items: newItems };
+    });
   }, []);
 
   const removeItem = useCallback((index: number) => {
@@ -395,14 +440,15 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
       quantity: '',
       pricePerBag: '',
       priceDisplayValue: '',
-      unitsPerBag: '2000',
+      unitsPerBag: '',
       saleType: 'bag',
     });
   }, [form.currency]);
 
   const submitSale = useCallback(async () => {
-    const validationError = validateSaleForm(form.items, form.customerId, form.manualCustomerName);
+    const validationError = validateSaleForm(form.items, form.customerId, form.manualCustomerName, form.isKocha);
     if (validationError) {
+      alert('Xatolik: ' + validationError);
       throw new Error(validationError);
     }
 
@@ -429,7 +475,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
           usd: parseFloat(form.paidUSD || '0'),
           click: parseFloat(form.paidCLICK || '0'),
         },
-        paymentType: form.paymentType,
+        paymentMethod: form.paymentType?.toUpperCase() || 'CASH', // ✅ Backend nomiga mos
         currency: form.currency,
         isKocha: form.isKocha,
         totalAmount: totalAmount,
@@ -440,7 +486,11 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
         status: debtAmount > 0 ? 'partial' : 'completed',
       };
 
-      await api.post('/sales', saleData);
+      console.log('📤 Sending sale data:', JSON.stringify(saleData, null, 2));
+      const response = await api.post('/sales', saleData);
+
+      // Note: Stock update and customer balance/debt updates are handled server-side 
+      // in the POST /sales endpoint to prevent race conditions
 
       // Create customer if manual
       if (form.manualCustomerName && form.manualCustomerPhone) {
@@ -451,7 +501,63 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
         });
       }
 
-      navigate('/sales');
+      // 🖨️ CHEK CHIQARISH
+      try {
+        // ✅ Extract data from standardized API response
+        const saleResult = extractData<any>(response, null);
+        const customerData = selectedCustomer || {
+          name: form.manualCustomerName || "Ko'chaga",
+          phone: form.manualCustomerPhone,
+        };
+
+        // Chek ma'lumotlarini tayyorlash va chiqarish
+        const receiptData = prepareSaleReceipt(
+          {
+            ...saleResult,
+            items: saleData.items,
+            totalAmount: totalAmount,
+            paidAmount: paidAmount,
+            debtAmount: debtAmount,
+            currency: form.currency,
+            paymentDetails: saleData.paymentDetails,
+            isKocha: form.isKocha,
+            manualCustomerName: form.manualCustomerName,
+            manualCustomerPhone: form.manualCustomerPhone,
+          },
+          customerData,
+          { name: 'Kassir' }, // Hozircha kassir nomi sifatida
+          undefined, // driver
+          exchangeRateNum
+        );
+
+        console.log('🖨️ Chek chiqarilmoqda...', receiptData);
+        printReceipt(receiptData);
+      } catch (printError) {
+        console.error('❌ Chek chiqarishda xatolik:', printError);
+        // Chek chiqarish xatosi sotuvni to'xtatmasin
+      }
+
+      // Mahsulotlarni qayta yuklash (yangi stock bilan)
+      try {
+        const refreshResponse = await api.get('/products');
+        // ✅ Handle standardized API response format
+        const productsData = extractArray<Product>(refreshResponse, []);
+        console.log('🔄 Products refresh data:', productsData);
+        if (productsData.length > 0) {
+          setProducts(productsData);
+        } else {
+          console.warn('⚠️ Products refresh returned empty data');
+        }
+      } catch (refreshError) {
+        console.error('❌ Products refresh failed:', refreshError);
+      }
+
+      alert('✅ Sotuv muvaffaqiyatli saqlandi! Chek chiqarildi.');
+      // Backend'da ma'lumot saqlanishini kutish (1 soniya)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Navigate based on current route context
+      const isCashierRoute = window.location.pathname.startsWith('/cashier');
+      navigate(isCashierRoute ? '/cashier/sales' : '/sales');
     } catch (error) {
       errorHandler.handleError(error, { action: 'saveSale' });
       throw error;

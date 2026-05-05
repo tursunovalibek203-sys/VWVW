@@ -159,4 +159,101 @@ router.put('/orders/:id/deliver', authorize('ADMIN', 'LOGISTICS_MANAGER'), async
   }
 });
 
+// ============ STATISTICS ENDPOINT ============
+
+// Logistika statistikasi
+router.get('/statistics', async (req, res) => {
+  try {
+    const [
+      totalDeliveries,
+      pendingDeliveries,
+      inProgressDeliveries,
+      completedDeliveries,
+      totalDrivers,
+      activeDrivers,
+      totalVehicles,
+      activeVehicles
+    ] = await Promise.all([
+      prisma.delivery.count(),
+      prisma.delivery.count({ where: { status: 'PENDING' } }),
+      prisma.delivery.count({ where: { status: 'IN_PROGRESS' } }),
+      prisma.delivery.count({ where: { status: 'COMPLETED' } }),
+      prisma.driver.count(),
+      prisma.driver.count({ where: { active: true } }),
+      prisma.vehicle.count(),
+      prisma.vehicle.count({ where: { active: true } })
+    ]);
+
+    res.json({
+      deliveries: {
+        total: totalDeliveries,
+        pending: pendingDeliveries,
+        inProgress: inProgressDeliveries,
+        completed: completedDeliveries
+      },
+      drivers: {
+        total: totalDrivers,
+        active: activeDrivers
+      },
+      vehicles: {
+        total: totalVehicles,
+        active: activeVehicles
+      }
+    });
+  } catch (error) {
+    console.error('Get statistics error:', error);
+    res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+// ============ VEHICLES ENDPOINTS ============
+
+// Barcha transport vositalarini olish
+router.get('/vehicles', async (req, res) => {
+  try {
+    const vehicles = await prisma.vehicle.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        driver: true
+      }
+    });
+    res.json(vehicles);
+  } catch (error) {
+    console.error('Get vehicles error:', error);
+    res.status(500).json({ error: 'Failed to fetch vehicles' });
+  }
+});
+
+// Transport vositasi yaratish
+router.post('/vehicles', authorize('ADMIN', 'LOGISTICS_MANAGER'), async (req: AuthRequest, res) => {
+  try {
+    const { 
+      name, 
+      plateNumber, 
+      type, 
+      capacity,
+      driverId 
+    } = req.body;
+
+    const vehicle = await prisma.vehicle.create({
+      data: {
+        name,
+        plateNumber,
+        type: type || 'TRUCK',
+        capacity: capacity || 0,
+        driverId: driverId || null,
+        active: true
+      },
+      include: {
+        driver: true
+      }
+    });
+
+    res.json(vehicle);
+  } catch (error) {
+    console.error('Create vehicle error:', error);
+    res.status(500).json({ error: 'Failed to create vehicle' });
+  }
+});
+
 export default router;

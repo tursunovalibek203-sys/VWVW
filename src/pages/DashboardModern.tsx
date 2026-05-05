@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, 
   DollarSign, 
@@ -7,16 +6,9 @@ import {
   Package, 
   Target,
   Activity,
-  ShoppingCart,
-  Truck,
-  Zap,
-  ArrowUpRight,
-  Brain,
-  LayoutDashboard,
-  CheckSquare,
-  Factory
+  ShoppingCart
 } from 'lucide-react';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
+// Note: Charts removed until real data API is available
 import api from '../lib/professionalApi';
 import { latinToCyrillic } from '../lib/transliterator';
 import ModernLayout from '../components/ModernLayout';
@@ -33,7 +25,6 @@ interface DashboardStats {
 }
 
 export default function DashboardModern() {
-  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,19 +33,22 @@ export default function DashboardModern() {
       try {
         setLoading(true);
         
-        // Mock data for now
-        const mockStats: DashboardStats = {
-          totalRevenue: 250000000,
-          monthlyRevenue: 45000000,
-          totalOrders: 1250,
-          monthlyOrders: 180,
-          totalCustomers: 77,
-          totalProducts: 25,
-          netProfit: 8500000,
-          growth: 12.5
-        };
+        // Real API call
+        const response = await api.get('/dashboard/stats');
+        const data = response.data;
         
-        setStats(mockStats);
+        if (data) {
+          setStats({
+            totalRevenue: data.totalRevenue || 0,
+            monthlyRevenue: data.monthlyRevenue || 0,
+            totalOrders: data.totalOrders || 0,
+            monthlyOrders: data.monthlyOrders || 0,
+            totalCustomers: data.totalCustomers || 0,
+            totalProducts: data.totalProducts || 0,
+            netProfit: data.netProfit || 0,
+            growth: data.growth || 0
+          });
+        }
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       } finally {
@@ -105,24 +99,8 @@ export default function DashboardModern() {
     );
   }
 
-  const profitMargin = stats.monthlyRevenue > 0 
-    ? ((stats.netProfit / stats.monthlyRevenue) * 100).toFixed(1)
-    : 0;
-
-  const salesData = [
-    { name: 'Yanvar', revenue: 38000000 },
-    { name: 'Fevral', revenue: 42000000 },
-    { name: 'Mart', revenue: 45000000 },
-    { name: 'Aprel', revenue: 41000000 },
-    { name: 'May', revenue: 48000000 },
-    { name: 'Iyun', revenue: 52000000 }
-  ];
-
-  const categoryData = [
-    { name: 'Preformalar', value: 45, color: '#3b82f6' },
-    { name: 'Qoplamlar', value: 30, color: '#10b981' },
-    { name: 'Etiketkalar', value: 25, color: '#f59e0b' }
-  ];
+  // Note: Chart data should be fetched from API endpoint
+  // For now, charts are hidden until real data is available
 
   return (
     <ModernLayout 
@@ -205,95 +183,6 @@ export default function DashboardModern() {
           </div>
         </div>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Sales Chart */}
-          <div className="glass-card-light p-6">
-            <h3 className="text-lg font-bold text-primary mb-6">{latinToCyrillic("Сотув Графиги")}</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={salesData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="name" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px'
-                  }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="revenue" 
-                  stroke="#3b82f6" 
-                  fill="url(#colorRevenue)" 
-                  strokeWidth={2}
-                />
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                  </linearGradient>
-                </defs>
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Category Pie Chart */}
-          <div className="glass-card-light p-6">
-            <h3 className="text-lg font-bold text-primary mb-6">{latinToCyrillic("Маҳсулот Категориялари")}</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="btn-gradient-primary px-6 py-3"
-            >
-              {latinToCyrillic("Қайта уриниш")}
-              <span className="text-sm font-medium">{latinToCyrillic("Янги Сотув")}</span>
-            </button>
-            
-            <button 
-              onClick={() => navigate('/customers')}
-              className="btn-gradient-secondary p-4 flex flex-col items-center gap-2"
-            >
-              <Users className="w-6 h-6" />
-              <span className="text-sm font-medium">{latinToCyrillic("Мижозлар")}</span>
-            </button>
-            
-            <button 
-              onClick={() => navigate('/products')}
-              className="btn-gradient-secondary p-4 flex flex-col items-center gap-2"
-            >
-              <Package className="w-6 h-6" />
-              <span className="text-sm font-medium">{latinToCyrillic("Маҳсулотлар")}</span>
-            </button>
-            
-            <button 
-              onClick={() => navigate('/reports')}
-              className="btn-gradient-secondary p-4 flex flex-col items-center gap-2"
-            >
-              <Brain className="w-6 h-6" />
-              <span className="text-sm font-medium">{latinToCyrillic("Ҳисботлар")}</span>
-            </button>
-          </div>
-        </div>
       </div>
     </ModernLayout>
   );

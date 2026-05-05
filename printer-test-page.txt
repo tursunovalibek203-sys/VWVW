@@ -1,7 +1,0 @@
-PRINTER TEST PAGE
-=================
-Date: 3/15/2026, 1:08:55 PM
-Test: Printer connectivity check
-Status: This is a test page to verify your printer is working
-
-If you can read this, your printer is connected and working!

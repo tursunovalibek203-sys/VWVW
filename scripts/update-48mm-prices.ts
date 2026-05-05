@@ -4,17 +4,17 @@ async function update48mmPrices() {
   console.log('Updating 48mm products prices...');
   
   try {
-    // 48mm Ruchkalar - donasini 0.017, 1000 dona/qop
+    // 48mm Ruchkalar - donasini 0.16, 1000 dona/qop
     const handles48 = [
-      { name: 'Ruchka 48 Ko\'k', pricePerPiece: 0.017, unitsPerBag: 0 },
-      { name: 'Ruchka 48 Sariq', pricePerPiece: 0.017, unitsPerBag: 1000 },
-      { name: 'Ruchka 48 Yashil', pricePerPiece: 0.017, unitsPerBag: 1000 },
-      { name: 'Ruchka 48 Apelsin (to\'q sariq)', pricePerPiece: 0.017, unitsPerBag: 1000 },
-      { name: 'Ruchka 48 Qizil', pricePerPiece: 0.017, unitsPerBag: 1000 },
-      { name: 'Ruchka 48 Oq', pricePerPiece: 0.017, unitsPerBag: 1000 },
-      { name: 'Ruchka 48 Qora', pricePerPiece: 0.017, unitsPerBag: 1000 },
-      { name: 'Ruchka 48 Donya (Brend)', pricePerPiece: 0.017, unitsPerBag: 1000 },
-      { name: 'Ruchka 48 Bekajon (Brend)', pricePerPiece: 0.017, unitsPerBag: 1000 }
+      { name: 'Ruchka 48 Ko\'k', pricePerPiece: 0.16, unitsPerBag: 0 },
+      { name: 'Ruchka 48 Sariq', pricePerPiece: 0.16, unitsPerBag: 1000 },
+      { name: 'Ruchka 48 Yashil', pricePerPiece: 0.16, unitsPerBag: 1000 },
+      { name: 'Ruchka 48 Apelsin (to\'q sariq)', pricePerPiece: 0.16, unitsPerBag: 1000 },
+      { name: 'Ruchka 48 Qizil', pricePerPiece: 0.16, unitsPerBag: 1000 },
+      { name: 'Ruchka 48 Oq', pricePerPiece: 0.16, unitsPerBag: 1000 },
+      { name: 'Ruchka 48 Qora', pricePerPiece: 0.16, unitsPerBag: 1000 },
+      { name: 'Ruchka 48 Donya (Brend)', pricePerPiece: 0.16, unitsPerBag: 1000 },
+      { name: 'Ruchka 48 Bekajon (Brend)', pricePerPiece: 0.16, unitsPerBag: 1000 }
     ];
     
     for (const handle of handles48) {
@@ -40,18 +40,18 @@ async function update48mmPrices() {
       }
     }
     
-    // 48mm Krishkalar - donasini 0.013, 2000 dona/qop
+    // 48mm Krishkalar - donasini 0.012, 2000 dona/qop
     const caps48 = [
-      { name: 'Qopqoq 48 Ko\'k', pricePerPiece: 0.013, unitsPerBag: 2000 },
-      { name: 'Qopqoq 48 Sariq', pricePerPiece: 0.013, unitsPerBag: 2000 },
-      { name: 'Qopqoq 48 Yashil', pricePerPiece: 0.013, unitsPerBag: 2000 },
-      { name: 'Qopqoq 48 Apelsin (to\'q sariq)', pricePerPiece: 0.013, unitsPerBag: 2000 },
-      { name: 'Qopqoq 48 Qizil', pricePerPiece: 0.013, unitsPerBag: 2000 },
-      { name: 'Qopqoq 48 Oq', pricePerPiece: 0.013, unitsPerBag: 2000 },
-      { name: 'Qopqoq 48 Salat rang', pricePerPiece: 0.013, unitsPerBag: 2000 },
-      { name: 'Qopqoq 48 Donya (Brend)', pricePerPiece: 0.013, unitsPerBag: 2000 },
-      { name: 'Qopqoq 48 Bekajon (Brend)', pricePerPiece: 0.013, unitsPerBag: 2000 },
-      { name: 'Qopqoq 48 Sayhun (Brend)', pricePerPiece: 0.013, unitsPerBag: 2000 }
+      { name: 'Qopqoq 48 Ko\'k', pricePerPiece: 0.012, unitsPerBag: 2000 },
+      { name: 'Qopqoq 48 Sariq', pricePerPiece: 0.012, unitsPerBag: 2000 },
+      { name: 'Qopqoq 48 Yashil', pricePerPiece: 0.012, unitsPerBag: 2000 },
+      { name: 'Qopqoq 48 Apelsin (to\'q sariq)', pricePerPiece: 0.012, unitsPerBag: 2000 },
+      { name: 'Qopqoq 48 Qizil', pricePerPiece: 0.012, unitsPerBag: 2000 },
+      { name: 'Qopqoq 48 Oq', pricePerPiece: 0.012, unitsPerBag: 2000 },
+      { name: 'Qopqoq 48 Salat rang', pricePerPiece: 0.012, unitsPerBag: 2000 },
+      { name: 'Qopqoq 48 Donya (Brend)', pricePerPiece: 0.012, unitsPerBag: 2000 },
+      { name: 'Qopqoq 48 Bekajon (Brend)', pricePerPiece: 0.012, unitsPerBag: 2000 },
+      { name: 'Qopqoq 48 Sayhun (Brend)', pricePerPiece: 0.012, unitsPerBag: 2000 }
     ];
     
     for (const cap of caps48) {

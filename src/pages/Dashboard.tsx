@@ -1,398 +1,249 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  DollarSign, 
-  Users, 
+  ShoppingCart, 
   Package, 
-  Target,
-  AlertCircle,
-  BarChart3,
-  ShoppingCart,
-  Truck,
-  RefreshCw,
-  Activity,
+  Users, 
+  Wallet, 
+  TrendingUp,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Calendar,
+  RefreshCw,
+  User,
+  Bell
 } from 'lucide-react';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
-import api from '../lib/professionalApi';
 import { latinToCyrillic } from '../lib/transliterator';
-import { useProfessionalApi } from '../hooks/useProfessionalApi';
-import { errorHandler } from '../lib/professionalErrorHandler';
-import { performanceMonitor } from '../lib/professionalPerformance';
-import { analytics } from '../lib/professionalAnalytics';
-import { notify } from '../lib/professionalNotifications';
-import { ProfessionalCard, ProfessionalButton } from '../components/ProfessionalComponents';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
-import StatCard from '../components/StatCard';
+import DashboardCard from '../components/cards/DashboardCard';
+import MainLayout from '../components/layout/MainLayout';
+import api from '../lib/professionalApi';
+
+interface DashboardStats {
+  todaySales: number;
+  todayRevenue: number;
+  totalProducts: number;
+  lowStockProducts: number;
+  totalCustomers: number;
+  newCustomers: number;
+  cashboxBalance: number;
+  pendingOrders: number;
+}
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
+  const [stats, setStats] = useState<DashboardStats>({
+    todaySales: 0,
+    todayRevenue: 0,
+    totalProducts: 0,
+    lowStockProducts: 0,
+    totalCustomers: 0,
+    newCustomers: 0,
+    cashboxBalance: 0,
+    pendingOrders: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadDashboardData();
-    const interval = setInterval(loadDashboardData, 300000);
-    return () => clearInterval(interval);
+    loadDashboardStats();
   }, []);
 
-  const { execute: loadDashboardStats } = useProfessionalApi(
-    () => api.get('/dashboard/stats'),
-    { cache: true, cacheTTL: 60000 }
-  );
-
-  const loadDashboardData = async () => {
-    const startTime = performance.now();
-    
+  const loadDashboardStats = async () => {
     try {
-      const data = await loadDashboardStats();
-      
-      if (data) {
-        setStats(data);
-        
-        // Track analytics
-        analytics.trackUserAction('dashboard_loaded', {
-          statsLoaded: true,
-          loadTime: performance.now() - startTime
-        });
-        
-        // Show success notification for refresh
-        if (refreshing) {
-          notify.success('Yangilandi', 'Dashboard ma\'lumotlari yangilandi');
-        }
-      }
-    } catch (error) {
-      const professionalError = errorHandler.handleError(error, {
-        action: 'loadDashboard',
-        refreshing
+      // Simulated data - replace with actual API calls
+      setStats({
+        todaySales: 12,
+        todayRevenue: 8540,
+        totalProducts: 156,
+        lowStockProducts: 3,
+        totalCustomers: 248,
+        newCustomers: 5,
+        cashboxBalance: 12500,
+        pendingOrders: 8,
       });
-      
-      // Convert unknown error to Error type for analytics
-      const errorObj = error instanceof Error ? error : new Error(String(error));
-      analytics.trackError(errorObj, { action: 'loadDashboard' });
-      notify.error('Xatolik', 'Dashboard ma\'lumotlarini yuklashda xatolik yuz berdi');
-      
-      console.error('Dashboard yuklashda xatolik:', professionalError.userMessage);
+    } catch (error) {
+      console.error('Dashboard stats loading error:', error);
     } finally {
       setLoading(false);
-      setRefreshing(false);
-      
-      // Track performance
-      const loadTime = performance.now() - startTime;
-      performanceMonitor.trackPerformance('dashboard_load_time', loadTime);
     }
   };
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    loadDashboardData();
-  };
+  const currentDate = new Date().toLocaleDateString('uz-UZ', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
 
   const quickActions = [
-    { 
-      title: 'Yangi Sotuv', 
-      icon: ShoppingCart, 
-      color: 'from-blue-500 to-blue-600',
-      href: '/sales/add',
-      description: 'Tez sotuv qilish'
-    },
-    { 
-      title: 'Yangi Mahsulot', 
-      icon: Package, 
-      color: 'from-emerald-500 to-emerald-600',
-      href: '/add-product',
-      description: 'Mahsulot qo\'shish'
-    },
-    { 
-      title: 'Buyurtmalar', 
-      icon: Truck, 
-      color: 'from-violet-500 to-violet-600',
-      href: '/orders',
-      description: 'Barcha buyurtmalar'
-    },
-    { 
-      title: 'Mijozlar', 
-      icon: Users, 
-      color: 'from-amber-500 to-amber-600',
-      href: '/customers',
-      description: 'Mijozlarni boshqarish'
-    }
+    { id: 'sotuv', icon: ShoppingCart, label: 'Янги сотув', color: 'bg-emerald-500', path: '/cashier/sales/new' },
+    { id: 'mijoz', icon: Users, label: 'Янги mijoz', color: 'bg-blue-500', path: '/cashier/customers/new' },
+    { id: 'buyurtma', icon: Package, label: 'Янги buyurtma', color: 'bg-amber-500', path: '/cashier/orders/new' },
+    { id: 'xarajat', icon: Wallet, label: 'Xarajat', color: 'bg-rose-500', path: '/cashier/expenses' },
   ];
-
-  const recentActivities = [
-    { id: 1, type: 'sale', description: 'Sotuv #1234', amount: '1,250,000 UZS', time: '5 daqiqa oldin', status: 'success' },
-    { id: 2, type: 'order', description: 'Buyurtma #5678', amount: '3,500,000 UZS', time: '15 daqiqa oldin', status: 'pending' },
-    { id: 3, type: 'payment', description: 'To\'lov #9012', amount: '750,000 UZS', time: '1 soat oldin', status: 'success' },
-    { id: 4, type: 'return', description: 'Qaytarish #3456', amount: '250,000 UZS', time: '2 soat oldin', status: 'warning' }
-  ];
-
-  const chartData = [
-    { name: 'Dush', sales: 4000, orders: 240 },
-    { name: 'Sesh', sales: 3000, orders: 139 },
-    { name: 'Chor', sales: 2000, orders: 380 },
-    { name: 'Pay', sales: 2780, orders: 390 },
-    { name: 'Jum', sales: 1890, orders: 480 },
-    { name: 'Shan', sales: 2390, orders: 380 },
-    { name: 'Yak', sales: 3490, orders: 430 }
-  ];
-
-  const pieData = [
-    { name: 'Sotuvlar', value: 45, color: '#3b82f6' },
-    { name: 'Buyurtmalar', value: 30, color: '#10b981' },
-    { name: 'Qaytarishlar', value: 15, color: '#f59e0b' },
-    { name: 'Boshqa', value: 10, color: '#8b5cf6' }
-  ];
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 bg-dots-pattern">
-        <div className="glass-card p-10 rounded-3xl shadow-glass-lg animate-scale-in">
-          <div className="relative">
-            <div className="animate-spin rounded-full h-20 w-20 border-4 border-blue-100 border-t-blue-600 border-r-blue-400 shadow-glow"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-10 w-10 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full animate-pulse shadow-glow"></div>
-            </div>
-          </div>
-          <p className="mt-6 text-center text-lg font-semibold text-gradient-blue animate-shimmer">
-            {latinToCyrillic('Yuklanmoqda...')}
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen p-6 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 bg-dots-pattern">
-      {/* Header */}
-      <div className="mb-8 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-gradient mb-2">
-              {latinToCyrillic('Dashboard')}
-            </h1>
-            <p className="text-gray-600">
-              {latinToCyrillic('LUX PET PLAST zavod boshqaruv tizimi')}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="btn-gradient-primary group"
-            >
-              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-              {latinToCyrillic('Yangilash')}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          title={latinToCyrillic('Jami Sotuvlar')}
-          value={stats?.totalSales ? `${stats.totalSales.toLocaleString()} UZS` : '0 UZS'}
-          icon={DollarSign}
-          iconColor="text-blue-500"
-          trend={{ value: 12.5, isPositive: true }}
-          description="O'tgan oyga nisbatan"
-        />
-        
-        <StatCard
-          title={latinToCyrillic('Buyurtmalar')}
-          value={stats?.totalOrders || '0'}
-          icon={ShoppingCart}
-          iconColor="text-emerald-500"
-          trend={{ value: 8.2, isPositive: true }}
-          description="O'tgan oyga nisbatan"
-        />
-        
-        <StatCard
-          title={latinToCyrillic('Mijozlar')}
-          value={stats?.totalCustomers || '0'}
-          icon={Users}
-          iconColor="text-violet-500"
-          trend={{ value: 15.3, isPositive: true }}
-          description="O'tgan oyga nisbatan"
-        />
-        
-        <StatCard
-          title={latinToCyrillic('Mahsulotlar')}
-          value={stats?.totalProducts || '0'}
-          icon={Package}
-          iconColor="text-amber-500"
-          trend={{ value: 5.7, isPositive: false }}
-          description="O'tgan oyga nisbatan"
-        />
-      </div>
-
-      {/* Quick Actions */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">
-          {latinToCyrillic('Tezkor Amallar')}
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {quickActions.map((action, index) => (
-            <button
-              key={index}
-              onClick={() => navigate(action.href)}
-              className="group relative overflow-hidden glass-card p-6 hover-lift"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className={`absolute inset-0 bg-gradient-to-r ${action.color} opacity-0 group-hover:opacity-10 transition-opacity duration-500`}></div>
-
-              <div className="relative z-10">
-                <div className={`w-12 h-12 bg-gradient-to-r ${action.color} rounded-xl flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
-                  <action.icon className="w-6 h-6 text-white" />
+    <MainLayout>
+      <div className="min-h-screen bg-gray-50/50 pb-24">
+        {/* Header */}
+        <div className="bg-white shadow-sm border-b border-gray-100">
+          <div className="px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
+                  <span className="text-white font-bold text-lg">LP</span>
                 </div>
-
-                <h3 className="text-lg font-semibold text-gray-900 mb-1 group-hover:text-blue-700 transition-colors">
-                  {latinToCyrillic(action.title)}
-                </h3>
-                <p className="text-sm text-gray-600">
-                  {latinToCyrillic(action.description)}
-                </p>
-              </div>
-
-              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:translate-x-1 group-hover:-translate-y-1">
-                <div className={`p-2 rounded-lg bg-gradient-to-r ${action.color} shadow-md`}>
-                  <ArrowUpRight className="w-4 h-4 text-white" />
+                <div>
+                  <h1 className="text-lg font-bold text-blue-700 uppercase tracking-wide">
+                    LUX PET PLAST
+                  </h1>
+                  <p className="text-xs text-gray-500 uppercase">
+                    {latinToCyrillic('BUXORO VILOYATI VOBKENT TUMAN')}
+                  </p>
                 </div>
               </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Sales Chart */}
-        <Card className="glass-card hover-lift animate-slide-up">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-gradient-blue">
-              <BarChart3 className="w-5 h-5 text-blue-500" />
-              {latinToCyrillic('Sotuvlar Statistikasi')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="name" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px'
-                  }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="sales" 
-                  stroke="#3b82f6" 
-                  fillOpacity={1} 
-                  fill="url(#colorSales)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Orders Pie Chart */}
-        <Card className="glass-card hover-lift animate-slide-up animate-delay-100">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-emerald-500" />
-              {latinToCyrillic('Buyurtmalar Tahlili')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
+              <div className="flex items-center gap-3">
+                <button 
+                  className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  aria-label={latinToCyrillic('Бildirishномалар')}
                 >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activities */}
-      <Card className="glass-card hover-lift animate-slide-up animate-delay-200">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-violet-500" />
-            {latinToCyrillic('So\'nggi Faoliyatlar')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {recentActivities.map((activity) => (
-              <div
-                key={activity.id}
-                className="flex items-center justify-between p-4 rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md ${
-                    activity.status === 'success' ? 'bg-gradient-to-br from-emerald-400 to-emerald-500' :
-                    activity.status === 'pending' ? 'bg-gradient-to-br from-amber-400 to-amber-500' :
-                    'bg-gradient-to-br from-rose-400 to-rose-500'
-                  }`}>
-                    {activity.status === 'success' ? (
-                      <ArrowUpRight className="w-5 h-5 text-white" />
-                    ) : activity.status === 'pending' ? (
-                      <AlertCircle className="w-5 h-5 text-white" />
-                    ) : (
-                      <ArrowDownRight className="w-5 h-5 text-white" />
-                    )}
+                  <Bell className="w-5 h-5 text-gray-600" />
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full" />
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">{latinToCyrillic('Kassir')}</span>
+                  <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-gray-600" />
                   </div>
-                  
-                  <div>
-                    <p className="font-medium text-gray-900 group-hover:text-blue-700 transition-colors">
-                      {latinToCyrillic(activity.description)}
-                    </p>
-                    <p className="text-sm text-gray-500 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-                      {activity.time}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="text-right">
-                  <p className={`font-semibold ${
-                    activity.status === 'success' ? 'text-emerald-600' :
-                    activity.status === 'warning' ? 'text-rose-600' :
-                    'text-amber-600'
-                  }`}>{activity.amount}</p>
                 </div>
               </div>
-            ))}
+            </div>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Date and Refresh */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-gray-600">
+              <Calendar className="w-4 h-4" />
+              <span className="text-sm font-medium">{currentDate}</span>
+            </div>
+            <button
+              onClick={loadDashboardStats}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors shadow-sm"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              {latinToCyrillic('Янгилаш')}
+            </button>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-4 gap-3">
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.id}
+                  onClick={() => navigate(action.path)}
+                  className={`${action.color} text-white rounded-xl p-4 shadow-lg shadow-gray-200 hover:shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98]`}
+                >
+                  <Icon className="w-6 h-6 mb-2" />
+                  <span className="text-xs font-medium block">{latinToCyrillic(action.label)}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <DashboardCard
+              icon={ShoppingCart}
+              title={latinToCyrillic('Бугунги савдолар')}
+              mainValue={stats.todaySales}
+              subValue={`$${stats.todayRevenue.toLocaleString()}`}
+              variant="info"
+            />
+            <DashboardCard
+              icon={TrendingUp}
+              title={latinToCyrillic('Даромад')}
+              mainValue={`$${stats.todayRevenue.toLocaleString()}`}
+              subValue={
+                <span className="flex items-center gap-1 text-emerald-600">
+                  <ArrowUpRight className="w-3 h-3" />
+                  +12%
+                </span>
+              }
+              variant="success"
+            />
+            <DashboardCard
+              icon={Package}
+              title={latinToCyrillic('Маҳсулотлар')}
+              mainValue={stats.totalProducts}
+              subValue={
+                stats.lowStockProducts > 0 ? (
+                  <span className="text-rose-600">
+                    {stats.lowStockProducts} {latinToCyrillic('та кам қолди')}
+                  </span>
+                ) : (
+                  latinToCyrillic('Ҳаммаси яхши')
+                )
+              }
+              variant={stats.lowStockProducts > 0 ? 'warning' : 'success'}
+            />
+            <DashboardCard
+              icon={Users}
+              title={latinToCyrillic('Мижозлар')}
+              mainValue={stats.totalCustomers}
+              subValue={
+                <span className="text-emerald-600">
+                  +{stats.newCustomers} {latinToCyrillic('яңи')}
+                </span>
+              }
+              variant="info"
+            />
+            <DashboardCard
+              icon={Wallet}
+              title={latinToCyrillic('Касса баланс')}
+              mainValue={`$${stats.cashboxBalance.toLocaleString()}`}
+              subValue={`${(stats.cashboxBalance * 12500).toLocaleString()} сум`}
+              variant="neutral"
+            />
+            <DashboardCard
+              icon={Package}
+              title={latinToCyrillic('Кутилаётган буюртмалар')}
+              mainValue={stats.pendingOrders}
+              subValue={latinToCyrillic('та буюртма')}
+              variant="warning"
+            />
+          </div>
+
+          {/* Recent Activity */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <h3 className="font-bold text-gray-900 mb-4">
+              {latinToCyrillic('Сўнги фаолият')}
+            </h3>
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <ShoppingCart className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">
+                      {latinToCyrillic('Сотув №')}{1000 + i}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {latinToCyrillic('Ever-Mac Caldo')} • 2 {latinToCyrillic('та маҳсулот')}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-gray-900">$640.00</p>
+                    <p className="text-xs text-gray-500">2 {latinToCyrillic('соат олдин')}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </MainLayout>
   );
 }

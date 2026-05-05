@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import Button from '../components/Button';
-import api from '../lib/api';
+import api from '../lib/professionalApi';
 import { formatCurrency } from '../lib/utils';
 import { formatDateTime } from '../lib/dateUtils';
 import { 
@@ -84,6 +84,8 @@ export default function AIManager() {
           
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <select
+              title="Vaqt oralig'ini tanlash"
+              aria-label="Vaqt oralig'ini tanlash"
               className="flex-1 sm:flex-none px-3 py-2 text-sm bg-background border border-border rounded-lg"
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value)}

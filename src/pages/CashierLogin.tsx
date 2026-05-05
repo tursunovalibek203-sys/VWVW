@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import api from '../lib/api';
+import api from '../lib/professionalApi';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
 import { restoreLastSession } from '../lib/authUtils';

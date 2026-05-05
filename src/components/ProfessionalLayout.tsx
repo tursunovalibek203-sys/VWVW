@@ -1,5 +1,6 @@
 import { ReactNode, useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { 
   LayoutDashboard, Package, ShoppingCart, Users, 
   DollarSign, Moon, Sun, LogOut, FileText, 
@@ -13,6 +14,7 @@ import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/utils';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { latinToCyrillic } from '../lib/transliterator';
+import LanguageSwitcher from './LanguageSwitcher';
 
 interface NavigationItem {
   name: string;
@@ -24,39 +26,40 @@ interface NavigationItem {
   category?: 'main' | 'analytics' | 'management' | 'tools';
 }
 
-const getNavigation = (): { main: NavigationItem[]; analytics: NavigationItem[]; management: NavigationItem[]; tools: NavigationItem[] } => ({
+const getNavigation = (t: (key: string) => string): { main: NavigationItem[]; analytics: NavigationItem[]; management: NavigationItem[]; tools: NavigationItem[] } => ({
   main: [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard, category: 'main' },
-    { name: 'Sales', href: '/sales', icon: ShoppingCart, category: 'main' },
-    { name: 'Orders', href: '/orders', icon: Package, category: 'main' },
-    { name: 'Products', href: '/products', icon: Package, category: 'main' },
-    { name: 'Customers', href: '/customers', icon: Users, category: 'main' },
-    { name: 'Cashbox', href: '/cashbox', icon: Wallet, category: 'main' },
-    { name: 'Cashier Management', href: '/cashiers', icon: Shield, adminOnly: true, category: 'main' },
-    { name: 'Reports', href: '/reports', icon: FileText, category: 'main' },
-    { name: 'Settings', href: '/settings', icon: SettingsIcon, category: 'main' },
+    { name: t('navigation.dashboard'), href: '/', icon: LayoutDashboard, category: 'main' },
+    { name: t('navigation.sales'), href: '/sales', icon: ShoppingCart, category: 'main' },
+    { name: t('navigation.orders'), href: '/orders', icon: Package, category: 'main' },
+    { name: t('navigation.products'), href: '/products', icon: Package, category: 'main' },
+    { name: t('navigation.customers'), href: '/customers', icon: Users, category: 'main' },
+    { name: t('navigation.cashbox'), href: '/cashbox', icon: Wallet, category: 'main' },
+    { name: t('navigation.cashierManagement'), href: '/cashiers', icon: Shield, adminOnly: true, category: 'main' },
+    { name: t('navigation.reports'), href: '/reports', icon: FileText, category: 'main' },
+    { name: t('navigation.settings'), href: '/settings', icon: SettingsIcon, category: 'main' },
   ],
   analytics: [
-    { name: 'Analytics', href: '/analytics', icon: BarChart3, category: 'analytics' },
-    { name: 'Revenue Calculator', href: '/revenue', icon: DollarSign, category: 'analytics' },
-    { name: 'Activity Monitor', href: '/activity', icon: Activity, category: 'analytics' },
+    { name: t('navigation.analytics'), href: '/analytics', icon: BarChart3, category: 'analytics' },
+    { name: t('navigation.revenueCalculator'), href: '/revenue', icon: DollarSign, category: 'analytics' },
+    { name: t('navigation.activityMonitor'), href: '/activity', icon: Activity, category: 'analytics' },
   ],
   management: [
-    { name: 'Inventory', href: '/inventory', icon: Package2, category: 'management' },
-    { name: 'Suppliers', href: '/suppliers', icon: Truck, category: 'management' },
-    { name: 'Production', href: '/production', icon: Factory, category: 'management' },
-    { name: 'Quality Control', href: '/quality', icon: CheckSquare, category: 'management' },
-    { name: 'Logistics', href: '/logistics', icon: Truck, category: 'management' },
+    { name: t('navigation.inventory'), href: '/inventory', icon: Package2, category: 'management' },
+    { name: t('navigation.suppliers'), href: '/suppliers', icon: Truck, category: 'management' },
+    { name: t('navigation.production'), href: '/production', icon: Factory, category: 'management' },
+    { name: t('navigation.qualityControl'), href: '/quality', icon: CheckSquare, category: 'management' },
+    { name: t('navigation.logistics'), href: '/logistics', icon: Truck, category: 'management' },
   ],
   tools: [
-    { name: 'AI Assistant', href: '/ai-assistant', icon: Brain, category: 'tools' },
-    { name: 'Bot Management', href: '/bots', icon: Bot, category: 'tools' },
-    { name: 'Cloud Backup', href: '/cloud-backup', icon: Cloud, category: 'tools' },
-    { name: 'Keyboard Shortcuts', href: '/shortcuts', icon: Zap, category: 'tools' },
+    { name: t('navigation.aiAssistant'), href: '/ai-assistant', icon: Brain, category: 'tools' },
+    { name: t('navigation.bots'), href: '/bots', icon: Bot, category: 'tools' },
+    { name: t('navigation.cloudBackup'), href: '/cloud-backup', icon: Cloud, category: 'tools' },
+    { name: t('navigation.shortcuts'), href: '/shortcuts', icon: Zap, category: 'tools' },
   ],
 });
 
 export default function ProfessionalLayout({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const { theme, toggleTheme } = useThemeStore();
   const { user, logout } = useAuthStore();
   const location = useLocation();
@@ -97,7 +100,7 @@ export default function ProfessionalLayout({ children }: { children: ReactNode }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isMobile]);
 
-  const navigation = getNavigation();
+  const navigation = getNavigation(t);
   const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
   const isCashier = user?.role?.toUpperCase() === 'CASHIER' || user?.role?.toUpperCase() === 'SELLER';
 
@@ -217,16 +220,23 @@ export default function ProfessionalLayout({ children }: { children: ReactNode }
                 <span className="text-gradient animate-gradient">LUX PET PLAST</span>
               </div>
             )}
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all duration-200 hover:scale-105"
-            >
-              {isSidebarOpen ? (
-                <ChevronUp className="w-5 h-5" />
-              ) : (
-                <ChevronDown className="w-5 h-5" />
+            <div className="flex items-center gap-2">
+              {isSidebarOpen && (
+                <div className="scale-90">
+                  <LanguageSwitcher />
+                </div>
               )}
-            </button>
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all duration-200 hover:scale-105"
+              >
+                {isSidebarOpen ? (
+                  <ChevronUp className="w-5 h-5" />
+                ) : (
+                  <ChevronDown className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -250,7 +260,7 @@ export default function ProfessionalLayout({ children }: { children: ReactNode }
                 <Moon className="w-5 h-5 text-indigo-500 group-hover:animate-bounce-gentle" />
               )}
               {isSidebarOpen && (
-                <span className="font-medium text-gray-700">{latinToCyrillic("Mavzu")}</span>
+                <span className="font-medium text-gray-700">{t('settings.theme')}</span>
               )}
             </button>
             
@@ -260,7 +270,7 @@ export default function ProfessionalLayout({ children }: { children: ReactNode }
             >
               <LogOut className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               {isSidebarOpen && (
-                <span className="font-medium">{latinToCyrillic("Chiqish")}</span>
+                <span className="font-medium">{t('auth.logout')}</span>
               )}
             </button>
           </div>

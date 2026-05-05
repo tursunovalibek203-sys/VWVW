@@ -13,8 +13,10 @@ router.get('/', async (req, res) => {
       include: {
         user: {
           select: {
+            id: true,
             name: true,
             login: true,
+            role: true,
           },
         },
       },
@@ -24,7 +26,13 @@ router.get('/', async (req, res) => {
       take: 500,
     });
 
-    res.json(logs);
+    // Parse changes field from JSON string to object
+    const parsedLogs = logs.map(log => ({
+      ...log,
+      changes: log.changes ? JSON.parse(log.changes) : null,
+    }));
+
+    res.json(parsedLogs);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch audit logs' });
   }

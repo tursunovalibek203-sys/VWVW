@@ -57,15 +57,22 @@ export const calculatePaidAmount = (
   const usd = parseFloat(paidUSD) || 0;
   const click = parseFloat(paidCLICK) || 0;
 
+  console.log('💰 calculatePaidAmount:', { paidUZS, paidUSD, paidCLICK, uzs, usd, click, currency, exchangeRate });
+
+  let result: number;
   if (currency === 'UZS') {
-    return uzs + (usd * exchangeRate) + click;
+    result = uzs + (usd * exchangeRate) + click;
+  } else {
+    result = uzs / exchangeRate + usd + (click / exchangeRate);
   }
-  return uzs / exchangeRate + usd + (click / exchangeRate);
+
+  console.log('💰 calculated result:', result);
+  return result;
 };
 
-// Calculate debt
+// Calculate debt (returns positive for debt, negative for overpayment)
 export const calculateDebt = (total: number, paid: number): number => {
-  return Math.max(0, total - paid);
+  return total - paid; // Can be negative for overpayment
 };
 
 // Get default piece price based on product name
@@ -76,11 +83,18 @@ export const getDefaultPiecePrice = (productName: string): number | null => {
 
   // Special prices for specific gram sizes
   const prices: Record<number, number> = {
-    75: 0.14325,
+    15: 0.02925,
+    21: 0.04095,
+    26: 0.0507,
+    30: 0.0585,
+    36: 0.0702,
+    52: 0.1283,
+    70: 0.163,
+    75: 0.147,
     80: 0.152,
-    85: 0.172,
-    86: 0.1745,
-    135: 0.258,
+    85: 0.166,
+    86: 0.167,
+    135: 0.265,
   };
 
   if (gramSize && prices[gramSize]) {
@@ -88,31 +102,42 @@ export const getDefaultPiecePrice = (productName: string): number | null => {
   }
 
   // 48 krishka
-  if (name.includes('48') && (name.includes('krishka') || name.includes('qopqoq') || name.includes('cap'))) {
-    return 0.012;
+  if (/\b48\b/.test(name) && (name.includes('krishka') || name.includes('qopqoq') || name.includes('cap') || name.includes('кришка') || name.includes('Кришка'))) {
+    return 0.016;
+  }
+
+  // 38 ruchka
+  if (/\b38\b/.test(name) && (name.includes('ruchka') || name.includes('handle') || name.includes('ручка') || name.includes('Ручка'))) {
+    return 0.010;
   }
 
   // 48 ruchka
-  if (name.includes('48') && (name.includes('ruchka') || name.includes('handle'))) {
+  if (/\b48\b/.test(name) && (name.includes('ruchka') || name.includes('handle') || name.includes('ручка') || name.includes('Ручка'))) {
     return 0.016;
   }
 
   // 28 ruchka
-  if (name.includes('28') && (name.includes('ruchka') || name.includes('handle'))) {
-    return 0.007;
+  if (/\b28\b/.test(name) && (name.includes('ruchka') || name.includes('handle') || name.includes('ручка') || name.includes('Ручка'))) {
+    return 0.010;
   }
 
-  // 28 krishka
-  if (name.includes('28') && (name.includes('krishka') || name.includes('qopqoq') || name.includes('cap'))) {
-    if (name.includes('dkm')) {
-      return 0.0012;
+  // 28 krishka bezgaz
+  if (/\b28\b/.test(name) && (name.includes('krishka') || name.includes('qopqoq') || name.includes('cap') || name.includes('кришка') || name.includes('Кришка'))) {
+    if (name.includes('gaz') || name.includes('газ')) {
+      return 0.008; // gazlik
     }
-    return 0.007;
+    if (name.includes('dkm') || name.includes('DKM')) {
+      return 0.012; // dkm
+    }
+    if (name.includes('okm') || name.includes('OKM') || name.includes('Okm')) {
+      return 0.007; // okm
+    }
+    return 0.007; // bezgaz
   }
 
   // 38 krishka
-  if (name.includes('38') && (name.includes('krishka') || name.includes('qopqoq') || name.includes('cap'))) {
-    return 0.012;
+  if (/\b38\b/.test(name) && (name.includes('krishka') || name.includes('qopqoq') || name.includes('cap') || name.includes('кришка') || name.includes('Кришка'))) {
+    return 0.015;
   }
 
   return null;
@@ -150,33 +175,50 @@ export const getDefaultUnitsPerBag = (productName: string): number | null => {
 // Get piece price for komplekt mode
 export const getPiecePrice = (productName: string): number | null => {
   const name = productName?.toLowerCase() || '';
+  console.log('🔧 getPiecePrice tekshirilmoqda:', productName, '→ lowercase:', name);
 
   // 48 krishka
-  if (name.includes('48') && (name.includes('krishka') || name.includes('qopqoq') || name.includes('cap'))) {
+  const has48 = /\b48\b/.test(name);
+  const hasKrishka = name.includes('krishka') || name.includes('qopqoq') || name.includes('cap') || name.includes('кришка') || name.includes('Кришка');
+  console.log('   Pattern test:', { has48, hasKrishka });
+  
+  if (has48 && hasKrishka) {
+    console.log('   ✅ 48 krishka topildi, returning 0.012');
     return 0.012;
+  }
+
+  // 38 ruchka
+  if (/\b38\b/.test(name) && (name.includes('ruchka') || name.includes('handle') || name.includes('ручка') || name.includes('Ручка'))) {
+    return 0.010;
   }
 
   // 48 ruchka
-  if (name.includes('48') && (name.includes('ruchka') || name.includes('handle'))) {
-    return 0.016;
+  if (/\b48\b/.test(name) && (name.includes('ruchka') || name.includes('handle') || name.includes('ручка') || name.includes('Ручка'))) {
+    return 0.16;
   }
 
   // 28 ruchka
-  if (name.includes('28') && (name.includes('ruchka') || name.includes('handle'))) {
-    return 0.007;
+  if (/\b28\b/.test(name) && (name.includes('ruchka') || name.includes('handle') || name.includes('ручка') || name.includes('Ручка'))) {
+    return 0.010;
   }
 
-  // 28 krishka
-  if (name.includes('28') && (name.includes('krishka') || name.includes('qopqoq') || name.includes('cap'))) {
-    if (name.includes('dkm')) {
-      return 0.0012;
+  // 28 krishka bezgaz
+  if (/\b28\b/.test(name) && (name.includes('krishka') || name.includes('qopqoq') || name.includes('cap') || name.includes('кришка') || name.includes('Кришка'))) {
+    if (name.includes('gaz') || name.includes('газ')) {
+      return 0.008; // gazlik
     }
-    return 0.007;
+    if (name.includes('dkm') || name.includes('DKM')) {
+      return 0.012; // dkm
+    }
+    if (name.includes('okm') || name.includes('OKM') || name.includes('Okm')) {
+      return 0.007; // okm
+    }
+    return 0.007; // bezgaz
   }
 
   // 38 krishka
-  if (name.includes('38') && (name.includes('krishka') || name.includes('qopqoq') || name.includes('cap'))) {
-    return 0.012;
+  if (/\b38\b/.test(name) && (name.includes('krishka') || name.includes('qopqoq') || name.includes('cap') || name.includes('кришка') || name.includes('Кришка'))) {
+    return 0.015;
   }
 
   return null;
@@ -184,8 +226,16 @@ export const getPiecePrice = (productName: string): number | null => {
 
 // Determine target products for komplekt mode
 export const getKomplektTargets = (preformName: string): { krishkaGram: number | null; ruchkaGram: number | null; needsRuchka: boolean } => {
-  const gramMatch = preformName?.match(/(\d+)\s*(gr|g|гр|г)/i);
+  const name = preformName?.toLowerCase() || '';
+  // Gram match - gr/g/гр/г bilan yoki ularsiz
+  const gramMatch = preformName?.match(/(\d+)\s*(gr|g|гр|г)?\b/i);
   const gramSize = gramMatch ? parseInt(gramMatch[1]) : null;
+  console.log('🔧 getKomplektTargets:', preformName, '| gramMatch:', gramMatch, '| gramSize:', gramSize);
+
+  // Kapsula uchun - 28 krishka (faqat krishka)
+  if (name.includes('kapsula') || name.includes('capsule') || name.includes('капсула')) {
+    return { krishkaGram: 28, ruchkaGram: null, needsRuchka: false };
+  }
 
   // Rules:
   // 15, 21, 26, 30 → 28 krishka (only krishka)
@@ -194,21 +244,26 @@ export const getKomplektTargets = (preformName: string): { krishkaGram: number |
   // 75, 80, 85, 86, 135 → 48 krishka + ruchka
 
   if ([15, 21, 26, 30].includes(gramSize || 0)) {
+    console.log('   ✅ Rule 1: [15, 21, 26, 30] → 28 krishka');
     return { krishkaGram: 28, ruchkaGram: null, needsRuchka: false };
   }
 
   if (gramSize === 36) {
+    console.log('   ✅ Rule 2: 36 → 28 krishka + 28 ruchka');
     return { krishkaGram: 28, ruchkaGram: 28, needsRuchka: true };
   }
 
   if ([52, 70].includes(gramSize || 0)) {
+    console.log('   ✅ Rule 3: [52, 70] → 38 krishka + ruchka');
     return { krishkaGram: 38, ruchkaGram: 38, needsRuchka: true };
   }
 
   if ([75, 80, 85, 86, 135].includes(gramSize || 0)) {
+    console.log('   ✅ Rule 4: [75, 80, 85, 86, 135] → 48 krishka + ruchka');
     return { krishkaGram: 48, ruchkaGram: 48, needsRuchka: true };
   }
 
+  console.log('   ❌ No rule matched, returning null');
   return { krishkaGram: null, ruchkaGram: null, needsRuchka: false };
 };
 
@@ -270,14 +325,19 @@ export const groupPreformsByGram = (products: Product[]) => {
 };
 
 // Validate sale form
-export const validateSaleForm = (items: SaleItemForm[], customerId: string, manualCustomerName: string): string | null => {
+export const validateSaleForm = (items: SaleItemForm[], customerId: string, manualCustomerName: string, isKocha?: boolean): string | null => {
+  console.log('🔍 validateSaleForm:', { itemsLength: items.length, customerId, manualCustomerName, isKocha });
+  
   if (items.length === 0) {
     return 'Kamida bitta mahsulot qoshish kerak';
   }
 
-  if (!customerId && !manualCustomerName) {
+  // Ko'chaga sotish uchun faqat ism kifoya, aks holda mijoz tanlash kerak
+  if (!isKocha && !customerId && !manualCustomerName) {
+    console.log('❌ Validation failed: need customer or kocha mode');
     return 'Mijoz tanlash yoki yangi mijoz qoshish kerak';
   }
 
+  console.log('✅ Validation passed');
   return null;
 };

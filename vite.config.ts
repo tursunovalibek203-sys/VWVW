@@ -1,12 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-import { fixDynamicImports } from './vite-plugin-fix-dynamic-imports'
 
 export default defineConfig({
   plugins: [
     react(),
-    fixDynamicImports(),
   ],
   resolve: {
     alias: {
@@ -41,6 +39,9 @@ export default defineConfig({
       allow: ['..'],
       deny: ['node_modules/crewai-ts'],
     },
+  },
+  preview: {
+    port: 3000,
   },
   define: {
     global: 'globalThis',

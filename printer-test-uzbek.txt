@@ -1,7 +1,0 @@
-PRINTER TEST SAHIFASI
-====================
-Sana: 15/03/2026, 13:09:56
-Test: Printer ulanishini tekshirish
-Holati: Bu printer ishlashini tekshirish uchun test sahifa
-
-Agar siz bu yozuvlarni o'qiy olsangiz, printeringiz ulangan va ishlayapti!

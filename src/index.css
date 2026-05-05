@@ -1,6 +1,8 @@
-/* Import Ultra-Modern Design System */
+/* Import Professional Design System */
 @import './styles/ultra-modern-design.css';
 @import './styles/modern-theme.css';
+@import './styles/professional-design.css';
+@import './styles/design-system.css';
 
 @tailwind base;
 @tailwind components;
@@ -290,6 +292,7 @@
   /* Modern Glass Input */
   .input-glass {
     background: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     border: 2px solid var(--glass-border);
     border-radius: 1rem;
@@ -380,6 +383,7 @@
   .table-container {
     @apply overflow-hidden rounded-2xl border border-gray-200/50;
     background: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
     box-shadow: var(--shadow-xl);
   }
@@ -390,6 +394,7 @@
 
   .table-header {
     @apply bg-gradient-to-r from-gray-50/80 to-gray-100/80 px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider;
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
   }
 
@@ -722,6 +727,7 @@
 
   .glass-card {
     background: white;
+    -webkit-backdrop-filter: none;
     backdrop-filter: none;
     border: 1px solid #e5e7eb;
   }

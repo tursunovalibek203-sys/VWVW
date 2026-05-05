@@ -51,8 +51,10 @@ export default function InventoryAlerts() {
               </h3>
             </div>
             <button
+              type="button"
               onClick={() => setIsVisible(false)}
               className="text-yellow-600 hover:text-yellow-800 transition-colors"
+              title="Yopish"
             >
               <X className="w-4 h-4" />
             </button>

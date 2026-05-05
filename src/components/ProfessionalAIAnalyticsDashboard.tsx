@@ -6,8 +6,8 @@ import {
   BarChart3, 
   Users, 
   Target, 
-  Zap,
   RefreshCw,
+  Play,
   Settings,
   Download,
   CheckCircle,
@@ -19,9 +19,8 @@ import {
   Activity
 } from 'lucide-react';
 import { 
-  aiAnalytics, 
-  PredictionType, 
-  ModelType
+  ProfessionalAIAnalyticsManager,
+  PredictionType
 } from '../lib/professionalAIAnalytics';
 
 interface AIAnalyticsDashboardProps {
@@ -33,15 +32,14 @@ interface AIAnalyticsDashboardProps {
 
 export default function ProfessionalAIAnalyticsDashboard({
   refreshInterval = 30000,
-  showCharts = true,
-  showDetails = true,
   className = '',
 }: AIAnalyticsDashboardProps) {
   const [dashboard, setDashboard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [selectedModel, setSelectedModel] = useState<PredictionType | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_selectedModel, setSelectedModel] = useState<PredictionType | null>(null);
   const [isTraining, setIsTraining] = useState(false);
 
   useEffect(() => {
@@ -57,7 +55,8 @@ export default function ProfessionalAIAnalyticsDashboard({
   const loadAnalyticsData = () => {
     try {
       setRefreshing(true);
-      const data = getAnalyticsDashboard();
+      const manager = ProfessionalAIAnalyticsManager.getInstance();
+      const data = manager.getAnalyticsDashboard();
       setDashboard(data);
       setLastRefresh(new Date());
     } catch (error) {
@@ -75,7 +74,8 @@ export default function ProfessionalAIAnalyticsDashboard({
   const handleTrainModel = async (type: PredictionType) => {
     setIsTraining(true);
     try {
-      await aiAnalytics.getInstance().trainModel(type);
+      const manager = ProfessionalAIAnalyticsManager.getInstance();
+      await manager.trainModel(type);
       loadAnalyticsData();
     } catch (error) {
       console.error('Failed to train model:', error);
@@ -84,16 +84,6 @@ export default function ProfessionalAIAnalyticsDashboard({
     }
   };
 
-  const getModelIcon = (type: ModelType) => {
-    switch (type) {
-      case ModelType.LINEAR_REGRESSION: return <TrendingUp className="w-5 h-5" />;
-      case ModelType.RANDOM_FOREST: return <BarChart3 className="w-5 h-5" />;
-      case ModelType.NEURAL_NETWORK: return <Brain className="w-5 h-5" />;
-      case ModelType.TIME_SERIES: return <Activity className="w-5 h-5" />;
-      case ModelType.CLUSTERING: return <Target className="w-5 h-5" />;
-      default: return <Zap className="w-5 h-5" />;
-    }
-  };
 
   const getPredictionIcon = (type: PredictionType) => {
     switch (type) {
@@ -167,6 +157,8 @@ export default function ProfessionalAIAnalyticsDashboard({
           <button
             onClick={handleRefresh}
             disabled={refreshing}
+            title="Ma'lumotlarni yangilash"
+            aria-label="Ma'lumotlarni yangilash"
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
           >
             <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
@@ -405,11 +397,11 @@ export default function ProfessionalAIAnalyticsDashboard({
                           sentiment === 'negative' ? 'bg-red-500' : 'bg-gray-500'
                         }`}
                         style={{ 
-                          width: `${dashboard.sentiments.total > 0 ? (count / dashboard.sentiments.total) * 100 : 0}%` 
+                          width: `${dashboard.sentiments.total > 0 ? ((count as number) / dashboard.sentiments.total) * 100 : 0}%` 
                         }}
                       />
                     </div>
-                    <span className="text-sm font-bold text-gray-900 w-12 text-right">{count}</span>
+                    <span className="text-sm font-bold text-gray-900 w-12 text-right">{count as number}</span>
                   </div>
                 </div>
               ))}

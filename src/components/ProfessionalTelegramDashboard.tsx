@@ -31,7 +31,6 @@ import {
   TelegramUser, 
   TelegramMessage, 
   NotificationType,
-  getAnalytics,
   startBot,
   UserRole 
 } from '../lib/professionalTelegramBot';
@@ -73,8 +72,9 @@ export default function ProfessionalTelegramDashboard({
     try {
       setRefreshing(true);
       
-      const analyticsData = getAnalytics();
-      const usersData = telegramBot.getInstance().getUsers();
+      const bot = telegramBot();
+      const analyticsData = bot.getAnalytics();
+      const usersData = bot.getUsers();
       
       setAnalytics(analyticsData);
       setUsers(usersData);
@@ -91,7 +91,7 @@ export default function ProfessionalTelegramDashboard({
   const handleStartBot = async () => {
     try {
       if (isRunning) {
-        telegramBot.getInstance().stop();
+        telegramBot().stop();
         setIsRunning(false);
       } else {
         await startBot();
@@ -138,7 +138,7 @@ export default function ProfessionalTelegramDashboard({
 
   const handleSendNotification = async (notification: NotificationType) => {
     try {
-      await telegramBot.getInstance().sendNotification(notification);
+      await telegramBot().sendNotification(notification);
       setShowNotificationModal(false);
       loadDashboardData();
     } catch (error) {
@@ -148,7 +148,7 @@ export default function ProfessionalTelegramDashboard({
 
   const handleUpdateUserRole = (userId: number, newRole: UserRole) => {
     try {
-      telegramBot.getInstance().updateUserRole(userId, newRole);
+      telegramBot().updateUserRole(userId, newRole);
       loadDashboardData();
     } catch (error) {
       console.error('Failed to update user role:', error);
@@ -206,6 +206,7 @@ export default function ProfessionalTelegramDashboard({
             onClick={handleRefresh}
             disabled={refreshing}
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            title="Refresh data"
           >
             <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
@@ -273,7 +274,7 @@ export default function ProfessionalTelegramDashboard({
               <Send className="w-5 h-5 text-purple-600" />
             </div>
             <span className="text-2xl font-bold text-gray-900">
-              {Object.values(analytics.commandsUsed).reduce((sum: number, count: number) => sum + count, 0).toLocaleString()}
+              {Object.values(analytics.commandsUsed as Record<string, number>).reduce((sum, count) => sum + count, 0).toLocaleString()}
             </span>
           </div>
           <p className="text-sm font-medium text-gray-600">Commands Used</p>
@@ -397,10 +398,11 @@ export default function ProfessionalTelegramDashboard({
                       <button
                         onClick={() => setSelectedUser(user)}
                         className="text-blue-600 hover:text-blue-900"
+                        title="View user"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button className="text-gray-600 hover:text-gray-900">
+                      <button className="text-gray-600 hover:text-gray-900" title="Edit user">
                         <Edit className="w-4 h-4" />
                       </button>
                     </div>
@@ -425,8 +427,8 @@ export default function ProfessionalTelegramDashboard({
           <div>
             <h4 className="text-sm font-medium text-gray-900 mb-4">Popular Commands</h4>
             <div className="space-y-3">
-              {Object.entries(analytics.commandsUsed)
-                .sort(([,a], [,b]) => b - a)
+              {Object.entries(analytics.commandsUsed as Record<string, number>)
+                .sort(([,a], [,b]) => (b as number) - (a as number))
                 .slice(0, 5)
                 .map(([command, count]) => (
                   <div key={command} className="flex items-center justify-between">
@@ -439,11 +441,11 @@ export default function ProfessionalTelegramDashboard({
                         <div 
                           className="bg-blue-600 h-2 rounded-full"
                           style={{ 
-                            width: `${(count / Math.max(...Object.values(analytics.commandsUsed))) * 100}%` 
+                            width: `${((count as number) / Math.max(...Object.values(analytics.commandsUsed as Record<string, number>))) * 100}%` 
                           }}
                         />
                       </div>
-                      <span className="text-sm font-bold text-gray-900 w-8 text-right">{count}</span>
+                      <span className="text-sm font-bold text-gray-900 w-8 text-right">{count as number}</span>
                     </div>
                   </div>
                 ))}
@@ -453,8 +455,8 @@ export default function ProfessionalTelegramDashboard({
           <div>
             <h4 className="text-sm font-medium text-gray-900 mb-4">Message Types</h4>
             <div className="space-y-3">
-              {Object.entries(analytics.messageTypes)
-                .sort(([,a], [,b]) => b - a)
+              {Object.entries(analytics.messageTypes as Record<string, number>)
+                .sort(([,a], [,b]) => (b as number) - (a as number))
                 .slice(0, 5)
                 .map(([type, count]) => (
                   <div key={type} className="flex items-center justify-between">
@@ -467,11 +469,11 @@ export default function ProfessionalTelegramDashboard({
                         <div 
                           className="bg-green-600 h-2 rounded-full"
                           style={{ 
-                            width: `${(count / Math.max(...Object.values(analytics.messageTypes))) * 100}%` 
+                            width: `${((count as number) / Math.max(...Object.values(analytics.messageTypes as Record<string, number>))) * 100}%` 
                           }}
                         />
                       </div>
-                      <span className="text-sm font-bold text-gray-900 w-8 text-right">{count}</span>
+                      <span className="text-sm font-bold text-gray-900 w-8 text-right">{count as number}</span>
                     </div>
                   </div>
                 ))}
@@ -548,6 +550,7 @@ export default function ProfessionalTelegramDashboard({
                 <button
                   onClick={() => setShowNotificationModal(false)}
                   className="text-gray-400 hover:text-gray-500"
+                  title="Close"
                 >
                   <XCircle className="w-5 h-5" />
                 </button>
@@ -558,7 +561,7 @@ export default function ProfessionalTelegramDashboard({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Notification Type
                   </label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" title="Notification type">
                     <option value="sale">Sale Notification</option>
                     <option value="customer">Customer Update</option>
                     <option value="product">Product Alert</option>
@@ -593,7 +596,7 @@ export default function ProfessionalTelegramDashboard({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Priority
                   </label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" title="Priority">
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>

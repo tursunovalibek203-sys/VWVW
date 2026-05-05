@@ -398,6 +398,7 @@ export default function ProfessionalSuperAnalyticsDashboard({
             onClick={handleRefresh}
             disabled={refreshing}
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            title="Refresh data"
           >
             <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
@@ -488,6 +489,7 @@ export default function ProfessionalSuperAnalyticsDashboard({
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value as any)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Filter by category"
             >
               <option value="all">All Categories</option>
               <option value={MetricCategory.SALES}>Sales</option>
@@ -546,7 +548,7 @@ export default function ProfessionalSuperAnalyticsDashboard({
               </div>
               <div className="flex items-center gap-2">
                 {getTrendIcon(result.trend)}
-                <button className="text-gray-400 hover:text-gray-600">
+                <button className="text-gray-400 hover:text-gray-600" title="More options">
                   <MoreVertical className="w-4 h-4" />
                 </button>
               </div>

@@ -49,7 +49,7 @@ router.get('/stats', async (req, res) => {
       });
     }
 
-    const [dailySales, monthlySales, totalDebt, expenses, topProducts, topCustomers, lowStock, todaySalesCount, totalCustomers, totalProducts, activeProduction, pendingTasks, pendingDeliveries] = await Promise.all([
+    const [dailySales, monthlySales, totalDebt, expenses, topProducts, topCustomers, lowStock, todaySalesCount, totalCustomers, totalProducts, activeProduction, pendingTasks, pendingDeliveries, cashboxSummary] = await Promise.all([
       prisma.sale.aggregate({
         where: { createdAt: { gte: today } },
         _sum: { totalAmount: true },
@@ -98,7 +98,17 @@ router.get('/stats', async (req, res) => {
       prisma.deliveryNew.count({
         where: { status: 'PENDING' }
       }),
+      prisma.cashboxTransaction.findMany(),
     ]);
+
+    // Calculate cash balance from cashbox transactions
+    const cashboxIncome = cashboxSummary
+      .filter(t => t.type === 'INCOME')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const cashboxExpense = cashboxSummary
+      .filter(t => t.type === 'EXPENSE')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const cashBalance = cashboxIncome - cashboxExpense;
 
     const productIds = topProducts.map(p => p.productId).filter((id): id is string => id !== null);
     const products = await prisma.product.findMany({ where: { id: { in: productIds } } });
@@ -121,6 +131,7 @@ router.get('/stats', async (req, res) => {
       netProfit,
       totalExpenses,
       totalDebt: totalDebt._sum.debt || 0,
+      cashBalance,
       weeklyTrend,
       todaySales: todaySalesCount,
       debtorsCount: customers.filter(c => c.debt > 0).length,

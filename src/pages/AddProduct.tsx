@@ -1,16 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent } from '../components/Card';
-import Button from '../components/Button';
-import { Save, ArrowLeft, RefreshCw, Settings } from 'lucide-react';
+import { Save, ArrowLeft, RefreshCw, X } from 'lucide-react';
 import CustomDropdown from '../components/CustomDropdown';
 import { useVariants } from '../hooks/useVariants';
-import api from '../lib/api';
+import api from '../lib/professionalApi';
 import { latinToCyrillic } from '../lib/transliterator';
 
 export default function AddProduct() {
   const navigate = useNavigate();
+  const isCashier = window.location.pathname.startsWith('/cashier');
   const [searchParams] = useSearchParams();
   const { t } = useTranslation();
   const editId = searchParams.get('edit');
@@ -46,6 +45,11 @@ export default function AddProduct() {
     sizeUnit: '',
     subType: '', // Aksessuar o'lchami (28, 38, 48)
   });
+
+  // Yangi mahsulot turlari state
+  const [customTypes, setCustomTypes] = useState<{id: string, label: string, color: string}[]>([]);
+  const [showAddTypeModal, setShowAddTypeModal] = useState(false);
+  const [newTypeName, setNewTypeName] = useState('');
 
   // Modal states - kerak bo'lsa qayta qo'shiladi
 
@@ -83,7 +87,7 @@ export default function AddProduct() {
           sizeUnit: 'g',
           unitsPerBag: sizeValue === 15 ? '4000' : 
                        sizeValue === 21 ? '3000' :
-                       sizeValue === 28 ? '2500' : 
+                       sizeValue === 28 ? '2500' :
                        sizeValue === 40 ? '2000' : 
                        sizeValue >= 70 ? '500' : '1000'
         };
@@ -161,7 +165,7 @@ export default function AddProduct() {
     } catch (error) {
       console.error('Mahsulot ma\'lumotlarini yuklashda xatolik:', error);
       alert('Mahsulot ma\'lumotlarini yuklashda xatolik yuz berdi!');
-      navigate('/products');
+      navigate(isCashier ? '/cashier/products' : '/products');
     }
   };
 
@@ -260,14 +264,10 @@ export default function AddProduct() {
       if (isEditing) {
         response = await api.put(`/products/${editId}`, productData);
         setMessage(`✅ "${response.data.name}" mahsuloti muvaffaqiyatli yangilandi!`);
-        setTimeout(() => navigate('/products'), 2000);
+        setTimeout(() => navigate(isCashier ? '/cashier/products' : '/products'), 2000);
       } else {
         response = await api.post('/products', productData);
         setMessage(`✅ "${response.data.name}" mahsuloti muvaffaqiyatli yaratildi!`);
-        // Trigger storage event to refresh product list
-        localStorage.setItem('productAdded', Date.now().toString());
-        setTimeout(() => localStorage.removeItem('productAdded'), 100);
-        
         setIsNameManuallyEdited(false);
         setManualSuffix('');
         
@@ -354,29 +354,36 @@ export default function AddProduct() {
               
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { id: 'preform', label: 'PREFORMA', icon: '📦', color: 'blue' },
-                  { id: 'krishka', label: 'QOPQOQ', icon: '⭕', color: 'orange' },
-                  { id: 'ruchka', label: 'RUCHKA', icon: '🎗️', color: 'emerald' },
-                  { id: 'other', label: 'BOSHQA', icon: '🛠️', color: 'gray' }
+                  { id: 'preform', label: 'PREFORM', color: 'blue' },
+                  { id: 'krishka', label: 'QOPQOQ', color: 'orange' },
+                  { id: 'ruchka', label: 'RUCHKA', color: 'emerald' },
+                  ...customTypes
                 ].map((type) => (
                   <button
                     key={type.id}
                     type="button"
                     onClick={() => setFormData(prev => ({ ...prev, warehouse: type.id }))}
-                    className={`group p-6 rounded-[2.5rem] border-2 transition-all duration-500 text-center ${
+                    className={`group p-6 rounded-2xl border-2 transition-all duration-300 text-center ${
                       formData.warehouse === type.id
-                        ? `border-${type.color}-500 bg-${type.color}-50 dark:bg-${type.color}-900/20 shadow-xl shadow-${type.color}-500/10`
-                        : 'border-gray-100 dark:border-gray-800 hover:border-gray-200'
+                        ? `border-${type.color}-500 bg-${type.color}-50 dark:bg-${type.color}-900/20 shadow-lg shadow-${type.color}-500/10`
+                        : 'border-gray-100 dark:border-gray-800 hover:border-gray-200 hover:bg-gray-50'
                     }`}
                   >
-                    <div className={`text-4xl mb-4 transition-transform duration-500 group-hover:scale-125 ${formData.warehouse === type.id ? 'scale-110' : ''}`}>
-                      {type.icon}
-                    </div>
-                    <p className={`text-xs font-semibold tracking-widest ${formData.warehouse === type.id ? `text-${type.color}-600` : 'text-gray-400'}`}>
+                    <p className={`text-sm font-bold tracking-wide ${formData.warehouse === type.id ? `text-${type.color}-600` : 'text-gray-500'}`}>
                       {type.label}
                     </p>
                   </button>
                 ))}
+                {/* Yangi tur qo'shish tugmasi */}
+                <button
+                  type="button"
+                  onClick={() => setShowAddTypeModal(true)}
+                  className="group p-6 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all duration-300 text-center"
+                >
+                  <p className="text-sm font-bold tracking-wide text-gray-400 group-hover:text-purple-600">
+                    + {latinToCyrillic("YANGI TUR")}
+                  </p>
+                </button>
               </div>
 
               {formData.warehouse === 'preform' && (
@@ -618,6 +625,80 @@ export default function AddProduct() {
           </form>
         </div>
       </div>
+
+      {/* Yangi tur qo'shish modal */}
+      {showAddTypeModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                {latinToCyrillic("Yangi mahsulot turi")}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddTypeModal(false);
+                  setNewTypeName('');
+                }}
+                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                aria-label={latinToCyrillic("Yopish")}
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-widest ml-1 mb-2 block">
+                  {latinToCyrillic("Tur nomi")}
+                </label>
+                <input
+                  type="text"
+                  value={newTypeName}
+                  onChange={(e) => setNewTypeName(e.target.value)}
+                  placeholder={latinToCyrillic("Masalan: ETIKETKA")}
+                  className="w-full h-14 px-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-purple-500 rounded-xl font-bold text-sm transition-all outline-none"
+                />
+              </div>
+              
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddTypeModal(false);
+                    setNewTypeName('');
+                  }}
+                  className="flex-1 h-12 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-all"
+                >
+                  {latinToCyrillic("Bekor qilish")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newTypeName.trim()) {
+                      const newId = 'custom-' + Date.now();
+                      const colors = ['purple', 'pink', 'indigo', 'cyan', 'teal', 'lime', 'amber', 'rose'];
+                      const randomColor = colors[customTypes.length % colors.length];
+                      setCustomTypes(prev => [...prev, { 
+                        id: newId, 
+                        label: newTypeName.trim().toUpperCase(), 
+                        color: randomColor 
+                      }]);
+                      setFormData(prev => ({ ...prev, warehouse: newId }));
+                      setNewTypeName('');
+                      setShowAddTypeModal(false);
+                    }
+                  }}
+                  disabled={!newTypeName.trim()}
+                  className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 text-white rounded-xl font-semibold transition-all"
+                >
+                  {latinToCyrillic("Qo'shish")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

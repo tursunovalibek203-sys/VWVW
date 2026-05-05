@@ -232,6 +232,7 @@ export default function ProfessionalPOSDashboard({
             onClick={handleRefresh}
             disabled={refreshing}
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            title="Refresh data"
           >
             <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
@@ -449,7 +450,7 @@ export default function ProfessionalPOSDashboard({
                       ))}
                     </div>
                   </div>
-                  <button className="text-gray-400 hover:text-gray-600">
+                  <button className="text-gray-400 hover:text-gray-600" title="View receipt">
                     <Receipt className="w-4 h-4" />
                   </button>
                 </div>

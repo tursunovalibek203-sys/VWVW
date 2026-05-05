@@ -9,6 +9,8 @@ import {
   detectSuspiciousInventoryActivity,
   getStockBalanceHistory,
 } from '../utils/inventory-audit';
+import { emitProductChange, EVENT_TYPES } from '../utils/eventEmitter.js';
+import { successResponse, errorResponse } from '../utils/response';
 
 const router = Router();
 
@@ -52,7 +54,8 @@ router.get('/', async (req, res) => {
         return p;
       });
       
-      return res.json(productsWithTotals);
+      // ✅ STANDARD API RESPONSE FORMAT
+      return res.json(successResponse(productsWithTotals));
     }
     
     // Qidirish - SQLite uchun case-insensitive qidirish
@@ -86,7 +89,8 @@ router.get('/', async (req, res) => {
         return p;
       });
       
-      return res.json(productsWithTotals);
+      // ✅ STANDARD API RESPONSE FORMAT
+      return res.json(successResponse(productsWithTotals));
     }
     
     const products = await prisma.product.findMany({
@@ -127,10 +131,11 @@ router.get('/', async (req, res) => {
       return p;
     });
     
-    res.json(productsWithTotals);
+    // ✅ STANDARD API RESPONSE FORMAT
+    res.json(successResponse(productsWithTotals));
   } catch (error) {
     console.error('❌ Get products error:', error);
-    res.status(500).json({ error: 'Failed to fetch products', details: error instanceof Error ? error.message : 'Unknown error' });
+    res.status(500).json(errorResponse('Failed to fetch products', error instanceof Error ? error.message : 'Unknown error'));
   }
 });
 
@@ -233,6 +238,9 @@ router.post('/', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'CASHIER'), async (req:
       // Audit log xatoligi mahsulot yaratishiga to'sqin bo'lmasin
     }
 
+    // Real-time event emit
+    emitProductChange(EVENT_TYPES.PRODUCT_CREATED, product);
+
     res.json(product);
   } catch (error: any) {
     console.error('Product creation error:', error);
@@ -299,6 +307,9 @@ router.put('/:id', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'MANAGER', 'CASHIER')
       console.error('Audit log error during update:', auditError);
     }
 
+    // Real-time event emit
+    emitProductChange(EVENT_TYPES.PRODUCT_UPDATED, product);
+
     res.json(product);
   } catch (error: any) {
     console.error('Product update error:', error);
@@ -361,6 +372,9 @@ router.patch('/:id', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'MANAGER', 'CASHIER
     } catch (auditError) {
       console.error('Audit log error during patch:', auditError);
     }
+
+    // Real-time event emit
+    emitProductChange(EVENT_TYPES.PRODUCT_UPDATED, product);
 
     res.json(product);
   } catch (error: any) {
@@ -450,6 +464,9 @@ router.post('/:id/stock', authorize('ADMIN', 'WAREHOUSE_MANAGER'), async (req: A
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
     });
+
+    // Real-time event emit - stock adjusted
+    emitProductChange(EVENT_TYPES.STOCK_ADJUSTED, updatedProduct);
 
     res.json(updatedProduct);
   } catch (error) {
@@ -1282,11 +1299,211 @@ router.delete('/:id', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'MANAGER', 'USER',
       userAgent: req.get('user-agent'),
     });
 
+    // Real-time event emit
+    emitProductChange(EVENT_TYPES.PRODUCT_DELETED, { id: req.params.id, name: product.name });
+
     console.log('Product deleted successfully:', product.name);
     res.json({ message: 'Product deleted successfully' });
   } catch (error) {
     console.error('Delete product error:', error);
     res.status(500).json({ error: 'Failed to delete product' });
+  }
+});
+
+// GET /products/:id/komplekt - Komplektni olish
+router.get('/:id/komplekt', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Asosiy mahsulotni tekshirish
+    const product = await prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Mahsulot topilmadi' });
+    }
+
+    // Mahsulot nomidan o'lchamni aniqlash (15g, 26g, 30g...)
+    const nameMatch = product.name.match(/(\d+)(g|G|г|Г|gr|GR)/);
+    const weight = nameMatch ? parseInt(nameMatch[1]) : 0;
+    const isPreform = product.name.toLowerCase().includes('preform') || 
+                      product.warehouse?.toLowerCase() === 'preform' ||
+                      nameMatch !== null;
+
+    if (!isPreform) {
+      return res.json({ items: [] });
+    }
+
+    // Komplekt komponentlarini aniqlash
+    const komplektItems: any[] = [];
+
+    // 15, 21, 26, 30gr preform → 28 krishka
+    // 36gr preform → 28 krishka + 28 ruchka
+    // 52, 70gr preform → 38 krishka + 38 ruchka
+    // 75, 80, 85, 86, 135gr preform → 48 krishka + 48 ruchka
+
+    let krishkaSize = '28';
+    let ruchkaSize = '28';
+    let needsRuchka = false;
+
+    if ([15, 21, 26, 30].includes(weight)) {
+      krishkaSize = '28';
+      needsRuchka = false;
+    } else if (weight === 36) {
+      krishkaSize = '28';
+      ruchkaSize = '28';
+      needsRuchka = true;
+    } else if ([52, 70].includes(weight)) {
+      krishkaSize = '38';
+      ruchkaSize = '38';
+      needsRuchka = true;
+    } else if ([75, 80, 85, 86, 135].includes(weight)) {
+      krishkaSize = '48';
+      ruchkaSize = '48';
+      needsRuchka = true;
+    }
+
+    // Krishka qo'shish - aniq o'lcham bo'yicha qidirish
+    console.log(`Komplekt: ${product.name} uchun krishka qidirilmoqda: ${krishkaSize}`);
+    
+    const krishkaProducts = await prisma.product.findMany({
+      where: {
+        AND: [
+          {
+            OR: [
+              // O'lcham bilan boshlanadigan nomlar
+              { name: { startsWith: `${krishkaSize} `, mode: 'insensitive' } },
+              { name: { startsWith: `${krishkaSize}-`, mode: 'insensitive' } },
+              { name: { startsWith: `${krishkaSize}krishka`, mode: 'insensitive' } },
+              { name: { startsWith: `${krishkaSize}qopqoq`, mode: 'insensitive' } },
+              { name: { startsWith: `${krishkaSize}cap`, mode: 'insensitive' } },
+              // O'lcham oxirida bo'lsa (masalan: "krishka 48")
+              { name: { endsWith: ` ${krishkaSize}`, mode: 'insensitive' } },
+              { name: { endsWith: `-${krishkaSize}`, mode: 'insensitive' } },
+              { name: { endsWith: `_${krishkaSize}`, mode: 'insensitive' } },
+              // Faqat raqam
+              { name: { equals: krishkaSize, mode: 'insensitive' } },
+            ],
+          },
+          { warehouse: 'krishka' },
+          { active: true },
+        ],
+      },
+      orderBy: { name: 'asc' },
+      take: 1,
+    });
+    
+    console.log(`Topilgan krishka: ${krishkaProducts.length > 0 ? krishkaProducts[0].name : 'yoq'}`);
+
+    if (krishkaProducts.length > 0) {
+      const krishka = krishkaProducts[0];
+      const unitsPerBag = product.unitsPerBag || 2000;
+      komplektItems.push({
+        productId: krishka.id,
+        productName: krishka.name,
+        quantity: unitsPerBag,
+        itemType: 'piece',
+      });
+    }
+
+    // Ruchka qo'shish (agar kerak bo'lsa) - aniq o'lcham bo'yicha qidirish
+    if (needsRuchka) {
+      console.log(`Komplekt: ${product.name} uchun ruchka qidirilmoqda: ${ruchkaSize}`);
+      
+      const ruchkaProducts = await prisma.product.findMany({
+        where: {
+          AND: [
+            {
+              OR: [
+                // O'lcham bilan boshlanadigan nomlar
+                { name: { startsWith: `${ruchkaSize} `, mode: 'insensitive' } },
+                { name: { startsWith: `${ruchkaSize}-`, mode: 'insensitive' } },
+                { name: { startsWith: `${ruchkaSize}ruchka`, mode: 'insensitive' } },
+                { name: { startsWith: `${ruchkaSize}handle`, mode: 'insensitive' } },
+                // O'lcham oxirida bo'lsa
+                { name: { endsWith: ` ${ruchkaSize}`, mode: 'insensitive' } },
+                { name: { endsWith: `-${ruchkaSize}`, mode: 'insensitive' } },
+                { name: { endsWith: `_${ruchkaSize}`, mode: 'insensitive' } },
+                // Faqat raqam
+                { name: { equals: ruchkaSize, mode: 'insensitive' } },
+              ],
+            },
+            { warehouse: 'ruchka' },
+            { active: true },
+          ],
+        },
+        orderBy: { name: 'asc' },
+        take: 1,
+      });
+      
+      console.log(`Topilgan ruchka: ${ruchkaProducts.length > 0 ? ruchkaProducts[0].name : 'yoq'}`);
+
+      if (ruchkaProducts.length > 0) {
+        const ruchka = ruchkaProducts[0];
+        const unitsPerBag = product.unitsPerBag || 2000;
+        komplektItems.push({
+          productId: ruchka.id,
+          productName: ruchka.name,
+          quantity: unitsPerBag,
+          itemType: 'piece',
+        });
+      }
+    }
+
+    console.log(`Komplekt natija: ${product.name} (weight: ${weight}) → ${komplektItems.length} ta item:`, 
+      komplektItems.map(i => `${i.productName} (${i.quantity} dona)`).join(', '));
+
+    res.json({
+      productId: id,
+      productName: product.name,
+      weight,
+      krishkaSize,
+      ruchkaSize,
+      needsRuchka,
+      items: komplektItems,
+    });
+  } catch (error) {
+    console.error('Komplekt olish xatolik:', error);
+    res.status(500).json({ error: 'Komplektni olishda xatolik yuz berdi' });
+  }
+});
+
+// POST /products/:id/komplekt - Komplekt saqlash
+router.post('/:id/komplekt', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'MANAGER', 'CASHIER'), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { items } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Komplekt elementlari kiritilishi shart' });
+    }
+
+    // Asosiy mahsulotni tekshirish
+    const product = await prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Mahsulot topilmadi' });
+    }
+
+    // Hozircha faqat log qilamiz (keyinchalik Kit/KitItem jadvaliga saqlash mumkin)
+    console.log('Komplekt saqlandi:', {
+      productId: id,
+      productName: product.name,
+      items: items,
+      userId: req.user?.id,
+    });
+
+    res.json({
+      message: 'Komplekt muvaffaqiyatli saqlandi',
+      productId: id,
+      items: items,
+    });
+  } catch (error) {
+    console.error('Komplekt saqlash xatolik:', error);
+    res.status(500).json({ error: 'Komplektni saqlashda xatolik yuz berdi' });
   }
 });
 

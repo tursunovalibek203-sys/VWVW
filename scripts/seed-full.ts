@@ -13,10 +13,10 @@ async function main() {
   const sellerPassword = await bcrypt.hash('seller123', 10);
   
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@aziztrades.com' },
+    where: { login: 'admin' },
     update: {},
     create: {
-      email: 'admin@aziztrades.com',
+      login: 'admin',
       password: adminPassword,
       name: 'Admin',
       role: 'ADMIN'
@@ -24,10 +24,10 @@ async function main() {
   });
 
   const seller = await prisma.user.upsert({
-    where: { email: 'seller@aziztrades.com' },
+    where: { login: 'seller' },
     update: {},
     create: {
-      email: 'seller@aziztrades.com',
+      login: 'seller',
       password: sellerPassword,
       name: 'Sotuvchi',
       role: 'SELLER'
@@ -40,8 +40,10 @@ async function main() {
   console.log('📦 Mahsulotlar yaratilmoqda...');
   
   const products = await Promise.all([
-    prisma.product.create({
-      data: {
+    prisma.product.upsert({
+      where: { name: '28mm Preform' },
+      update: {},
+      create: {
         name: '28mm Preform',
         bagType: 'STANDARD',
         unitsPerBag: 1000,
@@ -52,8 +54,10 @@ async function main() {
         maxCapacity: 200
       }
     }),
-    prisma.product.create({
-      data: {
+    prisma.product.upsert({
+      where: { name: '30mm Preform' },
+      update: {},
+      create: {
         name: '30mm Preform',
         bagType: 'STANDARD',
         unitsPerBag: 1000,
@@ -64,8 +68,10 @@ async function main() {
         maxCapacity: 180
       }
     }),
-    prisma.product.create({
-      data: {
+    prisma.product.upsert({
+      where: { name: '38mm Preform' },
+      update: {},
+      create: {
         name: '38mm Preform',
         bagType: 'STANDARD',
         unitsPerBag: 800,
@@ -76,8 +82,10 @@ async function main() {
         maxCapacity: 150
       }
     }),
-    prisma.product.create({
-      data: {
+    prisma.product.upsert({
+      where: { name: '48mm Preform' },
+      update: {},
+      create: {
         name: '48mm Preform',
         bagType: 'LARGE',
         unitsPerBag: 600,
@@ -88,8 +96,10 @@ async function main() {
         maxCapacity: 120
       }
     }),
-    prisma.product.create({
-      data: {
+    prisma.product.upsert({
+      where: { name: '0.5L Bottle' },
+      update: {},
+      create: {
         name: '0.5L Bottle',
         bagType: 'STANDARD',
         unitsPerBag: 500,
@@ -100,8 +110,10 @@ async function main() {
         maxCapacity: 250
       }
     }),
-    prisma.product.create({
-      data: {
+    prisma.product.upsert({
+      where: { name: '1.0L Bottle' },
+      update: {},
+      create: {
         name: '1.0L Bottle',
         bagType: 'STANDARD',
         unitsPerBag: 400,
@@ -112,8 +124,10 @@ async function main() {
         maxCapacity: 200
       }
     }),
-    prisma.product.create({
-      data: {
+    prisma.product.upsert({
+      where: { name: '1.5L Bottle' },
+      update: {},
+      create: {
         name: '1.5L Bottle',
         bagType: 'STANDARD',
         unitsPerBag: 300,
@@ -124,8 +138,10 @@ async function main() {
         maxCapacity: 180
       }
     }),
-    prisma.product.create({
-      data: {
+    prisma.product.upsert({
+      where: { name: '2.0L Bottle' },
+      update: {},
+      create: {
         name: '2.0L Bottle',
         bagType: 'LARGE',
         unitsPerBag: 250,
@@ -136,8 +152,10 @@ async function main() {
         maxCapacity: 150
       }
     }),
-    prisma.product.create({
-      data: {
+    prisma.product.upsert({
+      where: { name: 'PET Granule' },
+      update: {},
+      create: {
         name: 'PET Granule',
         bagType: 'BULK',
         unitsPerBag: 25,
@@ -148,8 +166,10 @@ async function main() {
         maxCapacity: 500
       }
     }),
-    prisma.product.create({
-      data: {
+    prisma.product.upsert({
+      where: { name: 'Bottle Cap' },
+      update: {},
+      create: {
         name: 'Bottle Cap',
         bagType: 'STANDARD',
         unitsPerBag: 5000,
@@ -169,33 +189,38 @@ async function main() {
   
   const customers = await Promise.all([
     // VIP mijozlar
-    prisma.customer.create({
-      data: {
+    prisma.customer.upsert({
+      where: { email: 'aziz@example.com' },
+      update: {},
+      create: {
         name: 'Aziz Savdo',
+        email: 'aziz@example.com',
         phone: '+998901234567',
         address: 'Toshkent, Chilonzor',
         category: 'VIP',
         balance: 0,
-        debt: 0,
-        telegramChatId: '123456789',
-        telegramUsername: 'aziz_savdo'
+        debt: 0
       }
     }),
-    prisma.customer.create({
-      data: {
+    prisma.customer.upsert({
+      where: { email: 'mega@example.com' },
+      update: {},
+      create: {
         name: 'Mega Trade',
+        email: 'mega@example.com',
         phone: '+998902345678',
         address: 'Toshkent, Yunusobod',
         category: 'VIP',
         balance: -5000,
-        debt: 5000,
-        telegramChatId: '234567890',
-        telegramUsername: 'mega_trade'
+        debt: 5000
       }
     }),
-    prisma.customer.create({
-      data: {
+    prisma.customer.upsert({
+      where: { email: 'premium@example.com' },
+      update: {},
+      create: {
         name: 'Premium Savdo',
+        email: 'premium@example.com',
         phone: '+998903456789',
         address: 'Samarqand',
         category: 'VIP',
@@ -205,9 +230,12 @@ async function main() {
     }),
     // Regular mijozlar
     ...Array.from({ length: 10 }, (_, i) => 
-      prisma.customer.create({
-        data: {
+      prisma.customer.upsert({
+        where: { email: `mijoz${i + 1}@example.com` },
+        update: {},
+        create: {
           name: `Mijoz ${i + 1}`,
+          email: `mijoz${i + 1}@example.com`,
           phone: `+99890${4000000 + i}`,
           address: `Toshkent, Manzil ${i + 1}`,
           category: 'NORMAL',
@@ -218,9 +246,12 @@ async function main() {
     ),
     // At-Risk mijozlar
     ...Array.from({ length: 5 }, (_, i) => 
-      prisma.customer.create({
-        data: {
+      prisma.customer.upsert({
+        where: { email: `risk${i + 1}@example.com` },
+        update: {},
+        create: {
           name: `Xavfli Mijoz ${i + 1}`,
+          email: `risk${i + 1}@example.com`,
           phone: `+99890${5000000 + i}`,
           address: `Toshkent, Manzil ${i + 20}`,
           category: 'RISK',
@@ -231,9 +262,12 @@ async function main() {
     ),
     // Inactive mijozlar
     ...Array.from({ length: 2 }, (_, i) => 
-      prisma.customer.create({
-        data: {
+      prisma.customer.upsert({
+        where: { email: `inactive${i + 1}@example.com` },
+        update: {},
+        create: {
           name: `Nofaol Mijoz ${i + 1}`,
+          email: `inactive${i + 1}@example.com`,
           phone: `+99890${6000000 + i}`,
           address: `Toshkent, Manzil ${i + 30}`,
           category: 'INACTIVE',
@@ -341,7 +375,7 @@ async function main() {
         amount: Math.floor(Math.random() * 5000) + 500,
         currency: Math.random() > 0.5 ? 'UZS' : 'USD',
         description: `Test xarajat ${i + 1}`,
-        date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000)
+        userId: admin.id
       }
     });
     expenses.push(expense);

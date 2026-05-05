@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import ProductSelector from '../components/ProductSelector';
-import api from '../lib/api';
+import api from '../lib/professionalApi';
 import { formatDate } from '../lib/utils';
 import { Factory, Play, CheckCircle, XCircle, Clock, Plus, Package, MoreHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -308,7 +308,7 @@ export default function Production() {
                               id: krishka.id,
                               name: krishka.name,
                               quantity: totalUnits,
-                              price: krishka.pricePerBag / (krishka.unitsPerBag || 1000),
+                              price: krishka.pricePerBag / (krishka.unitsPerBag || 2000),
                               type: 'krishka'
                             });
                           }
@@ -365,10 +365,12 @@ export default function Production() {
                           targetQuantity: raw,
                           accessories: prev.accessories.map(acc => {
                             const selectedAcc = products.find(p => p.id === acc.id);
+                            const isKrishka = acc.type === 'krishka' || selectedAcc?.warehouse === 'krishka';
+                            const defaultUnits = isKrishka ? 2000 : 1000;
                             return {
                               ...acc,
                               quantity: totalUnits,
-                              price: acc.price || (selectedAcc ? (selectedAcc.pricePerBag / (selectedAcc.unitsPerBag || 1000)) : 0)
+                              price: acc.price || (selectedAcc ? (selectedAcc.pricePerBag / (selectedAcc.unitsPerBag || defaultUnits)) : 0)
                             };
                           })
                         }));
@@ -394,7 +396,7 @@ export default function Production() {
                             id: firstKrishka.id,
                             name: firstKrishka.name,
                             quantity: 0,
-                            price: firstKrishka.pricePerBag / (firstKrishka.unitsPerBag || 1000),
+                            price: firstKrishka.pricePerBag / (firstKrishka.unitsPerBag || 2000),
                             type: 'krishka'
                           }]
                         }));
@@ -417,14 +419,16 @@ export default function Production() {
                             onChange={(e) => {
                               const newType = e.target.value;
                               const firstOfNewType = products.find(p => p.warehouse === newType);
+                              const isKrishka = newType === 'krishka';
+                              const defaultUnits = isKrishka ? 2000 : 1000;
                               setForm(prev => ({
                                 ...prev,
-                                accessories: prev.accessories.map((a, i) => i === index ? { 
-                                  ...a, 
-                                  type: newType, 
-                                  id: firstOfNewType?.id || '', 
+                                accessories: prev.accessories.map((a, i) => i === index ? {
+                                  ...a,
+                                  type: newType,
+                                  id: firstOfNewType?.id || '',
                                   name: firstOfNewType?.name || '',
-                                  price: firstOfNewType ? (firstOfNewType.pricePerBag / (firstOfNewType.unitsPerBag || 1000)) : 0
+                                  price: firstOfNewType ? (firstOfNewType.pricePerBag / (firstOfNewType.unitsPerBag || defaultUnits)) : 0
                                 } : a)
                               }));
                             }}
@@ -442,13 +446,15 @@ export default function Production() {
                             onChange={(e) => {
                               const newId = e.target.value;
                               const newProduct = products.find(p => p.id === newId);
+                              const isKrishka = acc.type === 'krishka' || newProduct?.warehouse === 'krishka';
+                              const defaultUnits = isKrishka ? 2000 : 1000;
                               setForm(prev => ({
                                 ...prev,
-                                accessories: prev.accessories.map((a, i) => i === index ? { 
-                                  ...a, 
-                                  id: newId, 
+                                accessories: prev.accessories.map((a, i) => i === index ? {
+                                  ...a,
+                                  id: newId,
                                   name: newProduct?.name || '',
-                                  price: newProduct ? (newProduct.pricePerBag / (newProduct.unitsPerBag || 1000)) : a.price
+                                  price: newProduct ? (newProduct.pricePerBag / (newProduct.unitsPerBag || defaultUnits)) : a.price
                                 } : a)
                               }));
                             }}

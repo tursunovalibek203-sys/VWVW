@@ -1,8 +1,0 @@
-NODE_ENV=production
-PORT=5000
-DB_PROVIDER=postgresql
-JWT_SECRET=51e80ff5ce408ae13842aaa48fd173c97569361dec2462123e8ca381b4424c0c22f518518c6c0d53af2dd59dd74d106188d5716e094d8aa1f3234f360568a96a
-USD_TO_UZS_RATE=12500
-FRONTEND_URL=https://luxpetplast.onrender.com
-CORS_ORIGIN=https://luxpetplast.onrender.com
-DATABASE_URL=(Render PostgreSQL dan avtomatik olinadi)

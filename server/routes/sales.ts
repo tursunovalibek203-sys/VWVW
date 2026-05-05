@@ -1,4 +1,4 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import { prisma } from '../utils/prisma';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { notifyCustomerSale, notifyLowStock } from '../utils/telegram-notifications';
@@ -11,6 +11,9 @@ import {
   parseMoney 
 } from '../utils/validation';
 import { logSalesAction } from '../utils/sales-audit';
+import { paginatedResponse, successResponse, errorResponse } from '../utils/response';
+import { DecimalHelper } from '../utils/decimal-helper';
+import { salesService } from '../services/SalesService';
 
 const router = Router();
 
@@ -21,55 +24,138 @@ const exchangeRates = {
 
 router.use(authenticate);
 
-router.get('/', async (req, res) => {
+router.get('/', async (req: AuthRequest, res) => {
   try {
-    const { productId } = req.query;
+    const { productId, customerId, limit = '100', page = '1' } = req.query;
     
-    let sales;
+    const take = Math.min(parseInt(limit as string) || 100, 500);
+    const skip = (Math.max(parseInt(page as string) || 1, 1) - 1) * take;
     
-    if (productId) {
-      // Agar productId berilgan bo'lsa, faqat shu mahsulot sotuvlarini qaytarish
-      sales = await prisma.sale.findMany({
-        where: {
-          items: {
-            some: {
-              productId: productId as string
-            }
-          }
-        },
-        include: {
-          customer: true,
-          product: true,
-          items: {
-            include: {
-              product: true
-            }
-          }
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    } else {
-      // Barcha sotuvlar
-      sales = await prisma.sale.findMany({
-        include: {
-          customer: true,
-          driver: true,
-          product: true,
-          items: {
-            include: {
-              product: true
-            }
-          }
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+    let total = 0;
+    
+    // Foydalanuvchi roli bo'yicha filter
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+    
+    // Asosiy where sharti
+    let where: any = customerId 
+      ? { customerId: customerId as string }
+      : productId 
+        ? { items: { some: { productId: productId as string } } }
+        : {};
+    
+    // Agar SELLER bo'lsa, faqat o'zining sotuvlarini ko'radi
+    if (userRole === 'SELLER' && userId) {
+      where = {
+        ...where,
+        userId: userId
+      };
     }
+    // ADMIN, CASHIER, ACCOUNTANT barcha sotuvlarni ko'radi
+    // (where o'zgarmaydi)
     
-    res.json(sales);
+    // Total count for pagination
+    total = await prisma.sale.count({ where });
+    
+    // Get sales with pagination and count items
+    const [sales, itemCounts] = await Promise.all([
+      prisma.sale.findMany({
+        where,
+        select: {
+          id: true,
+          receiptNumber: true,
+          createdAt: true,
+          totalAmount: true,
+          paidAmount: true,
+          currency: true,
+          paymentStatus: true,
+          isKocha: true,
+          manualCustomerName: true,
+          quantity: true,
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+            }
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+            }
+          },
+          driver: {
+            select: {
+              id: true,
+              name: true,
+            }
+          },
+          items: {
+            select: {
+              id: true,
+              quantity: true,
+              pricePerBag: true,
+              subtotal: true,
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  pricePerBag: true,
+                }
+              }
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        take,
+        skip,
+      }),
+      prisma.saleItem.groupBy({
+        by: ['saleId'],
+        where: {
+          saleId: {
+            in: (await prisma.sale.findMany({
+              where,
+              orderBy: { createdAt: 'desc' },
+              take,
+              skip,
+              select: { id: true }
+            })).map(s => s.id)
+          }
+        },
+        _count: {
+          saleId: true,
+        },
+      })
+    ]);
+    
+    // Create a map of saleId to item count
+    const itemCountMap = new Map(itemCounts.map(ic => [ic.saleId, ic._count.saleId]));
+    
+    // Calculate debt and add itemCount
+    const salesWithData = sales.map(sale => {
+      return {
+        ...sale,
+        // âœ… DECIMAL FIX: Use DecimalHelper for debt calculation
+        debtAmount: DecimalHelper.subtract(sale.totalAmount, sale.paidAmount),
+        itemCount: itemCountMap.get(sale.id) || sale.items?.length || 0,
+      };
+    });
+    
+    // âœ… STANDARD API RESPONSE FORMAT
+    res.json(paginatedResponse(
+      { sales: salesWithData },
+      {
+        total,
+        page: Math.floor(skip / take) + 1,
+        limit: take,
+        totalPages: Math.ceil(total / take),
+      }
+    ));
   } catch (error: any) {
-    console.error('❌ GET /sales xatolik:', error.message);
-    console.error('Stack:', error.stack);
-    res.status(500).json({ error: 'Failed to fetch sales', details: error.message });
+    console.error('GET /sales xatolik:', error.message);
+    res.status(500).json(errorResponse('Failed to fetch sales', error.message));
   }
 });
 
@@ -103,646 +189,81 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /sales - Sotuv yaratish (Zod validation bilan)
-router.post('/', 
-  authorize('ADMIN', 'CASHIER', 'SELLER'),
-  validateBody(SaleCreateSchema),
-  async (req: AuthRequest & { validatedBody: any }, res) => {
-  try {
-    // Validated body dan ma'lumotlarni olish
-    const { 
-      customerId, 
-      items, 
-      totalAmount, 
-      paidAmount, 
-      currency, 
-      paymentStatus,
-      paymentDetails, 
-      driverId, 
-      factoryShare, 
-      customerShare, 
-      isKocha, 
-      manualCustomerName, 
-      manualCustomerPhone 
-    } = req.validatedBody;
-
-    logger.info({
-      customerId,
-      isKocha,
-      itemsCount: items?.length,
-      totalAmount,
-      currency
-    }, 'Sotuv yaratish boshlandi');
-
-    if (!customerId && !isKocha) {
-      logger.warn('Sotuv yaratish: Mijoz tanlanmagan');
-      return res.status(400).json({ error: 'Mijoz tanlanmagan' });
-    }
-
-    // USER tekshirish
-    const userId = req.user?.id;
-    if (!userId) {
-      logger.error('Sotuv yaratish: Foydalanuvchi aniqlanmadi');
-      return res.status(401).json({ error: 'Foydalanuvchi aniqlanmadi' });
-    }
-
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      logger.warn('Sotuv yaratish: Mahsulotlar ro\'yxati bo\'sh');
-      return res.status(400).json({ error: 'Kamida bitta mahsulot tanlash kerak' });
-    }
-
-    logger.debug({ items: items.length }, 'Mahsulotlar tekshirilmoqda');
-
-    // ========================================================================
-    // 🔒 RACE CONDITION FIX: Barcha operatsiyalar bitta transaction ichida
-    // ========================================================================
-    
-    // 1. AVVAL VALIDATSIYA (transaction tashqarida)
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'Kamida bitta mahsulot tanlash kerak' });
-    }
-    
-    // ProductId lar ro'yxatini yaratish
-    const productIds = items.map(item => item.productId).filter(Boolean);
-    if (productIds.length === 0) {
-      return res.status(400).json({ error: 'Mahsulot tanlanmagan' });
-    }
-    
-    // 2. TRANSACTION ICHIDA ATOMIK OPERATSIYA
-    const saleResult = await prisma.$transaction(async (tx) => {
-      // 🔒 LOCK: Barcha mahsulotlarni bir vaqtda olish (stock lock)
-      const products = await tx.product.findMany({
-        where: { id: { in: productIds } },
-      });
-      
-      const productMap = new Map(products.map(p => [p.id, p]));
-      
-      // Validatsiya va stock tekshiruvi (transaction ichida - atomic)
-      const validationResults = [];
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        
-        if (!item.productId) {
-          throw new Error(`Item ${i + 1} da mahsulot tanlanmagan`);
-        }
-        
-        const product = productMap.get(item.productId);
-        if (!product) {
-          throw new Error(`Mahsulot topilmadi: ${item.productId}`);
-        }
-
-        const requestedQty = parseFloat(item.quantity) || 0;
-        if (requestedQty <= 0) {
-          throw new Error(`${product.name} miqdori xato`);
-        }
-
-        // Dona savdo tekshiruvi
-        const isPieceSale = item.saleType === 'piece';
-        const availableStock = isPieceSale ? product.currentUnits : product.currentStock;
-        const unitLabel = isPieceSale ? 'dona' : 'qop';
-
-        if (availableStock < requestedQty) {
-          throw new Error(`${product.name} uchun omborda yetarli mahsulot yo'q (${unitLabel} yetarli emas)`);
-        }
-
-        const price = parseFloat(item.pricePerBag || item.pricePerPiece || 0);
-        const subtotal = requestedQty * price;
-        
-        validationResults.push({ product, item, subtotal, saleType: item.saleType || 'bag', isPieceSale, requestedQty });
-      }
-
-      console.log('✅ Barcha mahsulotlar validatsiyadan o\'tdi (transaction ichida)');
-      
-      return { validationResults, productMap };
-    }, {
-      // Transaction sozlamalari
-      isolationLevel: 'Serializable', // Eng yuqori izolyatsiya darajasi
-      maxWait: 5000, // 5 soniya kutish
-      timeout: 10000, // 10 soniya timeout
-    });
-    
-    const { validationResults } = saleResult;
-
-    // 2. СОТУВ ЯРАТИШ
-    const totalQty = items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
-    
-    // UZS da to'lov summasini hisoblash
-    const paidUZS = parseFloat(paymentDetails?.uzs) || 0;
-    const paidUSD = parseFloat(paymentDetails?.usd) || 0;
-    const paidCLICK = parseFloat(paymentDetails?.click) || 0;
-    const totalPaidUZS = paidUZS + paidCLICK + (paidUSD * exchangeRates.USD_TO_UZS);
-    
-    console.log('💰 To\'lov hisob-kitobi:', {
-      paidUZS,
-      paidUSD,
-      paidCLICK,
-      totalPaidUZS,
-      paidAmount,
-      currency
-    });
-    
-    // USER va CUSTOMER mavjudligini tekshirish
-    console.log('🔍 User va Customer tekshirilmoqda...');
-    console.log('userId:', userId);
-    console.log('customerId:', customerId);
-    console.log('isKocha:', isKocha);
-    
-    // User mavjudligini tekshirish
-    let userExists = await prisma.user.findUnique({ where: { id: userId } });
-    if (!userExists) {
-      console.warn('⚠️ User topilmadi, yangi user yaratilmoqda:', userId);
-      
-      // Yangi user yaratish (tezkor yechim)
-      try {
-        // Hashed password yaratish (bcrypt bilan)
-        const bcrypt = require('bcryptjs');
-        const hashedPassword = await bcrypt.hash('temporary_password_123', 10);
-        
-        userExists = await prisma.user.create({
-          data: {
-            id: userId,
-            login: `cashier_${userId.slice(0, 8)}`,
-            name: 'Kassir',
-            role: 'CASHIER',
-            password: hashedPassword
-          }
-        });
-        console.log('✅ Yangi user yaratildi:', userExists.login);
-      } catch (createError: any) {
-        console.error('❌ User yaratishda xatolik:', createError);
-        console.error('❌ Xatolik ma\'lumotlari:', createError.message);
-        return res.status(400).json({ 
-          error: 'Foydalanuvchi topilmadi va yaratib bo\'lmadi',
-          details: `User ID: ${userId} bazada mavjud emas. Iltimos, qaytadan login qiling.`
-        });
-      }
-    }
-    console.log('✅ User topildi:', userExists.login);
-    
-    // Customer mavjudligini tekshirish (agar Ko'chaga bo'lmasa)
-    if (!isKocha && customerId) {
-      let customerExists = await prisma.customer.findUnique({ where: { id: customerId } });
-      if (!customerExists) {
-        console.warn('⚠️ Customer topilmadi, yangi customer yaratilmoqda:', customerId);
-        
-        // Yangi customer yaratish (tezkor yechim)
-        try {
-          customerExists = await prisma.customer.create({
-            data: {
-              id: customerId,
-              name: `Mijoz ${customerId.slice(0, 8)}`,
-              phone: '+998900000000',
-              address: 'Manzil kiritilmagan',
-              balanceUZS: 0,
-              balanceUSD: 0,
-              debtUZS: 0,
-              debtUSD: 0
-            }
-          });
-          console.log('✅ Yangi customer yaratildi:', customerExists.name);
-        } catch (createError) {
-          console.error('❌ Customer yaratishda xatolik:', createError);
-          return res.status(400).json({ 
-            error: 'Mijoz topilmadi va yaratib bo\'lmadi',
-            details: `Customer ID: ${customerId} bazada mavjud emas. Iltimos, mijozni qaytadan tanlang.`
-          });
-        }
-      }
-      console.log('✅ Customer topildi:', customerExists.name);
-    }
-    
-    // Ketma-ket chek raqamini olish
-    const lastSale = await prisma.sale.findFirst({
-      orderBy: { receiptNumber: 'desc' },
-      select: { receiptNumber: true }
-    });
-    const nextReceiptNumber = (lastSale?.receiptNumber || 0) + 1;
-    console.log('🎫 Yangi chek raqami:', nextReceiptNumber);
-    
-    const saleData = {
-      receiptNumber: nextReceiptNumber,
-      customerId: isKocha ? null : customerId,
-      productId: null, // Multi-product sale uchun null
-      userId: userId,
-      driverId: driverId || null,
-      quantity: totalQty,
-      pricePerBag: 0,
-      totalAmount: parseFloat(totalAmount) || 0,
-      paidAmount: currency === 'UZS' ? totalPaidUZS : parseFloat(paidAmount) || 0,
-      currency: currency || 'USD',
-      paymentStatus: (paymentStatus as any) || 'UNPAID',
-      paymentDetails: paymentDetails ? (typeof paymentDetails === 'string' ? paymentDetails : JSON.stringify(paymentDetails)) : null,
-      factoryShare: parseFloat(factoryShare) || 0,
-      customerShare: parseFloat(customerShare) || 0,
-      isKocha: !!isKocha,
-      manualCustomerName: manualCustomerName || null,
-      manualCustomerPhone: manualCustomerPhone || null,
-    };
-    
-    console.log('📝 Sotuv yaratilmoqda:', JSON.stringify(saleData, null, 2));
-    
-    let sale = null;
-    try {
-      sale = await prisma.sale.create({
-        data: saleData,
-        include: {
-          customer: true,
-        },
-      });
-
-      console.log('✅ Sotuv yaratildi:', sale.id);
-    } catch (createError: any) {
-      console.error('❌ Sotuv yaratishda Prisma xatosi:', createError);
-      console.error('❌ Xatolik kodi:', createError.code);
-      console.error('❌ Xatolik xabari:', createError.message);
-      console.error('❌ Meta ma\'lumotlar:', createError.meta);
-      
-      return res.status(500).json({
-        error: 'Sotuv yaratishda xatolik',
-        details: createError.message,
-        code: createError.code,
-        meta: createError.meta
-      });
-    }
-
-    // 3. SALE ITEMS ЯРАТИШ
-    console.log('📝 Sale items yaratilmoqda...', validationResults.length, 'ta item');
-    const saleItems = [];
-    
-    try {
-      for (const validation of validationResults) {
-        console.log('📦 Item yaratilmoqda:', validation.item.productId, validation.item.productName);
-        
-        const saleItemData: any = {
-          saleId: sale.id,
-          productId: validation.item.productId,
-          quantity: parseFloat(validation.item.quantity),
-          pricePerBag: parseFloat(validation.item.pricePerBag || validation.item.pricePerPiece || 0),
-          subtotal: validation.subtotal,
-          saleType: validation.item.saleType || 'bag'
-        };
-        
-        // Agar variantId bo'lsa, saqlash
-        if (validation.item.variantId) {
-          saleItemData.variantId = validation.item.variantId;
-        }
-        
-        console.log('📝 SaleItem data:', JSON.stringify(saleItemData, null, 2));
-        
-        const saleItem = await prisma.saleItem.create({
-          data: saleItemData,
-          include: {
-            product: true
-          }
-        });
-        
-        console.log('✅ SaleItem yaratildi:', saleItem.id);
-        saleItems.push(saleItem);
-      }
-      
-      console.log('✅ Barcha sale items yaratildi:', saleItems.length);
-    } catch (itemError: any) {
-      console.error('❌ Sale items yaratishda xatolik:', itemError);
-      console.error('❌ Xatolik xabari:', itemError.message);
-      console.error('❌ Xatolik kodi:', itemError.code);
-      
-      // Xatolikni qaytarish - lekin sotuv allaqachon yaratilgan bo'lishi mumkin
-      return res.status(500).json({
-        error: 'Sotuv mahsulotlari saqlashda xatolik',
-        details: itemError.message,
-        saleId: sale.id,
-        warning: 'Sotuv yaratildi lekin mahsulotlar saqlanmadi'
-      });
-    }
-
-    // АВТОМАТЛАШТИРИШ FLAGS
-    let stockUpdated = false;
-    let cashboxUpdated = false;
-    let invoiceCreated = false;
-    let notificationSent = false;
-    let lowStockAlert = false;
-
-    try {
-      // 4. HAR BIR MAHSULOT UCHUN OMBOR AVTOMATIK KAMAYTIRISH (ATOMIK TRANSACTION)
-      await prisma.$transaction(async (tx) => {
-        for (const validation of validationResults) {
-          const { product, item, isPieceSale, requestedQty: quantity } = validation;
-          
-          // Frontenddan kelgan unitsPerBag ishlatish (to'g'ri qiymat uchun)
-          const unitsPerBag = parseFloat(item.unitsPerBag) || product.unitsPerBag || 2000;
-          
-          // Dona savdo uchun ombor kamaytirish
-          let bagsToDeduct = quantity;
-          let unitsToDeduct = quantity * unitsPerBag;
-          
-          if (isPieceSale) {
-            // Dona savdo: quantity allaqachon dona, qopga aylantirish
-            bagsToDeduct = quantity / unitsPerBag;
-            unitsToDeduct = quantity;
-          }
-          
-          // 🔒 ATOMIK YANGILASH: Prisma decrement operatorlari (race condition yo'q)
-          await tx.product.update({
-            where: { id: product.id },
-            data: {
-              currentStock: { decrement: bagsToDeduct },
-              currentUnits: { decrement: unitsToDeduct }
-            }
-          });
-          
-          // AGAR VARIANT BO'LSA - variant omborini ham atomik yangilash
-          if (item.variantId) {
-            await tx.productVariant.update({
-              where: { id: item.variantId },
-              data: {
-                currentStock: { decrement: bagsToDeduct },
-                currentUnits: { decrement: unitsToDeduct }
-              }
-            });
-            console.log(`✅ Variant ${item.variantId} ombori atomik yangilandi`);
-          }
-
-          // 5. STOCK MOVEMENT YARATISH (transaction ichida)
-          let bagsChange = -quantity;
-          let unitsChange = -quantity * unitsPerBag;
-          
-          if (isPieceSale) {
-            bagsChange = -(quantity / unitsPerBag);
-            unitsChange = -quantity;
-          }
-          
-          const newStock = product.currentStock - bagsToDeduct;
-          const newUnits = product.currentUnits - unitsToDeduct;
-          
-          await tx.stockMovement.create({
-            data: {
-              productId: product.id,
-              type: 'SALE',
-              quantity: bagsChange,
-              units: unitsChange,
-              previousStock: product.currentStock,
-              previousUnits: product.currentUnits,
-              newStock: newStock,
-              newUnits: newUnits,
-              userId: userId,
-              userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
-              reason: `Multi-Sotuv: ${sale.id}`,
-              notes: `Mijoz: ${sale.isKocha ? sale.manualCustomerName || 'Ko\'cha' : sale.customer?.name || 'Noma\'lum'}, Mahsulot: ${product.name}, Tip: ${isPieceSale ? 'dona' : 'qop'}`
-            }
-          });
-        }
-      }, {
-        isolationLevel: 'Serializable',
-        maxWait: 5000,
-        timeout: 10000,
-      });
-      
-      stockUpdated = true;
-      console.log('✅ Barcha ombor operatsiyalari atomik bajarildi');
-
-      // 7. KASSA TRANZAKSIYASI YARATISH - Har bir valyuta uchun alohida
-      if (paymentDetails) {
-        try {
-          const details = typeof paymentDetails === 'string' ? JSON.parse(paymentDetails) : paymentDetails;
-          
-          // UZS (Naqd)
-          if (details.uzs && details.uzs > 0) {
-            await prisma.cashboxTransaction.create({
-              data: {
-                type: 'INCOME',
-                amount: details.uzs,
-                category: 'SALE',
-                description: `Sotuv (Naqd UZS): ${saleItems.map(item => item.product ? item.product.name : 'Noma\'lum').join(', ')}`,
-                userId: userId,
-                userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
-              }
-            });
-            console.log(`✅ Kassa (UZS): ${details.uzs} so'm`);
-          }
-          
-          // USD (Dollar)
-          if (details.usd && details.usd > 0) {
-            await prisma.cashboxTransaction.create({
-              data: {
-                type: 'INCOME',
-                amount: details.usd,
-                category: 'SALE',
-                description: `Sotuv (Dollar USD): ${saleItems.map(item => item.product?.name || 'Noma\'lum').join(', ')}`,
-                userId: userId,
-                userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
-              }
-            });
-            console.log(`✅ Kassa (USD): $${details.usd}`);
-          }
-          
-          // CLICK
-          if (details.click && details.click > 0) {
-            await prisma.cashboxTransaction.create({
-              data: {
-                type: 'INCOME',
-                amount: details.click,
-                category: 'SALE',
-                description: `Sotuv (Click UZS): ${saleItems.map(item => item.product?.name || 'Noma\'lum').join(', ')}`,
-                userId: userId,
-                userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
-              }
-            });
-            console.log(`✅ Kassa (Click): ${details.click} so'm`);
-          }
-          
-          cashboxUpdated = true;
-        } catch (error) {
-          console.log(`⚠️ Kassa tranzaksiyasi xatolik:`, error);
-        }
-      }
-
-      // 8. INVOICE ЯРАТИШ
-      try {
-        const invoice = await createInvoiceForSale(sale.id);
-        if (invoice) {
-          invoiceCreated = true;
-          console.log(`✅ Invoice яратилди: ${invoice.invoiceNumber}`);
-        }
-      } catch (error) {
-        console.log(`⚠️ Invoice yaratish xatolik:`, error);
-      }
-
-      // 9. TELEGRAM BILDIRISHNOMA
-      try {
-        await notifyCustomerSale(sale.id);
-        notificationSent = true;
-        console.log(`✅ Telegram bildirishnoma yuborildi`);
-      } catch (error) {
-        console.log(`⚠️ Telegram bildirishnoma xatolik:`, error);
-      }
-
-      // 10. MIJOZ QARZ VA BALANS YANGILASH (faqat isKocha bo'lmasa)
-      // 💰 FIX: To'g'ri qarz hisoblash - barcha valyutalarni sotuv valyutasiga aylantirish
-      if (!isKocha && customerId) {
-        const saleCurrency = currency || 'USD';
-        const total = parseFloat(totalAmount) || 0;
-        
-        // To'lov tafsilotlarini olish
-        const details = typeof paymentDetails === 'string' ? JSON.parse(paymentDetails) : (paymentDetails || {});
-        const paidUZS = parseFloat(details.uzs) || 0;
-        const paidUSD = parseFloat(details.usd) || 0;
-        const paidCLICK = parseFloat(details.click) || 0;
-        
-        // 💰 BARCHA TO'LOVLARNI SOTUV VALYUTASIGA AYLANTIRISH
-        let totalPaidInSaleCurrency = 0;
-        if (saleCurrency === 'UZS') {
-          // So'mda sotuv: USD ni so'mga aylantirish
-          totalPaidInSaleCurrency = paidUZS + paidCLICK + (paidUSD * exchangeRates.USD_TO_UZS);
-        } else {
-          // Dollarda sotuv: UZS ni dollarga aylantirish
-          totalPaidInSaleCurrency = paidUSD + ((paidUZS + paidCLICK) / exchangeRates.USD_TO_UZS);
-        }
-        
-        // QARZNI TO'G'RI HISOBLASH
-        const debtAmount = total - totalPaidInSaleCurrency;
-        
-        console.log(`💰 Qarz hisoblash:`, {
-          total,
-          totalPaidInSaleCurrency,
-          debtAmount,
-          saleCurrency,
-          paidUZS,
-          paidUSD,
-          paidCLICK
-        });
-        
-        if (debtAmount > 0.01) { // 0.01 dan katta bo'lsa qarz hisoblanadi (floating point xatolikni oldini olish)
-          // Mijoz kam to'lagan - qarz qo'shish
-          try {
-            if (saleCurrency === 'UZS') {
-              await prisma.customer.update({
-                where: { id: customerId },
-                data: {
-                  debtUZS: { increment: Math.round(debtAmount) }, // So'mni butun songa aylantirish
-                  lastPurchase: new Date()
-                }
-              });
-              console.log(`✅ Mijoz qarz yangilandi (UZS): +${Math.round(debtAmount)}`);
-            } else {
-              await prisma.customer.update({
-                where: { id: customerId },
-                data: {
-                  debtUSD: { increment: parseFloat(debtAmount.toFixed(2)) }, // Dollar 2 kasr
-                  lastPurchase: new Date()
-                }
-              });
-              console.log(`✅ Mijoz qarz yangilandi (USD): +${debtAmount.toFixed(2)}`);
-            }
-          } catch (error) {
-            console.error(`❌ Mijoz qarz yangilanmadi:`, error);
-          }
-        } else if (debtAmount < -0.01) {
-          // Ortiqcha to'lov - balansga qo'shish
-          const overpayment = Math.abs(debtAmount);
-          try {
-            if (saleCurrency === 'UZS') {
-              await prisma.customer.update({
-                where: { id: customerId },
-                data: {
-                  balanceUZS: { increment: Math.round(overpayment) },
-                  lastPurchase: new Date()
-                }
-              });
-              console.log(`✅ Mijoz balansiga qo'shildi (UZS): +${Math.round(overpayment)}`);
-            } else {
-              await prisma.customer.update({
-                where: { id: customerId },
-                data: {
-                  balanceUSD: { increment: parseFloat(overpayment.toFixed(2)) },
-                  lastPurchase: new Date()
-                }
-              });
-              console.log(`✅ Mijoz balansiga qo'shildi (USD): +${overpayment.toFixed(2)}`);
-            }
-          } catch (error) {
-            console.error(`❌ Mijoz balansi yangilanmadi:`, error);
-          }
-        } else {
-          console.log(`✅ To'lov to'liq - qarz/balans yangilanmadi`);
-        }
-      } else {
-        console.log('🚫 Ko\'chaga sotuv - mijoz qarz/balans yangilanmadi');
-      }
-
-      // 11. AUDIT LOG - Mahsulot tarixini saqlash
-      try {
-        const customerName = sale.customer?.name || manualCustomerName || 'Noma\'lum';
-        await logSalesAction({
-          userId: req.user?.id || 'unknown',
-          userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
-          action: 'SOTUV YARATISH',
-          entity: 'SALES',
-          entityId: sale.id,
-          customerId: isKocha ? null : customerId,
-          customerName: customerName,
-          details: {
-            type: 'CREATE',
-            totalAmount: parseFloat(totalAmount) || 0,
-            paidAmount: parseFloat(paidAmount) || 0,
-            currency: currency || 'USD',
-            paymentStatus: (paymentStatus as any) || 'UNPAID',
-            paymentMethod: 'CASH',
-            products: saleItems.map(item => ({
-              productId: item.productId,
-              productName: item.product?.name || 'Noma\'lum mahsulot',
-              quantity: item.quantity,
-              price: item.pricePerBag || 0
-            }))
-          },
-          ipAddress: req.ip,
-          userAgent: req.get('user-agent')
-        });
-        console.log(`✅ Audit log yaratildi (mahsulotlar bilan)`);
-      } catch (error) {
-        console.log(`⚠️ Audit log xatolik:`, error);
-      }
-
-    } catch (error) {
-      console.error('❌ Avtomatlashtirish xatolik:', error);
-    }
-
-    // Response with automation status and Ko'chaga info
-    const debtAmount = parseFloat(totalAmount) - parseFloat(paidAmount);
-    
-    const response = {
-      ...sale,
-      items: saleItems,
-      debtAmount: debtAmount > 0 ? debtAmount : 0,
-      isKocha: isKocha || false,
-      manualCustomerName: manualCustomerName || null,
-      manualCustomerPhone: manualCustomerPhone || null,
-      automationStatus: {
-        stockDeducted: stockUpdated,
-        cashboxUpdated: cashboxUpdated,
-        invoiceGenerated: invoiceCreated,
-        telegramSent: notificationSent,
-        lowStockAlert: lowStockAlert
-      }
-    };
-
-    res.json(response);
-  } catch (error: any) {
-    console.error('❌ Create multi-sale error:');
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    if (error.meta) console.error('Prisma meta:', error.meta);
-    res.status(500).json({ 
-      error: 'Сотув яратишда хатолик',
-      details: error.message,
-      stack: error.stack
-    });
-  }
-});
-
+// POST /sales - Create sale (Service-based, clean implementation)
+router.post('/', 
+  authorize('ADMIN', 'CASHIER', 'SELLER'),
+  validateBody(SaleCreateSchema),
+  async (req: AuthRequest & { validatedBody: any }, res: any) => {
+    try {
+      const userId = req.user?.id;
+      const userName = (req.user as any)?.name || req.user?.email || 'Unknown';
+      
+      if (!userId) {
+        return res.status(401).json(errorResponse('Foydalanuvchi aniqlanmadi'));
+      }
+
+      // âœ… USE SERVICE LAYER - All business logic moved to service
+      const sale = await salesService.createSale({
+        ...req.validatedBody,
+        userId,
+        userName
+      });
+
+      // Optional: Invoice and notifications (non-blocking)
+      try {
+        await Promise.all([
+          createInvoiceForSale(sale.id),
+          notifyCustomerSale(sale.id)
+        ]);
+      } catch (err) {
+        // Log but don't fail the request
+        logger.warn({ error: err }, 'Invoice/notification failed');
+      }
+
+      // Audit log
+      try {
+        await logSalesAction({
+          userId,
+          userName,
+          action: 'SOTUV YARATISH',
+          entity: 'SALES',
+          entityId: sale.id,
+          customerId: sale.customerId,
+          customerName: sale.customer?.name || req.validatedBody.manualCustomerName || 'Noma\'lum',
+          details: {
+            type: 'CREATE',
+            totalAmount: sale.totalAmount,
+            paidAmount: sale.paidAmount,
+            currency: sale.currency,
+            paymentStatus: sale.paymentStatus,
+            paymentMethod: sale.paymentMethod,
+            products: sale.items?.map(item => ({
+              productId: item.productId || '',
+              productName: item.product?.name || 'Noma\'lum',
+              quantity: item.quantity,
+              price: item.pricePerBag || 0
+            })) || []
+          },
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent')
+        });
+      } catch (err) {
+        logger.warn({ error: err }, 'Audit log failed');
+      }
+
+      // âœ… STANDARD RESPONSE FORMAT
+      res.json(successResponse(sale));
+    } catch (error: any) {
+      logger.error({ error }, 'Create sale error');
+      res.status(500).json(errorResponse(error.message));
+    }
+  }
+);
 // Update sale (Zod validation bilan)
 router.put('/:id', 
   authorize('ADMIN', 'CASHIER', 'SELLER'),
   validateBody(SaleUpdateSchema),
-  async (req: AuthRequest & { validatedBody: any }, res) => {
+  async (req: AuthRequest & { validatedBody: any }, res: any) => {
   try {
     const { id } = req.params;
     const { 
@@ -761,7 +282,7 @@ router.put('/:id',
       customerShare
     } = req.validatedBody;
 
-    console.log('📥 PUT /sales - Data:', { id, customerId, isKocha, itemsCount: items?.length });
+    console.log('ðŸ“¥ PUT /sales - Data:', { id, customerId, isKocha, itemsCount: items?.length });
 
     const userId = req.user?.id;
     if (!userId) {
@@ -839,6 +360,21 @@ router.put('/:id',
       validationResults.push({ product, item, subtotal: requestedQty * price });
     }
 
+    // To'lov statusini hisoblash (server tomondan)
+    const finalTotalAmount = parseFloat(totalAmount) || 0;
+    const finalPaidAmount = parseFloat(paidAmount) || 0;
+    let calculatedPaymentStatus: 'PAID' | 'PARTIAL' | 'UNPAID' = 'UNPAID';
+    
+    if (finalPaidAmount >= finalTotalAmount && finalTotalAmount > 0) {
+      calculatedPaymentStatus = 'PAID';
+    } else if (finalPaidAmount > 0 && finalPaidAmount < finalTotalAmount) {
+      calculatedPaymentStatus = 'PARTIAL';
+    } else {
+      calculatedPaymentStatus = 'UNPAID';
+    }
+    
+    // Payment status hisoblandi
+    
     // 3. Sotuvni yangilash
     const updatedSale = await prisma.sale.update({
       where: { id },
@@ -848,10 +384,10 @@ router.put('/:id',
         driverId: driverId || null,
         quantity: items.reduce((sum: number, item: any) => sum + (parseFloat(item.quantity) || 0), 0),
         pricePerBag: 0,
-        totalAmount: parseFloat(totalAmount) || 0,
-        paidAmount: parseFloat(paidAmount) || 0,
+        totalAmount: finalTotalAmount,
+        paidAmount: finalPaidAmount,
         currency: currency || 'USD',
-        paymentStatus: paymentStatus || 'UNPAID',
+        paymentStatus: calculatedPaymentStatus,
         paymentDetails: paymentDetails ? (typeof paymentDetails === 'string' ? paymentDetails : JSON.stringify(paymentDetails)) : null,
         factoryShare: parseFloat(factoryShare) || 0,
         customerShare: parseFloat(customerShare) || 0,
@@ -869,7 +405,7 @@ router.put('/:id',
       where: { saleId: id }
     });
 
-    // 5. Янги sale items яратиш
+    // 5. Ð¯Ð½Ð³Ð¸ sale items ÑÑ€Ð°Ñ‚Ð¸Ñˆ
     const saleItems = [];
     for (const validation of validationResults) {
       const saleItem = await prisma.saleItem.create({
@@ -913,9 +449,9 @@ router.put('/:id',
         }
       });
 
-      console.log(`✅ ${product.name} stock yangilandi: ${product.currentStock} → ${newStock}`);
+      // Stock yangilandi
 
-      // Stock movement яратиш
+      // Stock movement ÑÑ€Ð°Ñ‚Ð¸Ñˆ
       try {
         const bagsChange = isPieceSale ? -(quantity / product.unitsPerBag) : -quantity;
         const unitsChange = isPieceSale ? -quantity : -(quantity * product.unitsPerBag);
@@ -937,14 +473,15 @@ router.put('/:id',
           }
         });
       } catch (error) {
-        console.log(`⚠️ ${product.name} StockMovement yaratilmadi:`, error);
+        console.log(`âš ï¸ ${product.name} StockMovement yaratilmadi:`, error);
       }
     }
 
     // 7. Mijoz qarz va balansni yangilash
-    const oldDebt = oldSale.totalAmount - oldSale.paidAmount;
-    const newDebt = parseFloat(totalAmount) - parseFloat(paidAmount);
-    const debtDifference = newDebt - oldDebt;
+    // âœ… DECIMAL FIX: Use DecimalHelper for debt calculations
+    const oldDebt = DecimalHelper.subtract(oldSale.totalAmount, oldSale.paidAmount);
+    const newDebt = DecimalHelper.subtract(parseFloat(totalAmount), parseFloat(paidAmount));
+    const debtDifference = DecimalHelper.subtract(newDebt, oldDebt);
     const saleCurrency = currency || 'USD';
 
     if (debtDifference !== 0 && customerId) {
@@ -958,7 +495,7 @@ router.put('/:id',
               }
             }
           });
-          console.log(`✅ Mijoz qarz yangilandi (UZS): ${debtDifference > 0 ? '+' : ''}${debtDifference}`);
+          // Mijoz qarz yangilandi (UZS)
         } else {
           await prisma.customer.update({
             where: { id: customerId },
@@ -968,13 +505,11 @@ router.put('/:id',
               }
             }
           });
-          console.log(`✅ Mijoz qarz yangilandi (USD): ${debtDifference > 0 ? '+' : ''}${debtDifference}`);
+          // Mijoz qarz yangilandi (USD)
         }
       } catch (error) {
-        console.log(`⚠️ Mijoz qarz yangilanmadi:`, error);
+        // Mijoz qarz yangilanmadi
       }
-    } else if (debtDifference !== 0 && !customerId) {
-      console.log(`ℹ️ Ko'cha savdosi uchun qarz yangilanmadi: ${debtDifference}`);
     }
 
     // 8. Audit log
@@ -1009,9 +544,9 @@ router.put('/:id',
           })
         }
       });
-      console.log(`✅ Audit log yaratildi`);
+      console.log(`âœ… Audit log yaratildi`);
     } catch (error) {
-      console.log(`⚠️ Audit log xatolik:`, error);
+      console.log(`âš ï¸ Audit log xatolik:`, error);
     }
 
     res.json({
@@ -1030,7 +565,7 @@ router.delete('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
     const { id } = req.params;
     const userId = req.user?.id;
 
-    console.log('🗑️ DELETE /sales - ID:', id);
+    console.log('ðŸ—‘ï¸ DELETE /sales - ID:', id);
 
     // 1. Sotuvni va uning mahsulotlarini olish
     const sale = await prisma.sale.findUnique({
@@ -1093,12 +628,13 @@ router.delete('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
           }
         });
       } catch (error) {
-        console.log(`⚠️ ${product.name} StockMovement yaratilmadi:`, error);
+        console.log(`âš ï¸ ${product.name} StockMovement yaratilmadi:`, error);
       }
     }
 
     // 3. Mijoz qarzini kamaytirish
-    const debtToReduce = sale.totalAmount - sale.paidAmount;
+    // âœ… DECIMAL FIX: Use DecimalHelper for debt calculation
+    const debtToReduce = DecimalHelper.subtract(sale.totalAmount, sale.paidAmount);
     if (debtToReduce !== 0 && sale.customerId) {
       try {
         if (sale.currency === 'UZS') {
@@ -1120,9 +656,9 @@ router.delete('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
             }
           });
         }
-        console.log(`✅ Mijoz qarzi kamaytirildi: -${debtToReduce} ${sale.currency}`);
+        console.log(`âœ… Mijoz qarzi kamaytirildi: -${debtToReduce} ${sale.currency}`);
       } catch (error) {
-        console.log(`⚠️ Mijoz qarzi yangilanmadi:`, error);
+        console.log(`âš ï¸ Mijoz qarzi yangilanmadi:`, error);
       }
     }
 
@@ -1150,7 +686,7 @@ router.delete('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
         }
       });
     } catch (error) {
-      console.log(`⚠️ Audit log xatolik:`, error);
+      console.log(`âš ï¸ Audit log xatolik:`, error);
     }
 
     // 5. Sotuvni o'chirish (saleItems cascade delete bo'lishi kerak, bo'lmasa deleteMany qilish kerak)
@@ -1169,8 +705,6 @@ router.delete('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
     res.status(500).json({ error: 'Sotuvni o\'chirishda xatolik', details: error.message });
   }
 });
-
-export default router;
 
 // ==================== AUDIT ENDPOINTS ====================
 
@@ -1296,8 +830,9 @@ router.post('/:id/driver-collection', authorize('ADMIN', 'CASHIER', 'MANAGER'), 
     }
     
     // Yangi yig'ilgan summa
-    const newCollectedAmount = sale.driverCollectedAmount + parseFloat(collectedAmount);
-    const remainingToCollect = sale.totalAmount - newCollectedAmount;
+    // âœ… DECIMAL FIX: Use DecimalHelper for money calculations
+    const newCollectedAmount = DecimalHelper.add(sale.driverCollectedAmount, parseFloat(collectedAmount));
+    const remainingToCollect = DecimalHelper.subtract(sale.totalAmount, newCollectedAmount);
     
     // Statusni aniqlash
     let newStatus = 'PENDING';
@@ -1328,7 +863,7 @@ router.post('/:id/driver-collection', authorize('ADMIN', 'CASHIER', 'MANAGER'), 
     // To'lov tarixini saqlash (agar alohida jadval bo'lsa)
     try {
       // Bu yerda Payment modeliga yozish mumkin
-      console.log(`✅ Haydovchi to'lovi qayd etildi: ${sale.driver?.name} - $${collectedAmount}`);
+      console.log(`âœ… Haydovchi to'lovi qayd etildi: ${sale.driver?.name} - $${collectedAmount}`);
     } catch (paymentError) {
       console.error('To\'lov tarixini saqlashda xatolik:', paymentError);
     }
@@ -1348,9 +883,9 @@ router.post('/:id/driver-collection', authorize('ADMIN', 'CASHIER', 'MANAGER'), 
           relatedId: sale.id,
           relatedType: 'SALE'
         });
-        console.log(`✅ Kassaga qo'shildi: $${collectedAmount}`);
+        console.log(`âœ… Kassaga qo'shildi: $${collectedAmount}`);
       } catch (cashboxError) {
-        console.error('❌ Kassaga qo\'shishda xatolik:', cashboxError);
+        console.error('âŒ Kassaga qo\'shishda xatolik:', cashboxError);
       }
     }
     
@@ -1369,7 +904,7 @@ router.post('/:id/driver-collection', authorize('ADMIN', 'CASHIER', 'MANAGER'), 
           }
         );
       } catch (notifyError) {
-        console.log('⚠️ Haydovchiga xabar yuborishda xatolik:', notifyError);
+        console.log('âš ï¸ Haydovchiga xabar yuborishda xatolik:', notifyError);
       }
     }
     
@@ -1383,8 +918,8 @@ router.post('/:id/driver-collection', authorize('ADMIN', 'CASHIER', 'MANAGER'), 
         notes
       },
       message: remainingToCollect > 0
-        ? `✅ To'lov qabul qilindi! Qoldiq: $${remainingToCollect.toFixed(2)}`
-        : '✅ To\'lov to\'liq yig\'ildi!'
+        ? `âœ… To'lov qabul qilindi! Qoldiq: $${remainingToCollect.toFixed(2)}`
+        : 'âœ… To\'lov to\'liq yig\'ildi!'
     });
     
   } catch (error) {
@@ -1550,3 +1085,5 @@ router.get('/driver/:driverId/summary', authorize('ADMIN', 'CASHIER', 'MANAGER')
     res.status(500).json({ error: 'Haydovchi ma\'lumotlarini olishda xatolik' });
   }
 });
+
+export default router;

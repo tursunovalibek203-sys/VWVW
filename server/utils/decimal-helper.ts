@@ -122,7 +122,24 @@ export class MoneyCalculator {
   static format(value: number | string, decimals: number = 2): string {
     return new Decimal(value).toFixed(decimals);
   }
+
+  /**
+   * Get minimum of two numbers
+   */
+  static min(a: number | string, b: number | string): number {
+    return new Decimal(a).lessThan(new Decimal(b)) ? new Decimal(a).toNumber() : new Decimal(b).toNumber();
+  }
+
+  /**
+   * Get maximum of two numbers
+   */
+  static max(a: number | string, b: number | string): number {
+    return new Decimal(a).greaterThan(new Decimal(b)) ? new Decimal(a).toNumber() : new Decimal(b).toNumber();
+  }
 }
 
 // Export qisqa funksiyalar
 export const { add, subtract, multiply, divide, round, convertCurrency, sum } = MoneyCalculator;
+
+// Export as DecimalHelper for backward compatibility
+export const DecimalHelper = MoneyCalculator;

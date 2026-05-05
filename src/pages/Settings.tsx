@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DataBackup from '../components/DataBackup';
 import { useAuthStore } from '../store/authStore';
-import api from '../lib/api';
+import api from '../lib/professionalApi';
 import { 
   Bell, 
   Shield, 
@@ -27,6 +27,7 @@ import { latinToCyrillic } from '../lib/transliterator';
 
 export default function Settings() {
   const navigate = useNavigate();
+  const isCashier = window.location.pathname.startsWith('/cashier');
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -403,7 +404,7 @@ export default function Settings() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <button
                   type="button"
-                  onClick={() => navigate('/products')}
+                  onClick={() => navigate(isCashier ? '/cashier/products' : '/products')}
                   className="flex items-center gap-6 p-8 bg-white dark:bg-gray-900 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 hover:scale-[1.02] transition-all group"
                 >
                   <div className="w-14 h-14 bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-blue-600 group-hover:rotate-6 transition-all">
@@ -416,7 +417,7 @@ export default function Settings() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate('/add-product')}
+                  onClick={() => navigate(isCashier ? '/cashier/add-product' : '/add-product')}
                   className="flex items-center gap-6 p-8 bg-white dark:bg-gray-900 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 hover:scale-[1.02] transition-all group"
                 >
                   <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center text-emerald-600 group-hover:rotate-6 transition-all">

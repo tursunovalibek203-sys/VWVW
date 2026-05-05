@@ -254,12 +254,14 @@ export default function ProfessionalDataStorageMap({
             onClick={loadStorageData}
             disabled={refreshing}
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            title="Refresh data"
           >
             <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={() => setShowAdvancedInfo(!showAdvancedInfo)}
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            title="Toggle advanced info"
           >
             <Settings className="w-5 h-5" />
           </button>
@@ -587,18 +589,21 @@ export default function ProfessionalDataStorageMap({
                           <button
                             onClick={() => {/* Restore backup */}}
                             className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            title="Restore backup"
                           >
                             <Download className="w-4 h-4 text-blue-600" />
                           </button>
                           <button
                             onClick={() => {/* View details */}}
                             className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            title="View details"
                           >
                             <Eye className="w-4 h-4 text-gray-600" />
                           </button>
                           <button
                             onClick={() => {/* Delete backup */}}
                             className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            title="Delete backup"
                           >
                             <Trash2 className="w-4 h-4 text-red-600" />
                           </button>

@@ -3,7 +3,12 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import path from 'path';
+import jwt from 'jsonwebtoken';
+import { prisma } from './utils/prisma.js';
+import { logger } from './utils/logger.js';
 import { setupSwagger } from './swagger.js';
+import { securityLogger, sanitizeInput } from './middleware/security.js';
+import { errorHandler } from './middleware/error-handler.js';
 import authRoutes from './routes/auth.js';
 import productRoutes from './routes/products.js';
 import variantRoutes from './routes/variants.js';
@@ -32,10 +37,8 @@ import analyticsRoutes from './routes/analytics.js';
 import cashboxRoutes from './routes/cashbox.js';
 import ordersRoutes from './routes/orders.js';
 import inventoryAIRoutes from './routes/inventory-ai.js';
-import megaAIRoutes from './routes/mega-ai.js';
 import logisticsRoutes from './routes/logistics.js';
 import superManagerRoutes from './routes/super-manager.js';
-import cashboxAIRoutes from './routes/cashbox-ai.js';
 import publicOrdersRoutes from './routes/public-orders.js';
 import driversRoutes from './routes/drivers.js';
 import customerChatRoutes from './routes/customer-chat.js';
@@ -45,16 +48,16 @@ import statisticsRoutes from './routes/statistics.js';
 import exportRoutes from './routes/export.js';
 import printRoutes from './routes/print.js';
 import bagLabelRoutes from './routes/bag-labels.js';
-import businessAIRoutes from './routes/business-ai.js';
 import budgetRoutes from './routes/budgets.js';
+import realtimeRoutes from './routes/realtime.js';
 // import loanRoutes from './routes/loans'; // Fayl yo'q
 // import { botManager } from './bot/bot-manager'; // Vaqtinchalik o'chirildi
 
 const app = express();
 const PORT = process.env.PORT || 5003;
 
-console.log('🚀 Server starting...');
-console.log('🔐 JWT_SECRET exists:', !!process.env.JWT_SECRET);
+logger.info('Server starting');
+logger.info('JWT_SECRET configured', { exists: !!process.env.JWT_SECRET });
 
 // 🔒 HELMET - Security headers
 app.use(helmet({
@@ -76,6 +79,9 @@ app.use(helmet({
 }));
 
 // 🔒 Rate Limiting - DDoS himoyasi
+// Trust proxy for accurate IP behind reverse proxy (only internal networks)
+app.set('trust proxy', ['loopback', '127.0.0.1', '10.0.0.0/8']);
+
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 daqiqa
   max: process.env.NODE_ENV === 'development' ? 1000 : 100, // Development uchun yuqori limit
@@ -85,6 +91,8 @@ const limiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip successful requests from counting (optional optimization)
+  skipSuccessfulRequests: false,
 });
 
 // Stricter limit for auth endpoints
@@ -103,36 +111,52 @@ const authLimiter = rateLimit({
 app.use('/api/', limiter);
 app.use('/api/auth/login', authLimiter);
 
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://127.0.0.1:25852',
-  'http://127.0.0.1:3000',
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'https://luxpetplast.netlify.app',
-  process.env.CORS_ORIGIN
-].filter(Boolean);
+// CORS configuration - stricter in production
+const getAllowedOrigins = (): string[] => {
+  const productionOrigin = process.env.CORS_ORIGIN || 'https://luxpetplast.netlify.app';
+  
+  if (process.env.NODE_ENV === 'production') {
+    // Production: only configured origin
+    return [productionOrigin].filter(Boolean) as string[];
+  }
+  
+  // Development: localhost origins
+  return [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173',
+    productionOrigin
+  ].filter(Boolean) as string[];
+};
 
-// Development uchun barcha CORS sozlamalari
-if (process.env.NODE_ENV === 'development') {
-  app.use(cors({
-    origin: '*', // Barcha originlarga ruxsat
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id', 'X-Request-ID', 'x-request-time', 'X-Request-Time', 'Origin', 'Accept'],
-    credentials: true,
-    preflightContinue: false,
-    optionsSuccessStatus: 200
-  }));
-} else {
-  app.use(cors({
-    origin: allowedOrigins,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id', 'X-Request-ID', 'x-request-time', 'X-Request-Time'],
-    credentials: true
-  }));
-}
+const allowedOrigins = getAllowedOrigins();
+
+// CORS middleware
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      logger.warn('CORS blocked', { origin, allowed: allowedOrigins });
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id', 'X-Request-ID', 'x-request-time', 'X-Request-Time', 'Origin', 'Accept'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 200
+}));
 app.use(express.json({ limit: '10mb' })); // Limit request body size
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// 🔒 Security middleware - must be after body parsers but before routes
+app.use(securityLogger);
+app.use(sanitizeInput);
 
 // Swagger API Documentation
 setupSwagger(app);
@@ -165,36 +189,54 @@ app.use('/api/backup', backupRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/cashbox', cashboxRoutes);
 app.use('/api/inventory-ai', inventoryAIRoutes);
-app.use('/api/mega-ai', megaAIRoutes);
 app.use('/api/logistics', logisticsRoutes);
 app.use('/api/super-manager', superManagerRoutes);
-app.use('/api/cashbox-ai', cashboxAIRoutes);
-app.use('/api/business-ai', businessAIRoutes);
-
-// Public routes (autentifikatsiya kerak emas)
 app.use('/api/public', publicOrdersRoutes);
 
-// Bot API routes (vaqtinchalik o'chirildi)
-// app.use('/api/drivers', driversRoutes);
-// app.use('/api/bots', botApiRoutes);
-// app.use('/api/customer-chat', customerChatRoutes);
-// app.use('/api/customer-chats', customerChatsRoutes);
+// Bot API routes
+app.use('/api/drivers', driversRoutes);
+app.use('/api/bots', botApiRoutes);
+app.use('/api/customer-chat', customerChatRoutes);
+app.use('/api/customer-chats', customerChatsRoutes);
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/print', printRoutes);
 app.use('/api/bag-labels', bagLabelRoutes);
 app.use('/api/budgets', budgetRoutes);
+app.use('/api/realtime', realtimeRoutes);
 // app.use('/api/loans', loanRoutes); // Fayl yo'q
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Enhanced health check with DB connectivity
+app.get('/api/health', async (req, res) => {
+  const checks: any = {
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+  };
+  
+  // Database connectivity check
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    checks.database = 'ok';
+  } catch (error) {
+    checks.database = 'error';
+    checks.errors = checks.errors || [];
+    checks.errors.push('Database connection failed');
+  }
+  
+  const allOk = checks.database === 'ok';
+  
+  res.status(allOk ? 200 : 503).json({
+    status: allOk ? 'ok' : 'degraded',
+    ...checks
+  });
 });
 
 // Serve static frontend files in production
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(process.cwd(), 'dist');
   
-  console.log('📁 Serving static files from:', distPath);
+  logger.info('Serving static files', { path: distPath });
   
   app.use(express.static(distPath));
   
@@ -206,61 +248,31 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// 🔒 Security middleware
-import { securityLogger, sanitizeInput } from './middleware/security.js';
-app.use(securityLogger);
-app.use(sanitizeInput);
-
-// Global error handler - yangilangan
-import { errorHandler } from './middleware/error-handler.js';
-app.use(errorHandler);
-
 // Auth test endpoint
-import jwt from 'jsonwebtoken';
 app.get('/api/test-auth', (req, res) => {
   const auth = req.headers.authorization;
-  console.log('🧪 Test auth - Header present:', !!auth);
-  
+
   if (!auth) {
     return res.status(401).json({ error: 'No auth header' });
   }
-  
+
   const token = auth.split(' ')[1];
-  console.log('🧪 Test auth - Token:', token ? token.substring(0, 30) + '...' : 'missing');
-  
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    console.log('✅ Test auth - Valid, user:', (decoded as any).id);
     res.json({ valid: true, user: decoded });
   } catch (e) {
-    console.log('❌ Test auth - Invalid:', e instanceof Error ? e.message : 'Unknown');
     res.status(401).json({ valid: false, error: e instanceof Error ? e.message : 'Unknown error' });
   }
 });
 
+// Global error handler - must be last (BEFORE app.listen)
+app.use(errorHandler);
+
 app.listen(PORT, async () => {
-  console.log(`
-╔═══════════════════════════════════════════════════════╗
-║                                                       ║
-║        🚀 AzizTrades ERP Server Running! 🚀          ║
-║                                                       ║
-║  📊 API:    http://localhost:${PORT}/api              ║
-║  🔐 Health: http://localhost:${PORT}/api/health       ║
-║  💻 Frontend: http://localhost:3000                   ║
-║                                                       ║
-║  📧 Login: admin@aziztrades.com                      ║
-║  🔑 Password: admin123                               ║
-║                                                       ║
-║  🆕 NEW MODULES:                                     ║
-║  🏭 Production Management                            ║
-║  📦 Raw Materials & Suppliers                       ║
-║  🛡️  Quality Control                                 ║
-║  ✅ Task Management                                  ║
-║  💰 Advanced Financial Control                      ║
-║  🤖 Multi-Bot System (Disabled)                     ║
-║                                                       ║
-╚═══════════════════════════════════════════════════════╝
-  `);
+  logger.info('Server started successfully');
+  logger.info(`API available at http://localhost:${PORT}/api`);
+  logger.info(`Health check at http://localhost:${PORT}/api/health`);
   
   // Bot manager'ni ishga tushirish (vaqtinchalik o'chirildi)
   // console.log('🤖 Bot Manager ishga tushirilmoqda...');

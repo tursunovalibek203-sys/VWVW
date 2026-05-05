@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import Button from '../components/Button';
-import api from '../lib/api';
+import api from '../lib/professionalApi';
 import { formatCurrency } from '../lib/utils';
 import BusinessMetricsCard from '../components/BusinessMetricsCard';
 import MetricsCharts from '../components/MetricsCharts';
@@ -111,6 +111,8 @@ export default function Analytics() {
         
         <div className="flex gap-2">
           <select
+            title="Vaqt oralig'ini tanlash"
+            aria-label="Vaqt oralig'ini tanlash"
             className="px-4 py-2 bg-background border border-border rounded-lg"
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
