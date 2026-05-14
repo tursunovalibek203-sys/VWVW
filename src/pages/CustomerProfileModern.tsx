@@ -79,7 +79,7 @@ export default function CustomerProfileModern() {
         api.get(`/sales?customerId=${id}`)
       ]);
       
-      // ✅ Handle standardized API response format
+      // âœ… Handle standardized API response format
       const customerData = extractData<Customer | null>(customerRes, null);
       const { data: salesData } = extractPaginatedData<Sale>(salesRes, 'sales', []);
       
@@ -118,7 +118,7 @@ export default function CustomerProfileModern() {
     return (
       <MainLayout>
         <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600" />
+          <div className="animate-pulse rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600" />
         </div>
       </MainLayout>
     );
@@ -188,7 +188,7 @@ export default function CustomerProfileModern() {
                 <button
                   onClick={() => navigate('/cashier/customers')}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  aria-label={latinToCyrillic('Орқага')}
+                  aria-label={latinToCyrillic('ÐžÑ€Ò›Ð°Ð³Ð°')}
                 >
                   <ArrowLeft className="w-5 h-5 text-gray-600" />
                 </button>
@@ -206,7 +206,7 @@ export default function CustomerProfileModern() {
                   onClick={handleRefresh}
                   className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium transition-colors"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-pulse' : ''}`} />
                   {latinToCyrillic('Yangilash')}
                 </button>
                 <button
@@ -219,23 +219,23 @@ export default function CustomerProfileModern() {
                 <button
                   onClick={() => {}}
                   className="flex items-center gap-1 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg text-xs font-medium transition-colors"
-                  aria-label={latinToCyrillic('Нақд савдолар')}
+                  aria-label={latinToCyrillic('ÐÐ°Ò›Ð´ ÑÐ°Ð²Ð´Ð¾Ð»Ð°Ñ€')}
                 >
-                  {latinToCyrillic('Нақд савдолар')}
+                  {latinToCyrillic('ÐÐ°Ò›Ð´ ÑÐ°Ð²Ð´Ð¾Ð»Ð°Ñ€')}
                 </button>
                 <button
                   onClick={handlePayment}
                   className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-xs font-medium transition-colors"
                 >
                   <Coins className="w-3.5 h-3.5" />
-                  {latinToCyrillic('Тўлов қилиш')}
+                  {latinToCyrillic('Ð¢ÑžÐ»Ð¾Ð² Ò›Ð¸Ð»Ð¸Ñˆ')}
                 </button>
                 <button
                   onClick={() => {}}
                   className="flex items-center gap-1 px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-medium transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  {latinToCyrillic('Учирмоқ')}
+                  {latinToCyrillic('Ð£Ñ‡Ð¸Ñ€Ð¼Ð¾Ò›')}
                 </button>
               </div>
             </div>
@@ -250,7 +250,7 @@ export default function CustomerProfileModern() {
                 <Phone className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-xs text-gray-500">{latinToCyrillic('Телефон')}</p>
+                <p className="text-xs text-gray-500">{latinToCyrillic('Ð¢ÐµÐ»ÐµÑ„Ð¾Ð½')}</p>
                 <p className="text-sm font-semibold text-gray-900">{customer.phone || '-'}</p>
               </div>
             </div>
@@ -259,7 +259,7 @@ export default function CustomerProfileModern() {
                 <MapPin className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-xs text-gray-500">{latinToCyrillic('Манзил')}</p>
+                <p className="text-xs text-gray-500">{latinToCyrillic('ÐœÐ°Ð½Ð·Ð¸Ð»')}</p>
                 <p className="text-sm font-semibold text-gray-900">{customer.address || '-'}</p>
               </div>
             </div>
@@ -268,7 +268,7 @@ export default function CustomerProfileModern() {
                 <Calendar className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-xs text-gray-500">{latinToCyrillic('Рўйхатдан ўтган')}</p>
+                <p className="text-xs text-gray-500">{latinToCyrillic('Ð ÑžÐ¹Ñ…Ð°Ñ‚Ð´Ð°Ð½ ÑžÑ‚Ð³Ð°Ð½')}</p>
                 <p className="text-sm font-semibold text-gray-900">{formatDate(customer.createdAt)}</p>
               </div>
             </div>
@@ -278,30 +278,30 @@ export default function CustomerProfileModern() {
           <div className="grid grid-cols-4 gap-3">
             <DashboardCard
               icon={Wallet}
-              title={latinToCyrillic('Баланс')}
+              title={latinToCyrillic('Ð‘Ð°Ð»Ð°Ð½Ñ')}
               mainValue={customer.balanceUSD || 0}
               subValue={`${(customer.balanceUZS || 0).toLocaleString()} sum`}
               variant="success"
             />
             <DashboardCard
               icon={AlertTriangle}
-              title={latinToCyrillic('Қарз')}
+              title={latinToCyrillic('ÒšÐ°Ñ€Ð·')}
               mainValue={customer.debtUSD || 0}
               subValue={`${(customer.debtUZS || 0).toLocaleString()} sum`}
               variant="danger"
             />
             <DashboardCard
               icon={ShoppingCart}
-              title={latinToCyrillic('Харидлар')}
-              mainValue={`${sales.length} ${latinToCyrillic('та')}`}
+              title={latinToCyrillic('Ð¥Ð°Ñ€Ð¸Ð´Ð»Ð°Ñ€')}
+              mainValue={`${sales.length} ${latinToCyrillic('Ñ‚Ð°')}`}
               subValue={`$${totalPurchases.toFixed(2)}`}
               variant="info"
             />
             <DashboardCard
               icon={TrendingUp}
-              title={latinToCyrillic('Ўртача')}
+              title={latinToCyrillic('ÐŽÑ€Ñ‚Ð°Ñ‡Ð°')}
               mainValue={`$${averagePurchase.toFixed(2)}`}
-              subValue={latinToCyrillic('Хар бир сотув')}
+              subValue={latinToCyrillic('Ð¥Ð°Ñ€ Ð±Ð¸Ñ€ ÑÐ¾Ñ‚ÑƒÐ²')}
               variant="warning"
             />
           </div>
@@ -312,18 +312,18 @@ export default function CustomerProfileModern() {
               <div className="flex items-center gap-2">
                 <Package className="w-5 h-5 text-gray-600" />
                 <h3 className="font-bold text-gray-900">
-                  {latinToCyrillic('Сотувлар тарихи')}
+                  {latinToCyrillic('Ð¡Ð¾Ñ‚ÑƒÐ²Ð»Ð°Ñ€ Ñ‚Ð°Ñ€Ð¸Ñ…Ð¸')}
                 </h3>
               </div>
               <span className="text-sm text-gray-500">
-                {sales.length} {latinToCyrillic('та сотув')}
+                {sales.length} {latinToCyrillic('Ñ‚Ð° ÑÐ¾Ñ‚ÑƒÐ²')}
               </span>
             </div>
 
             {sales.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
                 <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                <p>{latinToCyrillic('Сотувлар мавжуд эмас')}</p>
+                <p>{latinToCyrillic('Ð¡Ð¾Ñ‚ÑƒÐ²Ð»Ð°Ñ€ Ð¼Ð°Ð²Ð¶ÑƒÐ´ ÑÐ¼Ð°Ñ')}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -331,22 +331,22 @@ export default function CustomerProfileModern() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {latinToCyrillic('Сана')}
+                        {latinToCyrillic('Ð¡Ð°Ð½Ð°')}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {latinToCyrillic('Маҳсулотлар')}
+                        {latinToCyrillic('ÐœÐ°Ò³ÑÑƒÐ»Ð¾Ñ‚Ð»Ð°Ñ€')}
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {latinToCyrillic('Жами')}
+                        {latinToCyrillic('Ð–Ð°Ð¼Ð¸')}
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {latinToCyrillic('Тўланган')}
+                        {latinToCyrillic('Ð¢ÑžÐ»Ð°Ð½Ð³Ð°Ð½')}
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {latinToCyrillic('Қарз')}
+                        {latinToCyrillic('ÒšÐ°Ñ€Ð·')}
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {latinToCyrillic('Ҳолат')}
+                        {latinToCyrillic('Ò²Ð¾Ð»Ð°Ñ‚')}
                       </th>
                     </tr>
                   </thead>
@@ -386,10 +386,10 @@ export default function CustomerProfileModern() {
                               : 'bg-rose-100 text-rose-700'
                           }`}>
                             {sale.paymentStatus === 'PAID' 
-                              ? latinToCyrillic('Тўланган')
+                              ? latinToCyrillic('Ð¢ÑžÐ»Ð°Ð½Ð³Ð°Ð½')
                               : sale.paymentStatus === 'PARTIAL'
-                              ? latinToCyrillic('Қисман')
-                              : latinToCyrillic('Қарз')}
+                              ? latinToCyrillic('ÒšÐ¸ÑÐ¼Ð°Ð½')
+                              : latinToCyrillic('ÒšÐ°Ñ€Ð·')}
                           </span>
                         </td>
                       </tr>
@@ -405,7 +405,7 @@ export default function CustomerProfileModern() {
         <button
           onClick={handleNewSale}
           className="fixed bottom-20 right-4 w-14 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 z-40"
-          aria-label={latinToCyrillic('Янги сотув')}
+          aria-label={latinToCyrillic('Ð¯Ð½Ð³Ð¸ ÑÐ¾Ñ‚ÑƒÐ²')}
         >
           <Plus className="w-6 h-6" />
         </button>

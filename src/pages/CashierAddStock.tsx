@@ -18,11 +18,11 @@ export default function CashierAddStock() {
   const loadProducts = async () => {
     try {
       const response = await api.get('/products');
-      // ✅ Handle new API response format
+      // âœ… Handle new API response format
       setProducts(response.data?.data || response.data);
     } catch (error) {
       console.error('Mahsulotlarni yuklashda xatolik:', error);
-      setMessage('❌ Mahsulotlarni yuklashda xatolik!');
+      setMessage('âŒ Mahsulotlarni yuklashda xatolik!');
     }
   };
 
@@ -32,7 +32,7 @@ export default function CashierAddStock() {
     setMessage('');
 
     if (!selectedProduct || !quantity) {
-      setMessage('❌ Iltimos, mahsulot va miqdorni tanlang!');
+      setMessage('âŒ Iltimos, mahsulot va miqdorni tanlang!');
       setLoading(false);
       return;
     }
@@ -41,7 +41,7 @@ export default function CashierAddStock() {
       // Mahsulotni topish
       const product = products.find(p => p.id === selectedProduct);
       if (!product) {
-        setMessage('❌ Mahsulot topilmadi!');
+        setMessage('âŒ Mahsulot topilmadi!');
         setLoading(false);
         return;
       }
@@ -54,7 +54,7 @@ export default function CashierAddStock() {
         currentStock: updatedStock
       });
 
-      setMessage(`✅ "${product.name}" mahsulotiga ${quantity} qop qo'shildi! Jami: ${updatedStock} qop`);
+      setMessage(`âœ… "${product.name}" mahsulotiga ${quantity} qop qo'shildi! Jami: ${updatedStock} qop`);
       
       // Formni tozalash
       setSelectedProduct('');
@@ -64,7 +64,7 @@ export default function CashierAddStock() {
       loadProducts();
     } catch (error: any) {
       console.error('Stock qo\'shishda xatolik:', error);
-      setMessage(`❌ Xatolik: ${error.response?.data?.error || error.message}`);
+      setMessage(`âŒ Xatolik: ${error.response?.data?.error || error.message}`);
     } finally {
       setLoading(false);
     }
@@ -95,7 +95,7 @@ export default function CashierAddStock() {
         <div className="bg-white rounded-lg shadow-md p-6">
           {message && (
             <div className={`p-4 rounded-lg mb-6 ${
-              message.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              message.includes('âœ…') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
             }`}>
               {message}
             </div>
@@ -105,7 +105,7 @@ export default function CashierAddStock() {
             {/* Mahsulot tanlash */}
             <div>
               <label htmlFor="product-select" className="block text-sm font-semibold text-gray-700 mb-2">
-                📦 Mahsulotni tanlang *
+                ðŸ“¦ Mahsulotni tanlang *
               </label>
               <select
                 id="product-select"
@@ -128,7 +128,7 @@ export default function CashierAddStock() {
             {/* Miqdor */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                📊 Qo'shiladigan miqdor (qop) *
+                ðŸ“Š Qo'shiladigan miqdor (qop) *
               </label>
               <input
                 type="number"
@@ -168,7 +168,7 @@ export default function CashierAddStock() {
               >
                 {loading ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <div className="animate-pulse rounded-full h-4 w-4 border-b-2 border-white"></div>
                     Saqlanmoqda...
                   </>
                 ) : (

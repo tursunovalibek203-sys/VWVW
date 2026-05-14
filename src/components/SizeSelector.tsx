@@ -54,9 +54,9 @@ export default function SizeSelector({
   );
 
   const getSizeIcon = (unit: string) => {
-    if (unit === 'gr') return '⚖️';
-    if (unit === 'kg') return '🏋️';
-    return '📏';
+    if (unit === 'gr') return 'âš–ï¸';
+    if (unit === 'kg') return 'ðŸ‹ï¸';
+    return 'ðŸ“';
   };
 
   const getSizeColor = (value: number) => {
@@ -87,7 +87,7 @@ export default function SizeSelector({
           />
         </div>
         <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <div className="inline-block animate-pulse rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
           <p className="text-sm text-gray-500 mt-2">Yuklanmoqda...</p>
         </div>
       </div>

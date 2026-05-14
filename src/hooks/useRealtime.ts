@@ -29,8 +29,8 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
-  const MAX_RECONNECT_ATTEMPTS = 5;
-  const RECONNECT_DELAY = 3000;
+  const MAX_RECONNECT_ATTEMPTS = 2; // Reduced from 5 to 2 for faster fail
+  const RECONNECT_DELAY = 1000; // Reduced from 3000 to 1000ms
   
   const { token } = useAuthStore();
 
@@ -48,69 +48,78 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
     const url = `${apiUrl}/api/realtime/events`;
     
     // Create EventSource with token in query param (for SSE compatibility)
-    const es = new EventSource(`${url}?token=${token}`);
-    eventSourceRef.current = es;
+    try {
+      const es = new EventSource(`${url}?token=${token}`);
+      eventSourceRef.current = es;
 
-    es.onopen = () => {
-      reconnectAttemptsRef.current = 0;
-      options.onConnected?.();
-    };
+      es.onopen = () => {
+        reconnectAttemptsRef.current = 0;
+        options.onConnected?.();
+        console.log('[Realtime] Connected successfully');
+      };
 
-    es.onmessage = (event) => {
-      try {
-        // Skip heartbeat messages
-        if (event.data.startsWith(':heartbeat')) {
-          return;
+      es.onmessage = (event) => {
+        try {
+          // Skip heartbeat messages
+          if (event.data.startsWith(':heartbeat')) {
+            return;
+          }
+
+          const data = JSON.parse(event.data) as RealtimeEvent;
+          
+          // Skip connection message
+          if ((data as any).type === 'connected') {
+            return;
+          }
+
+          // Route events to appropriate handlers
+          switch (data.type) {
+            case 'product:created':
+              options.onProductCreated?.(data.product);
+              break;
+            case 'product:updated':
+              options.onProductUpdated?.(data.product);
+              break;
+            case 'product:deleted':
+              options.onProductDeleted?.(data.product);
+              break;
+            case 'stock:adjusted':
+              options.onStockAdjusted?.(data.product);
+              break;
+            case 'product:settings:changed':
+              options.onSettingsChanged?.(data.product);
+              break;
+          }
+        } catch (error) {
+          // Event parsing error
         }
+      };
 
-        const data = JSON.parse(event.data) as RealtimeEvent;
+      es.onerror = (error) => {
+        console.warn('[Realtime] Connection error, closing');
+        options.onError?.(error);
         
-        // Skip connection message
-        if ((data as any).type === 'connected') {
-          return;
+        // Close current connection immediately
+        es.close();
+        eventSourceRef.current = null;
+        options.onDisconnected?.();
+
+        // Attempt reconnection with exponential backoff (reduced attempts)
+        if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttemptsRef.current++;
+          const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttemptsRef.current - 1);
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            console.log(`[Realtime] Reconnect attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS}`);
+            connect();
+          }, delay);
+        } else {
+          console.log('[Realtime] Max reconnection attempts reached, giving up');
         }
-
-        // Route events to appropriate handlers
-        switch (data.type) {
-          case 'product:created':
-            options.onProductCreated?.(data.product);
-            break;
-          case 'product:updated':
-            options.onProductUpdated?.(data.product);
-            break;
-          case 'product:deleted':
-            options.onProductDeleted?.(data.product);
-            break;
-          case 'stock:adjusted':
-            options.onStockAdjusted?.(data.product);
-            break;
-          case 'product:settings:changed':
-            options.onSettingsChanged?.(data.product);
-            break;
-        }
-      } catch (error) {
-        // Event parsing error
-      }
-    };
-
-    es.onerror = (error) => {
-      options.onError?.(error);
-      
-      // Close current connection
-      es.close();
-      eventSourceRef.current = null;
-      options.onDisconnected?.();
-
-      // Attempt reconnection with exponential backoff
-      if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
-        reconnectAttemptsRef.current++;
-        const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttemptsRef.current - 1);
-        
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connect();
-        }, delay);
-      }
-    };
+      };
+    } catch (error) {
+      console.error('[Realtime] Failed to create EventSource:', error);
+    }
   }, [token, options]);
 
   const disconnect = useCallback(() => {

@@ -162,7 +162,7 @@ export default function ProfessionalSecurityMonitor({
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             title="Refresh data"
           >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-pulse' : ''}`} />
           </button>
         </div>
       </div>

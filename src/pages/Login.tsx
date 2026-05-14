@@ -46,9 +46,9 @@ export default function Login() {
         requestData = { login, password };
       }
       
-      console.log('🔐 Login attempt:', { endpoint, requestData, loginType });
+      console.log('ðŸ” Login attempt:', { endpoint, requestData, loginType });
       const { data } = await api.post(endpoint, requestData);
-      console.log('✅ Login response:', data);
+      console.log('âœ… Login response:', data);
       
       if (!data.token || !data.user) {
         throw new Error('Serverdan noto\'g\'ri ma\'lumot keldi');
@@ -63,7 +63,8 @@ export default function Login() {
         navigate('/');
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.error || 'Кириш муваффақиятсиз. Фойдаланувчи номи ёки парол хато.';
+      console.error('❌ Login error:', error);
+      const errorMsg = error.details?.error || error.response?.data?.error || error.message || 'Кириш муваффақиятсиз. Фойдаланувчи номи ёки парол хато.';
       setError(errorMsg);
     } finally {
       setLoading(false);
@@ -177,7 +178,7 @@ export default function Login() {
               >
                 {loading ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-pulse"></div>
                     <span>Тизимга киришмоқда...</span>
                   </>
                 ) : (
@@ -205,7 +206,7 @@ export default function Login() {
         
         {/* Bottom text */}
         <p className="text-center text-sm text-white/70 mt-6 backdrop-blur-sm">
-          © 2025 LUX PET PLAST. Барча хуқуқлар ҳимояланган.
+          © 2025 LUX PET PLAST. Барча ҳуқуқлар ҳимояланган.
         </p>
       </div>
     </div>

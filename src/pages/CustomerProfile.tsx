@@ -53,7 +53,7 @@ export default function CustomerProfile() {
       ]);
       setCustomer(customerRes.data);
       
-      // ✅ API dan kelgan ma'lumotni to'g'ri parse qilish
+      // âœ… API dan kelgan ma'lumotni to'g'ri parse qilish
       const salesData = salesRes.data?.sales || salesRes.data || [];
       setSales(Array.isArray(salesData) ? salesData : []);
     } catch (error) {
@@ -76,12 +76,12 @@ export default function CustomerProfile() {
       await api.delete(`/customers/${id}`);
       console.log('Mijoz muvaffaqiyatli o\'chirildi');
       setShowDeleteModal(false);
-      alert('✅ Mijoz muvaffaqiyatli o\'chirildi!');
+      alert('âœ… Mijoz muvaffaqiyatli o\'chirildi!');
       navigate(isCashier ? '/cashier/customers' : '/customers');
     } catch (error: any) {
       console.error('Delete customer error:', error);
       const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Mijozni o\'chirishda xatolik yuz berdi';
-      alert('❌ Xatolik: ' + errorMsg);
+      alert('âŒ Xatolik: ' + errorMsg);
       setShowDeleteModal(false);
     }
   };
@@ -92,7 +92,7 @@ export default function CustomerProfile() {
 
     const amount = parseFloat(paymentForm.amount);
     if (!amount || amount <= 0) {
-      alert('❌ Iltimos, to\'lov summasini kiriting');
+      alert('âŒ Iltimos, to\'lov summasini kiriting');
       return;
     }
 
@@ -105,13 +105,13 @@ export default function CustomerProfile() {
         notes: paymentForm.notes
       });
 
-      alert('✅ To\'lov muvaffaqiyatli amalga oshirildi! Kassaga qo\'shildi.');
+      alert('âœ… To\'lov muvaffaqiyatli amalga oshirildi! Kassaga qo\'shildi.');
       setShowPaymentModal(false);
       setPaymentForm({ amount: '', currency: 'USD', type: 'CASH', notes: '' });
       loadCustomerData(); // Refresh customer data
     } catch (error: any) {
       console.error('To\'lov xatolik:', error);
-      alert('❌ To\'lov amalga oshirishda xatolik: ' + (error.response?.data?.error || error.message));
+      alert('âŒ To\'lov amalga oshirishda xatolik: ' + (error.response?.data?.error || error.message));
     } finally {
       setIsSubmitting(false);
     }
@@ -121,7 +121,7 @@ export default function CustomerProfile() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
+          <div className="animate-pulse rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600 text-lg">{latinToCyrillic('Yuklanmoqda...')}</p>
         </div>
       </div>
@@ -213,7 +213,7 @@ export default function CustomerProfile() {
             onClick={handleRefresh}
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm"
           >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-pulse' : ''}`} />
             {latinToCyrillic("Yangilash")}
           </button>
           <button
@@ -374,14 +374,14 @@ export default function CustomerProfile() {
                           <div key={idx} className="flex items-center gap-2">
                             <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                             <span className="font-medium">{i.product?.name || i.productName || 'N/A'}</span>
-                            <span className="text-gray-400">×</span>
+                            <span className="text-gray-400">Ã—</span>
                             <span className="bg-gray-100 px-2 py-0.5 rounded text-xs font-semibold">{i.quantity}</span>
                           </div>
                         )) || (sale.product?.name ? (
                           <div className="flex items-center gap-2">
                             <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                             <span className="font-medium">{sale.product.name}</span>
-                            <span className="text-gray-400">×</span>
+                            <span className="text-gray-400">Ã—</span>
                             <span className="bg-gray-100 px-2 py-0.5 rounded text-xs font-semibold">{sale.quantity}</span>
                           </div>
                         ) : '-')}
@@ -584,7 +584,7 @@ export default function CustomerProfile() {
               >
                 {isSubmitting ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                    <div className="animate-pulse rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
                     {latinToCyrillic("Saqlanmoqda...")}
                   </>
                 ) : (

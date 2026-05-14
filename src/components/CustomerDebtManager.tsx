@@ -103,14 +103,14 @@ const CustomerDebtManager: React.FC<CustomerDebtManagerProps> = ({
     <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200">
-          💰 {customerName} - Qarz Boshqarish
+          ðŸ’° {customerName} - Qarz Boshqarish
         </h3>
         <Button
           variant="outline"
           size="sm"
           onClick={() => onUpdate()}
         >
-          ❌
+          âŒ
         </Button>
       </div>
 
@@ -184,7 +184,7 @@ const CustomerDebtManager: React.FC<CustomerDebtManagerProps> = ({
           </div>
           {limitExceeded && (
             <div className="text-red-600 text-sm mt-1">
-              ⚠️ Qarz limitidan oshib ketishi mumkin!
+              âš ï¸ Qarz limitidan oshib ketishi mumkin!
             </div>
           )}
         </div>
@@ -210,7 +210,7 @@ const CustomerDebtManager: React.FC<CustomerDebtManagerProps> = ({
           >
             {loading ? (
               <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-r-2 border-t-2 border-l-2 border-green-500"></div>
+                <div className="animate-pulse rounded-full h-4 w-4 border-b-2 border-r-2 border-t-2 border-l-2 border-green-500"></div>
                 <span className="ml-2">To'lov...</span>
               </div>
             ) : (
@@ -228,7 +228,7 @@ const CustomerDebtManager: React.FC<CustomerDebtManagerProps> = ({
           >
             {loading ? (
               <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-r-2 border-t-2 border-l-2 border-red-500"></div>
+                <div className="animate-pulse rounded-full h-4 w-4 border-b-2 border-r-2 border-t-2 border-l-2 border-red-500"></div>
                 <span className="ml-2">Qarz...</span>
               </div>
             ) : (

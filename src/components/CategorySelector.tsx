@@ -57,12 +57,12 @@ export default function CategorySelector({
   const getCategoryIcon = (icon?: string, name?: string) => {
     if (icon) return icon;
     const lower = name?.toLowerCase() || '';
-    if (lower.includes('preform')) return '🔷';
-    if (lower.includes('qop')) return '📦';
-    if (lower.includes('qopqoq')) return '🔒';
-    if (lower.includes('stiker')) return '🏷️';
-    if (lower.includes('aksessuar')) return '🎁';
-    return '📋';
+    if (lower.includes('preform')) return 'ðŸ”·';
+    if (lower.includes('qop')) return 'ðŸ“¦';
+    if (lower.includes('qopqoq')) return 'ðŸ”’';
+    if (lower.includes('stiker')) return 'ðŸ·ï¸';
+    if (lower.includes('aksessuar')) return 'ðŸŽ';
+    return 'ðŸ“‹';
   };
 
   const getCategoryColor = (color?: string, name?: string) => {
@@ -88,7 +88,7 @@ export default function CategorySelector({
           />
         </div>
         <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <div className="inline-block animate-pulse rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
           <p className="text-sm text-gray-500 mt-2">Yuklanmoqda...</p>
         </div>
       </div>
@@ -109,7 +109,7 @@ export default function CategorySelector({
 
       {filteredCategories.length === 0 ? (
         <div className="text-center py-8">
-          <div className="text-6xl mb-4">📦</div>
+          <div className="text-6xl mb-4">ðŸ“¦</div>
           <p className="text-gray-500 text-lg mb-2">{latinToCyrillic("Hozircha kategoriyalar yo'q")}</p>
           <p className="text-gray-400 text-sm">{latinToCyrillic("Yangi tur qo'shish orqali boshlang")}</p>
         </div>

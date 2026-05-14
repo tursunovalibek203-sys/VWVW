@@ -102,3 +102,4 @@ capacitor.config.ts
 render.yaml
 render.env
 railway.yaml
+.vercel

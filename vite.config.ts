@@ -28,16 +28,30 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    middlewareMode: false,
+    sourcemap: false,
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      port: 3000,
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:5003',
         changeOrigin: true,
+        ws: true,
       },
     },
     fs: {
       // Exclude crewai-ts from dev server file system
       allow: ['..'],
       deny: ['node_modules/crewai-ts'],
+    },
+    watch: {
+      usePolling: false,
+      interval: 300,
+      batchTimeout: 300,
+      ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**'],
     },
   },
   preview: {
@@ -49,13 +63,31 @@ export default defineConfig({
     Buffer: 'globalThis.Buffer',
   },
   optimizeDeps: {
+    include: ['react', 'react-dom', 'axios', 'recharts'],
     exclude: ['crewai-ts', 'node-fasttext', 'fastembed', '@xenova/transformers', 'pg', 'fs', 'node:fs', 'fs/promises', 'path', 'crypto', 'events', 'child_process', 'stream', 'mysql2', 'mysql2/promise', 'formdata-node/file-from-path'],
+    esbuildOptions: {
+      target: 'es2020',
+    },
   },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    minify: 'terser',
+    sourcemap: false,
+    target: 'es2020',
+    reportCompressedSize: false,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       external: ['crewai-ts'],
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-vendor': ['lucide-react', 'clsx', 'tailwind-merge'],
+          'charts-vendor': ['recharts'],
+          'forms-vendor': ['react-hook-form', '@hookform/resolvers'],
+          'data-vendor': ['axios', 'zustand', 'date-fns'],
+        },
+      },
     },
   },
 })

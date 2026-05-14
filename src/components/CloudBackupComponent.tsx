@@ -463,7 +463,7 @@ export default function CloudBackupComponent({ className = '' }: CloudBackupComp
           >
             {isUploading ? (
               <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
+                <RefreshCw className="w-4 h-4 animate-pulse" />
                 Uploading... {uploadProgress}%
               </>
             ) : (

@@ -153,10 +153,10 @@ export default function CustomerPortal() {
   };
 
   const getCustomerLevel = (points: number) => {
-    if (points >= 5000) return { name: 'VIP', emoji: '👑', color: 'bg-purple-500' };
-    if (points >= 2000) return { name: 'Gold', emoji: '🏆', color: 'bg-yellow-500' };
-    if (points >= 1000) return { name: 'Silver', emoji: '⭐', color: 'bg-gray-500' };
-    return { name: 'Bronze', emoji: '🥉', color: 'bg-orange-500' };
+    if (points >= 5000) return { name: 'VIP', emoji: 'ðŸ‘‘', color: 'bg-purple-500' };
+    if (points >= 2000) return { name: 'Gold', emoji: 'ðŸ†', color: 'bg-yellow-500' };
+    if (points >= 1000) return { name: 'Silver', emoji: 'â­', color: 'bg-gray-500' };
+    return { name: 'Bronze', emoji: 'ðŸ¥‰', color: 'bg-orange-500' };
   };
 
   const addToCart = (product: Product, quantity: number) => {
@@ -195,7 +195,7 @@ export default function CustomerPortal() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+        <div className="animate-pulse rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
       </div>
     );
   }
@@ -406,7 +406,7 @@ export default function CustomerPortal() {
                           <div key={index} className="flex justify-between items-center">
                             <div>
                               <h4 className="font-semibold">{item.productName}</h4>
-                              <p className="text-sm text-gray-600">{item.quantityBags} qop × {item.pricePerBag.toLocaleString()}</p>
+                              <p className="text-sm text-gray-600">{item.quantityBags} qop Ã— {item.pricePerBag.toLocaleString()}</p>
                             </div>
                             <p className="font-semibold">{item.subtotal.toLocaleString()} so'm</p>
                           </div>
@@ -708,19 +708,19 @@ export default function CustomerPortal() {
                     <h3 className="font-semibold mb-4">Video Darsliklar</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="border rounded-lg p-4">
-                        <h4 className="font-semibold mb-2">📹 Ro'yxatdan o'tish</h4>
+                        <h4 className="font-semibold mb-2">ðŸ“¹ Ro'yxatdan o'tish</h4>
                         <p className="text-sm text-gray-600">Tizimdan to'liq foydalanish uchun ro'yxatdan o'tish</p>
                       </div>
                       <div className="border rounded-lg p-4">
-                        <h4 className="font-semibold mb-2">📹 Buyurtma berish</h4>
+                        <h4 className="font-semibold mb-2">ðŸ“¹ Buyurtma berish</h4>
                         <p className="text-sm text-gray-600">Mahsulotlarni tanlash va buyurtma qilish</p>
                       </div>
                       <div className="border rounded-lg p-4">
-                        <h4 className="font-semibold mb-2">📹 To'lov qilish</h4>
+                        <h4 className="font-semibold mb-2">ðŸ“¹ To'lov qilish</h4>
                         <p className="text-sm text-gray-600">Turli to'lov usullari bilan tanishish</p>
                       </div>
                       <div className="border rounded-lg p-4">
-                        <h4 className="font-semibold mb-2">📹 Bonus to'plash</h4>
+                        <h4 className="font-semibold mb-2">ðŸ“¹ Bonus to'plash</h4>
                         <p className="text-sm text-gray-600">Sadoqat dasturidan foydalanish</p>
                       </div>
                     </div>

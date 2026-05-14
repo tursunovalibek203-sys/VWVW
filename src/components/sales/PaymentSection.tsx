@@ -205,7 +205,7 @@ export const PaymentSection = ({
         >
           {isSubmitting ? (
             <>
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+              <div className="animate-pulse rounded-full h-6 w-6 border-b-2 border-white"></div>
               {latinToCyrillic('Saqlanmoqda...')}
             </>
           ) : (

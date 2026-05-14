@@ -25,19 +25,22 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onClose }) => {
 
     const duration = toast.duration || 5000;
     const interval = 50;
-    const decrement = (100 * interval) / duration;
+    const startedAt = Date.now();
 
-    const timer = setInterval(() => {
-      setProgress((prev) => {
-        if (prev <= decrement) {
-          onClose(toast.id);
-          return 0;
-        }
-        return prev - decrement;
-      });
+    const closeTimer = setTimeout(() => {
+      onClose(toast.id);
+    }, duration);
+
+    const progressTimer = setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      const next = Math.max(0, 100 - (elapsed / duration) * 100);
+      setProgress(next);
     }, interval);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearTimeout(closeTimer);
+      clearInterval(progressTimer);
+    };
   }, [toast.id, toast.duration, toast.persistent, onClose]);
 
   const icons = {

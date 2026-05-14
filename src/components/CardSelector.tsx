@@ -49,11 +49,11 @@ export default function CardSelector({
 
   const getCardIcon = (name: string) => {
     const lower = name.toLowerCase();
-    if (lower.includes('standart')) return '📋';
-    if (lower.includes('premium')) return '⭐';
-    if (lower.includes('ekologik') || lower.includes('eco')) return '🌱';
-    if (lower.includes('luxury')) return '👑';
-    return '🃏';
+    if (lower.includes('standart')) return 'ðŸ“‹';
+    if (lower.includes('premium')) return 'â­';
+    if (lower.includes('ekologik') || lower.includes('eco')) return 'ðŸŒ±';
+    if (lower.includes('luxury')) return 'ðŸ‘‘';
+    return 'ðŸƒ';
   };
 
   const getCardColor = (name: string) => {
@@ -82,7 +82,7 @@ export default function CardSelector({
           />
         </div>
         <div className="text-center py-4">
-          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+          <div className="inline-block animate-pulse rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
           <p className="text-sm text-gray-500 mt-2">Yuklanmoqda...</p>
         </div>
       </div>

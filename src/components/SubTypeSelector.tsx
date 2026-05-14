@@ -56,13 +56,13 @@ export default function SubTypeSelector({
 
   const getSubTypeIcon = (subType: string) => {
     const lower = subType.toLowerCase();
-    if (lower.includes('gidro')) return '💧';
-    if (lower.includes('karbonat')) return '🫧';
-    if (lower.includes('standart')) return '⭐';
-    if (lower.includes('premium')) return '👑';
-    if (lower.includes('ekologik')) return '🌱';
-    if (lower.includes('luxury')) return '💎';
-    return '📦';
+    if (lower.includes('gidro')) return 'ðŸ’§';
+    if (lower.includes('karbonat')) return 'ðŸ«§';
+    if (lower.includes('standart')) return 'â­';
+    if (lower.includes('premium')) return 'ðŸ‘‘';
+    if (lower.includes('ekologik')) return 'ðŸŒ±';
+    if (lower.includes('luxury')) return 'ðŸ’Ž';
+    return 'ðŸ“¦';
   };
 
   const getSubTypeColor = (subType: string) => {
@@ -105,7 +105,7 @@ export default function SubTypeSelector({
           />
         </div>
         <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <div className="inline-block animate-pulse rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
           <p className="text-sm text-gray-500 mt-2">Yuklanmoqda...</p>
         </div>
       </div>

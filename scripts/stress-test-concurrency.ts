@@ -50,7 +50,7 @@ async function setupTestData() {
 
   // Create test customer
   const customer = await prisma.customer.upsert({
-    where: { phone: 'TEST_STRESS_CUSTOMER' },
+     where:{ phone: 'TEST_STRESS_CUSTOMER' },
     update: {},
     create: {
       name: 'Test Stress Customer',

@@ -201,7 +201,7 @@ export default function ReportsModern() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={latinToCyrillic("Ҳисботларни қидириш...")}
+                placeholder={latinToCyrillic("Ò²Ð¸ÑÐ±Ð¾Ñ‚Ð»Ð°Ñ€Ð½Ð¸ Ò›Ð¸Ð´Ð¸Ñ€Ð¸Ñˆ...")}
                 className="input-modern w-full pl-12"
               />
             </div>
@@ -220,7 +220,7 @@ export default function ReportsModern() {
               >
                 {types.map(type => (
                   <option key={type} value={type}>
-                    {type === 'all' ? latinToCyrillic("Барчаси") : getTypeText(type)}
+                    {type === 'all' ? latinToCyrillic("Ð‘Ð°Ñ€Ñ‡Ð°ÑÐ¸") : getTypeText(type)}
                   </option>
                 ))}
               </select>
@@ -240,7 +240,7 @@ export default function ReportsModern() {
               >
                 {statuses.map(status => (
                   <option key={status} value={status}>
-                    {status === 'all' ? latinToCyrillic("Барчаси") : getStatusText(status)}
+                    {status === 'all' ? latinToCyrillic("Ð‘Ð°Ñ€Ñ‡Ð°ÑÐ¸") : getStatusText(status)}
                   </option>
                 ))}
               </select>
@@ -256,8 +256,8 @@ export default function ReportsModern() {
               disabled={loading}
               className="btn-gradient-secondary px-4 py-3 flex items-center gap-2 disabled:opacity-50"
             >
-              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-              {latinToCyrillic("Янгилаш")}
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} />
+              {latinToCyrillic("Ð¯Ð½Ð³Ð¸Ð»Ð°Ñˆ")}
             </button>
             
             {/* Generate Report Button */}
@@ -268,7 +268,7 @@ export default function ReportsModern() {
               className="btn-gradient-primary px-6 py-3 flex items-center gap-2 disabled:opacity-50"
             >
               <Plus className="w-5 h-5" />
-              {latinToCyrillic("Янги Ҳисбот")}
+              {latinToCyrillic("Ð¯Ð½Ð³Ð¸ Ò²Ð¸ÑÐ±Ð¾Ñ‚")}
             </button>
           </div>
         </div>
@@ -281,7 +281,7 @@ export default function ReportsModern() {
                 <FileText className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("Жами Ҳисботлар")}</p>
+                <p className="text-sm text-secondary">{latinToCyrillic("Ð–Ð°Ð¼Ð¸ Ò²Ð¸ÑÐ±Ð¾Ñ‚Ð»Ð°Ñ€")}</p>
                 <p className="text-2xl font-bold text-primary">{reports.length}</p>
               </div>
             </div>
@@ -293,7 +293,7 @@ export default function ReportsModern() {
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("Яратилган")}</p>
+                <p className="text-sm text-secondary">{latinToCyrillic("Ð¯Ñ€Ð°Ñ‚Ð¸Ð»Ð³Ð°Ð½")}</p>
                 <p className="text-2xl font-bold text-primary">
                   {reports.filter(r => r.status === 'generated').length}
                 </p>
@@ -307,7 +307,7 @@ export default function ReportsModern() {
                 <BarChart3 className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("Кутмоқда")}</p>
+                <p className="text-sm text-secondary">{latinToCyrillic("ÐšÑƒÑ‚Ð¼Ð¾Ò›Ð´Ð°")}</p>
                 <p className="text-2xl font-bold text-primary">
                   {reports.filter(r => r.status === 'pending').length}
                 </p>
@@ -321,7 +321,7 @@ export default function ReportsModern() {
                 <PieChart className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("Хатолик")}</p>
+                <p className="text-sm text-secondary">{latinToCyrillic("Ð¥Ð°Ñ‚Ð¾Ð»Ð¸Ðº")}</p>
                 <p className="text-2xl font-bold text-primary">
                   {reports.filter(r => r.status === 'failed').length}
                 </p>
@@ -335,7 +335,7 @@ export default function ReportsModern() {
           <div className="glass-card-light p-12">
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-16 h-16">
-                <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
+                <div className="animate-pulse rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
               </div>
               <p className="text-lg font-semibold text-primary mb-4">{latinToCyrillic("Yuklanmoqda...")}</p>
             </div>
@@ -433,10 +433,10 @@ export default function ReportsModern() {
                 <FileText className="w-8 h-8 text-gray-400" />
               </div>
               <h3 className="text-lg font-semibold text-primary mb-2">
-                {latinToCyrillic("Ҳисботлар топилмади")}
+                {latinToCyrillic("Ò²Ð¸ÑÐ±Ð¾Ñ‚Ð»Ð°Ñ€ Ñ‚Ð¾Ð¿Ð¸Ð»Ð¼Ð°Ð´Ð¸")}
               </h3>
               <p className="text-secondary">
-                {latinToCyrillic("Қидириш шартларини ўзгартириб қайта уриниб кўринг")}
+                {latinToCyrillic("ÒšÐ¸Ð´Ð¸Ñ€Ð¸Ñˆ ÑˆÐ°Ñ€Ñ‚Ð»Ð°Ñ€Ð¸Ð½Ð¸ ÑžÐ·Ð³Ð°Ñ€Ñ‚Ð¸Ñ€Ð¸Ð± Ò›Ð°Ð¹Ñ‚Ð° ÑƒÑ€Ð¸Ð½Ð¸Ð± ÐºÑžÑ€Ð¸Ð½Ð³")}
               </p>
             </div>
           </div>

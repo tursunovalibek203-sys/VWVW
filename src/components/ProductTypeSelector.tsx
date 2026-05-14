@@ -47,12 +47,12 @@ export default function ProductTypeSelector({
 
   const getTypeIcon = (name: string) => {
     const lower = name.toLowerCase();
-    if (lower.includes('preform')) return '🔷';
-    if (lower.includes('qop')) return '📦';
-    if (lower.includes('qopqoq')) return '🔒';
-    if (lower.includes('stiker')) return '🏷️';
-    if (lower.includes('aksessuar')) return '🎁';
-    return '📋';
+    if (lower.includes('preform')) return 'ðŸ”·';
+    if (lower.includes('qop')) return 'ðŸ“¦';
+    if (lower.includes('qopqoq')) return 'ðŸ”’';
+    if (lower.includes('stiker')) return 'ðŸ·ï¸';
+    if (lower.includes('aksessuar')) return 'ðŸŽ';
+    return 'ðŸ“‹';
   };
 
   const getTypeColor = (name: string) => {
@@ -77,7 +77,7 @@ export default function ProductTypeSelector({
           />
         </div>
         <div className="text-center py-4">
-          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+          <div className="inline-block animate-pulse rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
           <p className="text-sm text-gray-500 mt-2">Yuklanmoqda...</p>
         </div>
       </div>
@@ -139,7 +139,7 @@ export default function ProductTypeSelector({
                         ? 'bg-white text-green-600'
                         : 'bg-yellow-100 text-yellow-800'
                     }`}>
-                      🃏 {type.defaultCard}
+                      ðŸƒ {type.defaultCard}
                     </span>
                   )}
                 </div>

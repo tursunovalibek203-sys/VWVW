@@ -21,7 +21,7 @@ export const animations3D = {
   float: 'animate-float-3d',
   rotate: 'animate-rotate-3d',
   pulse: 'animate-pulse-3d',
-  spin: 'animate-spin-3d',
+  spin: 'animate-pulse-3d',
 };
 
 // 3D color gradients

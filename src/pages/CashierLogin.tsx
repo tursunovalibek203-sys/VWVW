@@ -18,7 +18,7 @@ export default function CashierLogin() {
   useEffect(() => {
     const session = restoreLastSession();
     if (session) {
-      console.log('🔄 Sessiya tiklanmoqda:', session.path);
+      console.log('ðŸ”„ Sessiya tiklanmoqda:', session.path);
       // Agar avvalgi sahifa saqlangan bo'lsa, uni eslatish
       setError(`⏰ Uzoq vaftdan keyin qayta login qiling. Avvalgi sahifa: ${session.path}`);
     }
@@ -68,7 +68,7 @@ export default function CashierLogin() {
         {/* Header */}
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-2xl font-bold">💰</span>
+            <span className="text-white text-2xl font-bold">ðŸ’°</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-green-800 mb-2">
             Кассир Тизими
@@ -114,7 +114,7 @@ export default function CashierLogin() {
           >
             {loading ? (
               <span className="flex items-center justify-center">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-pulse mr-2"></div>
                 Кириш...
               </span>
             ) : (
@@ -138,7 +138,7 @@ export default function CashierLogin() {
         {/* Info */}
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800 text-center">
-            <strong>Эслатма:</strong> Кассирлар фақат sotuvлар билан ишлай олади
+            <strong>Эслатма:</strong> Кассирлар фақат sotuvlar билан ишлай олади
           </p>
         </div>
       </div>

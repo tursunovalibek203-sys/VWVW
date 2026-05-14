@@ -184,7 +184,7 @@ export default function SalesHistory() {
   const formatCurrency = (amount: number, currency: string = 'USD') => {
     if (currency === 'USD') return `$${amount.toLocaleString()}`;
     if (currency === 'UZS') return `${amount.toLocaleString()} so'm`;
-    if (currency === 'EUR') return `€${amount.toLocaleString()}`;
+    if (currency === 'EUR') return `â‚¬${amount.toLocaleString()}`;
     return amount.toLocaleString();
   };
 
@@ -192,7 +192,7 @@ export default function SalesHistory() {
     return (
       <Card>
         <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-pulse rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Yuklanmoqda...</p>
         </div>
       </Card>
@@ -211,7 +211,7 @@ export default function SalesHistory() {
               : 'text-gray-600 hover:text-gray-800'
           }`}
         >
-          📜 Tarix
+          ðŸ“œ Tarix
         </button>
         <button
           onClick={() => setActiveTab('stats')}
@@ -221,7 +221,7 @@ export default function SalesHistory() {
               : 'text-gray-600 hover:text-gray-800'
           }`}
         >
-          📊 Statistika
+          ðŸ“Š Statistika
         </button>
         <button
           onClick={() => setActiveTab('suspicious')}
@@ -231,7 +231,7 @@ export default function SalesHistory() {
               : 'text-gray-600 hover:text-gray-800'
           }`}
         >
-          ⚠️ Shubhali Faoliyat
+          âš ï¸ Shubhali Faoliyat
           {suspicious.length > 0 && (
             <span className="ml-2 px-2 py-1 text-xs bg-red-500 text-white rounded-full">
               {suspicious.length}
@@ -246,7 +246,7 @@ export default function SalesHistory() {
               : 'text-gray-600 hover:text-gray-800'
           }`}
         >
-          📈 Trend
+          ðŸ“ˆ Trend
         </button>
       </div>
 
@@ -302,7 +302,7 @@ export default function SalesHistory() {
                 variant="secondary"
                 className="w-full"
               >
-                🔄 Tozalash
+                ðŸ”„ Tozalash
               </Button>
             </div>
           </div>
@@ -325,11 +325,11 @@ export default function SalesHistory() {
                         {log.action}
                       </span>
                       <p className="text-sm text-gray-600">
-                        👤 {log.user.name} ({log.user.role})
+                        ðŸ‘¤ {log.user.name} ({log.user.role})
                       </p>
                       {log.changes.customerName && (
                         <p className="text-sm text-gray-600">
-                          👥 Mijoz: {log.changes.customerName}
+                          ðŸ‘¥ Mijoz: {log.changes.customerName}
                         </p>
                       )}
                     </div>
@@ -341,16 +341,16 @@ export default function SalesHistory() {
                   {log.changes.details.totalAmount && (
                     <div className="mt-2 text-sm">
                       <p className="text-gray-700">
-                        💰 Jami: {formatCurrency(log.changes.details.totalAmount, log.changes.details.currency)}
+                        ðŸ’° Jami: {formatCurrency(log.changes.details.totalAmount, log.changes.details.currency)}
                       </p>
                       {log.changes.details.paidAmount !== undefined && (
                         <p className="text-gray-700">
-                          💳 To'langan: {formatCurrency(log.changes.details.paidAmount, log.changes.details.currency)}
+                          ðŸ’³ To'langan: {formatCurrency(log.changes.details.paidAmount, log.changes.details.currency)}
                         </p>
                       )}
                       {log.changes.details.paymentStatus && (
                         <p className="text-gray-700">
-                          📊 Holat: {log.changes.details.paymentStatus}
+                          ðŸ“Š Holat: {log.changes.details.paymentStatus}
                         </p>
                       )}
                     </div>
@@ -358,11 +358,11 @@ export default function SalesHistory() {
 
                   {log.changes.details.products && log.changes.details.products.length > 0 && (
                     <div className="mt-2">
-                      <p className="text-sm font-medium text-gray-700">📦 Mahsulotlar:</p>
+                      <p className="text-sm font-medium text-gray-700">ðŸ“¦ Mahsulotlar:</p>
                       <ul className="text-sm text-gray-600 ml-4">
                         {log.changes.details.products.map((product, idx) => (
                           <li key={idx}>
-                            {product.productName} - {product.quantity} qop × {formatCurrency(product.price, log.changes.details.currency)}
+                            {product.productName} - {product.quantity} qop Ã— {formatCurrency(product.price, log.changes.details.currency)}
                           </li>
                         ))}
                       </ul>
@@ -371,19 +371,19 @@ export default function SalesHistory() {
 
                   {log.changes.details.notes && (
                     <p className="mt-2 text-sm text-gray-600">
-                      📝 {log.changes.details.notes}
+                      ðŸ“ {log.changes.details.notes}
                     </p>
                   )}
 
                   {log.changes.details.reason && (
                     <p className="mt-2 text-sm text-red-600">
-                      ❌ Sabab: {log.changes.details.reason}
+                      âŒ Sabab: {log.changes.details.reason}
                     </p>
                   )}
 
                   {log.changes.ipAddress && (
                     <p className="mt-2 text-xs text-gray-400">
-                      🌐 IP: {log.changes.ipAddress}
+                      ðŸŒ IP: {log.changes.ipAddress}
                     </p>
                   )}
                 </div>
@@ -493,7 +493,7 @@ export default function SalesHistory() {
           <div className="space-y-4">
             {suspicious.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-green-600 text-lg">✅ Shubhali faoliyat topilmadi</p>
+                <p className="text-green-600 text-lg">âœ… Shubhali faoliyat topilmadi</p>
                 <p className="text-gray-500 text-sm mt-2">Barcha harakatlar normal</p>
               </div>
             ) : (

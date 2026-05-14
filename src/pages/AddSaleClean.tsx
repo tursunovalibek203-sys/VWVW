@@ -9,14 +9,14 @@
  * 5. 38 ruchka: 1000 dona/qop, dona narxi: $0.010
  * 
  * Komplekt qoidalari:
- * - 15, 21, 26, 30gr preform → 28 krishka (faqat krishka)
- * - 36gr preform → 28 krishka + 28 ruchka
- * - 52, 70gr preform → 38 krishka + 38 ruchka
- * - 75, 80, 85, 86, 135gr preform → 48 krishka + 48 ruchka
+ * - 15, 21, 26, 30gr preform â†’ 28 krishka (faqat krishka)
+ * - 36gr preform â†’ 28 krishka + 28 ruchka
+ * - 52, 70gr preform â†’ 38 krishka + 38 ruchka
+ * - 75, 80, 85, 86, 135gr preform â†’ 48 krishka + 48 ruchka
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Package, ShoppingCart, User } from 'lucide-react';
+import { ArrowLeft, Package, ShoppingCart, User, WifiOff, AlertCircle, RefreshCw } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { latinToCyrillic } from '../lib/transliterator';
 import { useSaleForm } from '../hooks/useSaleForm';
@@ -25,6 +25,7 @@ import { filterProductsByCategory, getCurrencySymbol, getDisplayAmount } from '.
 import { useRealtime } from '../hooks/useRealtime';
 import api from '../lib/professionalApi';
 import { extractArray } from '../lib/apiHelpers';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import type { Product } from '../types';
 
 // Product Section Component - Yangi tip kartochkalar
@@ -61,7 +62,7 @@ const ProductSection = ({
   const allPreforms = filteredProducts.filter((p) => {
     const name = p.name?.toLowerCase() || '';
     const warehouse = p.warehouse?.toLowerCase() || '';
-    return warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|гр|г)/.test(name);
+    return warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|Ð³Ñ€|Ð³)/.test(name);
   });
 
   // Preformlarni gram bo'yicha dinamik guruhlash - ma'lumotdan avtomatik olish
@@ -70,7 +71,7 @@ const ProductSection = ({
   allPreforms.forEach((p) => {
     const name = p.name?.toLowerCase() || '';
     // Gramajni nomdan olish (96g, 96gr, 96 g, va h.k.)
-    const gramMatch = name.match(/(\d+)\s*(gr|g|гр|г)\b/i);
+    const gramMatch = name.match(/(\d+)\s*(gr|g|Ð³Ñ€|Ð³)\b/i);
     if (gramMatch) {
       const gramSize = parseInt(gramMatch[1]);
       if (!gramSizeMap.has(gramSize)) {
@@ -98,7 +99,7 @@ const ProductSection = ({
   // Gramaj aniqlanmagan preformlar uchun alohida guruh
   const undefinedGramPreforms = allPreforms.filter((p) => {
     const name = p.name?.toLowerCase() || '';
-    return !/\d+\s*(gr|g|гр|г)\b/i.test(name);
+    return !/\d+\s*(gr|g|Ð³Ñ€|Ð³)\b/i.test(name);
   });
   if (undefinedGramPreforms.length > 0) {
     preformGroups.push({
@@ -120,7 +121,7 @@ const ProductSection = ({
   allKrishka.forEach((p) => {
     const name = p.name?.toLowerCase() || '';
     // O'lchamni nomdan olish (28mm, 28 mm, 28-mm, va h.k.)
-    let sizeMatch = name.match(/(\d+)\s*(mm|ml|мм|мл)/i);
+    let sizeMatch = name.match(/(\d+)\s*(mm|ml|Ð¼Ð¼|Ð¼Ð»)/i);
     if (!sizeMatch) {
       // Agar mm yo'q bo'lsa, krishka yoki qopqoq dan keyingi/o'ndingi raqamni qidirish
       sizeMatch = name.match(/(?:krishka|qopqoq|cap).*?(\d{2})|(\d{2}).*?(?:krishka|qopqoq|cap)/i);
@@ -155,7 +156,7 @@ const ProductSection = ({
   // O'lcham aniqlanmagan krishkalar uchun alohida guruh
   const undefinedSizeKrishka = allKrishka.filter((p) => {
     const name = p.name?.toLowerCase() || '';
-    const hasSize = /(\d+)\s*(mm|ml|мм|мл)/i.test(name) || 
+    const hasSize = /(\d+)\s*(mm|ml|Ð¼Ð¼|Ð¼Ð»)/i.test(name) || 
                     /(?:krishka|qopqoq|cap).*?(\d{2})|(\d{2}).*?(?:krishka|qopqoq|cap)/i.test(name);
     return !hasSize;
   });
@@ -179,7 +180,7 @@ const ProductSection = ({
   allRuchka.forEach((p) => {
     const name = p.name?.toLowerCase() || '';
     // O'lchamni nomdan olish (28mm, 28 mm, 28-mm, va h.k.)
-    let sizeMatch = name.match(/(\d+)\s*(mm|ml|мм|мл)/i);
+    let sizeMatch = name.match(/(\d+)\s*(mm|ml|Ð¼Ð¼|Ð¼Ð»)/i);
     if (!sizeMatch) {
       // Agar mm yo'q bo'lsa, ruchka yoki handle dan keyingi/o'ndingi raqamni qidirish
       sizeMatch = name.match(/(?:ruchka|handle).*?(\d{2})|(\d{2}).*?(?:ruchka|handle)/i);
@@ -214,7 +215,7 @@ const ProductSection = ({
   // O'lcham aniqlanmagan ruchkalar uchun alohida guruh
   const undefinedSizeRuchka = allRuchka.filter((p) => {
     const name = p.name?.toLowerCase() || '';
-    const hasSize = /(\d+)\s*(mm|ml|мм|мл)/i.test(name) || 
+    const hasSize = /(\d+)\s*(mm|ml|Ð¼Ð¼|Ð¼Ð»)/i.test(name) || 
                     /(?:ruchka|handle).*?(\d{2})|(\d{2}).*?(?:ruchka|handle)/i.test(name);
     return !hasSize;
   });
@@ -255,7 +256,7 @@ const ProductSection = ({
   const otherProducts = filteredProducts.filter((p) => {
     const name = p.name?.toLowerCase() || '';
     const warehouse = p.warehouse?.toLowerCase() || '';
-    const isPreform = warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|гр|г)/.test(name);
+    const isPreform = warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|Ð³Ñ€|Ð³)/.test(name);
     const isKrishka = warehouse === 'krishka' || name.includes('krishka') || name.includes('qopqoq') || name.includes('cap');
     const isRuchka = warehouse === 'ruchka' || name.includes('ruchka') || name.includes('handle');
     const isCustom = warehouse.startsWith('custom-');
@@ -394,9 +395,12 @@ export default function AddSaleClean() {
   const location = useLocation();
   const editSale = location.state?.editSale;
   const orderData = location.state?.orderData;
+  const { isOnline } = useOnlineStatus();
 
   const saleForm = useSaleForm({ editSale, orderData });
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Real-time product sync
   const handleProductUpdate = useCallback((updatedProduct: Product) => {
@@ -413,7 +417,7 @@ export default function AddSaleClean() {
     if (saleForm.form.items.length > 0) {
       const updatedItems = saleForm.form.items.map(item => {
         if (item.productId === updatedProduct.id) {
-          console.log('🔄 Realtime sync updating item:', item.productName, 'Old price:', item.pricePerBag, 'New price:', updatedProduct.pricePerBag);
+          console.log('ðŸ”„ Realtime sync updating item:', item.productName, 'Old price:', item.pricePerBag, 'New price:', updatedProduct.pricePerBag);
           return {
             ...item,
             // Faqat ombor qoldig'ini yangilaymiz, narxni yo'q
@@ -428,7 +432,7 @@ export default function AddSaleClean() {
       
       // Update cart with new product data
       if (JSON.stringify(updatedItems) !== JSON.stringify(saleForm.form.items)) {
-        console.log('🔄 Realtime sync: Updating cart items');
+        console.log('ðŸ”„ Realtime sync: Updating cart items');
         saleForm.form.items = updatedItems;
       }
     }
@@ -440,41 +444,61 @@ export default function AddSaleClean() {
     );
   }, [saleForm.setProducts]);
 
-  // Initialize real-time connection
+  // Initialize real-time connection only when online
   useRealtime({
     onProductCreated: handleProductUpdate,
     onProductUpdated: handleProductUpdate,
     onStockAdjusted: handleProductUpdate,
     onProductDeleted: handleProductDelete,
     onSettingsChanged: handleProductUpdate,
+    onError: () => console.warn('[Realtime] Connection error - will retry'),
   });
 
   // Load initial data - to'g'ridan-to'g'ri API dan
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [productsRes, customersRes] = await Promise.all([
-          api.get('/products'),
-          api.get('/customers'),
-        ]);
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    // Add timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setError('Loading timeout. Please check your connection.');
+      console.warn('Loading timeout reached for initial data');
+    }, 10000); // 10 second timeout
+    
+    try {
+      const [productsRes, customersRes] = await Promise.all([
+        api.get('/products'),
+        api.get('/customers'),
+      ]);
+      clearTimeout(timeout);
 
-        // ✅ Handle standardized API response format
-        const productsData = extractArray<Product>(productsRes, []);
-        const customersData = extractArray<any>(customersRes, []);
-        
-        if (productsData.length > 0) {
-          saleForm.setProducts(productsData);
-        }
-        if (customersData.length > 0) {
-          saleForm.setCustomers(customersData);
-        }
-      } catch (error) {
-        // Silently handle error - UI shows empty state
+      // âœ… Handle standardized API response format
+      const productsData = extractArray<Product>(productsRes, []);
+      const customersData = extractArray<any>(customersRes, []);
+      
+      if (productsData.length > 0) {
+        saleForm.setProducts(productsData);
       }
-    };
+      if (customersData.length > 0) {
+        saleForm.setCustomers(customersData);
+      }
+    } catch (error: any) {
+      clearTimeout(timeout);
+      console.error('Failed to load initial data:', error);
+      if (error.code === 'NETWORK_ERROR' || !error.response) {
+        setError('Internet not connected. Cannot load products.');
+      } else {
+        setError('Failed to load data. Please try again.');
+      }
+    } finally {
+      clearTimeout(timeout);
+      setLoading(false);
+    }
+  }, [saleForm.setProducts, saleForm.setCustomers]);
 
+  useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   // Sahifa ko'rinib qolganda maxsulotlarni yangilash (bir xil tabda)
   useEffect(() => {
@@ -483,7 +507,7 @@ export default function AddSaleClean() {
         const reloadProducts = async () => {
           try {
             const res = await api.get('/products');
-            // ✅ Handle standardized API response format
+            // âœ… Handle standardized API response format
             const productsData = extractArray<Product>(res, []);
             if (productsData.length > 0) {
               saleForm.setProducts(productsData);
@@ -534,7 +558,7 @@ export default function AddSaleClean() {
     try {
       await saleForm.submitSale();
     } catch (error: any) {
-      console.error('❌ Sotuv yaratishda xatolik:', error);
+      console.error('âŒ Sotuv yaratishda xatolik:', error);
       // Extract detailed error message from server response
       let errorMessage = 'Sotuv yaratib bo\'lmadi';
       if (error.response?.data?.error?.message) {
@@ -552,9 +576,59 @@ export default function AddSaleClean() {
     }
   }, [saleForm]);
 
+  // Handle retry
+  const handleRetry = useCallback(() => {
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="animate-pulse rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="modern-bg page-container">
       <div className="content-wrapper">
+        {/* Offline Warning Banner */}
+        {!isOnline && (
+          <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-4 mb-4 flex items-center gap-3">
+            <WifiOff className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                Internet not connected. Data will not be updated.
+              </p>
+            </div>
+            <button
+              onClick={handleRetry}
+              className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Error Banner */}
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4 mb-4 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                {error}
+              </p>
+            </div>
+            <button
+              onClick={handleRetry}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Retry
+            </button>
+          </div>
+        )}
         {/* Header */}
         <div className="glass-card p-4 mb-4 fade-in">
           <div className="flex items-center justify-between">

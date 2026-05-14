@@ -124,7 +124,7 @@ export default function ProfessionalDatabaseMonitor({
     return (
       <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-8 ${className}`}>
         <div className="flex items-center justify-center h-64">
-          <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+          <RefreshCw className="w-8 h-8 text-blue-600 animate-pulse" />
         </div>
       </div>
     );
@@ -175,7 +175,7 @@ export default function ProfessionalDatabaseMonitor({
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             title="Refresh data"
           >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-pulse' : ''}`} />
           </button>
         </div>
       </div>

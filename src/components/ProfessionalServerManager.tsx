@@ -353,7 +353,7 @@ export default function ProfessionalServerManager({
       case 'restarting':
       case 'in_progress':
       case 'pending':
-        return <RefreshCw className="w-4 h-4 animate-spin" />;
+        return <RefreshCw className="w-4 h-4 animate-pulse" />;
       case 'maintenance':
       case 'encrypted':
         return <Shield className="w-4 h-4" />;
@@ -436,7 +436,7 @@ export default function ProfessionalServerManager({
             disabled={refreshing}
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
           >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-pulse' : ''}`} />
           </button>
         </div>
       </div>
@@ -455,7 +455,7 @@ export default function ProfessionalServerManager({
               }`}>
                 {serverStatus === 'online' ? <Wifi className="w-5 h-5 text-green-600" /> :
                  serverStatus === 'offline' ? <WifiOff className="w-5 h-5 text-red-600" /> :
-                 serverStatus === 'restarting' ? <RefreshCw className="w-5 h-5 text-yellow-600 animate-spin" /> :
+                 serverStatus === 'restarting' ? <RefreshCw className="w-5 h-5 text-yellow-600 animate-pulse" /> :
                  <Settings className="w-5 h-5 text-blue-600" />}
               </div>
               <div>
@@ -501,7 +501,7 @@ export default function ProfessionalServerManager({
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-500">Temperature</span>
-            <span className="text-sm font-medium">{systemMetrics.temperature.toFixed(1)}°C</span>
+            <span className="text-sm font-medium">{systemMetrics.temperature.toFixed(1)}Â°C</span>
           </div>
         </div>
 
@@ -850,7 +850,7 @@ export default function ProfessionalServerManager({
               >
                 {isRestarting ? (
                   <div className="flex items-center justify-center gap-2">
-                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <RefreshCw className="w-4 h-4 animate-pulse" />
                     Restarting...
                   </div>
                 ) : (
@@ -926,7 +926,7 @@ export default function ProfessionalServerManager({
               >
                 {isCreatingBackup ? (
                   <div className="flex items-center justify-center gap-2">
-                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <RefreshCw className="w-4 h-4 animate-pulse" />
                     Creating...
                   </div>
                 ) : (

@@ -59,7 +59,7 @@ export default function GlobalSearch() {
           ...products.data.slice(0, 3).map((item: any) => ({
             id: item.id,
             title: item.name,
-            subtitle: `${item.currentStock} қоп мавжуд`,
+            subtitle: `${item.currentStock} Ò›Ð¾Ð¿ Ð¼Ð°Ð²Ð¶ÑƒÐ´`,
             type: 'product' as const,
             url: '/products',
           })),
@@ -72,7 +72,7 @@ export default function GlobalSearch() {
           })),
           ...sales.data.slice(0, 2).map((item: any) => ({
             id: item.id,
-            title: `Сотув #${item.id.slice(-6)}`,
+            title: `Ð¡Ð¾Ñ‚ÑƒÐ² #${item.id.slice(-6)}`,
             subtitle: `${item.customer.name} - ${item.totalAmount} UZS`,
             type: 'sale' as const,
             url: '/sales',
@@ -81,7 +81,7 @@ export default function GlobalSearch() {
 
         setResults(searchResults);
       } catch (error) {
-        console.error('Қидирув хатоси:', error);
+        console.error('ÒšÐ¸Ð´Ð¸Ñ€ÑƒÐ² Ñ…Ð°Ñ‚Ð¾ÑÐ¸:', error);
       } finally {
         setLoading(false);
       }
@@ -112,9 +112,9 @@ export default function GlobalSearch() {
         className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 group shadow-sm hover:shadow-md"
       >
         <Search className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
-        <span className="hidden sm:inline">Қидириш...</span>
+        <span className="hidden sm:inline">ÒšÐ¸Ð´Ð¸Ñ€Ð¸Ñˆ...</span>
         <kbd className="hidden sm:inline-flex h-6 select-none items-center gap-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 font-mono text-[11px] font-semibold text-gray-500 dark:text-gray-400 shadow-sm">
-          <span className="text-xs">⌘</span>K
+          <span className="text-xs">âŒ˜</span>K
         </kbd>
       </button>
     );
@@ -135,7 +135,7 @@ export default function GlobalSearch() {
           <input
             ref={inputRef}
             type="text"
-            placeholder="Маҳсулот, мижоз ёки сотув қидириш..."
+            placeholder="ÐœÐ°Ò³ÑÑƒÐ»Ð¾Ñ‚, Ð¼Ð¸Ð¶Ð¾Ð· Ñ‘ÐºÐ¸ ÑÐ¾Ñ‚ÑƒÐ² Ò›Ð¸Ð´Ð¸Ñ€Ð¸Ñˆ..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="flex-1 bg-transparent outline-none text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
@@ -143,7 +143,7 @@ export default function GlobalSearch() {
           <button
             onClick={() => setIsOpen(false)}
             className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0"
-            title="Ёпиш (Esc)"
+            title="ÐÐ¿Ð¸Ñˆ (Esc)"
           >
             <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
           </button>
@@ -154,8 +154,8 @@ export default function GlobalSearch() {
           {loading && (
             <div className="p-8 text-center">
               <div className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                <span>Қидирилмоқда...</span>
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-pulse"></div>
+                <span>ÒšÐ¸Ð´Ð¸Ñ€Ð¸Ð»Ð¼Ð¾Ò›Ð´Ð°...</span>
               </div>
             </div>
           )}
@@ -165,8 +165,8 @@ export default function GlobalSearch() {
               <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                 <Search className="w-8 h-8 text-gray-400" />
               </div>
-              <p className="text-gray-600 dark:text-gray-400 font-medium">Ҳеч нарса топилмади</p>
-              <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">Бошқа сўз билан қидиринг</p>
+              <p className="text-gray-600 dark:text-gray-400 font-medium">Ò²ÐµÑ‡ Ð½Ð°Ñ€ÑÐ° Ñ‚Ð¾Ð¿Ð¸Ð»Ð¼Ð°Ð´Ð¸</p>
+              <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">Ð‘Ð¾ÑˆÒ›Ð° ÑÑžÐ· Ð±Ð¸Ð»Ð°Ð½ Ò›Ð¸Ð´Ð¸Ñ€Ð¸Ð½Ð³</p>
             </div>
           )}
 
@@ -203,7 +203,7 @@ export default function GlobalSearch() {
         {/* Search Tips */}
         {query.length < 2 && (
           <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-b-xl">
-            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">💡 Tezkor qidiruv:</p>
+            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">ðŸ’¡ Tezkor qidiruv:</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
               <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                 <Package className="w-4 h-4 text-blue-500" />

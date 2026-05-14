@@ -45,15 +45,17 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     return res.status(401).json({ error: 'No token provided' });
   }
 
-  // Check if token is blacklisted (revoked)
-  try {
-    const isBlacklisted = await redis.get(`blacklist:${token}`);
-    if (isBlacklisted) {
-      return res.status(401).json({ error: 'Token has been revoked' });
+  // Check if token is blacklisted (revoked) - only if Redis is configured
+  if (process.env.REDIS_URL) {
+    try {
+      const isBlacklisted = await redis.get(`blacklist:${token}`);
+      if (isBlacklisted) {
+        return res.status(401).json({ error: 'Token has been revoked' });
+      }
+    } catch (redisError) {
+      // If Redis is down, log the error but continue with JWT verification
+      console.error('Redis blacklist check failed:', redisError);
     }
-  } catch (redisError) {
-    // If Redis is down, log the error but continue with JWT verification
-    console.error('Redis blacklist check failed:', redisError);
   }
 
   try {

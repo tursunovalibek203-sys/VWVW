@@ -130,13 +130,13 @@ export default function Cashbox() {
   ];
 
   const defaultCategories = [
-    { id: 'SALARY', name: 'Иш ҳақи', icon: 'Users', color: 'bg-blue-500' },
-    { id: 'UTILITIES', name: 'Коммунал', icon: 'Zap', color: 'bg-yellow-500' },
-    { id: 'SUPPLIES', name: 'Таъминот', icon: 'Truck', color: 'bg-green-500' },
-    { id: 'MAINTENANCE', name: 'Таъмирлаш', icon: 'Wrench', color: 'bg-orange-500' },
-    { id: 'RENT', name: 'Ижара', icon: 'Building2', color: 'bg-purple-500' },
-    { id: 'MARKETING', name: 'Маркетинг', icon: 'ShoppingCart', color: 'bg-pink-500' },
-    { id: 'OTHER', name: 'Бошқа', icon: 'MoreHorizontal', color: 'bg-gray-500' }
+    { id: 'SALARY', name: 'Ð˜Ñˆ Ò³Ð°Ò›Ð¸', icon: 'Users', color: 'bg-blue-500' },
+    { id: 'UTILITIES', name: 'ÐšÐ¾Ð¼Ð¼ÑƒÐ½Ð°Ð»', icon: 'Zap', color: 'bg-yellow-500' },
+    { id: 'SUPPLIES', name: 'Ð¢Ð°ÑŠÐ¼Ð¸Ð½Ð¾Ñ‚', icon: 'Truck', color: 'bg-green-500' },
+    { id: 'MAINTENANCE', name: 'Ð¢Ð°ÑŠÐ¼Ð¸Ñ€Ð»Ð°Ñˆ', icon: 'Wrench', color: 'bg-orange-500' },
+    { id: 'RENT', name: 'Ð˜Ð¶Ð°Ñ€Ð°', icon: 'Building2', color: 'bg-purple-500' },
+    { id: 'MARKETING', name: 'ÐœÐ°Ñ€ÐºÐµÑ‚Ð¸Ð½Ð³', icon: 'ShoppingCart', color: 'bg-pink-500' },
+    { id: 'OTHER', name: 'Ð‘Ð¾ÑˆÒ›Ð°', icon: 'MoreHorizontal', color: 'bg-gray-500' }
   ];
 
   const iconMap: Record<string, any> = { Users, Zap, Truck, Wrench, Building2, ShoppingCart, MoreHorizontal };
@@ -269,7 +269,7 @@ export default function Cashbox() {
         api.get('/expenses?limit=100')
       ]);
       
-      // ✅ Handle standardized API response format
+      // âœ… Handle standardized API response format
       const cashboxData = extractData<any>(cashboxRes, null);
       const transactionsData = extractArray<any>(transactionsRes, []);
       const expensesData = extractArray<any>(expensesRes, []);
@@ -326,14 +326,14 @@ export default function Cashbox() {
         amount: parseFloat(form.amount),
         currency: form.currency,
         paymentMethod: form.type,
-        description: form.description || 'Касса тўлдириш'
+        description: form.description || 'ÐšÐ°ÑÑÐ° Ñ‚ÑžÐ»Ð´Ð¸Ñ€Ð¸Ñˆ'
       });
       setShowAddMoney(false);
       setForm({ amount: '', currency: 'USD', description: '', type: 'CASH' });
       loadCashbox();
-      alert('Касса муваффақиятли тўлдирилди!');
+      alert('ÐšÐ°ÑÑÐ° Ð¼ÑƒÐ²Ð°Ñ„Ñ„Ð°Ò›Ð¸ÑÑ‚Ð»Ð¸ Ñ‚ÑžÐ»Ð´Ð¸Ñ€Ð¸Ð»Ð´Ð¸!');
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Хатолик юз берди');
+      alert(error.response?.data?.error || 'Ð¥Ð°Ñ‚Ð¾Ð»Ð¸Ðº ÑŽÐ· Ð±ÐµÑ€Ð´Ð¸');
     }
   };
 
@@ -344,14 +344,14 @@ export default function Cashbox() {
         amount: parseFloat(form.amount),
         currency: form.currency,
         paymentMethod: form.type,
-        description: form.description || 'Касса чиқим'
+        description: form.description || 'ÐšÐ°ÑÑÐ° Ñ‡Ð¸Ò›Ð¸Ð¼'
       });
       setShowWithdraw(false);
       setForm({ amount: '', currency: 'USD', description: '', type: 'CASH' });
       loadCashbox();
-      alert('Чиқим муваффақиятли амалга оширилди!');
+      alert('Ð§Ð¸Ò›Ð¸Ð¼ Ð¼ÑƒÐ²Ð°Ñ„Ñ„Ð°Ò›Ð¸ÑÑ‚Ð»Ð¸ Ð°Ð¼Ð°Ð»Ð³Ð° Ð¾ÑˆÐ¸Ñ€Ð¸Ð»Ð´Ð¸!');
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Хатолик юз берди');
+      alert(error.response?.data?.error || 'Ð¥Ð°Ñ‚Ð¾Ð»Ð¸Ðº ÑŽÐ· Ð±ÐµÑ€Ð´Ð¸');
     }
   };
 
@@ -388,7 +388,7 @@ export default function Cashbox() {
     } catch (error: any) {
       console.error('Valyuta ayirboshlashda xatolik:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Valyuta ayirboshlashda xatolik yuz berdi';
-      alert(`❌ Xatolik: ${errorMessage}`);
+      alert(`âŒ Xatolik: ${errorMessage}`);
     }
   };
   // Xarajat qo'shish - avtomatik kassadan kamayadi
@@ -432,7 +432,7 @@ export default function Cashbox() {
     } catch (error: any) {
       console.error('Xarajat qo\'shishda xatolik:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Xarajat qo\'shishda xatolik yuz berdi';
-      alert(`❌ Xatolik: ${errorMessage}`);
+      alert(`âŒ Xatolik: ${errorMessage}`);
     }
   };
 
@@ -443,7 +443,7 @@ export default function Cashbox() {
         from: transferForm.from,
         to: transferForm.to,
         amount: parseFloat(transferForm.amount),
-        description: transferForm.description || 'Тўлов усуллари оқсида трансфер',
+        description: transferForm.description || 'Ð¢ÑžÐ»Ð¾Ð² ÑƒÑÑƒÐ»Ð»Ð°Ñ€Ð¸ Ð¾Ò›ÑÐ¸Ð´Ð° Ñ‚Ñ€Ð°Ð½ÑÑ„ÐµÑ€',
         exchangeRate: exchangeRate
       });
       setShowTransfer(false);
@@ -453,7 +453,7 @@ export default function Cashbox() {
     } catch (error: any) {
       console.error('Kassa o\'tkazmasida xatolik:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Kassa o\'tkazmasida xatolik yuz berdi';
-      alert(`❌ Xatolik: ${errorMessage}`);
+      alert(`âŒ Xatolik: ${errorMessage}`);
     }
   };
 
@@ -463,12 +463,12 @@ export default function Cashbox() {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `касса-ҳисобот-${new Date().toISOString().split('T')[0]}.pdf`);
+      link.setAttribute('download', `ÐºÐ°ÑÑÐ°-Ò³Ð¸ÑÐ¾Ð±Ð¾Ñ‚-${new Date().toISOString().split('T')[0]}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
     } catch (error) {
-      alert('PDF экспорт қилишда хатолик');
+      alert('PDF ÑÐºÑÐ¿Ð¾Ñ€Ñ‚ Ò›Ð¸Ð»Ð¸ÑˆÐ´Ð° Ñ…Ð°Ñ‚Ð¾Ð»Ð¸Ðº');
     }
   };
 
@@ -493,7 +493,7 @@ export default function Cashbox() {
         'Kategoriya': category?.name || e.category,
         'To\'lov usuli': e.paymentMethod === 'CASH' ? 'Naqd' : e.paymentMethod === 'CARD' ? 'Karta' : 'Click',
         'Tavsif': e.description,
-        'Chek №': e.receiptNumber || '-',
+        'Chek â„–': e.receiptNumber || '-',
         'Summa': e.amount,
         'Valyuta': e.currency
       };
@@ -585,10 +585,10 @@ export default function Cashbox() {
       <div className="flex items-center justify-center h-screen ultra-bg-gradient">
         <div className="text-center">
           <div className="relative mb-6">
-            <div className="animate-spin rounded-full h-20 w-20 border-4 border-blue-200 border-t-blue-600 shadow-lg"></div>
+            <div className="animate-pulse rounded-full h-20 w-20 border-4 border-blue-200 border-t-blue-600 shadow-lg"></div>
             <Wallet className="w-8 h-8 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
           </div>
-          <p className="text-lg font-semibold text-gray-700">Юкланмоқда...</p>
+          <p className="text-lg font-semibold text-gray-700">Ð®ÐºÐ»Ð°Ð½Ð¼Ð¾Ò›Ð´Ð°...</p>
           <div className="flex justify-center gap-1 mt-3">
             <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
             <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
@@ -600,8 +600,8 @@ export default function Cashbox() {
   }
 
   const paymentMethodsData = [
-    { name: 'Нақд (UZS)', value: cashbox?.byCurrency?.cashUZS || 0, color: COLORS[0] },
-    { name: 'Доллар (USD)', value: cashbox?.byCurrency?.cashUSD || 0, color: COLORS[1] },
+    { name: 'ÐÐ°Ò›Ð´ (UZS)', value: cashbox?.byCurrency?.cashUZS || 0, color: COLORS[0] },
+    { name: 'Ð”Ð¾Ð»Ð»Ð°Ñ€ (USD)', value: cashbox?.byCurrency?.cashUSD || 0, color: COLORS[1] },
     { name: 'Click (UZS)', value: cashbox?.byCurrency?.clickUZS || 0, color: COLORS[2] },
   ];
 
@@ -815,7 +815,7 @@ export default function Cashbox() {
                     <th className="text-left py-5 px-8 text-xs font-semibold text-gray-400 uppercase tracking-widest">{t("Kategoriya")}</th>
                     <th className="text-left py-5 px-8 text-xs font-semibold text-gray-400 uppercase tracking-widest">{t("To'lov Usuli")}</th>
                     <th className="text-left py-5 px-8 text-xs font-semibold text-gray-400 uppercase tracking-widest">{t("Tavsif")}</th>
-                    <th className="text-left py-5 px-8 text-xs font-semibold text-gray-400 uppercase tracking-widest">{t("Chek №")}</th>
+                    <th className="text-left py-5 px-8 text-xs font-semibold text-gray-400 uppercase tracking-widest">{t("Chek â„–")}</th>
                     <th className="text-right py-5 px-8 text-xs font-semibold text-gray-400 uppercase tracking-widest">{t("Summa")}</th>
                   </tr>
                 </thead>
@@ -1586,7 +1586,7 @@ export default function Cashbox() {
               {/* Kurs inputi */}
               <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-[2rem] border border-amber-100 dark:border-amber-800">
                 <label className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-widest block text-center mb-3">
-                  💱 {t("AYIRBOSHLASH KURSI")}: 1 USD =
+                  ðŸ’± {t("AYIRBOSHLASH KURSI")}: 1 USD =
                 </label>
                 <div className="flex items-center justify-center gap-2">
                   <input
@@ -1634,9 +1634,9 @@ export default function Cashbox() {
                     onChange={(e) => setExchangeForm({...exchangeForm, fromType: e.target.value})}
                     className="w-full h-12 rounded-xl border-2 border-gray-100 dark:bg-gray-800 dark:border-gray-800 px-4 font-bold text-xs appearance-none"
                   >
-                    <option value="CASH">💵 {t("Naqd")}</option>
-                    <option value="CARD">💳 {t("Karta")}</option>
-                    <option value="CLICK">📱 {t("Click")}</option>
+                    <option value="CASH">ðŸ’µ {t("Naqd")}</option>
+                    <option value="CARD">ðŸ’³ {t("Karta")}</option>
+                    <option value="CLICK">ðŸ“± {t("Click")}</option>
                   </select>
                 </div>
 
@@ -1664,9 +1664,9 @@ export default function Cashbox() {
                     onChange={(e) => setExchangeForm({...exchangeForm, toType: e.target.value})}
                     className="w-full h-12 rounded-xl border-2 border-gray-100 dark:bg-gray-800 dark:border-gray-800 px-4 font-bold text-xs appearance-none"
                   >
-                    <option value="CASH">💵 {t("Naqd")}</option>
-                    <option value="CARD">💳 {t("Karta")}</option>
-                    <option value="CLICK">📱 {t("Click")}</option>
+                    <option value="CASH">ðŸ’µ {t("Naqd")}</option>
+                    <option value="CARD">ðŸ’³ {t("Karta")}</option>
+                    <option value="CLICK">ðŸ“± {t("Click")}</option>
                   </select>
                 </div>
               </div>
@@ -1708,7 +1708,7 @@ export default function Cashbox() {
                 type="submit"
                 className="w-full h-16 bg-purple-600 hover:bg-purple-700 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-purple-500/30 transition-all active:scale-95"
               >
-                💱 {t("ALMASHISHNI TASDIQLASH")}
+                ðŸ’± {t("ALMASHISHNI TASDIQLASH")}
               </button>
             </form>
           </div>
@@ -1727,7 +1727,7 @@ export default function Cashbox() {
             </div>
             <div className="p-8 space-y-6">
               <div className="space-y-3">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-widest ml-1">💵 1 USD = ? UZS</label>
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-widest ml-1">ðŸ’µ 1 USD = ? UZS</label>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -1925,9 +1925,9 @@ export default function Cashbox() {
                     onChange={(e) => setExpenseForm({ ...expenseForm, paymentMethod: e.target.value })}
                     className="w-full h-16 rounded-2xl border-2 border-gray-100 dark:bg-gray-800 dark:border-gray-800 px-6 font-bold text-sm focus:border-rose-500 outline-none transition-all appearance-none"
                   >
-                    <option value="CASH">💵 {t("Naqd")}</option>
-                    <option value="CARD">💳 {t("Karta")}</option>
-                    <option value="CLICK">📱 {t("Click")}</option>
+                    <option value="CASH">ðŸ’µ {t("Naqd")}</option>
+                    <option value="CARD">ðŸ’³ {t("Karta")}</option>
+                    <option value="CLICK">ðŸ“± {t("Click")}</option>
                   </select>
                 </div>
                 <div className="space-y-3">

@@ -158,7 +158,7 @@ export default function CashboxHistory() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+        <RefreshCw className="w-8 h-8 animate-pulse text-primary" />
       </div>
     );
   }
@@ -325,7 +325,7 @@ export default function CashboxHistory() {
                       )}
                       {log.details.details.from && log.details.details.to && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          {log.details.details.from} → {log.details.details.to}
+                          {log.details.details.from} â†’ {log.details.details.to}
                         </p>
                       )}
                     </td>

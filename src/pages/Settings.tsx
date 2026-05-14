@@ -195,7 +195,7 @@ export default function Settings() {
               onClick={handleRefresh}
               className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl font-semibold text-sm transition-all active:scale-95 text-gray-900 dark:text-white shadow-md border border-gray-100 dark:border-gray-700"
             >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-pulse' : ''}`} />
               {latinToCyrillic("Yangilash")}
             </button>
             <button 
@@ -304,7 +304,7 @@ export default function Settings() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">USD → UZS</label>
+                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">USD â†’ UZS</label>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -315,7 +315,7 @@ export default function Settings() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">EUR → UZS</label>
+                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">EUR â†’ UZS</label>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -326,7 +326,7 @@ export default function Settings() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">RUB → UZS</label>
+                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">RUB â†’ UZS</label>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -600,7 +600,7 @@ export default function Settings() {
                       onChange={(e) => updateSetting('LANGUAGE', e.target.value)}
                     >
                       <option value="uz">O'zbek</option>
-                      <option value="ru">Русский</option>
+                      <option value="ru">Ð ÑƒÑÑÐºÐ¸Ð¹</option>
                       <option value="en">English</option>
                     </select>
                   </div>

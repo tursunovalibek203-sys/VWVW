@@ -170,11 +170,11 @@ export default function ProductDetail() {
   const deleteProduct = async () => {
     try {
       await api.delete(`/products/${id}`);
-      alert('✅ Mahsulot muvaffaqiyatli o\'chirildi!');
+      alert('âœ… Mahsulot muvaffaqiyatli o\'chirildi!');
       navigate(isCashier ? '/cashier/products' : '/products');
     } catch (error) {
       console.error('Mahsulotni o\'chirishda xatolik:', error);
-      alert('❌ Xatolik yuz berdi!');
+      alert('âŒ Xatolik yuz berdi!');
     }
   };
 
@@ -206,14 +206,14 @@ export default function ProductDetail() {
       
       setShowSettingsModal(false);
       loadProduct();
-      alert('✅ Sozlamalar yangilandi!');
+      alert('âœ… Sozlamalar yangilandi!');
     } catch (error: any) {
       if (error.response?.status === 403) {
         const requiredRoles = error.response?.data?.requiredRoles?.join(', ') || 'ADMIN, WAREHOUSE_MANAGER, MANAGER';
         const yourRole = error.response?.data?.yourRole || 'unknown';
-        alert(`❌ Ruxsat yo'q! Sizning rolingiz: ${yourRole}\nKerakli rollar: ${requiredRoles}`);
+        alert(`âŒ Ruxsat yo'q! Sizning rolingiz: ${yourRole}\nKerakli rollar: ${requiredRoles}`);
       } else {
-        alert('❌ Sozlamalarni yangilashda xatolik');
+        alert('âŒ Sozlamalarni yangilashda xatolik');
       }
     }
   };
@@ -296,9 +296,9 @@ export default function ProductDetail() {
             <h1 className="text-3xl font-bold">{product.name}</h1>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-[10px] font-semibold uppercase tracking-widest">
-                {product.warehouse === 'preform' ? '📦 PREFORMA' : 
-                 product.warehouse === 'krishka' ? '⭕ QOPQOQ' : 
-                 product.warehouse === 'ruchka' ? '🎗️ RUCHKA' : '🛠️ BOSHQA'}
+                {product.warehouse === 'preform' ? 'ðŸ“¦ PREFORMA' : 
+                 product.warehouse === 'krishka' ? 'â­• QOPQOQ' : 
+                 product.warehouse === 'ruchka' ? 'ðŸŽ—ï¸ RUCHKA' : 'ðŸ› ï¸ BOSHQA'}
               </span>
               {product.productType && (
                 <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded text-[10px] font-semibold uppercase tracking-widest">
@@ -754,7 +754,7 @@ export default function ProductDetail() {
               type="button"
               variant="outline"
               onClick={() => {
-                if (confirm(`Ростдан ҳам "${product.name}" маҳсулотни ўчирмоқчимисиз? Бу амал бекор қилинмайdi!`)) {
+                if (confirm(`Ð Ð¾ÑÑ‚Ð´Ð°Ð½ Ò³Ð°Ð¼ "${product.name}" Ð¼Ð°Ò³ÑÑƒÐ»Ð¾Ñ‚Ð½Ð¸ ÑžÑ‡Ð¸Ñ€Ð¼Ð¾Ò›Ñ‡Ð¸Ð¼Ð¸ÑÐ¸Ð·? Ð‘Ñƒ Ð°Ð¼Ð°Ð» Ð±ÐµÐºÐ¾Ñ€ Ò›Ð¸Ð»Ð¸Ð½Ð¼Ð°Ð¹di!`)) {
                   deleteProduct();
                 }
               }}
@@ -910,10 +910,10 @@ export default function ProductDetail() {
     const loadModalData = async () => {
       setLoading(true);
       try {
-        console.log('📥 Mijozlar yuklanmoqda...');
+        console.log('ðŸ“¥ Mijozlar yuklanmoqda...');
         const customersResponse = await api.get('/customers');
         const customersData = extractArray<any>(customersResponse, []);
-        console.log('✅ Mijozlar yuklandi:', customersData.length, 'ta');
+        console.log('âœ… Mijozlar yuklandi:', customersData.length, 'ta');
         setLocalCustomers(customersData);
         
         // Mijozlarning productPrices maydonidan ushbu mahsulot uchun narxni olish
@@ -931,7 +931,7 @@ export default function ProductDetail() {
           }
         });
         setLocalPrices(prices);
-        console.log('💰 Narxlar yuklandi:', Object.keys(prices).length, 'ta');
+        console.log('ðŸ’° Narxlar yuklandi:', Object.keys(prices).length, 'ta');
         
         // Har bir mijoz uchun chegirma shablonini hisoblash
         const discounts: Record<string, number> = {};
@@ -945,7 +945,7 @@ export default function ProductDetail() {
                 const discount = standardPrice - customerPrice;
                 if (discount !== 0) {
                   discounts[customer.id] = discount;
-                  console.log(`💎 ${customer.name}: chegirma ${discount} UZS`);
+                  console.log(`ðŸ’Ž ${customer.name}: chegirma ${discount} UZS`);
                 }
               }
             } catch (error) {
@@ -954,9 +954,9 @@ export default function ProductDetail() {
           }
         });
         setCustomerDiscounts(discounts);
-        console.log('🎁 Chegirma shablonlari yuklandi:', Object.keys(discounts).length, 'ta');
+        console.log('ðŸŽ Chegirma shablonlari yuklandi:', Object.keys(discounts).length, 'ta');
       } catch (error) {
-        console.error('❌ Mijozlarni yuklashda xatolik:', error);
+        console.error('âŒ Mijozlarni yuklashda xatolik:', error);
       } finally {
         setLoading(false);
       }
@@ -965,7 +965,7 @@ export default function ProductDetail() {
     const applyBulkAdjustment = (increase: boolean) => {
       const amount = parseFloat(bulkAmount);
       if (!amount || amount <= 0) {
-        alert('⚠️ Iltimos, to\'g\'ri miqdor kiriting!');
+        alert('âš ï¸ Iltimos, to\'g\'ri miqdor kiriting!');
         return;
       }
 
@@ -1000,19 +1000,19 @@ export default function ProductDetail() {
       
       const action = increase ? 'ko\'tarildi' : 'tushirildi';
       const typeText = bulkType === 'percent' ? `${amount}%` : `${amount} UZS`;
-      alert(`✅ ${appliedCount} ta mijoz uchun narx ${typeText} ga ${action}!`);
+      alert(`âœ… ${appliedCount} ta mijoz uchun narx ${typeText} ga ${action}!`);
     };
 
     const applyDiscountTemplates = async () => {
       if (Object.keys(customerDiscounts).length === 0) {
-        alert('⚠️ Hech qanday chegirma shabloni topilmadi!\n\nAvval kamida bitta mijoz uchun narx belgilang.');
+        alert('âš ï¸ Hech qanday chegirma shabloni topilmadi!\n\nAvval kamida bitta mijoz uchun narx belgilang.');
         return;
       }
       
-      const confirmMsg = `🎁 Chegirma shablonlarini boshqa mahsulotlarga qo'llash:\n\n${
+      const confirmMsg = `ðŸŽ Chegirma shablonlarini boshqa mahsulotlarga qo'llash:\n\n${
         Object.entries(customerDiscounts).map(([customerId, discount]) => {
           const customer = localCustomers.find(c => c.id === customerId);
-          return `• ${customer?.name}: ${discount > 0 ? '-' : '+'}${Math.abs(discount)} UZS`;
+          return `â€¢ ${customer?.name}: ${discount > 0 ? '-' : '+'}${Math.abs(discount)} UZS`;
         }).join('\n')
       }\n\nDavom ettirilsinmi?`;
       
@@ -1031,29 +1031,29 @@ export default function ProductDetail() {
             });
             successCount++;
             const customer = localCustomers.find(c => c.id === customerId);
-            console.log(`✅ ${customer?.name} uchun chegirma qo'llandi`);
+            console.log(`âœ… ${customer?.name} uchun chegirma qo'llandi`);
           } catch (error: any) {
             errorCount++;
-            console.error(`❌ Xatolik:`, error);
+            console.error(`âŒ Xatolik:`, error);
           }
         }
         
         if (errorCount === 0) {
-          alert(`✅ Barcha chegirma shablonlari muvaffaqiyatli qo'llandi!\n\n${successCount} ta mijoz uchun barcha mahsulotlarga chegirma qo'llandi.`);
+          alert(`âœ… Barcha chegirma shablonlari muvaffaqiyatli qo'llandi!\n\n${successCount} ta mijoz uchun barcha mahsulotlarga chegirma qo'llandi.`);
         } else {
-          alert(`⚠️ ${successCount} ta muvaffaqiyatli, ${errorCount} ta xatolik!`);
+          alert(`âš ï¸ ${successCount} ta muvaffaqiyatli, ${errorCount} ta xatolik!`);
         }
       } catch (error: any) {
-        console.error('❌ Umumiy xatolik:', error);
+        console.error('âŒ Umumiy xatolik:', error);
         alert(`Xatolik: ${error.response?.data?.error || error.message}`);
       }
     };
 
     const handleSave = async () => {
       try {
-        console.log('💾 Narxlar saqlanmoqda...');
-        console.log('📝 Kiritilgan narxlar:', localPrices);
-        console.log('👥 Mijozlar soni:', localCustomers.length);
+        console.log('ðŸ’¾ Narxlar saqlanmoqda...');
+        console.log('ðŸ“ Kiritilgan narxlar:', localPrices);
+        console.log('ðŸ‘¥ Mijozlar soni:', localCustomers.length);
         
         // Debug
         Object.keys(localPrices).forEach(key => {
@@ -1076,7 +1076,7 @@ export default function ProductDetail() {
                 try {
                   existingPrices = JSON.parse(customer.productPrices);
                 } catch (parseError) {
-                  console.warn(`⚠️ ${customer.name} uchun mavjud narxlarni parse qilishda xatolik:`, parseError);
+                  console.warn(`âš ï¸ ${customer.name} uchun mavjud narxlarni parse qilishda xatolik:`, parseError);
                   existingPrices = {};
                 }
               }
@@ -1084,7 +1084,7 @@ export default function ProductDetail() {
               // Narxni raqamga aylantirish va tekshirish
               const priceNumber = parseFloat(price.toString());
               if (isNaN(priceNumber) || priceNumber < 0) {
-                console.error(`❌ ${customer.name} uchun noto'g'ri narx:`, price);
+                console.error(`âŒ ${customer.name} uchun noto'g'ri narx:`, price);
                 errorCount++;
                 continue;
               }
@@ -1095,26 +1095,26 @@ export default function ProductDetail() {
                 [id as string]: priceNumber
               };
               
-              console.log(`💰 ${customer.name} uchun narx saqlanmoqda:`, priceNumber);
-              console.log(`📊 Yangi narxlar obyekti:`, newPrices);
+              console.log(`ðŸ’° ${customer.name} uchun narx saqlanmoqda:`, priceNumber);
+              console.log(`ðŸ“Š Yangi narxlar obyekti:`, newPrices);
               
               const pricesJson = JSON.stringify(newPrices);
-              console.log(`📝 JSON string:`, pricesJson);
-              console.log(`📏 JSON uzunligi:`, pricesJson.length);
+              console.log(`ðŸ“ JSON string:`, pricesJson);
+              console.log(`ðŸ“ JSON uzunligi:`, pricesJson.length);
               
               // Saqlash - FAQAT productPrices maydonini yuborish
               const response = await api.put(`/customers/${customer.id}`, {
                 productPrices: pricesJson
               });
               
-              console.log(`✅ Response:`, response.data);
+              console.log(`âœ… Response:`, response.data);
               
               savedCount++;
-              console.log(`✅ ${customer.name} uchun narx saqlandi`);
+              console.log(`âœ… ${customer.name} uchun narx saqlandi`);
             } catch (customerError: any) {
               errorCount++;
               const errorDetails = customerError.response?.data;
-              console.error(`❌ ${customer.name} uchun xatolik:`, errorDetails);
+              console.error(`âŒ ${customer.name} uchun xatolik:`, errorDetails);
               console.error('Full error object:', {
                 message: customerError.message,
                 status: customerError.response?.status,
@@ -1129,16 +1129,16 @@ export default function ProductDetail() {
         setShowPriceModal(false);
         
         if (savedCount === 0) {
-          alert(`⚠️ Hech qanday narx saqlanmadi!\n\nIltimos, kamida bitta mijoz uchun narx kiriting.`);
+          alert(`âš ï¸ Hech qanday narx saqlanmadi!\n\nIltimos, kamida bitta mijoz uchun narx kiriting.`);
         } else if (errorCount === 0) {
-          alert(`✅ ${savedCount} ta mijoz uchun narxlar muvaffaqiyatli saqlandi!`);
+          alert(`âœ… ${savedCount} ta mijoz uchun narxlar muvaffaqiyatli saqlandi!`);
         } else {
-          alert(`⚠️ ${savedCount} ta saqlandi, ${errorCount} ta xatolik!`);
+          alert(`âš ï¸ ${savedCount} ta saqlandi, ${errorCount} ta xatolik!`);
         }
         
-        console.log(`📊 Natija: ${savedCount} saqlandi, ${errorCount} xatolik`);
+        console.log(`ðŸ“Š Natija: ${savedCount} saqlandi, ${errorCount} xatolik`);
       } catch (error: any) {
-        console.error('❌ Umumiy xatolik:', error);
+        console.error('âŒ Umumiy xatolik:', error);
         alert(`Xatolik: ${error.response?.data?.error || error.message || 'Narxlarni saqlashda xatolik!'}`);
       }
     };
@@ -1146,7 +1146,7 @@ export default function ProductDetail() {
     if (loading) {
       return (
         <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-pulse rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-sm text-gray-500">Mijozlar yuklanmoqda...</p>
         </div>
       );
@@ -1156,17 +1156,17 @@ export default function ProductDetail() {
       <div className="space-y-4">
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 p-4 rounded-lg">
           <p className="text-sm font-medium mb-2">
-            📦 <strong>{product?.name}</strong> mahsuloti uchun har bir mijozga alohida narx belgilang
+            ðŸ“¦ <strong>{product?.name}</strong> mahsuloti uchun har bir mijozga alohida narx belgilang
           </p>
           <p className="text-xs text-muted-foreground">
-            💰 Asosiy narx: <strong>{product?.pricePerBag?.toLocaleString()} UZS</strong>/qop
+            ðŸ’° Asosiy narx: <strong>{product?.pricePerBag?.toLocaleString()} UZS</strong>/qop
           </p>
         </div>
 
         {/* Ommaviy narx o'zgartirish */}
         <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 p-4 rounded-lg border-2 border-green-200 dark:border-green-800">
           <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-            <span className="text-lg">⚡</span>
+            <span className="text-lg">âš¡</span>
             Barcha mijozlar uchun narxni birdan o'zgartirish
           </h3>
           
@@ -1215,7 +1215,7 @@ export default function ProductDetail() {
               onClick={() => applyBulkAdjustment(true)}
               className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
             >
-              <span className="text-lg">📈</span>
+              <span className="text-lg">ðŸ“ˆ</span>
               Ko'tarish
             </button>
             <button
@@ -1223,19 +1223,19 @@ export default function ProductDetail() {
               onClick={() => applyBulkAdjustment(false)}
               className="flex-1 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
             >
-              <span className="text-lg">📉</span>
+              <span className="text-lg">ðŸ“‰</span>
               Tushirish
             </button>
           </div>
 
           <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-            💡 Masalan: 10% yoki 5000 UZS ga barcha narxlarni birdan o'zgartiring
+            ðŸ’¡ Masalan: 10% yoki 5000 UZS ga barcha narxlarni birdan o'zgartiring
           </p>
         </div>
 
         <div className="bg-yellow-50 dark:bg-yellow-950 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800">
           <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            ℹ️ Jami <strong>{localCustomers.length}</strong> ta mijoz topildi
+            â„¹ï¸ Jami <strong>{localCustomers.length}</strong> ta mijoz topildi
           </p>
         </div>
 
@@ -1262,15 +1262,15 @@ export default function ProductDetail() {
                 <div className="flex-1 min-w-0">
                   <h4 className="font-semibold text-lg truncate">{customer.name}</h4>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-500">📞 {customer.phone}</span>
+                    <span className="text-xs text-gray-500">ðŸ“ž {customer.phone}</span>
                     {customer.pricePerBag && (
                       <span className="text-xs text-blue-600 dark:text-blue-400">
-                        • Umumiy: {customer.pricePerBag} UZS/qop
+                        â€¢ Umumiy: {customer.pricePerBag} UZS/qop
                       </span>
                     )}
                     {customerDiscounts[customer.id] && (
                       <span className="text-xs font-bold text-green-600 dark:text-green-400">
-                        • Chegirma: {customerDiscounts[customer.id] > 0 ? '-' : '+'}{Math.abs(customerDiscounts[customer.id])} UZS
+                        â€¢ Chegirma: {customerDiscounts[customer.id] > 0 ? '-' : '+'}{Math.abs(customerDiscounts[customer.id])} UZS
                       </span>
                     )}
                   </div>
@@ -1298,7 +1298,7 @@ export default function ProductDetail() {
                             ...prev,
                             [customer.id]: discount
                           }));
-                          console.log(`🎁 ${customer.name} uchun chegirma saqlandi: ${discount} UZS`);
+                          console.log(`ðŸŽ ${customer.name} uchun chegirma saqlandi: ${discount} UZS`);
                         } else {
                           // Agar chegirma 0 bo'lsa, o'chirish
                           setCustomerDiscounts(prev => {
@@ -1325,7 +1325,7 @@ export default function ProductDetail() {
         {Object.keys(customerDiscounts).length > 0 && (
           <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 p-4 rounded-lg border-2 border-purple-200 dark:border-purple-800">
             <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
-              <span className="text-lg">🎁</span>
+              <span className="text-lg">ðŸŽ</span>
               Chegirma shablonlari topildi
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
@@ -1337,7 +1337,7 @@ export default function ProductDetail() {
               onClick={applyDiscountTemplates}
               className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
             >
-              <span className="text-lg">✨</span>
+              <span className="text-lg">âœ¨</span>
               Barcha mahsulotlarga qo'llash
             </button>
           </div>
@@ -1357,7 +1357,7 @@ export default function ProductDetail() {
             onClick={handleSave}
             className="flex-1 bg-blue-600 hover:bg-blue-700"
           >
-            💾 Saqlash
+            ðŸ’¾ Saqlash
           </Button>
         </div>
       </div>

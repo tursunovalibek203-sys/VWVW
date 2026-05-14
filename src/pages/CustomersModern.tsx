@@ -137,7 +137,7 @@ export default function CustomersModern() {
         const lastSale: any = customerSales
           .sort((a: any, b: any) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime())[0];
         
-        // ✅ TUZATILDI: debtUZS ishlatildi
+        // âœ… TUZATILDI: debtUZS ishlatildi
         let debtPeriod = 0;
         const totalDebt = (c.debtUZS || c.debt || 0) + (c.debtUSD || 0) * 12500;
         if (totalDebt > 0 && lastSale) {
@@ -146,7 +146,7 @@ export default function CustomersModern() {
           debtPeriod = daysSinceLastSale;
         }
         
-        // ✅ TUZATILDI: API dan kelgan balanceUZS/balanceUSD ishlatiladi
+        // âœ… TUZATILDI: API dan kelgan balanceUZS/balanceUSD ishlatiladi
         const balanceUZS = c.balanceUZS || c.balance || 0;
         const balanceUSD = c.balanceUSD || 0;
         const debtUZS = c.debtUZS || c.debt || 0;
@@ -353,10 +353,10 @@ export default function CustomersModern() {
       link.click();
       document.body.removeChild(link);
 
-      alert(latinToCyrillic(`✅ ${customers.length} ta mijoz muvaffaqiyatli eksport qilindi!`));
+      alert(latinToCyrillic(`âœ… ${customers.length} ta mijoz muvaffaqiyatli eksport qilindi!`));
     } catch (error) {
       console.error('Export xatolik:', error);
-      alert(latinToCyrillic('❌ Eksport qilishda xatolik yuz berdi'));
+      alert(latinToCyrillic('âŒ Eksport qilishda xatolik yuz berdi'));
     }
   };
 
@@ -384,7 +384,7 @@ export default function CustomersModern() {
             className="p-2 bg-white rounded-lg shadow-sm hover:shadow-md transition-all border border-gray-200"
             title={latinToCyrillic("Yangilash")}
           >
-            <RefreshCw className={`w-5 h-5 text-blue-600 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 text-blue-600 ${loading ? 'animate-pulse' : ''}`} />
           </button>
         </div>
       </div>
@@ -402,7 +402,7 @@ export default function CustomersModern() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={latinToCyrillic("Мижозларни қидириш...")}
+                placeholder={latinToCyrillic("ÐœÐ¸Ð¶Ð¾Ð·Ð»Ð°Ñ€Ð½Ð¸ Ò›Ð¸Ð´Ð¸Ñ€Ð¸Ñˆ...")}
                 className="input-modern w-full pl-12"
               />
             </div>
@@ -421,7 +421,7 @@ export default function CustomersModern() {
               >
                 {categories.map(category => (
                   <option key={category} value={category}>
-                    {category === 'all' ? latinToCyrillic("Барчаси") : category}
+                    {category === 'all' ? latinToCyrillic("Ð‘Ð°Ñ€Ñ‡Ð°ÑÐ¸") : category}
                   </option>
                 ))}
               </select>
@@ -467,7 +467,7 @@ export default function CustomersModern() {
           <div className="glass-card p-12 rounded-2xl">
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-16 h-16">
-                <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
+                <div className="animate-pulse rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
               </div>
               <p className="text-lg font-semibold text-blue-600 mt-4">{latinToCyrillic("Yuklanmoqda...")}</p>
             </div>

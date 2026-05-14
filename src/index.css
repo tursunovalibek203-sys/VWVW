@@ -603,7 +603,7 @@
   animation: bounce-gentle 2s ease-in-out infinite;
 }
 
-.animate-spin-slow {
+.animate-pulse-slow {
   animation: spin-slow 8s linear infinite;
 }
 

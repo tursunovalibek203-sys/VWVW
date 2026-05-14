@@ -13,43 +13,56 @@ router.get('/stats', async (req, res) => {
 
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    // Generate weekly trend data (last 7 days)
+    // Generate weekly trend data (last 7 days) - Batch queries with raw SQL for better performance
+    const weeklyData = await prisma.$queryRaw`
+      SELECT 
+        DATE_TRUNC('day', "createdAt") as "day",
+        SUM(CASE WHEN "totalAmount" IS NOT NULL THEN "totalAmount" ELSE 0 END) as "sales",
+        0 as "expenses"
+      FROM "Sale"
+      WHERE "createdAt" >= ${new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)}
+      GROUP BY DATE_TRUNC('day', "createdAt")
+      ORDER BY "day" DESC
+      LIMIT 7
+    `;
+
+    const expenseData = await prisma.$queryRaw`
+      SELECT 
+        DATE_TRUNC('day', "createdAt") as "day",
+        SUM("amount") as "total"
+      FROM "Expense"
+      WHERE "createdAt" >= ${new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)}
+      GROUP BY DATE_TRUNC('day', "createdAt")
+    `;
+
+    // Convert to weekly trend format
     const weeklyTrend = [];
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       date.setHours(0, 0, 0, 0);
-      const nextDate = new Date(date);
-      nextDate.setDate(nextDate.getDate() + 1);
       
-      const daySales = await prisma.sale.aggregate({
-        where: { 
-          createdAt: { 
-            gte: date, 
-            lt: nextDate 
-          } 
-        },
-        _sum: { totalAmount: true },
+      const dayData = (weeklyData as any[]).find((d: any) => {
+        const d_date = new Date(d.day);
+        d_date.setHours(0, 0, 0, 0);
+        return d_date.getTime() === date.getTime();
       });
-      
-      const dayExpenses = await prisma.expense.aggregate({
-        where: { 
-          createdAt: { 
-            gte: date, 
-            lt: nextDate 
-          } 
-        },
-        _sum: { amount: true },
+
+      const expData = (expenseData as any[]).find((d: any) => {
+        const d_date = new Date(d.day);
+        d_date.setHours(0, 0, 0, 0);
+        return d_date.getTime() === date.getTime();
       });
 
       weeklyTrend.push({
         day: date.toLocaleDateString('uz-UZ', { weekday: 'short' }),
-        sales: daySales._sum.totalAmount || 0,
-        profit: (daySales._sum.totalAmount || 0) - (dayExpenses._sum.amount || 0),
+        sales: dayData?.sales ? Number(dayData.sales) : 0,
+        profit: (dayData?.sales ? Number(dayData.sales) : 0) - (expData?.total ? Number(expData.total) : 0),
       });
     }
 
-    const [dailySales, monthlySales, totalDebt, expenses, topProducts, topCustomers, lowStock, todaySalesCount, totalCustomers, totalProducts, activeProduction, pendingTasks, pendingDeliveries, cashboxSummary] = await Promise.all([
+    // Optimize: Batch all queries together
+    const [dailySales, monthlySales, totalDebt, expenses, topProducts, topCustomers, lowStock, todaySalesCount, totalCustomers, totalProducts, activeProduction, pendingTasks, pendingDeliveries] = await Promise.all([
       prisma.sale.aggregate({
         where: { createdAt: { gte: today } },
         _sum: { totalAmount: true },
@@ -77,11 +90,16 @@ router.get('/stats', async (req, res) => {
         orderBy: { _sum: { totalAmount: 'desc' } },
         take: 5,
       }),
-      prisma.$queryRaw`
-        SELECT * FROM "Product" 
-        WHERE "currentStock" <= "minStockLimit" OR "currentStock" = 0
-        LIMIT 10
-      `,
+      prisma.product.findMany({
+        where: {
+          OR: [
+            { currentStock: { lte: prisma.product.fields.minStockLimit } },
+            { currentStock: 0 }
+          ]
+        },
+        select: { id: true, name: true, currentStock: true, minStockLimit: true },
+        take: 10,
+      }),
       prisma.sale.count({
         where: { createdAt: { gte: today } }
       }),
@@ -98,10 +116,15 @@ router.get('/stats', async (req, res) => {
       prisma.deliveryNew.count({
         where: { status: 'PENDING' }
       }),
-      prisma.cashboxTransaction.findMany(),
     ]);
 
-    // Calculate cash balance from cashbox transactions
+    // Calculate cash balance from recent cashbox transactions (limit to last 1000)
+    const cashboxSummary = await prisma.cashboxTransaction.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 1000,
+      select: { type: true, amount: true }
+    });
+
     const cashboxIncome = cashboxSummary
       .filter(t => t.type === 'INCOME')
       .reduce((sum, t) => sum + t.amount, 0);
@@ -111,10 +134,16 @@ router.get('/stats', async (req, res) => {
     const cashBalance = cashboxIncome - cashboxExpense;
 
     const productIds = topProducts.map(p => p.productId).filter((id): id is string => id !== null);
-    const products = await prisma.product.findMany({ where: { id: { in: productIds } } });
+    const products = await prisma.product.findMany({ 
+      where: { id: { in: productIds } },
+      select: { id: true, name: true }
+    });
 
     const customerIds = topCustomers.map(c => c.customerId).filter((id): id is string => id !== null);
-    const customers = await prisma.customer.findMany({ where: { id: { in: customerIds } } });
+    const customers = await prisma.customer.findMany({ 
+      where: { id: { in: customerIds } },
+      select: { id: true, name: true, debt: true }
+    });
 
     const revenue = monthlySales._sum.totalAmount || 0;
     const totalExpenses = expenses._sum.amount || 0;

@@ -273,7 +273,7 @@ export default function CashierManagement() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           {loading ? (
             <div className="p-8 text-center">
-              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-pulse mx-auto"></div>
               <p className="mt-2 text-gray-600">
                 {latinToCyrillic("Yuklanmoqda...")}
               </p>

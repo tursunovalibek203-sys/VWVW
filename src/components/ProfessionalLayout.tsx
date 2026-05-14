@@ -255,7 +255,7 @@ export default function ProfessionalLayout({ children }: { children: ReactNode }
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/80 hover:shadow-md transition-all duration-300 group"
             >
               {theme === 'dark' ? (
-                <Sun className="w-5 h-5 text-amber-500 group-hover:animate-spin-slow" />
+                <Sun className="w-5 h-5 text-amber-500 group-hover:animate-pulse-slow" />
               ) : (
                 <Moon className="w-5 h-5 text-indigo-500 group-hover:animate-bounce-gentle" />
               )}

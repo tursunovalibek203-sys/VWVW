@@ -115,7 +115,7 @@ export default function ProfessionalAIAnalyticsDashboard({
     return (
       <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-8 ${className}`}>
         <div className="flex items-center justify-center h-64">
-          <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+          <RefreshCw className="w-8 h-8 text-blue-600 animate-pulse" />
         </div>
       </div>
     );
@@ -161,7 +161,7 @@ export default function ProfessionalAIAnalyticsDashboard({
             aria-label="Ma'lumotlarni yangilash"
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
           >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-pulse' : ''}`} />
           </button>
         </div>
       </div>
@@ -296,7 +296,7 @@ export default function ProfessionalAIAnalyticsDashboard({
               >
                 {isTraining ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <RefreshCw className="w-4 h-4 animate-pulse" />
                     Training...
                   </>
                 ) : (

@@ -94,7 +94,7 @@ export default function CloudBackup() {
               >
                 {isBackingUp ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <RefreshCw className="w-4 h-4 animate-pulse" />
                     Zaxiralanmoqda...
                   </>
                 ) : (

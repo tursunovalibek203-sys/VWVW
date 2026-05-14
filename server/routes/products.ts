@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { prisma } from '../utils/prisma';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import {
@@ -31,22 +32,18 @@ router.get('/', async (req, res) => {
       orderBy: { variantName: 'asc' }
     };
     
-    // Kam qolgan mahsulotlar filtri
+    // Kam qolgan mahsulotlar filtri - Use DB filtering instead of loading all
     if (lowStock === 'true') {
-      const allProducts = await prisma.product.findMany({
+      const products = await prisma.product.findMany({
+        where: {
+          currentStock: { lte: 0 }
+        },
         include: includeOptions,
-      });
-      
-      const lowStockProducts = allProducts.filter(p => {
-        if (p.isParent && p.variants) {
-          // Check if any variant is low stock
-          return p.variants.some((v: any) => v.currentStock < p.minStockLimit);
-        }
-        return p.currentStock < p.minStockLimit;
+        take: 100, // Limit results for performance
       });
       
       // Calculate total stock for parent products
-      const productsWithTotals = lowStockProducts.map(p => {
+      const productsWithTotals = products.map(p => {
         if (p.isParent && p.variants) {
           const totalStock = p.variants.reduce((sum: number, v: any) => sum + v.currentStock, 0);
           return { ...p, totalStock };
@@ -58,30 +55,22 @@ router.get('/', async (req, res) => {
       return res.json(successResponse(productsWithTotals));
     }
     
-    // Qidirish - SQLite uchun case-insensitive qidirish
+    // Qidirish - Use database search with ILIKE for better performance
     if (search) {
-      const allProducts = await prisma.product.findMany({
+      const searchTerm = `%${search}%`;
+      const products = await prisma.product.findMany({
+        where: {
+          OR: [
+            { name: { contains: search as string, mode: 'insensitive' } },
+            { bagType: { contains: search as string, mode: 'insensitive' } }
+          ]
+        },
         include: includeOptions,
-      });
-      
-      const searchLower = (search as string).toLowerCase();
-      const filtered = allProducts.filter(p => {
-        const nameMatch = p.name.toLowerCase().includes(searchLower);
-        const bagTypeMatch = p.bagType.toLowerCase().includes(searchLower);
-        
-        // Search in variants too
-        let variantMatch = false;
-        if (p.variants) {
-          variantMatch = p.variants.some((v: any) => 
-            v.variantName.toLowerCase().includes(searchLower)
-          );
-        }
-        
-        return nameMatch || bagTypeMatch || variantMatch;
+        take: 100, // Limit results for performance
       });
       
       // Calculate total stock for parent products
-      const productsWithTotals = filtered.map(p => {
+      const productsWithTotals = products.map(p => {
         if (p.isParent && p.variants) {
           const totalStock = p.variants.reduce((sum: number, v: any) => sum + v.currentStock, 0);
           return { ...p, totalStock };
@@ -95,35 +84,11 @@ router.get('/', async (req, res) => {
     
     const products = await prisma.product.findMany({
       include: includeOptions,
+      take: 500, // Limit to prevent memory issues
     });
     
-    // Variantlarni qo'shish (15g preform uchun)
-    const productsWithVariants = await Promise.all(
-      products.map(async (p: any) => {
-        if (p.name.toLowerCase().includes('15g') && p.isParent) {
-          try {
-            // SQL orqali variantlarni olish
-            const variants = await prisma.$queryRaw`
-              SELECT 
-                id, variantName, cardType, currentStock, currentUnits, 
-                pricePerBag, active, parentId
-              FROM ProductVariant 
-              WHERE parentId = ${p.id} AND active = true
-              ORDER BY variantName
-            `;
-            
-            return { ...p, variants };
-          } catch (error) {
-            console.error('Error fetching variants for 15g preform:', error);
-            return { ...p, variants: [] };
-          }
-        }
-        return p;
-      })
-    );
-    
     // Calculate total stock for parent products
-    const productsWithTotals = productsWithVariants.map(p => {
+    const productsWithTotals = products.map(p => {
       if (p.isParent && p.variants) {
         const totalStock = p.variants.reduce((sum: number, v: any) => sum + (v.currentStock || 0), 0);
         return { ...p, totalStock };

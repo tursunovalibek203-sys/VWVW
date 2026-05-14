@@ -205,7 +205,7 @@ export function Drivers() {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="relative">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
+          <div className="animate-pulse rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
           <Sparkles className="w-6 h-6 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
         </div>
       </div>
@@ -249,7 +249,7 @@ export function Drivers() {
               className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-all"
               aria-label="Yangilash"
             >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-pulse' : ''}`} />
             </button>
             <button 
               onClick={handleExport}

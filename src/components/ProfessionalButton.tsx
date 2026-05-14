@@ -50,7 +50,7 @@ const ProfessionalButton = forwardRef<HTMLButtonElement, ProfessionalButtonProps
     const renderIcon = () => {
       if (loading) {
         return (
-          <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+          <div className="animate-pulse h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
         );
       }
       return icon;

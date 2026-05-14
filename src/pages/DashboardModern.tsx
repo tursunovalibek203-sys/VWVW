@@ -66,7 +66,7 @@ export default function DashboardModern() {
           <div className="glass-card p-12">
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-16 h-16">
-                <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
+                <div className="animate-pulse rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
               </div>
               <p className="mt-6 text-lg font-semibold text-primary">{latinToCyrillic("Yuklanmoqda...")}</p>
             </div>
@@ -104,7 +104,7 @@ export default function DashboardModern() {
 
   return (
     <ModernLayout 
-      title={latinToCyrillic("Бошқарув Панели")}
+      title={latinToCyrillic("Ð‘Ð¾ÑˆÒ›Ð°Ñ€ÑƒÐ² ÐŸÐ°Ð½ÐµÐ»Ð¸")}
       subtitle={new Date().toLocaleDateString('uz-UZ', { weekday: 'long', day: 'numeric', month: 'long' })}
     >
       <div className="space-y-8">
@@ -113,7 +113,7 @@ export default function DashboardModern() {
           <div className="glass-card-light p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("Жами Даромад")}</p>
+                <p className="text-sm text-secondary">{latinToCyrillic("Ð–Ð°Ð¼Ð¸ Ð”Ð°Ñ€Ð¾Ð¼Ð°Ð´")}</p>
                 <p className="text-2xl font-bold text-primary">
                   {stats.totalRevenue.toLocaleString()} UZS
                 </p>
@@ -131,7 +131,7 @@ export default function DashboardModern() {
           <div className="glass-card-light p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("Ойлик Даромад")}</p>
+                <p className="text-sm text-secondary">{latinToCyrillic("ÐžÐ¹Ð»Ð¸Ðº Ð”Ð°Ñ€Ð¾Ð¼Ð°Ð´")}</p>
                 <p className="text-2xl font-bold text-primary">
                   {stats.monthlyRevenue.toLocaleString()} UZS
                 </p>
@@ -149,7 +149,7 @@ export default function DashboardModern() {
           <div className="glass-card-light p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("Жами Буюртмалар")}</p>
+                <p className="text-sm text-secondary">{latinToCyrillic("Ð–Ð°Ð¼Ð¸ Ð‘ÑƒÑŽÑ€Ñ‚Ð¼Ð°Ð»Ð°Ñ€")}</p>
                 <p className="text-2xl font-bold text-primary">
                   {stats.totalOrders.toLocaleString()}
                 </p>
@@ -167,7 +167,7 @@ export default function DashboardModern() {
           <div className="glass-card-light p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("Мижозлар")}</p>
+                <p className="text-sm text-secondary">{latinToCyrillic("ÐœÐ¸Ð¶Ð¾Ð·Ð»Ð°Ñ€")}</p>
                 <p className="text-2xl font-bold text-primary">
                   {stats.totalCustomers.toLocaleString()}
                 </p>

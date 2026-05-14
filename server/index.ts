@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import compression from 'compression';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import { prisma } from './utils/prisma.js';

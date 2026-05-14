@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { salesService, SaleFilters } from '../services/SalesService';
-import { ResponseHelper } from '../utils/response';
+import { SalesService, SaleFilters } from '../services/SalesService';
+import { successResponse, errorResponse, paginatedResponse } from '../utils/response';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { validate, schemas } from '../middleware/validator';
 import { DecimalHelper } from '../utils/decimal-helper';
 
 const router = Router();
+const salesService = new SalesService();
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -38,16 +39,17 @@ router.get('/', async (req: AuthRequest, res) => {
     const limitNum = parseInt(limit as string);
     const total = sales.length;
     const paginatedSales = sales.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+    const totalPages = Math.ceil(total / limitNum);
 
-    res.json(ResponseHelper.success(paginatedSales, {
+    res.json(paginatedResponse(paginatedSales, {
       page: pageNum,
       limit: limitNum,
       total,
-      totalPages: Math.ceil(total / limitNum)
-    }));
+      totalPages
+    }, 'Sotuvlar muvaffaqiyatli yuklandi'));
   } catch (error: any) {
     console.error('Get sales error:', error);
-    res.status(500).json(ResponseHelper.internalError(error.message));
+    res.status(500).json(errorResponse(error.message));
   }
 });
 
@@ -61,9 +63,9 @@ router.get('/stats', authorize('ADMIN', 'ACCOUNTANT', 'MANAGER'), async (req, re
       endDate ? new Date(endDate as string) : undefined
     );
 
-    res.json(ResponseHelper.success(stats));
+    res.json(successResponse(stats));
   } catch (error: any) {
-    res.status(500).json(ResponseHelper.internalError(error.message));
+    res.status(500).json(errorResponse(error.message));
   }
 });
 
@@ -73,12 +75,12 @@ router.get('/:id', async (req, res) => {
     const sale = await salesService.getSaleById(req.params.id);
 
     if (!sale) {
-      return res.status(404).json(ResponseHelper.notFound('Sotuv'));
+      return res.status(404).json(errorResponse('Sotuv'));
     }
 
-    res.json(ResponseHelper.success(sale));
+    res.json(successResponse(sale));
   } catch (error: any) {
-    res.status(500).json(ResponseHelper.internalError(error.message));
+    res.status(500).json(errorResponse(error.message));
   }
 });
 
@@ -102,7 +104,7 @@ router.post('/',
       } = req.body;
 
       if (!req.user?.id) {
-        return res.status(401).json(ResponseHelper.unauthorized());
+        return res.status(401).json(errorResponse('Unauthorized'));
       }
 
       const sale = await salesService.createSale({
@@ -120,24 +122,24 @@ router.post('/',
         userName: req.user.name || req.user.email || 'Noma\'lum'
       });
 
-      res.status(201).json(ResponseHelper.success(sale));
+      res.status(201).json(successResponse(sale));
     } catch (error: any) {
       console.error('Create sale error:', error);
       console.error('Error stack:', error.stack);
       console.error('Request body:', req.body);
       
       if (error.message?.includes('topilmadi')) {
-        return res.status(404).json(ResponseHelper.notFound('Mahsulot'));
+        return res.status(404).json(errorResponse('Mahsulot'));
       }
       if (error.message?.includes('yetarli')) {
-        return res.status(400).json(ResponseHelper.badRequest(error.message));
+        return res.status(400).json(errorResponse(error.message));
       }
       if (error.message?.includes('Kamida')) {
-        return res.status(400).json(ResponseHelper.badRequest(error.message));
+        return res.status(400).json(errorResponse(error.message));
       }
       
       // Return detailed error message for debugging
-      res.status(500).json(ResponseHelper.internalError(
+      res.status(500).json(errorResponse(
         error.message || 'Sotuv yaratishda server xatosi'
       ));
     }
@@ -154,12 +156,12 @@ router.put('/:id',
         ...req.body
       });
 
-      res.json(ResponseHelper.success(sale));
+      res.json(successResponse(sale));
     } catch (error: any) {
       if (error.message === 'Sotuv topilmadi') {
-        return res.status(404).json(ResponseHelper.notFound('Sotuv'));
+        return res.status(404).json(errorResponse('Sotuv'));
       }
-      res.status(500).json(ResponseHelper.internalError(error.message));
+      res.status(500).json(errorResponse(error.message));
     }
   }
 );
@@ -170,7 +172,7 @@ router.delete('/:id',
   async (req: AuthRequest, res) => {
     try {
       if (!req.user?.id) {
-        return res.status(401).json(ResponseHelper.unauthorized());
+        return res.status(401).json(errorResponse('Unauthorized'));
       }
 
       await salesService.deleteSale(
@@ -179,14 +181,14 @@ router.delete('/:id',
         req.user.name || req.user.email || 'Noma\'lum'
       );
 
-      res.json(ResponseHelper.success({ 
+      res.json(successResponse({ 
         message: 'Sotuv muvaffaqiyatli o\'chirildi' 
       }));
     } catch (error: any) {
       if (error.message === 'Sotuv topilmadi') {
-        return res.status(404).json(ResponseHelper.notFound('Sotuv'));
+        return res.status(404).json(errorResponse('Sotuv'));
       }
-      res.status(500).json(ResponseHelper.internalError(error.message));
+      res.status(500).json(errorResponse(error.message));
     }
   }
 );

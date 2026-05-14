@@ -55,10 +55,17 @@ export default function SalesModern() {
   const periods = ['all', 'today', 'week', 'month', 'year'];
 
   const loadSales = async (pageNum = 1) => {
+    setLoading(true);
+    // Add timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setRefreshing(false);
+      console.warn('Loading timeout reached for sales');
+    }, 10000); // 10 second timeout
+    
     try {
-      setLoading(true);
-      
       const response = await api.get(`/sales?limit=${pageSize}&page=${pageNum}`);
+      clearTimeout(timeout);
       
       // Handle standardized API response format
       const { data: salesData, pagination } = extractPaginatedData<any>(
@@ -83,9 +90,11 @@ export default function SalesModern() {
       setTotal(pagination?.total || 0);
       
     } catch (error) {
+      clearTimeout(timeout);
       console.error('Sotuvlarni yuklashda xatolik:', error);
       addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Sotuvlarni yuklashda xatolik yuz berdi')));
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
       setRefreshing(false);
     }

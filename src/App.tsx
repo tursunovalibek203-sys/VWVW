@@ -68,11 +68,11 @@ const LoadingSpinner = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 bg-dots-pattern">
     <div className="glass-card p-10 rounded-3xl shadow-glass-lg animate-scale-in">
       <div className="relative">
-        {/* Outer ring with shimmer effect */}
-        <div className="animate-spin rounded-full h-20 w-20 border-4 border-blue-100 border-t-blue-600 border-r-blue-400 shadow-glow"></div>
+        {/* Outer ring with pulse effect */}
+        <div className="animate-pulse rounded-full h-20 w-20 bg-blue-500 shadow-glow"></div>
         
-        {/* Middle ring - counter spin */}
-        <div className="absolute top-1 left-1 animate-spin rounded-full h-18 w-18 border-3 border-indigo-100 border-b-indigo-500 border-l-indigo-300" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+        {/* Middle ring - delayed pulse */}
+        <div className="absolute top-1 left-1 animate-pulse rounded-full h-18 w-18 bg-indigo-500" style={{ animationDelay: '0.2s' }}></div>
         
         {/* Inner animated gradient */}
         <div className="absolute inset-0 flex items-center justify-center">
@@ -80,17 +80,17 @@ const LoadingSpinner = () => (
         </div>
         
         {/* Orbital dots */}
-        <div className="absolute inset-0 animate-spin-slow" style={{ animationDuration: '3s' }}>
+        <div className="absolute inset-0 animate-pulse" style={{ animationDelay: '0.5s' }}>
           <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-blue-400 rounded-full shadow-glow"></div>
         </div>
-        <div className="absolute inset-0 animate-spin-slow" style={{ animationDirection: 'reverse', animationDuration: '4s' }}>
+        <div className="absolute inset-0 animate-pulse" style={{ animationDelay: '0.7s' }}>
           <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-indigo-400 rounded-full shadow-glow"></div>
         </div>
       </div>
       
-      {/* Loading text with shimmer effect */}
+      {/* Loading text with pulse effect */}
       <div className="mt-8 text-center">
-        <p className="text-lg font-semibold text-gradient-blue animate-shimmer">Yuklanmoqda...</p>
+        <p className="text-lg font-semibold text-gradient-blue animate-pulse">Yuklanmoqda...</p>
         <p className="text-sm text-gray-500 mt-2">Iltimos, kuting</p>
       </div>
     </div>

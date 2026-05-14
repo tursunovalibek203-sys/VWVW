@@ -1,0 +1,5612 @@
+{
+  "generatedAt": "2026-05-11T03:42:10.187Z",
+  "baseUrl": "http://localhost:5003",
+  "endpointCount": 248,
+  "summary": {
+    "testedEndpoints": 143,
+    "nonStandardAuthResponses": 129,
+    "endpointsWithAny5xx": 65,
+    "totalValueIssuesInAuthResponses": 2644
+  },
+  "endpoints": [
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/analytics",
+        "file": "analytics.ts",
+        "line": 378
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"totalRevenue\":155792.4,\"totalExpenses\":58156,\"netProfit\":97636.4,\"totalSales\":58,\"period\":\"30 days\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/analytics/ai-insights",
+        "file": "analytics.ts",
+        "line": 20
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Tahlil yaratishda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/analytics/business-intelligence",
+        "file": "analytics.ts",
+        "line": 410
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Business Intelligence generatsiya qilishda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/analytics/business-metrics",
+        "file": "analytics.ts",
+        "line": 425
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Biznes metrikalari hisoblanishida xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/audit-logs",
+        "file": "audit-logs.ts",
+        "line": 10
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch audit logs\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/auth/me",
+        "file": "auth.ts",
+        "line": 245
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"id\":\"dcdf3bb1-560c-4daa-8e69-56134c5e3c5b\",\"name\":\"Admin\",\"role\":\"ADMIN\",\"active\":true,\"createdAt\":\"2026-04-27T05:02:45.806Z\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Token topilmadi\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/backup/export",
+        "file": "backup.ts",
+        "line": 8
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [
+            {
+              "path": "$.data.customers[0].address",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[0].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[0].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[0].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[0].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[0].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[1].address",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[1].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[1].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[1].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[1].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[1].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[2].address",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[2].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[2].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[2].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[2].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[2].lastPurchase",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[2].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[3].address",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[3].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[3].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[3].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[3].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[3].lastPurchase",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[3].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[4].address",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[4].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[4].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[4].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[4].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[4].lastPurchase",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[4].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[5].address",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[5].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[5].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[5].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[5].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[5].lastPurchase",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[5].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[6].address",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[6].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[6].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[6].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[6].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[6].lastPurchase",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[6].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[7].address",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[7].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.data.customers[7].telegramUsername",
+              "type": "null"
+            }
+          ],
+          "valueIssueCount": 1243,
+          "bodySnippet": "{\"exportDate\":\"2026-05-11T03:42:17.615Z\",\"version\":\"1.0\",\"data\":{\"users\":[{\"id\":\"dcdf3bb1-560c-4daa-8e69-56134c5e3c5b\",\"login\":\"admin\",\"name\":\"Admin\",\"role\":\"ADMIN\",\"active\":true,\"createdAt\":\"2026-04-27T05:02:45.806Z\",\"updatedAt\":\"2026-04-27T05:02:45.806Z\"},{\"id\":\"42da818e-0351-4c05-bc31-93ec37256997\",\"login\":\"seller\",\"name\":\"Sotuvchi\",\"role\":\"SELLER\",\"active\":true,\"createdAt\":\"2026-04-27T05:02:47.856Z\",\"updatedAt\":\"2026-04-27T05:02:47.856Z\"},{\"id\":\"08014a05-9a4e-4e83-b287-f9bb633bebf9\",\"login\":"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/bag-labels",
+        "file": "bag-labels.ts",
+        "line": 8
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch bag labels\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/bag-labels/stats/overview",
+        "file": "bag-labels.ts",
+        "line": 198
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"total\":0,\"byStatus\":[],\"byWorker\":[],\"byProduct\":[]}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/bots/list",
+        "file": "bot-api.ts",
+        "line": 24
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"success\":true,\"data\":{\"bots\":[],\"totalCount\":0}}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/bots/status",
+        "file": "bot-api.ts",
+        "line": 9
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"success\":true,\"data\":{\"totalBots\":0,\"activeBots\":0,\"inactiveBots\":0,\"botStatus\":{}},\"timestamp\":\"2026-05-11T03:42:34.821Z\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/budgets",
+        "file": "budgets.ts",
+        "line": 10
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch budgets\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/budgets/alerts/unread",
+        "file": "budgets.ts",
+        "line": 239
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch alerts\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/cards",
+        "file": "cards.ts",
+        "line": 8
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Internal server error\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/cashbox/audit-stats",
+        "file": "cashbox.ts",
+        "line": 586
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "null"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/cashbox/budgets",
+        "file": "cashbox.ts",
+        "line": 484
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/cashbox/export/excel",
+        "file": "cashbox.ts",
+        "line": 417
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"message\":\"Excel eksport tez orada qoshiladi\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/cashbox/export/pdf",
+        "file": "cashbox.ts",
+        "line": 409
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"message\":\"PDF eksport tez orada qoshiladi\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/cashbox/history",
+        "file": "cashbox.ts",
+        "line": 564
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/cashbox/loans",
+        "file": "cashbox.ts",
+        "line": 428
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Qarzlarni olishda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/cashbox/summary",
+        "file": "cashbox.ts",
+        "line": 10
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"totalBalance\":59875400,\"totalUSD\":164421.50116071186,\"todayIncome\":0,\"todayExpense\":0,\"monthlyIncome\":59875400,\"monthlyExpense\":0,\"byCurrency\":{\"cashUZS\":1285126452,\"cashUSD\":47487.64243055313,\"cardUSD\":0,\"clickUZS\":188240168},\"dailyFlow\":[{\"date\":\"5-may\",\"income\":13200,\"expense\":0,\"net\":13200},{\"date\":\"6-may\",\"income\":2450,\"expense\":0,\"net\":2450},{\"date\":\"7-may\",\"income\":3454.888373183493,\"expense\":0,\"net\":3454.888373183493},{\"date\":\"8-may\",\"income\":1167.099111555549,\"expense\":0,\"net\":1167.09"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/cashbox/suspicious-activity",
+        "file": "cashbox.ts",
+        "line": 604
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/cashbox/transactions",
+        "file": "cashbox.ts",
+        "line": 229
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Tranzaksiyalarni yuklashda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/customer-chat/conversations",
+        "file": "customer-chat.ts",
+        "line": 11
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch conversations\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/customer-chat/stats",
+        "file": "customer-chat.ts",
+        "line": 375
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"totalConversations\":0,\"totalMessages\":0,\"unreadMessages\":0,\"activeConversations\":0}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/customer-chat/unread-count",
+        "file": "customer-chat.ts",
+        "line": 160
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"count\":0}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/customer-chats",
+        "file": "customer-chats.ts",
+        "line": 8
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/customers",
+        "file": "customers.ts",
+        "line": 21
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"success\":false,\"error\":\"Failed to fetch customers\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/customers/alerts/overdue",
+        "file": "customers.ts",
+        "line": 337
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/dashboard/stats",
+        "file": "dashboard.ts",
+        "line": 9
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch dashboard stats\",\"details\":\"\\nInvalid `prisma.product.findMany()` invocation in\\nC:\\\\Users\\\\tilav\\\\Desktop\\\\zavod tizimi\\\\server\\\\routes\\\\dashboard.ts:93:22\\n\\n  90   orderBy: { _sum: { totalAmount: 'desc' } },\\n  91   take: 5,\\n  92 }),\\n→ 93 prisma.product.findMany(\\nInput error. Expected a referenced scalar field of type Float but found Product.minStockLimit of type Int.\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/drivers",
+        "file": "drivers.ts",
+        "line": 9
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch drivers\"}"
+        },
+        "noAuth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch drivers\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/expenses",
+        "file": "expenses.ts",
+        "line": 9
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch expenses\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/expenses/summary",
+        "file": "expenses.ts",
+        "line": 43
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[{\"_sum\":{\"amount\":4513},\"category\":\"SALARY\",\"currency\":\"USD\"},{\"_sum\":{\"amount\":8621},\"category\":\"TRANSPORT\",\"currency\":\"USD\"},{\"_sum\":{\"amount\":3898},\"category\":\"MAINTENANCE\",\"currency\":\"USD\"},{\"_sum\":{\"amount\":9653},\"category\":\"OTHER\",\"currency\":\"UZS\"},{\"_sum\":{\"amount\":7213},\"category\":\"MAINTENANCE\",\"currency\":\"UZS\"},{\"_sum\":{\"amount\":10734},\"category\":\"TRANSPORT\",\"currency\":\"UZS\"},{\"_sum\":{\"amount\":13524},\"category\":\"UTILITIES\",\"currency\":\"UZS\"}]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/export/all",
+        "file": "export.ts",
+        "line": 86
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [
+            {
+              "path": "$.customers[0].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[0].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[0].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[1].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[1].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[1].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[2].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[2].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[2].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[3].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[3].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[3].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[4].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[4].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[5].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[5].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[5].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[6].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[6].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[6].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[7].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[7].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[7].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[8].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[8].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[8].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[9].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[9].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[9].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[10].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[10].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[10].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[11].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[11].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[11].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[12].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[12].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[12].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[13].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[13].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[13].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[14].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[14].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[14].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[15].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[15].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[15].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[16].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[16].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[16].Telegram username",
+              "type": "empty_string"
+            }
+          ],
+          "valueIssueCount": 171,
+          "bodySnippet": "{\"exportDate\":\"2026-05-11T03:42:55.290Z\",\"version\":\"1.0\",\"products\":[{\"ID\":\"01272131-7b35-462b-9b99-b550beacfcf6\",\"Nomi\":\"0.5L Bottle\",\"Qop turi\":\"Boshqa\",\"Qopdagi donalar soni\":500,\"Minimal zaxira\":25,\"Optimal zaxira\":180,\"Maksimal sig'im\":250,\"Joriy zaxira (qop)\":120,\"Joriy zaxira (dona)\":0,\"Narx qop uchun\":45,\"Ishlab chiqarish narxi\":0,\"Yaratilgan sana\":\"27/04/2026\",\"Yangilangan sana\":\"28/04/2026\"},{\"ID\":\"e7c0aa47-6c84-4a10-9136-76471e0a838a\",\"Nomi\":\"1.0L Bottle\",\"Qop turi\":\"Boshqa\",\"Qopdagi "
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/export/customers",
+        "file": "export.ts",
+        "line": 50
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [
+            {
+              "path": "$.customers[0].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[0].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[0].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[1].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[1].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[1].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[2].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[2].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[2].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[3].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[3].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[3].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[4].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[4].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[5].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[5].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[5].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[6].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[6].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[6].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[7].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[7].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[7].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[8].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[8].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[8].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[9].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[9].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[9].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[10].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[10].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[10].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[11].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[11].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[11].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[12].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[12].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[12].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[13].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[13].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[13].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[14].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[14].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[14].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[15].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[15].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[15].Telegram username",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[16].Manzil",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[16].Telegram Chat ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.customers[16].Telegram username",
+              "type": "empty_string"
+            }
+          ],
+          "valueIssueCount": 171,
+          "bodySnippet": "{\n  \"exportDate\": \"2026-05-11T03:42:57.642Z\",\n  \"total\": 64,\n  \"customers\": [\n    {\n      \"ID\": \"d82b37c3-3166-4c7c-9875-61904500570a\",\n      \"Ismi\": \"Alyaska water\",\n      \"Email\": \"alyaskawater@sum.com\",\n      \"Telefon\": \"+99890000000\",\n      \"Manzil\": \"\",\n      \"Telegram Chat ID\": \"\",\n      \"Telegram username\": \"\",\n      \"Eslatmalar yoqilgan\": \"Ha\",\n      \"Qarz eslatma kunlari\": 7,\n      \"To'lov muddati (kun)\": 30,\n      \"Chegirma foizi\": 0,\n      \"Balans\": 0,\n      \"Qarz\": 0,\n      \"Kredit l"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/export/products",
+        "file": "export.ts",
+        "line": 14
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\n  \"exportDate\": \"2026-05-11T03:42:58.671Z\",\n  \"total\": 105,\n  \"products\": [\n    {\n      \"ID\": \"01272131-7b35-462b-9b99-b550beacfcf6\",\n      \"Nomi\": \"0.5L Bottle\",\n      \"Qop turi\": \"Boshqa\",\n      \"Qopdagi donalar soni\": 500,\n      \"Minimal zaxira\": 25,\n      \"Optimal zaxira\": 180,\n      \"Maksimal sig'im\": 250,\n      \"Joriy zaxira (qop)\": 120,\n      \"Joriy zaxira (dona)\": 0,\n      \"Narx qop uchun\": 45,\n      \"Ishlab chiqarish narxi\": 0,\n      \"Yaratilgan sana\": \"27/04/2026\",\n      \"Yangilangan"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/export/statistics",
+        "file": "export.ts",
+        "line": 154
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"products\":{\"total\":105,\"lowStock\":6,\"outOfStock\":6,\"normal\":93},\"customers\":{\"total\":64,\"withDebt\":13,\"active\":4,\"inactive\":60},\"exportDate\":\"2026-05-11T03:42:59.693Z\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/forecast",
+        "file": "forecast.ts",
+        "line": 51
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to generate forecast\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/forecast/overview",
+        "file": "forecast.ts",
+        "line": 96
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to generate overview\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/inventory-ai/analyze-all",
+        "file": "inventory-ai.ts",
+        "line": 25
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"\\nInvalid `prisma.product.findUnique()` invocation in\\nC:\\\\Users\\\\tilav\\\\Desktop\\\\zavod tizimi\\\\server\\\\ai\\\\inventory-optimizer.ts:71:40\\n\\n  68  */\\n  69 export async function analyzeProductInventory(productId: string): Promise<InventoryAnalysis> {\\n  70   // 1. Mahsulot ma'lumotlarini olish\\n→ 71   const product = await prisma.product.findUnique({\\n         where: {\\n           id: \\\"e2f0cbbd-82e1-4398-b0f4-2f48eb108793\\\"\\n         },\\n         include: {\\n           sales: {\\n      "
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/inventory-ai/recommendations",
+        "file": "inventory-ai.ts",
+        "line": 51
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"\\nInvalid `prisma.product.findUnique()` invocation in\\nC:\\\\Users\\\\tilav\\\\Desktop\\\\zavod tizimi\\\\server\\\\ai\\\\inventory-optimizer.ts:71:40\\n\\n  68  */\\n  69 export async function analyzeProductInventory(productId: string): Promise<InventoryAnalysis> {\\n  70   // 1. Mahsulot ma'lumotlarini olish\\n→ 71   const product = await prisma.product.findUnique({\\n         where: {\\n           id: \\\"e2f0cbbd-82e1-4398-b0f4-2f48eb108793\\\"\\n         },\\n         include: {\\n           sales: {\\n      "
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/inventory-ai/risks",
+        "file": "inventory-ai.ts",
+        "line": 38
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"\\nInvalid `prisma.product.findUnique()` invocation in\\nC:\\\\Users\\\\tilav\\\\Desktop\\\\zavod tizimi\\\\server\\\\ai\\\\inventory-optimizer.ts:71:40\\n\\n  68  */\\n  69 export async function analyzeProductInventory(productId: string): Promise<InventoryAnalysis> {\\n  70   // 1. Mahsulot ma'lumotlarini olish\\n→ 71   const product = await prisma.product.findUnique({\\n         where: {\\n           id: \\\"e2f0cbbd-82e1-4398-b0f4-2f48eb108793\\\"\\n         },\\n         include: {\\n           sales: {\\n      "
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/logistics/deliveries",
+        "file": "logistics.ts",
+        "line": 11
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/logistics/drivers",
+        "file": "logistics.ts",
+        "line": 71
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/logistics/orders",
+        "file": "logistics.ts",
+        "line": 124
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch orders\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/logistics/statistics",
+        "file": "logistics.ts",
+        "line": 165
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch statistics\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/logistics/vehicles",
+        "file": "logistics.ts",
+        "line": 212
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch vehicles\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/notifications",
+        "file": "notifications.ts",
+        "line": 8
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/orders",
+        "file": "orders.ts",
+        "line": 22
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch orders\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/product-categories",
+        "file": "product-categories.ts",
+        "line": 10
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch categories\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/product-categories/sub-types",
+        "file": "product-categories.ts",
+        "line": 76
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/product-types",
+        "file": "product-types.ts",
+        "line": 8
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Internal server error\",\"details\":\"\\nInvalid `prisma.$queryRaw()` invocation:\\n\\n\\nRaw query failed. Code: `42P01`. Message: `relation \\\"sqlite_master\\\" does not exist`\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/product-variants",
+        "file": "product-variants.ts",
+        "line": 8
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Internal server error\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/product-variants/card-types",
+        "file": "product-variants.ts",
+        "line": 140
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[{\"value\":\"STANDART\",\"label\":\"Standart\",\"description\":\"Oddiy kart qadoq\"},{\"value\":\"PREMIUM\",\"label\":\"Premium\",\"description\":\"Sifatli kart qadoq\"},{\"value\":\"ECO\",\"label\":\"Ekologik\",\"description\":\"Ekologik toza kart\"},{\"value\":\"LUXURY\",\"label\":\"Luxury\",\"description\":\"Hashamatli kart qadoq\"}]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/production",
+        "file": "production.ts",
+        "line": 11
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/production/orders",
+        "file": "production.ts",
+        "line": 23
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/products",
+        "file": "products.ts",
+        "line": 19
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"success\":false,\"error\":\"Failed to fetch products\",\"data\":\"\\nInvalid `prisma.product.findMany()` invocation in\\nC:\\\\Users\\\\tilav\\\\Desktop\\\\zavod tizimi\\\\server\\\\routes\\\\products.ts:87:43\\n\\n  84   return res.json(successResponse(productsWithTotals));\\n  85 }\\n  86 \\n→ 87 const products = await prisma.product.findMany({\\n       include: {\\n         batches: {\\n         ~~~~~~~\\n           orderBy: {\\n             productionDate: \\\"desc\\\"\\n           },\\n           take: 1\\n         },\\n         "
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/products/alerts",
+        "file": "products.ts",
+        "line": 501
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[{\"productId\":\"d50fe415-1218-4cfd-92dc-2c5e421491dc\",\"productName\":\"30mm Preform\",\"currentStock\":80,\"status\":\"warning\"},{\"productId\":\"9e21a868-78bc-4a02-8bc9-6213134f2ba1\",\"productName\":\"38mm Preform\",\"currentStock\":60,\"status\":\"warning\"},{\"productId\":\"5b032101-b627-44d7-a03a-25d1c413c8f7\",\"productName\":\"48mm Preform\",\"currentStock\":40,\"status\":\"warning\"},{\"productId\":\"b9e71570-047f-4af6-ac8d-ae62434ea35f\",\"productName\":\"PET Preform 28mm\",\"currentStock\":150,\"status\":\"warning\"},{\"productId\":\"e73f"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/products/audit/history",
+        "file": "products.ts",
+        "line": 755
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/products/audit/stats",
+        "file": "products.ts",
+        "line": 792
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "null"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/products/audit/suspicious-activity",
+        "file": "products.ts",
+        "line": 822
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/products/history/expense",
+        "file": "products.ts",
+        "line": 894
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Chiqim tarixini yuklashda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/products/history/income",
+        "file": "products.ts",
+        "line": 853
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Kirim tarixini yuklashda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/products/history/stats",
+        "file": "products.ts",
+        "line": 937
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Statistikani yuklashda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/public/products",
+        "file": "public-orders.ts",
+        "line": 7
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[{\"id\":\"01272131-7b35-462b-9b99-b550beacfcf6\",\"name\":\"0.5L Bottle\",\"pricePerBag\":45,\"currentStock\":120,\"bagType\":\"Boshqa\"},{\"id\":\"e7c0aa47-6c84-4a10-9136-76471e0a838a\",\"name\":\"1.0L Bottle\",\"pricePerBag\":50,\"currentStock\":90,\"bagType\":\"Boshqa\"},{\"id\":\"e4657bc2-46bc-48af-854d-5f8277ede924\",\"name\":\"1.5L Bottle\",\"pricePerBag\":55,\"currentStock\":70,\"bagType\":\"Boshqa\"},{\"id\":\"10642c0e-0aae-495e-96c8-b5a3dd4743d7\",\"name\":\"2.0L Bottle\",\"pricePerBag\":60,\"currentStock\":50,\"bagType\":\"Boshqa\"},{\"id\":\"2efe420"
+        },
+        "noAuth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[{\"id\":\"01272131-7b35-462b-9b99-b550beacfcf6\",\"name\":\"0.5L Bottle\",\"pricePerBag\":45,\"currentStock\":120,\"bagType\":\"Boshqa\"},{\"id\":\"e7c0aa47-6c84-4a10-9136-76471e0a838a\",\"name\":\"1.0L Bottle\",\"pricePerBag\":50,\"currentStock\":90,\"bagType\":\"Boshqa\"},{\"id\":\"e4657bc2-46bc-48af-854d-5f8277ede924\",\"name\":\"1.5L Bottle\",\"pricePerBag\":55,\"currentStock\":70,\"bagType\":\"Boshqa\"},{\"id\":\"10642c0e-0aae-495e-96c8-b5a3dd4743d7\",\"name\":\"2.0L Bottle\",\"pricePerBag\":60,\"currentStock\":50,\"bagType\":\"Boshqa\"},{\"id\":\"2efe420"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/quality-checks",
+        "file": "quality-checks.ts",
+        "line": 9
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch quality checks\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/quality-checks/stats",
+        "file": "quality-checks.ts",
+        "line": 39
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"total\":0,\"passed\":0,\"failed\":0,\"passRate\":0}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/raw-materials",
+        "file": "raw-materials.ts",
+        "line": 9
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch raw materials\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/raw-materials/alerts",
+        "file": "raw-materials.ts",
+        "line": 46
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch material alerts\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/reports/customer-analysis",
+        "file": "reports.ts",
+        "line": 67
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to generate customer analysis\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/reports/customers",
+        "file": "reports.ts",
+        "line": 237
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [
+            {
+              "path": "$.customers[0].address",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[0].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[0].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[0].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[0].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[0].lastPurchase",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[0].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[1].address",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[1].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[1].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[1].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[1].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[1].lastPurchase",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[1].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[2].address",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[2].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[2].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[2].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[2].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[2].lastPurchase",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[2].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[3].address",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[3].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[3].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[3].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[3].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[3].lastPurchase",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[3].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[4].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[4].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[4].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[4].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[4].lastPurchase",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[4].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[5].address",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[5].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[5].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[5].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[5].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[5].lastPurchase",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[5].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[6].address",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[6].telegramChatId",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[6].telegramUsername",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[6].pricePerBag",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[6].productPrices",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[6].lastPurchase",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[6].lastPayment",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[7].address",
+              "type": "null"
+            },
+            {
+              "path": "$.customers[7].telegramChatId",
+              "type": "null"
+            }
+          ],
+          "valueIssueCount": 423,
+          "bodySnippet": "{\"customers\":[{\"id\":\"d82b37c3-3166-4c7c-9875-61904500570a\",\"name\":\"Alyaska water\",\"email\":\"alyaskawater@sum.com\",\"phone\":\"+99890000000\",\"address\":null,\"telegramChatId\":null,\"telegramUsername\":null,\"notificationsEnabled\":true,\"debtReminderDays\":7,\"category\":\"NORMAL\",\"balance\":0,\"balanceUZS\":0,\"balanceUSD\":0,\"debt\":0,\"debtUZS\":0,\"debtUSD\":0,\"creditLimit\":0,\"paymentTermDays\":30,\"discountPercent\":0,\"pricePerBag\":null,\"productPrices\":null,\"lastPurchase\":null,\"lastPayment\":null,\"createdAt\":\"2026-05-02"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/reports/daily",
+        "file": "reports.ts",
+        "line": 261
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Date parameter is required\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/reports/inventory",
+        "file": "reports.ts",
+        "line": 45
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to generate inventory report\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/reports/products",
+        "file": "reports.ts",
+        "line": 213
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [
+            {
+              "path": "$.products[0].parentProductId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[0].variantName",
+              "type": "null"
+            },
+            {
+              "path": "$.products[0].productTypeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[0].categoryId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[0].sizeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[0].subType",
+              "type": "null"
+            },
+            {
+              "path": "$.products[1].parentProductId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[1].variantName",
+              "type": "null"
+            },
+            {
+              "path": "$.products[1].productTypeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[1].categoryId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[1].sizeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[1].subType",
+              "type": "null"
+            },
+            {
+              "path": "$.products[2].parentProductId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[2].variantName",
+              "type": "null"
+            },
+            {
+              "path": "$.products[2].productTypeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[2].categoryId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[2].sizeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[2].subType",
+              "type": "null"
+            },
+            {
+              "path": "$.products[3].parentProductId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[3].variantName",
+              "type": "null"
+            },
+            {
+              "path": "$.products[3].productTypeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[3].categoryId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[3].sizeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[3].subType",
+              "type": "null"
+            },
+            {
+              "path": "$.products[4].parentProductId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[4].variantName",
+              "type": "null"
+            },
+            {
+              "path": "$.products[4].productTypeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[4].categoryId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[4].sizeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[4].subType",
+              "type": "null"
+            },
+            {
+              "path": "$.products[5].parentProductId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[5].variantName",
+              "type": "null"
+            },
+            {
+              "path": "$.products[5].productTypeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[5].categoryId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[5].sizeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[5].subType",
+              "type": "null"
+            },
+            {
+              "path": "$.products[6].parentProductId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[6].variantName",
+              "type": "null"
+            },
+            {
+              "path": "$.products[6].productTypeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[6].categoryId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[6].sizeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[6].subType",
+              "type": "null"
+            },
+            {
+              "path": "$.products[7].parentProductId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[7].variantName",
+              "type": "null"
+            },
+            {
+              "path": "$.products[7].productTypeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[7].categoryId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[7].sizeId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[7].subType",
+              "type": "null"
+            },
+            {
+              "path": "$.products[8].parentProductId",
+              "type": "null"
+            },
+            {
+              "path": "$.products[8].variantName",
+              "type": "null"
+            }
+          ],
+          "valueIssueCount": 630,
+          "bodySnippet": "{\"products\":[{\"id\":\"01272131-7b35-462b-9b99-b550beacfcf6\",\"name\":\"0.5L Bottle\",\"bagType\":\"Boshqa\",\"unitsPerBag\":500,\"minStockLimit\":25,\"optimalStock\":180,\"maxCapacity\":250,\"currentStock\":120,\"currentUnits\":0,\"pricePerBag\":45,\"pricePerPiece\":0,\"productionCost\":0,\"isParent\":false,\"parentProductId\":null,\"variantName\":null,\"productTypeId\":null,\"warehouse\":\"preform\",\"categoryId\":null,\"sizeId\":null,\"subType\":null,\"active\":true,\"createdAt\":\"2026-04-27T05:02:49.555Z\",\"updatedAt\":\"2026-04-28T10:54:06.341"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/reports/profit-loss",
+        "file": "reports.ts",
+        "line": 94
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"revenue\":183227.4,\"expenses\":58156,\"grossProfit\":125071.4,\"profitMargin\":68.26}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/reports/sales",
+        "file": "reports.ts",
+        "line": 173
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to generate sales report\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/reports/sales-summary",
+        "file": "reports.ts",
+        "line": 9
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to generate sales report\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/sales",
+        "file": "sales.ts",
+        "line": 27
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"success\":false,\"error\":\"Failed to fetch sales\",\"data\":\"\\nInvalid `prisma.sale.findMany()` invocation in\\nC:\\\\Users\\\\tilav\\\\Desktop\\\\zavod tizimi\\\\server\\\\routes\\\\sales.ts:62:19\\n\\n  59 \\n  60 // Get sales with pagination and count items\\n  61 const [sales, itemCounts] = await Promise.all([\\n→ 62   prisma.sale.findMany({\\n         where: {},\\n         select: {\\n           id: true,\\n           receiptNumber: true,\\n           createdAt: true,\\n           totalAmount: true,\\n           paidAmou"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/sales/audit/history",
+        "file": "sales.ts",
+        "line": 781
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/sales/audit/stats",
+        "file": "sales.ts",
+        "line": 804
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "null"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/sales/audit/suspicious-activity",
+        "file": "sales.ts",
+        "line": 822
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/sales/audit/trend",
+        "file": "sales.ts",
+        "line": 837
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[{\"date\":\"2026-05-02\",\"sales\":10,\"amount\":8765.4,\"payments\":0,\"cancelled\":0}]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/sales/driver-pending-collections",
+        "file": "sales.ts",
+        "line": 1001
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch sale\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/settings",
+        "file": "settings.ts",
+        "line": 8
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [
+            {
+              "path": "$.TELEGRAM_BOT_TOKEN",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.TELEGRAM_ADMIN_CHAT_ID",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.SMS_API_KEY",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.EMAIL_SMTP_HOST",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.EMAIL_USERNAME",
+              "type": "empty_string"
+            },
+            {
+              "path": "$.EMAIL_PASSWORD",
+              "type": "empty_string"
+            }
+          ],
+          "valueIssueCount": 6,
+          "bodySnippet": "{\"USD_TO_UZS_RATE\":\"12500\",\"EUR_TO_UZS_RATE\":\"13500\",\"COMPANY_NAME\":\"Lux Pet Plast\",\"COMPANY_ADDRESS\":\"Toshkent, O'zbekiston\",\"COMPANY_PHONE\":\"+998901234567\",\"COMPANY_EMAIL\":\"info@luxpetplast.uz\",\"TAX_RATE\":\"12\",\"INVOICE_PREFIX\":\"INV\",\"LOW_STOCK_THRESHOLD\":\"10\",\"DEBT_ALERT_DAYS\":\"30\",\"TELEGRAM_BOT_TOKEN\":\"\",\"TELEGRAM_ADMIN_CHAT_ID\":\"\",\"SMS_API_KEY\":\"\",\"EMAIL_SMTP_HOST\":\"\",\"EMAIL_SMTP_PORT\":\"587\",\"EMAIL_USERNAME\":\"\",\"EMAIL_PASSWORD\":\"\",\"BACKUP_FREQUENCY\":\"daily\",\"LANGUAGE\":\"uz\",\"TIMEZONE\":\"Asia/T"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/settings/exchange-rates",
+        "file": "settings.ts",
+        "line": 118
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"USD_TO_UZS\":\"12500\",\"EUR_TO_UZS\":\"13500\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/statistics/business-metrics",
+        "file": "statistics.ts",
+        "line": 328
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Biznes metrikalari hisoblanishida xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/statistics/comprehensive",
+        "file": "statistics.ts",
+        "line": 12
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Statistika yaratishda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/statistics/export",
+        "file": "statistics.ts",
+        "line": 344
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"message\":\"Export funksiyasi ishlab chiqilmoqda\",\"format\":\"pdf\",\"days\":30,\"data\":[]}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/super-manager/report",
+        "file": "super-manager.ts",
+        "line": 10
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Hisobotni yaratishda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/suppliers",
+        "file": "suppliers.ts",
+        "line": 9
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to fetch suppliers\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/tasks",
+        "file": "tasks.ts",
+        "line": 9
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/tasks/my-tasks",
+        "file": "tasks.ts",
+        "line": 101
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[]"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "GET",
+        "path": "/api/users",
+        "file": "users.ts",
+        "line": 11
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "[{\"id\":\"dcdf3bb1-560c-4daa-8e69-56134c5e3c5b\",\"login\":\"admin\",\"name\":\"Admin\",\"role\":\"ADMIN\",\"active\":true,\"createdAt\":\"2026-04-27T05:02:45.806Z\"},{\"id\":\"42da818e-0351-4c05-bc31-93ec37256997\",\"login\":\"seller\",\"name\":\"Sotuvchi\",\"role\":\"SELLER\",\"active\":true,\"createdAt\":\"2026-04-27T05:02:47.856Z\"},{\"id\":\"08014a05-9a4e-4e83-b287-f9bb633bebf9\",\"login\":\"admin@aziztrades.com\",\"name\":\"Admin User\",\"role\":\"ADMIN\",\"active\":true,\"createdAt\":\"2026-05-01T00:53:44.181Z\"},{\"id\":\"7cc58c82-8f28-44e2-bafd-872e4f3a"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/auth/cashier-login",
+        "file": "auth.ts",
+        "line": 151
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Login va parol kiritilishi shart\"}"
+        },
+        "noAuth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Login va parol kiritilishi shart\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Login va parol kiritilishi shart\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Login va parol kiritilishi shart\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/auth/login",
+        "file": "auth.ts",
+        "line": 86
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Login va parol kiritilishi shart\"}"
+        },
+        "noAuth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Login va parol kiritilishi shart\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Login va parol kiritilishi shart\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Login va parol kiritilishi shart\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/auth/refresh",
+        "file": "auth.ts",
+        "line": 280
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImRjZGYzYmIxLTU2MGMtNGRhYS04ZTY5LTU2MTM0YzVlM2M1YiIsInJvbGUiOiJBRE1JTiIsIm5hbWUiOiJBZG1pbiIsImlhdCI6MTc3ODQ3MTAxMywiZXhwIjoxNzgxMDYzMDEzfQ.JsXmWs_nkiTqj3JyxZEiTrtEi8TkC12klsUiEF8gpgA\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImRjZGYzYmIxLTU2MGMtNGRhYS04ZTY5LTU2MTM0YzVlM2M1YiIsInJvbGUiOiJBRE1JTiIsIm5hbWUiOiJBZG1pbiIsImlhdCI6MTc3ODQ3MTAxMywiZXhwIjoxNzgxMDYzMDEzfQ.JsXmWs_nkiTqj3JyxZEiTrtEi8TkC12klsUiEF8gpgA\"}"
+        },
+        "invalidPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImRjZGYzYmIxLTU2MGMtNGRhYS04ZTY5LTU2MTM0YzVlM2M1YiIsInJvbGUiOiJBRE1JTiIsIm5hbWUiOiJBZG1pbiIsImlhdCI6MTc3ODQ3MTAxMywiZXhwIjoxNzgxMDYzMDEzfQ.JsXmWs_nkiTqj3JyxZEiTrtEi8TkC12klsUiEF8gpgA\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/auth/register",
+        "file": "auth.ts",
+        "line": 220
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Login, parol va ism kiritilishi shart\"}"
+        },
+        "noAuth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Login, parol va ism kiritilishi shart\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Login, parol va ism kiritilishi shart\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Login, parol va ism kiritilishi shart\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/backup/import",
+        "file": "backup.ts",
+        "line": 54
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Ma'lumotlar topilmadi\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Ma'lumotlar topilmadi\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Ma'lumotlar topilmadi\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/bag-labels",
+        "file": "bag-labels.ts",
+        "line": 89
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Labels array is required\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Labels array is required\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Labels array is required\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/bots/broadcast",
+        "file": "bot-api.ts",
+        "line": 47
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Xabar matn kiritilmagan\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Xabar matn kiritilmagan\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Xabar matn kiritilmagan\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/bots/customer/order",
+        "file": "bot-api.ts",
+        "line": 88
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Buyurtma berishda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Buyurtma berishda xatolik\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Buyurtma berishda xatolik\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Buyurtma berishda xatolik\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/bots/webhook/admin",
+        "file": "bot-api.ts",
+        "line": 286
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "noAuth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "emptyPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "invalidPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/bots/webhook/customer",
+        "file": "bot-api.ts",
+        "line": 234
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "noAuth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "emptyPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "invalidPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/bots/webhook/customer-old",
+        "file": "bot-api.ts",
+        "line": 221
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "noAuth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "emptyPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "invalidPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/bots/webhook/customer-premium",
+        "file": "bot-api.ts",
+        "line": 247
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "noAuth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "emptyPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "invalidPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/bots/webhook/logistics",
+        "file": "bot-api.ts",
+        "line": 273
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "noAuth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "emptyPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "invalidPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/bots/webhook/production",
+        "file": "bot-api.ts",
+        "line": 260
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "noAuth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "emptyPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        },
+        "invalidPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_json",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "OK"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/budgets",
+        "file": "budgets.ts",
+        "line": 42
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create budget\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create budget\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create budget\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/cards",
+        "file": "cards.ts",
+        "line": 29
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Name is required and must be a non-empty string\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Name is required and must be a non-empty string\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Name is required and must be a non-empty string\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/cashbox/add",
+        "file": "cashbox.ts",
+        "line": 261
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Kassa toldirishda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Kassa toldirishda xatolik\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Kassa toldirishda xatolik\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/cashbox/budgets",
+        "file": "cashbox.ts",
+        "line": 530
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Byudjet yaratishda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Byudjet yaratishda xatolik\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Byudjet yaratishda xatolik\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/cashbox/exchange",
+        "file": "cashbox.ts",
+        "line": 344
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Miqdor musbat bolishi kerak\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Miqdor musbat bolishi kerak\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Miqdor musbat bolishi kerak\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/cashbox/loans",
+        "file": "cashbox.ts",
+        "line": 442
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Qarz yaratishda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Qarz yaratishda xatolik\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Qarz yaratishda xatolik\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/cashbox/transfer",
+        "file": "cashbox.ts",
+        "line": 301
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Bir xil tolov usullariga transfer qilib bolmaydi\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Bir xil tolov usullariga transfer qilib bolmaydi\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Bir xil tolov usullariga transfer qilib bolmaydi\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/cashbox/withdraw",
+        "file": "cashbox.ts",
+        "line": 281
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Kassa chiqimida xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Kassa chiqimida xatolik\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Kassa chiqimida xatolik\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/cashier/sales",
+        "file": "cashier.ts",
+        "line": 10
+      },
+      "tests": {
+        "auth": {
+          "status": 403,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Insufficient permissions\",\"requiredRoles\":[\"CASHIER\"],\"yourRole\":\"ADMIN\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 403,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Insufficient permissions\",\"requiredRoles\":[\"CASHIER\"],\"yourRole\":\"ADMIN\"}"
+        },
+        "invalidPayload": {
+          "status": 403,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Insufficient permissions\",\"requiredRoles\":[\"CASHIER\"],\"yourRole\":\"ADMIN\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/customer-chats/send-message",
+        "file": "customer-chats.ts",
+        "line": 77
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Telegram chat ID and message are required\"}"
+        },
+        "noAuth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Telegram chat ID and message are required\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Telegram chat ID and message are required\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Telegram chat ID and message are required\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/customer-chats/webhook/telegram",
+        "file": "customer-chats.ts",
+        "line": 176
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"ok\":true}"
+        },
+        "noAuth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"ok\":true}"
+        },
+        "emptyPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"ok\":true}"
+        },
+        "invalidPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"ok\":true}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/customers",
+        "file": "customers.ts",
+        "line": 145
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Ism kiritilishi shart\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Ism kiritilishi shart\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Ism kiritilishi shart\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/drivers",
+        "file": "drivers.ts",
+        "line": 32
+      },
+      "tests": {
+        "auth": {
+          "status": 403,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Insufficient permissions\",\"requiredRoles\":[\"ADMIN\"],\"yourRole\":\"unknown\"}"
+        },
+        "noAuth": {
+          "status": 403,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Insufficient permissions\",\"requiredRoles\":[\"ADMIN\"],\"yourRole\":\"unknown\"}"
+        },
+        "emptyPayload": {
+          "status": 403,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Insufficient permissions\",\"requiredRoles\":[\"ADMIN\"],\"yourRole\":\"unknown\"}"
+        },
+        "invalidPayload": {
+          "status": 403,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Insufficient permissions\",\"requiredRoles\":[\"ADMIN\"],\"yourRole\":\"unknown\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/drivers/check-or-create",
+        "file": "drivers.ts",
+        "line": 429
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Ism va telefon raqami majburiy\"}"
+        },
+        "noAuth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Ism va telefon raqami majburiy\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Ism va telefon raqami majburiy\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Ism va telefon raqami majburiy\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/expenses",
+        "file": "expenses.ts",
+        "line": 32
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create expense\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create expense\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create expense\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/logistics/deliveries",
+        "file": "logistics.ts",
+        "line": 24
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create delivery\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create delivery\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create delivery\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/logistics/drivers",
+        "file": "logistics.ts",
+        "line": 84
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create driver\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create driver\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create driver\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/logistics/vehicles",
+        "file": "logistics.ts",
+        "line": 228
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create vehicle\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create vehicle\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create vehicle\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/notifications",
+        "file": "notifications.ts",
+        "line": 65
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Bildirishnoma yaratishda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Bildirishnoma yaratishda xatolik\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Bildirishnoma yaratishda xatolik\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "PUT",
+        "path": "/api/notifications/mark-all-read",
+        "file": "notifications.ts",
+        "line": 46
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"message\":\"Barcha bildirishnomalar o'qilgan deb belgilandi\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"message\":\"Barcha bildirishnomalar o'qilgan deb belgilandi\"}"
+        },
+        "invalidPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"message\":\"Barcha bildirishnomalar o'qilgan deb belgilandi\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/orders",
+        "file": "orders.ts",
+        "line": 43
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Validatsiya xatosi\",\"details\":[{\"path\":\"customerId\",\"message\":\"Required\"},{\"path\":\"items\",\"message\":\"Required\"}]}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Validatsiya xatosi\",\"details\":[{\"path\":\"customerId\",\"message\":\"Required\"},{\"path\":\"items\",\"message\":\"Required\"}]}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Validatsiya xatosi\",\"details\":[{\"path\":\"customerId\",\"message\":\"Required\"},{\"path\":\"items\",\"message\":\"Expected array, received string\"}]}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/print/receipt",
+        "file": "print.ts",
+        "line": 11
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Content and filename are required\"}"
+        },
+        "noAuth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Content and filename are required\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Content and filename are required\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Content and filename are required\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/print/test",
+        "file": "print.ts",
+        "line": 75
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"success\":true,\"message\":\"Test print sent to printer\"}"
+        },
+        "noAuth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"success\":true,\"message\":\"Test print sent to printer\"}"
+        },
+        "emptyPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"success\":true,\"message\":\"Test print sent to printer\"}"
+        },
+        "invalidPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"success\":true,\"message\":\"Test print sent to printer\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/product-types",
+        "file": "product-types.ts",
+        "line": 67
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Name is required and must be a non-empty string\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Name is required and must be a non-empty string\"}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Name is required and must be a non-empty string\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/product-variants",
+        "file": "product-variants.ts",
+        "line": 29
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Internal server error\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Internal server error\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Internal server error\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/production/orders",
+        "file": "production.ts",
+        "line": 34
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create production order\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create production order\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create production order\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/products",
+        "file": "products.ts",
+        "line": 109
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create product\",\"details\":\"\\nInvalid `prisma.product.findUnique()` invocation in\\nC:\\\\Users\\\\tilav\\\\Desktop\\\\zavod tizimi\\\\server\\\\routes\\\\products.ts:115:50\\n\\n  112 const { productTypeId, categoryId, sizeId, ...productData } = req.body;\\n  113 \\n  114 // 1. Ism takrorlanmasligini tekshirish\\n→ 115 const existingProduct = await prisma.product.findUnique({\\n        where: {\\n          name: undefined,\\n      ?   id?: String,\\n      ?   AND?: ProductWhereInput | ProductWhereIn"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create product\",\"details\":\"\\nInvalid `prisma.product.findUnique()` invocation in\\nC:\\\\Users\\\\tilav\\\\Desktop\\\\zavod tizimi\\\\server\\\\routes\\\\products.ts:115:50\\n\\n  112 const { productTypeId, categoryId, sizeId, ...productData } = req.body;\\n  113 \\n  114 // 1. Ism takrorlanmasligini tekshirish\\n→ 115 const existingProduct = await prisma.product.findUnique({\\n        where: {\\n          name: undefined,\\n      ?   id?: String,\\n      ?   AND?: ProductWhereInput | ProductWhereIn"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create product\",\"details\":\"\\nInvalid `prisma.product.findUnique()` invocation in\\nC:\\\\Users\\\\tilav\\\\Desktop\\\\zavod tizimi\\\\server\\\\routes\\\\products.ts:115:50\\n\\n  112 const { productTypeId, categoryId, sizeId, ...productData } = req.body;\\n  113 \\n  114 // 1. Ism takrorlanmasligini tekshirish\\n→ 115 const existingProduct = await prisma.product.findUnique({\\n        where: {\\n          name: undefined,\\n      ?   id?: String,\\n      ?   AND?: ProductWhereInput | ProductWhereIn"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/public/orders",
+        "file": "public-orders.ts",
+        "line": 31
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Buyurtma yaratishda xatolik\"}"
+        },
+        "noAuth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Buyurtma yaratishda xatolik\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Buyurtma yaratishda xatolik\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Buyurtma yaratishda xatolik\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/quality-checks",
+        "file": "quality-checks.ts",
+        "line": 24
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create quality check\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create quality check\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create quality check\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/raw-materials",
+        "file": "raw-materials.ts",
+        "line": 21
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create raw material\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create raw material\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create raw material\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/sales",
+        "file": "sales.ts",
+        "line": 194
+      },
+      "tests": {
+        "auth": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Validatsiya xatosi\",\"details\":[{\"path\":\"items\",\"message\":\"Required\"},{\"path\":\"totalAmount\",\"message\":\"Invalid input\"}]}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Validatsiya xatosi\",\"details\":[{\"path\":\"items\",\"message\":\"Required\"},{\"path\":\"totalAmount\",\"message\":\"Invalid input\"}]}"
+        },
+        "invalidPayload": {
+          "status": 400,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Validatsiya xatosi\",\"details\":[{\"path\":\"items\",\"message\":\"Expected array, received string\"},{\"path\":\"totalAmount\",\"message\":\"Invalid input\"}]}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "PUT",
+        "path": "/api/settings",
+        "file": "settings.ts",
+        "line": 79
+      },
+      "tests": {
+        "auth": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"message\":\"Barcha sozlamalar yangilandi\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"message\":\"Barcha sozlamalar yangilandi\"}"
+        },
+        "invalidPayload": {
+          "status": 200,
+          "ok": true,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"message\":\"Barcha sozlamalar yangilandi\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/suppliers",
+        "file": "suppliers.ts",
+        "line": 28
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create supplier\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create supplier\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create supplier\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/tasks",
+        "file": "tasks.ts",
+        "line": 25
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create task\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create task\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create task\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/users",
+        "file": "users.ts",
+        "line": 29
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create user\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create user\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create user\"}"
+        }
+      }
+    },
+    {
+      "endpoint": {
+        "method": "POST",
+        "path": "/api/variants",
+        "file": "variants.ts",
+        "line": 97
+      },
+      "tests": {
+        "auth": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create variant\"}"
+        },
+        "noAuth": {
+          "status": 401,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"No token provided\"}"
+        },
+        "emptyPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create variant\"}"
+        },
+        "invalidPayload": {
+          "status": 500,
+          "ok": false,
+          "shape": "non_standard",
+          "valueIssues": [],
+          "valueIssueCount": 0,
+          "bodySnippet": "{\"error\":\"Failed to create variant\"}"
+        }
+      }
+    }
+  ],
+  "globalTests": {
+    "concurrentHealth": {
+      "N": 25,
+      "ms": 3344,
+      "statuses": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ],
+      "failed": 0
+    },
+    "largePayload": {
+      "status": 500,
+      "ok": false,
+      "shape": "standard",
+      "valueIssues": [],
+      "valueIssueCount": 0,
+      "bodySnippet": "{\"success\":false,\"error\":\"Ichki server xatosi\",\"stack\":[\"PayloadTooLargeError: request entity too large\",\"    at readStream (C:\\\\Users\\\\tilav\\\\Desktop\\\\zavod tizimi\\\\node_modules\\\\raw-body\\\\index.js:163:17)\",\"    at getRawBody (C:\\\\Users\\\\tilav\\\\Desktop\\\\zavod tizimi\\\\node_modules\\\\raw-body\\\\index.js:116:12)\",\"    at read (C:\\\\Users\\\\tilav\\\\Desktop\\\\zavod tizimi\\\\node_modules\\\\body-parser\\\\lib\\\\read.js:79:3)\",\"    at jsonParser (C:\\\\Users\\\\tilav\\\\Desktop\\\\zavod tizimi\\\\node_modules\\\\body-parser\\"
+    },
+    "timeout": {
+      "status": 0,
+      "ok": false,
+      "error": "timeout",
+      "shape": "non_json",
+      "valueIssues": [],
+      "valueIssueCount": 0,
+      "bodySnippet": ""
+    }
+  }
+}

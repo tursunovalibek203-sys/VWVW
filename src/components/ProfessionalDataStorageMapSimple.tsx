@@ -256,7 +256,7 @@ export default function ProfessionalDataStorageMap({
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             title="Refresh data"
           >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-pulse' : ''}`} />
           </button>
           <button
             onClick={() => setShowAdvancedInfo(!showAdvancedInfo)}
@@ -489,7 +489,7 @@ export default function ProfessionalDataStorageMap({
                         <ul className="space-y-1 text-sm text-yellow-700">
                           {health.issues.map((issue: string, index: number) => (
                             <li key={index} className="flex items-start gap-2">
-                              <span className="text-yellow-600 mt-0.5">·</span>
+                              <span className="text-yellow-600 mt-0.5">Â·</span>
                               <span>{issue}</span>
                             </li>
                           ))}

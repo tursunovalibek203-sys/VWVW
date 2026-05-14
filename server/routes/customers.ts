@@ -56,6 +56,15 @@ router.get('/', async (req, res) => {
 
     
 
+    // Search - Use database filtering instead of JavaScript
+    if (search) {
+      where.OR = [
+        { name: { contains: search as string, mode: 'insensitive' } },
+        { phone: { contains: search as string } },
+        { email: { contains: search as string, mode: 'insensitive' } }
+      ];
+    }
+
     const customers = await prisma.customer.findMany({
 
       where,
@@ -112,32 +121,9 @@ router.get('/', async (req, res) => {
 
         _count: { select: { sales: true } }
 
-      }
-
+      },
+      take: 1000 // Limit to prevent memory overflow
     });
-
-    
-
-    // Qidirish - SQLite uchun JavaScript'da filtrlash
-
-    if (search) {
-
-      const searchLower = (search as string).toLowerCase();
-
-      const filtered = customers.filter(c => 
-
-        c.name.toLowerCase().includes(searchLower) ||
-
-        (c.phone && c.phone.includes(search as string)) ||
-
-        (c.email && c.email.toLowerCase().includes(searchLower))
-
-      );
-
-      // ✅ STANDARD API RESPONSE FORMAT
-      return res.json(successResponse(filtered));
-
-    }
 
     
 

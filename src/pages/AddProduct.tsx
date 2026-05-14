@@ -191,7 +191,7 @@ export default function AddProduct() {
       // Allow manual editing but keep the warning if format is unusual
       const pattern = /^(\d+)(G|g|GR|gr|KG|kg|Kg)\s+.+$/;
       if (value && !pattern.test(value)) {
-        setMessage('⚠️ ' + latinToCyrillic("Mahsulot nomi '15G QORA' formatida bo'lishi tavsiya etiladi"));
+        setMessage('âš ï¸ ' + latinToCyrillic("Mahsulot nomi '15G QORA' formatida bo'lishi tavsiya etiladi"));
         setTimeout(() => setMessage(''), 3000);
       }
     }
@@ -212,7 +212,7 @@ export default function AddProduct() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🚀 Form submit bosildi!');
+    console.log('ðŸš€ Form submit bosildi!');
     setLoading(true);
     setMessage('');
 
@@ -221,7 +221,7 @@ export default function AddProduct() {
       console.log('Form ma\'lumotlari:', formData);
       if (!formData.name || !formData.bagType || !formData.color || !formData.unitsPerBag || !formData.pricePerBag) {
         console.log('Validatsiya xatosi:', { name: !!formData.name, bagType: !!formData.bagType, color: !!formData.color, unitsPerBag: !!formData.unitsPerBag, pricePerBag: !!formData.pricePerBag });
-        setMessage('❌ Iltimos, barcha majburiy maydonlarni to\'ldiring!');
+        setMessage('âŒ Iltimos, barcha majburiy maydonlarni to\'ldiring!');
         setLoading(false);
         return;
       }
@@ -257,17 +257,17 @@ export default function AddProduct() {
         productData.subType = formData.subType;
       }
 
-      console.log('📤 Mahsulot yaratilmoqda:', productData);
+      console.log('ðŸ“¤ Mahsulot yaratilmoqda:', productData);
 
       // Mahsulot yaratish yoki yangilash
       let response;
       if (isEditing) {
         response = await api.put(`/products/${editId}`, productData);
-        setMessage(`✅ "${response.data.name}" mahsuloti muvaffaqiyatli yangilandi!`);
+        setMessage(`âœ… "${response.data.name}" mahsuloti muvaffaqiyatli yangilandi!`);
         setTimeout(() => navigate(isCashier ? '/cashier/products' : '/products'), 2000);
       } else {
         response = await api.post('/products', productData);
-        setMessage(`✅ "${response.data.name}" mahsuloti muvaffaqiyatli yaratildi!`);
+        setMessage(`âœ… "${response.data.name}" mahsuloti muvaffaqiyatli yaratildi!`);
         setIsNameManuallyEdited(false);
         setManualSuffix('');
         
@@ -296,10 +296,10 @@ export default function AddProduct() {
       }
 
     } catch (error: any) {
-      console.error('❌ Mahsulot yaratish xatoligi:', error);
+      console.error('âŒ Mahsulot yaratish xatoligi:', error);
       const errorMsg = error.response?.data?.error || error.message;
       const details = error.response?.data?.details || '';
-      setMessage(`❌ Xatolik: ${errorMsg} ${details ? '(' + details + ')' : ''}`);
+      setMessage(`âŒ Xatolik: ${errorMsg} ${details ? '(' + details + ')' : ''}`);
     } finally {
       setLoading(false);
     }
@@ -338,7 +338,7 @@ export default function AddProduct() {
         <div className="bg-white dark:bg-gray-900 rounded-[4rem] border border-gray-100 dark:border-gray-800 shadow-2xl overflow-hidden">
           {message && (
             <div className={`p-6 text-center font-semibold text-xs tracking-widest uppercase animate-in slide-in-from-top duration-500 ${
-              message.includes('✅') ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+              message.includes('âœ…') ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
             }`}>
               {message}
             </div>
@@ -615,7 +615,7 @@ export default function AddProduct() {
                 disabled={loading}
                 className="flex-[2] h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-lg shadow-blue-500/30 transition-all active:scale-95 flex items-center justify-center gap-2"
               >
-                {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                {loading ? <RefreshCw className="w-5 h-5 animate-pulse" /> : <Save className="w-5 h-5" />}
                 {loading 
                   ? (isEditing ? t("Yangilanmoqda...") : t("Saqlanmoqda..."))
                   : (isEditing ? t("Mahsulotni yangilash") : t("Mahsulotni saqlash"))

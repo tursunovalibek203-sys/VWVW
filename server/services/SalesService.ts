@@ -255,7 +255,9 @@ export class SalesService {
       await Promise.all(stockPromises);
 
       // 6. GET ACTIVE CASHBOX FOR TRANSACTIONS
+      // Cashbox model not available - skipping cashbox logic
       let activeCashbox = null;
+      /*
       try {
         activeCashbox = await tx.cashbox.findFirst({
           where: {
@@ -267,11 +269,12 @@ export class SalesService {
       } catch (error) {
         // If no active cashbox, transactions will be created without cashbox_id
       }
+      */
 
-      // 7. CASHBOX TRANSACTIONS
+      // 7. CASHBOX TRANSACTIONS - Skipped (Cashbox model not available)
       const method = paymentMethod || 'CASH';
+      /*
       const cashboxPromises: Promise<any>[] = [];
-      
       if (paymentDetails) {
         if (paymentDetails.uzs && paymentDetails.uzs > 0) {
           const paymentType = method === 'CLICK' ? 'Click' : (method === 'CARD' ? 'Karta' : 'Naqd');
@@ -338,6 +341,7 @@ export class SalesService {
       if (cashboxPromises.length > 0) {
         await Promise.all(cashboxPromises);
       }
+      */
 
       // 7. UPDATE CUSTOMER DEBT/BALANCE (if not Ko'cha)
       if (!isKocha && customerId) {

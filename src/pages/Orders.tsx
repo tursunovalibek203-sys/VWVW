@@ -138,7 +138,7 @@ export default function Orders() {
   const [showInventoryWarning, setShowInventoryWarning] = useState(false);
 
   // Real-time form state display
-  console.log('🔄 Current form state:', {
+  console.log('ðŸ”„ Current form state:', {
     customerId: form.customerId,
     customerName: form.customerName,
     items: form.items,
@@ -148,9 +148,9 @@ export default function Orders() {
 
   // Track form items changes
   useEffect(() => {
-    console.log('📋 Form items changed:', form.items);
+    console.log('ðŸ“‹ Form items changed:', form.items);
     form.items.forEach((item, index) => {
-      console.log(`📋 Item ${index}:`, item);
+      console.log(`ðŸ“‹ Item ${index}:`, item);
     });
   }, [form.items]);
   
@@ -165,30 +165,30 @@ export default function Orders() {
   const loadData = async () => {
     setLoading(true);
     try {
-      console.log('🔄 Loading data...');
+      console.log('ðŸ”„ Loading data...');
       const [ordersRes, customersRes, productsRes] = await Promise.all([
         api.get('/orders'),
         api.get('/customers'),
         api.get('/products')
       ]);
       
-      console.log('📊 Data loaded:');
+      console.log('ðŸ“Š Data loaded:');
       console.log('   Orders:', ordersRes.data.length);
       console.log('   Customers:', customersRes.data.length);
       console.log('   Products:', productsRes.data.length);
       
       if (productsRes.data.length > 0) {
-        console.log('📦 First product sample:', productsRes.data[0]);
+        console.log('ðŸ“¦ First product sample:', productsRes.data[0]);
       }
       
       setOrders(ordersRes.data);
-      // ✅ Handle new API response format
+      // âœ… Handle new API response format
       setCustomers(customersRes.data?.data || customersRes.data || []);
       setProducts(productsRes.data?.data || productsRes.data || []);
       
-      console.log('✅ Data loaded and state updated');
+      console.log('âœ… Data loaded and state updated');
     } catch (error) {
-      console.error('❌ Ma\'lumotlarni yuklashda xatolik:', error);
+      console.error('âŒ Ma\'lumotlarni yuklashda xatolik:', error);
     } finally {
       setLoading(false);
     }
@@ -217,30 +217,30 @@ export default function Orders() {
         notes: 'Buyurtmalar uchun avtomatik yaratildi'
       });
       
-      alert(`✅ Ishlab chiqarish buyurtmasi yaratildi!\n\nMahsulot: ${response.data.productName}\nMiqdor: ${quantity} qop`);
+      alert(`âœ… Ishlab chiqarish buyurtmasi yaratildi!\n\nMahsulot: ${response.data.productName}\nMiqdor: ${quantity} qop`);
       loadData();
     } catch (error: any) {
       console.error('Ishlab chiqarish buyurtmasi xatolik:', error);
-      alert('❌ Ishlab chiqarish buyurtmasi yaratilmadi: ' + (error.response?.data?.error || error.message));
+      alert('âŒ Ishlab chiqarish buyurtmasi yaratilmadi: ' + (error.response?.data?.error || error.message));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('📋 handleSubmit called');
-    console.log('📋 Form state:', form);
-    console.log('📋 CustomerId:', form.customerId);
-    console.log('📋 Items:', form.items);
-    console.log('📋 Items length:', form.items.length);
+    console.log('ðŸ“‹ handleSubmit called');
+    console.log('ðŸ“‹ Form state:', form);
+    console.log('ðŸ“‹ CustomerId:', form.customerId);
+    console.log('ðŸ“‹ Items:', form.items);
+    console.log('ðŸ“‹ Items length:', form.items.length);
     
     // Validate form
     if (!validateForm()) {
-      console.log('❌ Validation failed');
+      console.log('âŒ Validation failed');
       return;
     }
 
-    console.log('✅ Validation passed');
+    console.log('âœ… Validation passed');
 
     try {
       console.log('Submitting order:', form);
@@ -276,9 +276,9 @@ export default function Orders() {
           .map((item: any) => `${item.productName}: ${item.needProduction} qop kerak`)
           .join('\n');
         
-        alert(`✅ Buyurtma yaratildi!\n\n⚠️ Omborda yetarli mahsulot yo'q:\n${warnings}\n\nIshlab chiqarish rejasiga qo'shildi.`);
+        alert(`âœ… Buyurtma yaratildi!\n\nâš ï¸ Omborda yetarli mahsulot yo'q:\n${warnings}\n\nIshlab chiqarish rejasiga qo'shildi.`);
       } else {
-        alert('✅ Buyurtma muvaffaqiyatli yaratildi!');
+        alert('âœ… Buyurtma muvaffaqiyatli yaratildi!');
       }
       
       closeForm();
@@ -297,7 +297,7 @@ export default function Orders() {
         errorMessage = error.message || 'Xatolik yuz berdi';
       }
       
-      alert(`❌ Buyurtma yaratilmadi!\n\nXatolik: ${errorMessage}\n\nIltimos, administrator bilan bog'laning.`);
+      alert(`âŒ Buyurtma yaratilmadi!\n\nXatolik: ${errorMessage}\n\nIltimos, administrator bilan bog'laning.`);
     }
   };
 
@@ -367,7 +367,7 @@ export default function Orders() {
   };
 
   const updateItem = (index: number, field: string, value: any) => {
-    console.log('🔄 updateItem called:', { index, field, value });
+    console.log('ðŸ”„ updateItem called:', { index, field, value });
     
     const newItems = [...form.items];
     const item = { ...newItems[index], [field]: value };
@@ -478,7 +478,7 @@ export default function Orders() {
       setSelectedOrder(data);
       setShowDetail(true);
     } catch (error) {
-      alert('❌ Ma\'lumotlarni yuklashda xatolik');
+      alert('âŒ Ma\'lumotlarni yuklashda xatolik');
     }
   };
 
@@ -540,13 +540,13 @@ Ismi: ${orderData.customer?.name || 'Noma\'lum'}
 Tel: ${orderData.customer?.phone || 'Mavjud emas'}
 Manzil: ${orderData.customer?.address || 'Mavjud emas'}
 ----------------------------------------
-┌──────────────────────────┬─────┬─────┐
-│ Mahsulot nomi            │ Qop │ Dona│
-├──────────────────────────┼─────┼─────┤
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”
+â”‚ Mahsulot nomi            â”‚ Qop â”‚ Donaâ”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”¤
 ${orderData.items?.map((item: any) => 
-  `│ ${(item.product?.name || item.productName || 'Noma\'lum').substring(0, 24).padEnd(24).replace(/[^\x00-\x7F]/g, "")} │ ${item.quantityBags.toString().padStart(3)} │ ${item.quantityUnits.toString().padStart(3)} │`
-).join('\n├──────────────────────────┼─────┼─────┤\n') || '│ Mahsulotlar mavjud emas              │'}
-└──────────────────────────┴─────┴─────┘
+  `â”‚ ${(item.product?.name || item.productName || 'Noma\'lum').substring(0, 24).padEnd(24).replace(/[^\x00-\x7F]/g, "")} â”‚ ${item.quantityBags.toString().padStart(3)} â”‚ ${item.quantityUnits.toString().padStart(3)} â”‚`
+).join('\nâ”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”¤\n') || 'â”‚ Mahsulotlar mavjud emas              â”‚'}
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”˜
 ----------------------------------------
 Umumiy summa: ${orderData.totalAmount.toLocaleString()} UZS
 To'lov turi: ${orderData.paymentType}
@@ -569,10 +569,10 @@ ID: SLS-${selectedOrder.id}
           filename: `sales-receipt-${Date.now()}.txt`
         });
         
-        console.log('✅ Savdo cheki chop etish uchun serverga yuborildi');
+        console.log('âœ… Savdo cheki chop etish uchun serverga yuborildi');
         
       } catch (printError) {
-        console.error('❌ Chek chop etish xatolik:', printError);
+        console.error('âŒ Chek chop etish xatolik:', printError);
       }
       
       setShowPaymentModal(false);
@@ -621,17 +621,17 @@ ID: SLS-${selectedOrder.id}
   const handleDriverPayment = async () => {
     try {
       if (!selectedOrder) {
-        alert('❌ Buyurtma tanlanmagan!');
+        alert('âŒ Buyurtma tanlanmagan!');
         return;
       }
       
       if (!driverPaymentForm.driverId) {
-        alert('❌ Haydovchini tanlang!');
+        alert('âŒ Haydovchini tanlang!');
         return;
       }
       
       if (driverPaymentForm.amount <= 0) {
-        alert('❌ To\'lov summasini kiriting!');
+        alert('âŒ To\'lov summasini kiriting!');
         return;
       }
 
@@ -642,7 +642,7 @@ ID: SLS-${selectedOrder.id}
       setShowDetail(false);
       loadData();
     } catch (error: any) {
-      alert('❌ Xatolik: ' + (error.response?.data?.error || 'Haydovchi to\'lovida xatolik'));
+      alert('âŒ Xatolik: ' + (error.response?.data?.error || 'Haydovchi to\'lovida xatolik'));
     }
   };
 
@@ -805,7 +805,7 @@ ID: SLS-${selectedOrder.id}
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto mb-4"></div>
+          <div className="animate-pulse rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto mb-4"></div>
           <p className="text-lg font-semibold text-gray-700">{t('Yuklanmoqda...')}</p>
         </div>
       </div>
@@ -1138,7 +1138,7 @@ ID: SLS-${selectedOrder.id}
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                 className="px-3 py-2 bg-background border border-border rounded-lg text-sm hover:bg-gray-100"
               >
-                {sortOrder === 'asc' ? '↑' : '↓'} {sortOrder === 'asc' ? 'Oldest' : 'Newest'}
+                {sortOrder === 'asc' ? 'â†‘' : 'â†“'} {sortOrder === 'asc' ? 'Oldest' : 'Newest'}
               </button>
             </div>
           </div>
@@ -1238,7 +1238,7 @@ ID: SLS-${selectedOrder.id}
                         <div className="flex gap-1">
                           {order.customer?.category === 'VIP' && (
                             <div className="w-6 h-6 bg-amber-50 dark:bg-amber-900/30 rounded-lg flex items-center justify-center text-amber-600">
-                              <span className="text-xs">👑</span>
+                              <span className="text-xs">ðŸ‘‘</span>
                             </div>
                           )}
                           {order.priority === 'URGENT' && (
@@ -1787,7 +1787,7 @@ ID: SLS-${selectedOrder.id}
                   <p className="text-xs font-semibold text-emerald-100 uppercase tracking-widest">{t("JAMI TO'LOV SUMMASI")}</p>
                   <h4 className="text-3xl font-bold tracking-tight leading-none">${selectedOrder.totalAmount?.toFixed(2)}</h4>
                   <p className="text-xs font-bold text-emerald-100/70 uppercase tracking-widest mt-4">
-                    ≈ {(selectedOrder.totalAmount * exchangeRates.USD_TO_UZS).toLocaleString()} UZS
+                    â‰ˆ {(selectedOrder.totalAmount * exchangeRates.USD_TO_UZS).toLocaleString()} UZS
                   </p>
                 </div>
               </div>

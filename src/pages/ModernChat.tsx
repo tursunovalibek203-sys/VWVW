@@ -457,7 +457,7 @@ export default function ModernChat() {
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center h-32">
-              <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
+              <RefreshCw className="w-6 h-6 text-blue-500 animate-pulse" />
             </div>
           ) : (
             filteredConversations.map((conversation) => (
@@ -799,7 +799,7 @@ export default function ModernChat() {
                   aria-label={sending ? latinToCyrillic('Yuborilmoqda...') : latinToCyrillic('Yuborish')}
                 >
                   {sending ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <RefreshCw className="w-5 h-5 animate-pulse" />
                   ) : (
                     <Send className="w-5 h-5" />
                   )}

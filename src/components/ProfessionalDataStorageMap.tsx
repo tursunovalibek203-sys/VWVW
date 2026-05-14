@@ -294,7 +294,7 @@ export default function ProfessionalDataStorageMap({
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             title="Refresh data"
           >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-pulse' : ''}`} />
           </button>
           <button
             onClick={() => setShowAdvancedInfo(!showAdvancedInfo)}
@@ -675,10 +675,10 @@ export default function ProfessionalDataStorageMap({
                   <div className="flex items-center gap-2">
                     <Thermometer className="w-4 h-4 text-gray-500" />
                     <span className="text-sm text-gray-600">
-                      {layer === BackupLayer.LAYER_1 ? '18-22°C' :
-                       layer === BackupLayer.LAYER_2 ? '18-22°C' :
-                       layer === BackupLayer.LAYER_3 ? '20-25°C' :
-                       layer === BackupLayer.LAYER_4 ? '15-20°C' : '10-15°C'}
+                      {layer === BackupLayer.LAYER_1 ? '18-22Â°C' :
+                       layer === BackupLayer.LAYER_2 ? '18-22Â°C' :
+                       layer === BackupLayer.LAYER_3 ? '20-25Â°C' :
+                       layer === BackupLayer.LAYER_4 ? '15-20Â°C' : '10-15Â°C'}
                     </span>
                   </div>
                   

@@ -98,15 +98,24 @@ export default function SimplifiedInventory() {
 
   const loadProducts = async () => {
     setLoading(true);
+    // Add timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      console.warn('Loading timeout reached for products');
+    }, 10000); // 10 second timeout
+    
     try {
       const response = await api.get('/products');
-      // ✅ Handle standardized API response format { success, data }
+      clearTimeout(timeout);
+      // âœ… Handle standardized API response format { success, data }
       const productsData = extractArray<Product>(response, []);
       setProducts(productsData);
       setLastUpdated(new Date());
     } catch (error) {
+      clearTimeout(timeout);
       errorHandler.handleError(error, { action: 'loadProducts' });
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
     }
   };
@@ -134,10 +143,10 @@ export default function SimplifiedInventory() {
       await api.put(`/products/${productId}`, updateData);
       loadProducts();
       setEditingProduct(null);
-      alert(latinToCyrillic('✅ Ma\'lumotlar yangilandi!'));
+      alert(latinToCyrillic('âœ… Ma\'lumotlar yangilandi!'));
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Noma\'lum xatolik';
-      alert(latinToCyrillic(`❌ Xatolik: ${errorMessage}`));
+      alert(latinToCyrillic(`âŒ Xatolik: ${errorMessage}`));
     }
   };
 
@@ -151,7 +160,7 @@ export default function SimplifiedInventory() {
     try {
       await api.delete(`/products/${productId}`);
       loadProducts();
-      alert(latinToCyrillic('✅ Mahsulot muvaffaqiyatli o\'chirildi!'));
+      alert(latinToCyrillic('âœ… Mahsulot muvaffaqiyatli o\'chirildi!'));
     } catch (error) {
       errorHandler.handleError(error, { action: 'deleteProduct', productId });
     }
@@ -212,7 +221,7 @@ export default function SimplifiedInventory() {
         color: 'text-slate-600', 
         bgColor: 'bg-slate-100 border-2 border-slate-300',
         label: latinToCyrillic('Tugagan'),
-        emoji: '❌',
+        emoji: 'âŒ',
         icon: AlertTriangle
       };
     }
@@ -222,7 +231,7 @@ export default function SimplifiedInventory() {
         color: 'text-slate-500', 
         bgColor: 'bg-slate-50 border-2 border-slate-200',
         label: latinToCyrillic('Kam'),
-        emoji: '⚠️',
+        emoji: 'âš ï¸',
         icon: TrendingDown
       };
     }
@@ -231,7 +240,7 @@ export default function SimplifiedInventory() {
       color: 'text-blue-600', 
       bgColor: 'bg-blue-50 border-2 border-blue-200',
       label: latinToCyrillic('Yaxshi'),
-      emoji: '✅',
+      emoji: 'âœ…',
       icon: TrendingUp
     };
   };
@@ -240,16 +249,16 @@ export default function SimplifiedInventory() {
     const name = productName.toLowerCase();
     
     const colorPatterns = [
-      { pattern: /oq|white|belyy|белый/i, label: latinToCyrillic('Oq'), hex: '#FFFFFF' },
-      { pattern: /qora|black|chernyy|черный/i, label: latinToCyrillic('Qora'), hex: '#1F2937' },
-      { pattern: /kok|ko'k|blue|siniy|синий|голубой/i, label: latinToCyrillic('Ko\'k'), hex: '#3B82F6' },
-      { pattern: /yashil|green|zelenyy|зеленый/i, label: latinToCyrillic('Yashil'), hex: '#10B981' },
-      { pattern: /qizil|red|krasnyy|красный/i, label: latinToCyrillic('Qizil'), hex: '#EF4444' },
-      { pattern: /sariq|yellow|zheltyy|желтый/i, label: latinToCyrillic('Sariq'), hex: '#F59E0B' },
-      { pattern: /jigarrang|brown|korichnevyy|коричневый/i, label: latinToCyrillic('Jigarrang'), hex: '#92400E' },
-      { pattern: /kul|gray|seryy|серый/i, label: latinToCyrillic('Kul'), hex: '#6B7280' },
-      { pattern: /binafsha|purple|fioletovyy|фиолетовый/i, label: latinToCyrillic('Binafsha'), hex: '#8B5CF6' },
-      { pattern: /pushti|pink|rozovyy|розовый/i, label: latinToCyrillic('Pushti'), hex: '#EC4899' },
+      { pattern: /oq|white|belyy|Ð±ÐµÐ»Ñ‹Ð¹/i, label: latinToCyrillic('Oq'), hex: '#FFFFFF' },
+      { pattern: /qora|black|chernyy|Ñ‡ÐµÑ€Ð½Ñ‹Ð¹/i, label: latinToCyrillic('Qora'), hex: '#1F2937' },
+      { pattern: /kok|ko'k|blue|siniy|ÑÐ¸Ð½Ð¸Ð¹|Ð³Ð¾Ð»ÑƒÐ±Ð¾Ð¹/i, label: latinToCyrillic('Ko\'k'), hex: '#3B82F6' },
+      { pattern: /yashil|green|zelenyy|Ð·ÐµÐ»ÐµÐ½Ñ‹Ð¹/i, label: latinToCyrillic('Yashil'), hex: '#10B981' },
+      { pattern: /qizil|red|krasnyy|ÐºÑ€Ð°ÑÐ½Ñ‹Ð¹/i, label: latinToCyrillic('Qizil'), hex: '#EF4444' },
+      { pattern: /sariq|yellow|zheltyy|Ð¶ÐµÐ»Ñ‚Ñ‹Ð¹/i, label: latinToCyrillic('Sariq'), hex: '#F59E0B' },
+      { pattern: /jigarrang|brown|korichnevyy|ÐºÐ¾Ñ€Ð¸Ñ‡Ð½ÐµÐ²Ñ‹Ð¹/i, label: latinToCyrillic('Jigarrang'), hex: '#92400E' },
+      { pattern: /kul|gray|seryy|ÑÐµÑ€Ñ‹Ð¹/i, label: latinToCyrillic('Kul'), hex: '#6B7280' },
+      { pattern: /binafsha|purple|fioletovyy|Ñ„Ð¸Ð¾Ð»ÐµÑ‚Ð¾Ð²Ñ‹Ð¹/i, label: latinToCyrillic('Binafsha'), hex: '#8B5CF6' },
+      { pattern: /pushti|pink|rozovyy|Ñ€Ð¾Ð·Ð¾Ð²Ñ‹Ð¹/i, label: latinToCyrillic('Pushti'), hex: '#EC4899' },
       { pattern: /to'q|dark|temnyy/i, label: latinToCyrillic('To\'q'), hex: '#374151' },
       { pattern: /och|light|svetlyy/i, label: latinToCyrillic('Och'), hex: '#D1D5DB' }
     ];
@@ -269,8 +278,8 @@ export default function SimplifiedInventory() {
     // 1. AVVAL Preform mahsulotlarni gramm bo'yicha guruhlash (eng ustuvor)
     // Preform yoki gramajga ega mahsulotlar
     // Katta grammalar (10 dan katta) - preform
-    const gramMatch = name.match(/(\d+)\s*(?:g|gr|gram|г|гр|грамм)/i);
-    const hasPreform = name.includes('preform') || name.includes('преформ');
+    const gramMatch = name.match(/(\d+)\s*(?:g|gr|gram|Ð³|Ð³Ñ€|Ð³Ñ€Ð°Ð¼Ð¼)/i);
+    const hasPreform = name.includes('preform') || name.includes('Ð¿Ñ€ÐµÑ„Ð¾Ñ€Ð¼');
     
     if (hasPreform || gramMatch) {
       const gramValue = gramMatch ? parseInt(gramMatch[1]) : null;
@@ -287,14 +296,14 @@ export default function SimplifiedInventory() {
     }
     
     // 2. Krishka/Qopqoqlarni o'lchami bo'yicha guruhlash (mm/ml)
-    if (name.includes('krishka') || name.includes('cap') || name.includes('qopqoq') || name.includes('крышка') || name.includes('копкок')) {
+    if (name.includes('krishka') || name.includes('cap') || name.includes('qopqoq') || name.includes('ÐºÑ€Ñ‹ÑˆÐºÐ°') || name.includes('ÐºÐ¾Ð¿ÐºÐ¾Ðº')) {
       // O'lchamni topish (masalan: 28mm, 28, 30mm, 38mm, 38, 48mm, 48)
       // Avval mm/ml bilan qidirish, keyin faqat raqam
-      let sizeMatch = name.match(/(\d+)\s*(mm|ml|мм|мл)/i);
+      let sizeMatch = name.match(/(\d+)\s*(mm|ml|Ð¼Ð¼|Ð¼Ð»)/i);
       if (!sizeMatch) {
         // Agar mm/ml yo'q bo'lsa, faqat raqamni qidirish (krishka 28, 28 krishka)
         // Faqat kichik sonlarni (28, 30, 38, 48, 52) krishka o'lchami deb qabul qilish
-        sizeMatch = name.match(/(?:krishka|cap|qopqoq|крышка).*?(\d{2})|(\d{2}).*?(?:krishka|cap|qopqoq|крышка)/i);
+        sizeMatch = name.match(/(?:krishka|cap|qopqoq|ÐºÑ€Ñ‹ÑˆÐºÐ°).*?(\d{2})|(\d{2}).*?(?:krishka|cap|qopqoq|ÐºÑ€Ñ‹ÑˆÐºÐ°)/i);
         if (sizeMatch) {
           const size = sizeMatch[1] || sizeMatch[2];
           // Krishka o'lchamlari: 28, 30, 38, 48, 52
@@ -309,12 +318,12 @@ export default function SimplifiedInventory() {
       
       // Rangni topish
       const colorPatterns = [
-        { pattern: /oq|white|belyy|белый/i, label: latinToCyrillic('Oq') },
-        { pattern: /qora|black|chernyy|черный/i, label: latinToCyrillic('Qora') },
-        { pattern: /kok|ko'k|blue|siniy|синий|голубой/i, label: latinToCyrillic('Ko\'k') },
-        { pattern: /yashil|green|zelenyy|зеленый/i, label: latinToCyrillic('Yashil') },
-        { pattern: /qizil|red|krasnyy|красный/i, label: latinToCyrillic('Qizil') },
-        { pattern: /sariq|yellow|zheltyy|желтый/i, label: latinToCyrillic('Sariq') }
+        { pattern: /oq|white|belyy|Ð±ÐµÐ»Ñ‹Ð¹/i, label: latinToCyrillic('Oq') },
+        { pattern: /qora|black|chernyy|Ñ‡ÐµÑ€Ð½Ñ‹Ð¹/i, label: latinToCyrillic('Qora') },
+        { pattern: /kok|ko'k|blue|siniy|ÑÐ¸Ð½Ð¸Ð¹|Ð³Ð¾Ð»ÑƒÐ±Ð¾Ð¹/i, label: latinToCyrillic('Ko\'k') },
+        { pattern: /yashil|green|zelenyy|Ð·ÐµÐ»ÐµÐ½Ñ‹Ð¹/i, label: latinToCyrillic('Yashil') },
+        { pattern: /qizil|red|krasnyy|ÐºÑ€Ð°ÑÐ½Ñ‹Ð¹/i, label: latinToCyrillic('Qizil') },
+        { pattern: /sariq|yellow|zheltyy|Ð¶ÐµÐ»Ñ‚Ñ‹Ð¹/i, label: latinToCyrillic('Sariq') }
       ];
       
       // Agar o'lcham topilmasa, rang bo'yicha guruhlash
@@ -333,12 +342,12 @@ export default function SimplifiedInventory() {
     }
     
     // 3. Ruchkalarni hajmi/o'lchami bo'yicha guruhlash (28mm, 38mm, 48mm)
-    if (name.includes('ruchka') || name.includes('handle') || name.includes('ручка')) {
+    if (name.includes('ruchka') || name.includes('handle') || name.includes('Ñ€ÑƒÑ‡ÐºÐ°')) {
       // O'lchamni topish (masalan: 28mm, 28, 38mm, 38, 48mm, 48)
-      let sizeMatch = name.match(/(\d+)\s*(mm|ml|мм|мл)/i);
+      let sizeMatch = name.match(/(\d+)\s*(mm|ml|Ð¼Ð¼|Ð¼Ð»)/i);
       if (!sizeMatch) {
         // Agar mm/ml yo'q bo'lsa, faqat raqamni qidirish (ruchka 28, 28 ruchka)
-        sizeMatch = name.match(/(?:ruchka|handle|ручка).*?(\d{2})|(\d{2}).*?(?:ruchka|handle|ручка)/i);
+        sizeMatch = name.match(/(?:ruchka|handle|Ñ€ÑƒÑ‡ÐºÐ°).*?(\d{2})|(\d{2}).*?(?:ruchka|handle|Ñ€ÑƒÑ‡ÐºÐ°)/i);
         if (sizeMatch) {
           const size = sizeMatch[1] || sizeMatch[2];
           // Ruchka o'lchamlari: 28, 30, 38, 48
@@ -382,21 +391,21 @@ export default function SimplifiedInventory() {
       const name = product.name.toLowerCase();
       if (activeCategory === 'preform') {
         // Preform yoki gramajga ega mahsulotlar (10g va undan katta)
-        const hasGram = /(\d+)\s*(?:g|gr|gram|г|гр|грамм)/i.test(name);
-        const gramMatch = name.match(/(\d+)\s*(?:g|gr|gram|г|гр|грамм)/i);
+        const hasGram = /(\d+)\s*(?:g|gr|gram|Ð³|Ð³Ñ€|Ð³Ñ€Ð°Ð¼Ð¼)/i.test(name);
+        const gramMatch = name.match(/(\d+)\s*(?:g|gr|gram|Ð³|Ð³Ñ€|Ð³Ñ€Ð°Ð¼Ð¼)/i);
         const gramValue = gramMatch ? parseInt(gramMatch[1]) : 0;
-        const hasPreform = name.includes('preform') || name.includes('преформ');
+        const hasPreform = name.includes('preform') || name.includes('Ð¿Ñ€ÐµÑ„Ð¾Ñ€Ð¼');
         
         // Preform so'zi bor yoki 10g+ gramajga ega va krishka/ruchka emas
         return (hasPreform || (hasGram && gramValue >= 10)) && 
-               !name.includes('krishka') && !name.includes('cap') && !name.includes('крышка') &&
-               !name.includes('ruchka') && !name.includes('handle') && !name.includes('ручка');
+               !name.includes('krishka') && !name.includes('cap') && !name.includes('ÐºÑ€Ñ‹ÑˆÐºÐ°') &&
+               !name.includes('ruchka') && !name.includes('handle') && !name.includes('Ñ€ÑƒÑ‡ÐºÐ°');
       }
       if (activeCategory === 'krishka') {
-        return name.includes('krishka') || name.includes('cap') || name.includes('qopqoq') || name.includes('крышка') || name.includes('копкок');
+        return name.includes('krishka') || name.includes('cap') || name.includes('qopqoq') || name.includes('ÐºÑ€Ñ‹ÑˆÐºÐ°') || name.includes('ÐºÐ¾Ð¿ÐºÐ¾Ðº');
       }
       if (activeCategory === 'ruchka') {
-        return name.includes('ruchka') || name.includes('handle') || name.includes('ручка');
+        return name.includes('ruchka') || name.includes('handle') || name.includes('Ñ€ÑƒÑ‡ÐºÐ°');
       }
       return activeCategory === 'other';
     });
@@ -480,10 +489,10 @@ export default function SimplifiedInventory() {
       await api.put(`/products/${productId}`, updateData);
       loadProducts();
       setEditingPriceRow(null);
-      alert(latinToCyrillic('✅ Narxlar yangilandi!'));
+      alert(latinToCyrillic('âœ… Narxlar yangilandi!'));
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Noma\'lum xatolik';
-      alert(latinToCyrillic(`❌ Xatolik: ${errorMessage}`));
+      alert(latinToCyrillic(`âŒ Xatolik: ${errorMessage}`));
     }
   };
 
@@ -513,7 +522,7 @@ export default function SimplifiedInventory() {
 
       // Preformlar
       products
-        .filter(p => p.warehouse === 'preform' || p.name.toLowerCase().includes('preform') || /\d+\s*(gr|g|гр|г)/i.test(p.name))
+        .filter(p => p.warehouse === 'preform' || p.name.toLowerCase().includes('preform') || /\d+\s*(gr|g|Ð³Ñ€|Ð³)/i.test(p.name))
         .forEach(p => allProducts.push({ product: p, category: 'Preform' }));
 
       // Krishkalar
@@ -530,7 +539,7 @@ export default function SimplifiedInventory() {
       products
         .filter(p => {
           const name = p.name.toLowerCase();
-          const isPreform = p.warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|гр|г)/i.test(name);
+          const isPreform = p.warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|Ð³Ñ€|Ð³)/i.test(name);
           const isKrishka = p.warehouse === 'krishka' || name.includes('krishka') || name.includes('qopqoq');
           const isRuchka = p.warehouse === 'ruchka' || name.includes('ruchka') || name.includes('handle');
           return !isPreform && !isKrishka && !isRuchka;
@@ -583,10 +592,10 @@ export default function SimplifiedInventory() {
       link.click();
       document.body.removeChild(link);
 
-      alert(latinToCyrillic('✅ Narxlar jadvali muvaffaqiyatli yuklandi!'));
+      alert(latinToCyrillic('âœ… Narxlar jadvali muvaffaqiyatli yuklandi!'));
     } catch (error) {
       console.error('Export xatolik:', error);
-      alert(latinToCyrillic('❌ Yuklashda xatolik yuz berdi'));
+      alert(latinToCyrillic('âŒ Yuklashda xatolik yuz berdi'));
     }
   };
 
@@ -650,7 +659,7 @@ export default function SimplifiedInventory() {
       <div className="min-h-screen professional-bg-pattern flex items-center justify-center">
         <div className="text-center">
           <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl animate-pulse">
-            <Package className="w-10 h-10 text-white animate-spin" />
+            <Package className="w-10 h-10 text-white animate-pulse" />
           </div>
           <p className="text-xl font-bold text-gray-700">{latinToCyrillic("Mahsulotlar yuklanmoqda...")}</p>
         </div>
@@ -786,7 +795,7 @@ export default function SimplifiedInventory() {
                         <div className="flex-1 min-w-0">
                           <h3 className="text-lg font-black text-white truncate max-w-[160px] drop-shadow-md">{groupName}</h3>
                           <p className="text-xs font-bold text-white/80">
-                            {colorGroups.length} {latinToCyrillic("ta rang")} • {totalStock} {latinToCyrillic("qop jami")}
+                            {colorGroups.length} {latinToCyrillic("ta rang")} â€¢ {totalStock} {latinToCyrillic("qop jami")}
                           </p>
                         </div>
                       </div>
@@ -887,7 +896,7 @@ export default function SimplifiedInventory() {
                                                 type="button"
                                                 onClick={() => navigate(isCashierRoute ? `/cashier/products/${product.id}` : `/products/${product.id}`)}
                                                 className="h-7 px-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg flex items-center gap-1 transition-all duration-300 hover:scale-105 shadow-md text-xs font-black"
-                                                title={latinToCyrillic("Батафсил")}
+                                                title={latinToCyrillic("Ð‘Ð°Ñ‚Ð°Ñ„ÑÐ¸Ð»")}
                                               >
                                                 <Eye className="w-3 h-3" />
                                               </button>
@@ -895,7 +904,7 @@ export default function SimplifiedInventory() {
                                                 type="button"
                                                 onClick={() => startEditing(product)}
                                                 className="w-7 h-7 bg-gradient-to-br from-blue-100 to-blue-200 hover:from-blue-500 hover:to-blue-600 text-blue-600 hover:text-white rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-md"
-                                                title={latinToCyrillic("Таҳрир")}
+                                                title={latinToCyrillic("Ð¢Ð°Ò³Ñ€Ð¸Ñ€")}
                                               >
                                                 <Pencil className="w-3 h-3" />
                                               </button>
@@ -903,8 +912,8 @@ export default function SimplifiedInventory() {
                                                 type="button"
                                                 onClick={() => deleteProduct(product.id)}
                                                 className="w-7 h-7 bg-gradient-to-br from-red-100 to-red-200 hover:from-red-500 hover:to-red-600 text-red-600 hover:text-white rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-md"
-                                                title={latinToCyrillic("Ўчириш")}
-                                                aria-label={latinToCyrillic("Ўчириш")}
+                                                title={latinToCyrillic("ÐŽÑ‡Ð¸Ñ€Ð¸Ñˆ")}
+                                                aria-label={latinToCyrillic("ÐŽÑ‡Ð¸Ñ€Ð¸Ñˆ")}
                                               >
                                                 <Trash2 className="w-3 h-3" />
                                               </button>
@@ -1105,7 +1114,7 @@ export default function SimplifiedInventory() {
                 <tbody>
                   {/* Preformlar */}
                   {products
-                    .filter(p => p.warehouse === 'preform' || p.name.toLowerCase().includes('preform') || /\d+\s*(gr|g|гр|г)/i.test(p.name))
+                    .filter(p => p.warehouse === 'preform' || p.name.toLowerCase().includes('preform') || /\d+\s*(gr|g|Ð³Ñ€|Ð³)/i.test(p.name))
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map((product, index) => {
                       const isEditingRow = editingPriceRow === product.id;
@@ -1392,7 +1401,7 @@ export default function SimplifiedInventory() {
                   {products
                     .filter(p => {
                       const name = p.name.toLowerCase();
-                      const isPreform = p.warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|гр|г)/i.test(name);
+                      const isPreform = p.warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|Ð³Ñ€|Ð³)/i.test(name);
                       const isKrishka = p.warehouse === 'krishka' || name.includes('krishka') || name.includes('qopqoq');
                       const isRuchka = p.warehouse === 'ruchka' || name.includes('ruchka') || name.includes('handle');
                       return !isPreform && !isKrishka && !isRuchka;

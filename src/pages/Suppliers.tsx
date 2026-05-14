@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/professionalApi';
-import { Truck, Phone, Mail, MapPin, Plus, Sparkles, RefreshCw, FileText, Search, User, CreditCard } from 'lucide-react';
+import { Truck, Phone, Mail, MapPin, Plus, Sparkles, RefreshCw, FileText, Search, User, CreditCard, WifiOff, AlertCircle } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
 import { exportToExcel } from '../lib/excelUtils';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 export default function Suppliers() {
+  const { isOnline } = useOnlineStatus();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<any>(null);
@@ -25,12 +28,30 @@ export default function Suppliers() {
   }, []);
 
   const loadSuppliers = async () => {
+    setLoading(true);
+    // Add timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setRefreshing(false);
+      setError('Loading timeout. Please try again.');
+      console.warn('Loading timeout reached for suppliers');
+    }, 10000); // 10 second timeout
+    
     try {
       const { data } = await api.get('/suppliers');
+      clearTimeout(timeout);
       setSuppliers(data);
-    } catch (error) {
-      console.error('Failed to load suppliers');
+      setError(null);
+    } catch (error: any) {
+      clearTimeout(timeout);
+      console.error('Failed to load suppliers:', error);
+      if (error.code === 'NETWORK_ERROR' || !error.response) {
+        setError('Internet not connected. Cannot load suppliers.');
+      } else {
+        setError('Failed to load suppliers. Please try again.');
+      }
     } finally {
+      clearTimeout(timeout);
       setLoading(false);
       setRefreshing(false);
     }
@@ -110,7 +131,7 @@ export default function Suppliers() {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="relative">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
+          <div className="animate-pulse rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
           <Sparkles className="w-6 h-6 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
         </div>
       </div>
@@ -119,6 +140,43 @@ export default function Suppliers() {
 
   return (
     <div className="space-y-12 pb-20 animate-in fade-in duration-700">
+      {/* Offline Warning Banner */}
+      {!isOnline && (
+        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-4 flex items-center gap-3">
+          <WifiOff className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
+              Internet bilan aloqa yo'q. Ma'lumotlar yangilanmaydi.
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Qayta urinish
+          </button>
+        </div>
+      )}
+
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-red-800 dark:text-red-200">
+              {error}
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Qayta urinish
+          </button>
+        </div>
+      )}
       {/* Premium Header */}
       <div className="relative overflow-hidden bg-white dark:bg-gray-900 rounded-[3rem] p-8 sm:p-12 shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-white dark:border-gray-800">
         <div className="absolute top-0 -left-10 w-64 h-64 bg-blue-100 dark:bg-blue-900/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob pointer-events-none"></div>
@@ -142,7 +200,7 @@ export default function Suppliers() {
               onClick={handleRefresh}
               className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl font-semibold text-sm transition-all active:scale-95 text-gray-900 dark:text-white shadow-md border border-gray-100 dark:border-gray-700"
             >
-              <RefreshCw className={`w-4 h-4 rounded-lg ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 rounded-lg ${refreshing ? 'animate-pulse' : ''}`} />
               {latinToCyrillic("Yangilash")}
             </button>
             <button 

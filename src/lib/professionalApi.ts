@@ -54,9 +54,9 @@ class ProfessionalApi {
   constructor(config: Partial<ApiConfig> = {}) {
     this.config = {
       baseURL: '/api',
-      timeout: 30000,
-      retryAttempts: 3,
-      retryDelay: 1000,
+      timeout: 15000, // Reduced from 30000 to 15000ms
+      retryAttempts: 2, // Reduced from 3 to 2
+      retryDelay: 500, // Reduced from 1000 to 500ms
       ...config
     };
 
@@ -130,7 +130,7 @@ class ProfessionalApi {
 
   private getAuthToken(): string | null {
     try {
-      const storage = localStorage.getItem('auth-storage');
+      const storage = sessionStorage.getItem('auth-storage');
       if (storage) {
         const parsed = JSON.parse(storage);
         return parsed.state?.token || null;
@@ -151,11 +151,17 @@ class ProfessionalApi {
     const status = error.response?.status;
     const method = error.config.method?.toLowerCase();
     
-    // Retry on network errors or 5xx server errors
-    if (!status || status >= 500) return true;
+    // Don't retry on network errors (offline mode)
+    if (status === undefined && error.code === 'NETWORK_ERROR') {
+      console.warn('🌐 Network error - possibly offline');
+      return false;
+    }
+    
+    // Retry on 5xx server errors
+    if (status !== undefined && status >= 500) return true;
     
     // Don't retry on 4xx client errors (except 429 Too Many Requests)
-    if (status >= 400 && status < 500 && status !== 429) return false;
+    if (status !== undefined && status >= 400 && status < 500 && status !== 429) return false;
     
     // Don't retry on POST/PUT/DELETE requests by default
     if (method === 'post' || method === 'put' || method === 'delete') return false;
@@ -168,7 +174,7 @@ class ProfessionalApi {
     saveSessionBeforeLogout();
     
     // Clear auth storage
-    localStorage.removeItem('auth-storage');
+    sessionStorage.removeItem('auth-storage');
     
     // Faqat agar login sahifasida bo'lmasa, redirect qilish
     if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
@@ -214,9 +220,11 @@ class ProfessionalApi {
   async get<T = any>(url: string, config: RequestConfig = {}): Promise<ApiResponse<T>> {
     const cacheKey = this.getCacheKey({ ...config, method: 'get', url });
     
-    // Check cache
-    if (config.cache && this.isCacheValid(cacheKey)) {
+    // Check cache - enable by default for GET requests
+    const shouldCache = config.cache !== false;
+    if (shouldCache && this.isCacheValid(cacheKey)) {
       const cached = this.cache.get(cacheKey)!;
+      console.log(`[API Cache] Returning cached data for ${url}`);
       return {
         data: cached.data,
         success: true,

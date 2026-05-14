@@ -355,7 +355,7 @@ export default function ProfessionalSuperAnalyticsDashboard({
     return (
       <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-8 ${className}`}>
         <div className="flex items-center justify-center h-64">
-          <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+          <RefreshCw className="w-8 h-8 text-blue-600 animate-pulse" />
         </div>
       </div>
     );
@@ -400,7 +400,7 @@ export default function ProfessionalSuperAnalyticsDashboard({
             className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             title="Refresh data"
           >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-pulse' : ''}`} />
           </button>
           <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
             <Download className="w-4 h-4" />
@@ -579,7 +579,7 @@ export default function ProfessionalSuperAnalyticsDashboard({
                   <ul className="space-y-1 text-xs text-gray-600">
                     {result.insights.slice(0, 2).map((insight, index) => (
                       <li key={index} className="flex items-start gap-1">
-                        <span className="text-blue-600 mt-0.5">·</span>
+                        <span className="text-blue-600 mt-0.5">Â·</span>
                         <span>{insight}</span>
                       </li>
                     ))}
@@ -597,7 +597,7 @@ export default function ProfessionalSuperAnalyticsDashboard({
                   <ul className="space-y-1 text-xs text-gray-600">
                     {result.recommendations.slice(0, 2).map((rec, index) => (
                       <li key={index} className="flex items-start gap-1">
-                        <span className="text-blue-600 mt-0.5">·</span>
+                        <span className="text-blue-600 mt-0.5">Â·</span>
                         <span>{rec}</span>
                       </li>
                     ))}

@@ -4,12 +4,16 @@ interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   text?: string;
+  isOffline?: boolean;
+  hasError?: boolean;
 }
 
 export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
   size = 'md', 
   className = '',
-  text 
+  text,
+  isOffline = false,
+  hasError = false
 }) => {
   const sizeClasses = {
     sm: 'w-4 h-4',
@@ -17,13 +21,37 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     lg: 'w-8 h-8',
   };
 
+  // Offline yoki xato bo'lganda - aylanmasin, static ko'rinsin
+  if (isOffline || hasError) {
+    const bgColor = isOffline ? 'bg-yellow-100' : 'bg-red-100';
+    const borderColor = isOffline ? 'border-yellow-300' : 'border-red-300';
+    const iconColor = isOffline ? 'text-yellow-600' : 'text-red-600';
+    const textColor = isOffline ? 'text-yellow-800' : 'text-red-800';
+    
+    return (
+      <div className={`flex items-center gap-3 ${bgColor} p-4 rounded-lg border ${borderColor} ${className}`}>
+        <div className={`flex-shrink-0 text-2xl ${iconColor}`}>
+          {isOffline ? '📡' : '❌'}
+        </div>
+        <div className="flex-1">
+          <p className={`text-sm font-medium ${textColor}`}>
+            {isOffline ? 'Internet ulanmagan' : 'Xatolik yuz berdi'}
+          </p>
+          {text && (
+            <p className={`text-xs mt-1 ${textColor}`}>{text}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <div 
         className={`
           ${sizeClasses[size]} 
-          border-2 border-gray-300 border-t-blue-600 
-          rounded-full animate-spin
+          bg-blue-500 
+          rounded-full animate-pulse
         `}
       />
       {text && (
@@ -34,13 +62,26 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 };
 
 // Full page loading component
-export const PageLoading: React.FC<{ text?: string }> = ({ 
-  text = 'Yuklanmoqda...' 
+export const PageLoading: React.FC<{ text?: string; isOffline?: boolean }> = ({ 
+  text = 'Yuklanmoqda...',
+  isOffline = false
 }) => {
+  if (isOffline) {
+    return (
+      <div className="min-h-screen bg-yellow-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">📡</div>
+          <h1 className="text-2xl font-bold text-yellow-800 mb-2">Internet ulanmagan</h1>
+          <p className="text-yellow-700">Iltimos, internet ulanishini tekshiring</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
-        <LoadingSpinner size="lg" className="mb-4" />
+        <LoadingSpinner size="lg" className="mb-4 justify-center" />
         <p className="text-gray-600">{text}</p>
       </div>
     </div>

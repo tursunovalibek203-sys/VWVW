@@ -15,7 +15,8 @@ router.post('/sales', authorize('CASHIER'), async (req: AuthRequest, res) => {
     });
 
     // Import and use SalesService directly
-    const { salesService } = await import('../services/SalesService');
+    const { SalesService } = await import('../services/SalesService');
+    const salesService = new SalesService();
     
     // Prepare user info for SalesService
     const userInfo = {
