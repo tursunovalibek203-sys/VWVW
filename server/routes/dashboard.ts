@@ -90,16 +90,12 @@ router.get('/stats', async (req, res) => {
         orderBy: { _sum: { totalAmount: 'desc' } },
         take: 5,
       }),
-      prisma.product.findMany({
-        where: {
-          OR: [
-            { currentStock: { lte: prisma.product.fields.minStockLimit } },
-            { currentStock: 0 }
-          ]
-        },
-        select: { id: true, name: true, currentStock: true, minStockLimit: true },
-        take: 10,
-      }),
+      prisma.$queryRaw`
+        SELECT id, name, "currentStock", "minStockLimit"
+        FROM "Product"
+        WHERE "currentStock" <= "minStockLimit" OR "currentStock" = 0
+        LIMIT 10
+      `,
       prisma.sale.count({
         where: { createdAt: { gte: today } }
       }),

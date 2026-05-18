@@ -31,7 +31,7 @@ function validateJwtSecret(): string {
   return JWT_SECRET;
 }
 
-const VALIDATED_JWT_SECRET = validateJwtSecret();
+export const VALIDATED_JWT_SECRET = validateJwtSecret();
 
 export interface AuthRequest extends Request {
   user?: { id: string; role: string; name?: string; email?: string };

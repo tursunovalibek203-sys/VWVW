@@ -155,23 +155,18 @@ router.post('/', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'CASHIER'), async (req:
 
         if (productType?.defaultCard) {
           // Standart kartni topish
-          const card = await prisma.$queryRaw<{ id: string }[]>`
-            SELECT id FROM Card WHERE name = ${productType.defaultCard} AND active = true
-          `;
+          const card = await prisma.card.findFirst({
+            where: { name: productType.defaultCard, active: true },
+            select: { id: true },
+          });
 
-          if (card.length > 0) {
-            // Mahsulotni kartga qo'shish
-            await prisma.$executeRaw`
-              INSERT OR REPLACE INTO CardProduct (id, cardId, productId, quantity, active, createdAt)
-              VALUES (
-                lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6))),
-                ${card[0].id},
-                ${product.id},
-                1,
-                true,
-                datetime('now')
-              )
-            `;
+          if (card) {
+            // Mahsulotni kartga qo'shish (mavjud bo'lsa yangilash - INSERT OR REPLACE semantikasi)
+            await prisma.cardProduct.upsert({
+              where: { cardId_productId: { cardId: card.id, productId: product.id } },
+              create: { cardId: card.id, productId: product.id, quantity: 1, active: true },
+              update: { quantity: 1, active: true },
+            });
             console.log(`✅ ${product.name} mahsuloti ${productType.defaultCard} kartiga avtomatik qo'shildi`);
           }
         }

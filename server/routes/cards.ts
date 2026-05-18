@@ -7,16 +7,19 @@ const router = Router();
 // Barcha kartlarni olish
 router.get('/', authenticate, async (req, res) => {
   try {
-    const cards = await prisma.$queryRaw`
-      SELECT 
-        c.*,
-        COUNT(cp.id) as productCount
-      FROM Card c
-      LEFT JOIN CardProduct cp ON c.id = cp.cardId AND cp.active = true
-      WHERE c.active = true
-      GROUP BY c.id
-      ORDER BY c.name ASC
-    `;
+    const rows = await prisma.card.findMany({
+      where: { active: true },
+      orderBy: { name: 'asc' },
+      include: {
+        cardProducts: { where: { active: true }, select: { id: true } },
+      },
+    });
+
+    // Preserve original response shape: card fields + productCount
+    const cards = rows.map(({ cardProducts, ...card }) => ({
+      ...card,
+      productCount: cardProducts.length,
+    }));
 
     res.json(cards);
   } catch (error) {

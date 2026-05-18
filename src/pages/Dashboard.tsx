@@ -49,16 +49,17 @@ export default function Dashboard() {
 
   const loadDashboardStats = async () => {
     try {
-      // Simulated data - replace with actual API calls
+      // Haqiqiy backend ma'lumotlari (avval simulyatsiya/hardcoded edi)
+      const { data } = await api.get('/dashboard/stats');
       setStats({
-        todaySales: 12,
-        todayRevenue: 8540,
-        totalProducts: 156,
-        lowStockProducts: 3,
-        totalCustomers: 248,
-        newCustomers: 5,
-        cashboxBalance: 12500,
-        pendingOrders: 8,
+        todaySales: data.todaySales ?? 0,
+        todayRevenue: data.dailyRevenue ?? 0,
+        totalProducts: data.totalProducts ?? 0,
+        lowStockProducts: Array.isArray(data.lowStock) ? data.lowStock.length : 0,
+        totalCustomers: data.totalCustomers ?? 0,
+        newCustomers: data.newCustomers ?? 0,
+        cashboxBalance: data.cashBalance ?? 0,
+        pendingOrders: data.pendingDeliveries ?? 0,
       });
     } catch (error) {
       console.error('Dashboard stats loading error:', error);

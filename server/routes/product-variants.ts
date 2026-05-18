@@ -7,16 +7,18 @@ const router = Router();
 // Barcha mahsulot variantlarini olish
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const variants = await prisma.$queryRaw`
-      SELECT 
-        pv.*,
-        p.name as parentName,
-        p.bagType as parentBagType
-      FROM ProductVariant pv
-      LEFT JOIN Product p ON pv.parentId = p.id
-      WHERE pv.active = true
-      ORDER BY pv.createdAt DESC
-    `;
+    const rows = await prisma.productVariant.findMany({
+      where: { active: true },
+      orderBy: { createdAt: 'desc' },
+      include: { parent: { select: { name: true, bagType: true } } },
+    });
+
+    // Preserve original flattened response shape (parentName / parentBagType)
+    const variants = rows.map(({ parent, ...pv }) => ({
+      ...pv,
+      parentName: parent?.name ?? null,
+      parentBagType: parent?.bagType ?? null,
+    }));
 
     res.json(variants);
   } catch (error) {
@@ -47,39 +49,26 @@ router.post('/', authenticateToken, async (req, res) => {
       });
     }
 
-    // To'g'ridan-to'g'ri SQL orqali variant yaratish
-    const variantId = `var_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    await prisma.$executeRaw`
-      INSERT INTO ProductVariant (
-        id, parentId, variantName, cardType, currentStock, currentUnits, 
-        pricePerBag, active, createdAt, updatedAt
-      ) VALUES (
-        ${variantId},
-        ${parentId},
-        ${variantName},
-        ${cardType || null},
-        ${currentStock},
-        ${currentUnits},
-        ${pricePerBag},
-        true,
-        datetime('now'),
-        datetime('now')
-      )
-    `;
+    const created = await prisma.productVariant.create({
+      data: {
+        parentId,
+        variantName,
+        cardType: cardType || null,
+        currentStock,
+        currentUnits,
+        pricePerBag,
+        active: true,
+      },
+      include: { parent: { select: { name: true, bagType: true } } },
+    });
 
-    // Yaratilgan variantni olish
-    const variant = await prisma.$queryRaw`
-      SELECT 
-        pv.*,
-        p.name as parentName,
-        p.bagType as parentBagType
-      FROM ProductVariant pv
-      LEFT JOIN Product p ON pv.parentId = p.id
-      WHERE pv.id = ${variantId}
-    `;
-
-    res.status(201).json((variant as any[])[0]);
+    // Preserve original flattened response shape (parentName / parentBagType)
+    const { parent, ...pv } = created;
+    res.status(201).json({
+      ...pv,
+      parentName: parent?.name ?? null,
+      parentBagType: parent?.bagType ?? null,
+    });
   } catch (error) {
     console.error('Error creating product variant:', error);
     res.status(500).json({ error: 'Internal server error' });

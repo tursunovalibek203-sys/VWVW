@@ -99,7 +99,20 @@ docker-compose.yml
 nginx.conf
 ecosystem.config.js
 capacitor.config.ts
+.vercel
+
+# Secret-bearing deploy manifests / env files (NEVER commit - set in platform dashboard)
 render.yaml
 render.env
+render-deploy.env
 railway.yaml
-.vercel
+windsurf_deployment.yaml
+.env.production
+.env.render
+# Generated audit artifact (may contain live tokens)
+scripts/api-runtime-report.json
+
+# Local working backups (audit/remediation artifacts - never commit)
+prisma/*corrupt*
+prisma/*stripped-backup*
+prisma/*.backup*

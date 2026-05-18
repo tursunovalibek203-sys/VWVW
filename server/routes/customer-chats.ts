@@ -56,8 +56,8 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// Get chat history for specific customer
-router.get('/:telegramChatId', async (req, res) => {
+// Get chat history for specific customer (auth: mijoz PII himoyasi)
+router.get('/:telegramChatId', authenticate, async (req, res) => {
   try {
     const { telegramChatId } = req.params;
     
@@ -73,8 +73,8 @@ router.get('/:telegramChatId', async (req, res) => {
   }
 });
 
-// Send message to customer
-router.post('/send-message', async (req, res) => {
+// Send message to customer (auth: bot orqali xabar yuborishni himoyalash)
+router.post('/send-message', authenticate, async (req, res) => {
   try {
     const { telegramChatId, message } = req.body;
 

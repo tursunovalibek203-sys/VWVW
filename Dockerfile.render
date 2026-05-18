@@ -19,12 +19,11 @@ RUN npm run db:generate
 # Build frontend only (server runs with tsx)
 RUN npm run build
 
-# Use PORT from environment (Render sets this)
+# Non-secret defaults only. ALL secrets (DATABASE_URL, JWT_SECRET,
+# TELEGRAM_BOT_TOKEN, ...) MUST be set in the Render dashboard
+# Environment settings — never bake secrets into image layers.
 ENV PORT=10000
-ENV DATABASE_URL="postgresql://postgres.cxgerdqlovclceeoroir:1234qazA%40A%23%23E@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
-ENV JWT_SECRET="luxpetplast-secret-key-2024"
 ENV USD_TO_UZS_RATE=12500
-ENV TELEGRAM_BOT_TOKEN="8228740483:AAFAGajvvZkCA8eXNMY-dLa4I2gin4wYUKw"
 ENV CORS_ORIGIN="https://luxpetplast.onrender.com"
 EXPOSE 10000
 

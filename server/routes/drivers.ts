@@ -5,6 +5,9 @@ import { DriverBotManager } from '../bot/driver-bot';
 
 const router = Router();
 
+// Barcha driver endpointlari autentifikatsiya talab qiladi (driver PII himoyasi)
+router.use(authenticate);
+
 // Barcha haydovchilarni olish
 router.get('/', async (req, res) => {
   try {

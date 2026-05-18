@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
-import { generateSuperManagerReport } from '../ai/archive/super-manager';
+import { generateSuperManagerReport } from '../ai/super-manager';
 
 const router = Router();
 

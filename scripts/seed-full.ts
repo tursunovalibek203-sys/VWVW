@@ -11,6 +11,7 @@ async function main() {
   
   const adminPassword = await bcrypt.hash('admin123', 10);
   const sellerPassword = await bcrypt.hash('seller123', 10);
+  const cashierPassword = await bcrypt.hash('cashier123', 10);
   
   const admin = await prisma.user.upsert({
     where: { login: 'admin' },
@@ -34,7 +35,18 @@ async function main() {
     }
   });
 
-  console.log('✅ 2 ta foydalanuvchi yaratildi\n');
+  const cashier = await prisma.user.upsert({
+    where: { login: 'cashier' },
+    update: {},
+    create: {
+      login: 'cashier',
+      password: cashierPassword,
+      name: 'Kassir',
+      role: 'CASHIER'
+    }
+  });
+
+  console.log('✅ 3 ta foydalanuvchi yaratildi (admin, seller, cashier)\n');
 
   // 2. Mahsulotlar
   console.log('📦 Mahsulotlar yaratilmoqda...');
@@ -182,7 +194,19 @@ async function main() {
     })
   ]);
 
-  console.log(`✅ ${products.length} ta mahsulot yaratildi\n`);
+  // currentUnits ni currentStock va unitsPerBag asosida izchil qilish.
+  // Sotuv mantig'i atomik tekshiruvda HAM currentStock HAM currentUnits ni talab qiladi
+  // (SalesService.ts), shuning uchun currentUnits = 0 qolsa har qanday qop-sotuv "stok yetarli emas" beradi.
+  await Promise.all(
+    products.map((p) =>
+      prisma.product.update({
+        where: { id: p.id },
+        data: { currentUnits: p.currentStock * p.unitsPerBag },
+      })
+    )
+  );
+
+  console.log(`✅ ${products.length} ta mahsulot yaratildi (currentUnits izchillashtirildi)\n`);
 
   // 3. Mijozlar
   console.log('👥 Mijozlar yaratilmoqda...');

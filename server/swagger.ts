@@ -57,7 +57,7 @@ export const setupSwagger = (app: Express) => {
     res.send(specs);
   });
 
-  console.log('📚 Swagger UI: http://localhost:5000/api-docs');
+  console.log(`Swagger UI: http://localhost:${process.env.PORT || 5003}/api-docs`);
 };
 
 export default specs;

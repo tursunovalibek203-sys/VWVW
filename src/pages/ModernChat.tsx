@@ -192,7 +192,7 @@ export default function ModernChat() {
   // Fetch messages for selected conversation
   const fetchMessages = useCallback(async (conversationId: string) => {
     try {
-      const response = await api.get(`/customer-chat/${conversationId}/messages`);
+      const response = await api.get(`/customer-chat/conversations/${conversationId}/messages`);
       setMessages(response.data || []);
       scrollToBottom();
     } catch (error) {

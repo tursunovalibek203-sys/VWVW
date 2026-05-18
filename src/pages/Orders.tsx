@@ -210,7 +210,7 @@ export default function Orders() {
   // Ishlab chiqarish buyurtmasi yaratish
   const createProductionOrder = async (productId: string, quantity: number) => {
     try {
-      const response = await api.post('/production-orders', {
+      const response = await api.post('/production/orders', {
         productId,
         quantity,
         priority: 'HIGH',

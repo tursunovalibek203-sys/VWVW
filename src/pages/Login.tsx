@@ -46,9 +46,8 @@ export default function Login() {
         requestData = { login, password };
       }
       
-      console.log('ðŸ” Login attempt:', { endpoint, requestData, loginType });
+      // Xavfsizlik: parol/JWT konsolga chiqarilmaydi
       const { data } = await api.post(endpoint, requestData);
-      console.log('âœ… Login response:', data);
       
       if (!data.token || !data.user) {
         throw new Error('Serverdan noto\'g\'ri ma\'lumot keldi');
@@ -60,7 +59,7 @@ export default function Login() {
       if (role === 'CASHIER' || role === 'SELLER') {
         navigate('/cashier/sales');
       } else {
-        navigate('/');
+        navigate('/dashboard');
       }
     } catch (error: any) {
       console.error('❌ Login error:', error);

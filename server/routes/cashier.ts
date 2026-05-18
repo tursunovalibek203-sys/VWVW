@@ -6,8 +6,10 @@ const router = Router();
 
 router.use(authenticate);
 
-// Cashier sales endpoint - handles sales created from cashier interface
-router.post('/sales', authorize('CASHIER'), async (req: AuthRequest, res) => {
+// Cashier sales endpoint - handles sales created from cashier interface.
+// Roles must match the cashier-login policy (auth.ts allowedRoles = cashier, seller):
+// anyone who can log into the cashier interface must be able to create cashier sales.
+router.post('/sales', authorize('CASHIER', 'SELLER'), async (req: AuthRequest, res) => {
   try {
     console.log('📥 Cashier POST /sales - Data:', { 
       userId: req.user?.id, 

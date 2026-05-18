@@ -548,7 +548,7 @@ export default function Cashbox() {
   const handleCreateLoan = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/loans', {
+      await api.post('/cashbox/loans', {
         employeeName: loanForm.employeeName,
         employeeId: loanForm.employeeId || null,
         amount: parseFloat(loanForm.amount),

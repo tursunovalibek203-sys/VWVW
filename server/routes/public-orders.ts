@@ -60,10 +60,37 @@ router.post('/orders', async (req, res) => {
     const orderCount = await prisma.order.count();
     const orderNumber = `ORD-${Date.now()}-${orderCount + 1}`;
 
-    // Umumiy summani hisoblash
-    const totalAmount = items.reduce((sum: number, item: any) => {
-      return sum + (item.quantity * item.pricePerBag);
-    }, 0);
+    // XAVFSIZLIK: narxni MIJOZ EMAS, server DB'dan oladi (narx buzishni oldini olish)
+    const productIds: string[] = [...new Set(items.map((i: any) => i.productId))] as string[];
+    const dbProducts = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, pricePerBag: true },
+    });
+    const priceMap = new Map(dbProducts.map((p) => [p.id, p.pricePerBag]));
+
+    // Har bir item uchun mahsulot mavjudligi va musbat miqdorni tekshirish
+    for (const item of items) {
+      if (!priceMap.has(item.productId)) {
+        return res.status(400).json({ error: `Mahsulot topilmadi: ${item.productId}` });
+      }
+      const qty = Number(item.quantity);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        return res.status(400).json({ error: 'Miqdor musbat son bo\'lishi kerak' });
+      }
+    }
+
+    // Umumiy summani SERVER narxidan hisoblash
+    const lineItems = items.map((item: any) => {
+      const serverPrice = priceMap.get(item.productId)!;
+      return {
+        productId: item.productId,
+        quantityBags: item.quantity,
+        quantityUnits: 0,
+        pricePerBag: serverPrice,
+        subtotal: item.quantity * serverPrice,
+      };
+    });
+    const totalAmount = lineItems.reduce((sum: number, li: { subtotal: number }) => sum + li.subtotal, 0);
 
     // Buyurtma yaratish
     const order = await prisma.order.create({
@@ -76,13 +103,7 @@ router.post('/orders', async (req, res) => {
         totalAmount,
         notes: customer.notes || null,
         items: {
-          create: items.map((item: any) => ({
-            productId: item.productId,
-            quantityBags: item.quantity,
-            quantityUnits: 0,
-            pricePerBag: item.pricePerBag,
-            subtotal: item.quantity * item.pricePerBag
-          }))
+          create: lineItems
         }
       },
       include: {

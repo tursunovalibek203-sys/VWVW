@@ -189,75 +189,75 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /sales - Sotuv yaratish (Zod validation bilan)
-// POST /sales - Create sale (Service-based, clean implementation)
-router.post('/', 
-  authorize('ADMIN', 'CASHIER', 'SELLER'),
-  validateBody(SaleCreateSchema),
-  async (req: AuthRequest & { validatedBody: any }, res: any) => {
-    try {
-      const userId = req.user?.id;
-      const userName = (req.user as any)?.name || req.user?.email || 'Unknown';
-      
-      if (!userId) {
-        return res.status(401).json(errorResponse('Foydalanuvchi aniqlanmadi'));
-      }
-
-      // âœ… USE SERVICE LAYER - All business logic moved to service
-      const sale = await salesService.createSale({
-        ...req.validatedBody,
-        userId,
-        userName
-      });
-
-      // Optional: Invoice and notifications (non-blocking)
-      try {
-        await Promise.all([
-          createInvoiceForSale(sale.id),
-          notifyCustomerSale(sale.id)
-        ]);
-      } catch (err) {
-        // Log but don't fail the request
-        logger.warn({ error: err }, 'Invoice/notification failed');
-      }
-
-      // Audit log
-      try {
-        await logSalesAction({
-          userId,
-          userName,
-          action: 'SOTUV YARATISH',
-          entity: 'SALES',
-          entityId: sale.id,
-          customerId: sale.customerId,
-          customerName: sale.customer?.name || req.validatedBody.manualCustomerName || 'Noma\'lum',
-          details: {
-            type: 'CREATE',
-            totalAmount: sale.totalAmount,
-            paidAmount: sale.paidAmount,
-            currency: sale.currency,
-            paymentStatus: sale.paymentStatus,
-            paymentMethod: sale.paymentMethod,
-            products: sale.items?.map(item => ({
-              productId: item.productId || '',
-              productName: item.product?.name || 'Noma\'lum',
-              quantity: item.quantity,
-              price: item.pricePerBag || 0
-            })) || []
-          },
-          ipAddress: req.ip,
-          userAgent: req.get('user-agent')
-        });
-      } catch (err) {
-        logger.warn({ error: err }, 'Audit log failed');
-      }
-
-      // âœ… STANDARD RESPONSE FORMAT
-      res.json(successResponse(sale));
-    } catch (error: any) {
-      logger.error({ error }, 'Create sale error');
-      res.status(500).json(errorResponse(error.message));
-    }
-  }
+// POST /sales - Create sale (Service-based, clean implementation)
+router.post('/', 
+  authorize('ADMIN', 'CASHIER', 'SELLER'),
+  validateBody(SaleCreateSchema),
+  async (req: AuthRequest & { validatedBody: any }, res: any) => {
+    try {
+      const userId = req.user?.id;
+      const userName = (req.user as any)?.name || req.user?.email || 'Unknown';
+      
+      if (!userId) {
+        return res.status(401).json(errorResponse('Foydalanuvchi aniqlanmadi'));
+      }
+
+      // âœ… USE SERVICE LAYER - All business logic moved to service
+      const sale = await salesService.createSale({
+        ...req.validatedBody,
+        userId,
+        userName
+      });
+
+      // Optional: Invoice and notifications (non-blocking)
+      try {
+        await Promise.all([
+          createInvoiceForSale(sale.id),
+          notifyCustomerSale(sale.id)
+        ]);
+      } catch (err) {
+        // Log but don't fail the request
+        logger.warn({ error: err }, 'Invoice/notification failed');
+      }
+
+      // Audit log
+      try {
+        await logSalesAction({
+          userId,
+          userName,
+          action: 'SOTUV YARATISH',
+          entity: 'SALES',
+          entityId: sale.id,
+          customerId: sale.customerId,
+          customerName: sale.customer?.name || req.validatedBody.manualCustomerName || 'Noma\'lum',
+          details: {
+            type: 'CREATE',
+            totalAmount: sale.totalAmount,
+            paidAmount: sale.paidAmount,
+            currency: sale.currency,
+            paymentStatus: sale.paymentStatus,
+            paymentMethod: sale.paymentMethod,
+            products: sale.items?.map(item => ({
+              productId: item.productId || '',
+              productName: item.product?.name || 'Noma\'lum',
+              quantity: item.quantity,
+              price: item.pricePerBag || 0
+            })) || []
+          },
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent')
+        });
+      } catch (err) {
+        logger.warn({ error: err }, 'Audit log failed');
+      }
+
+      // âœ… STANDARD RESPONSE FORMAT
+      res.json(successResponse(sale));
+    } catch (error: any) {
+      logger.error({ error }, 'Create sale error');
+      res.status(500).json(errorResponse(error.message));
+    }
+  }
 );
 // Update sale (Zod validation bilan)
 router.put('/:id', 
@@ -508,7 +508,12 @@ router.put('/:id',
           // Mijoz qarz yangilandi (USD)
         }
       } catch (error) {
-        // Mijoz qarz yangilanmadi
+        // MOLIYAVIY NOMUVOFIQLIK: sotuv yangilandi, lekin mijoz qarzi yangilanmadi.
+        // Jim yutmaymiz - qo'lda rekonsiliatsiya uchun ko'rinadigan log.
+        logger.error('Sale updated but customer debt update FAILED - manual reconciliation required', {
+          saleId: (req.params as any)?.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -658,7 +663,7 @@ router.delete('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
         }
         console.log(`âœ… Mijoz qarzi kamaytirildi: -${debtToReduce} ${sale.currency}`);
       } catch (error) {
-        console.log(`âš ï¸ Mijoz qarzi yangilanmadi:`, error);
+        logger.error('Sale deleted but customer debt reduction FAILED - manual reconciliation required', { error: error instanceof Error ? error.message : String(error) });
       }
     }
 
@@ -885,7 +890,7 @@ router.post('/:id/driver-collection', authorize('ADMIN', 'CASHIER', 'MANAGER'), 
         });
         console.log(`âœ… Kassaga qo'shildi: $${collectedAmount}`);
       } catch (cashboxError) {
-        console.error('âŒ Kassaga qo\'shishda xatolik:', cashboxError);
+        logger.error('Driver collection recorded but cashbox add FAILED - cash/till discrepancy, manual reconciliation required', { error: cashboxError instanceof Error ? cashboxError.message : String(cashboxError) });
       }
     }
     

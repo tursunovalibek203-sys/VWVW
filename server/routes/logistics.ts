@@ -211,11 +211,9 @@ router.get('/statistics', async (req, res) => {
 // Barcha transport vositalarini olish
 router.get('/vehicles', async (req, res) => {
   try {
+    // Vehicle modelida `driver` relation yo'q (faqat scalar driverId)
     const vehicles = await prisma.vehicle.findMany({
       orderBy: { createdAt: 'desc' },
-      include: {
-        driver: true
-      }
     });
     res.json(vehicles);
   } catch (error) {
@@ -227,25 +225,30 @@ router.get('/vehicles', async (req, res) => {
 // Transport vositasi yaratish
 router.post('/vehicles', authorize('ADMIN', 'LOGISTICS_MANAGER'), async (req: AuthRequest, res) => {
   try {
-    const { 
-      name, 
-      plateNumber, 
-      type, 
+    const {
+      name,
+      plateNumber,
+      type,
+      model,
+      fuelType,
       capacity,
-      driverId 
+      driverId
     } = req.body;
+
+    if (!name || !plateNumber) {
+      return res.status(400).json({ error: 'name va plateNumber majburiy' });
+    }
 
     const vehicle = await prisma.vehicle.create({
       data: {
         name,
         plateNumber,
         type: type || 'TRUCK',
+        model: model || 'N/A',          // schema majburiy qiladi
+        fuelType: fuelType || 'DIESEL', // schema majburiy qiladi
         capacity: capacity || 0,
         driverId: driverId || null,
         active: true
-      },
-      include: {
-        driver: true
       }
     });
 

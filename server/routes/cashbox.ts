@@ -1,6 +1,6 @@
 ﻿import { Router } from 'express';
 import { prisma } from '../utils/prisma';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { DecimalHelper } from '../utils/decimal-helper';
 
 const router = Router();
@@ -258,7 +258,7 @@ router.get('/transactions', async (req, res) => {
   }
 });
 
-router.post('/add', async (req: AuthRequest, res) => {
+router.post('/add', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), async (req: AuthRequest, res) => {
   try {
     const { amount, currency, type, description } = req.body;
     await prisma.cashboxTransaction.create({
@@ -278,7 +278,7 @@ router.post('/add', async (req: AuthRequest, res) => {
   }
 });
 
-router.post('/withdraw', async (req: AuthRequest, res) => {
+router.post('/withdraw', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), async (req: AuthRequest, res) => {
   try {
     const { amount, currency, type, description } = req.body;
     await prisma.cashboxTransaction.create({
@@ -298,7 +298,7 @@ router.post('/withdraw', async (req: AuthRequest, res) => {
   }
 });
 
-router.post('/transfer', async (req: AuthRequest, res) => {
+router.post('/transfer', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), async (req: AuthRequest, res) => {
   try {
     const { from, to, amount, description, exchangeRate } = req.body;
 
@@ -341,7 +341,7 @@ router.post('/transfer', async (req: AuthRequest, res) => {
 });
 
 // Valyuta ayirboshlash endpointi
-router.post('/exchange', async (req: AuthRequest, res) => {
+router.post('/exchange', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), async (req: AuthRequest, res) => {
   try {
     const { fromCurrency, toCurrency, amount, fromType, toType, exchangeRate, description } = req.body;
 
@@ -427,8 +427,8 @@ router.get('/export/excel', async (req: AuthRequest, res) => {
 // Qarzlarni olish
 router.get('/loans', async (req: AuthRequest, res) => {
   try {
+    // Loan modelida `employee` relation yo'q (faqat scalar employeeName/employeeId)
     const loans = await prisma.loan.findMany({
-      include: { employee: true },
       orderBy: { createdAt: 'desc' }
     });
     res.json(loans);
@@ -535,17 +535,27 @@ router.post('/budgets', async (req: AuthRequest, res) => {
       currency,
       month,
       year,
-      alertThreshold
+      alertThreshold,
+      description
     } = req.body;
+
+    const amountNum = parseFloat(amount);
+    if (!category || !Number.isFinite(amountNum) || !month || !year) {
+      return res.status(400).json({ error: 'category, amount, month, year majburiy' });
+    }
 
     const budget = await prisma.budget.create({
       data: {
         category,
-        amount: parseFloat(amount),
+        amount: amountNum,
         currency: currency || 'UZS',
         month: parseInt(month),
         year: parseInt(year),
-        alertThreshold: alertThreshold ? parseFloat(alertThreshold) : 80
+        alertThreshold: alertThreshold ? parseFloat(alertThreshold) : 80,
+        spent: 0,
+        remaining: amountNum,            // schema majburiy: yaratishda spent=0 -> remaining=amount
+        createdBy: req.user?.id || 'system', // schema majburiy
+        description: description || null
       }
     });
 

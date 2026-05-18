@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { realtimeEvents, EVENT_TYPES } from '../utils/eventEmitter.js';
 import { logger } from '../utils/logger.js';
+import { VALIDATED_JWT_SECRET } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -17,8 +18,8 @@ const authenticateSSE = (req: Request, res: Response, next: Function) => {
       return res.status(401).json({ error: 'No token provided' });
     }
 
-    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    // Yagona, validatsiyalangan secret (fail-closed). Hardcoded fallback YO'Q.
+    const decoded = jwt.verify(token, VALIDATED_JWT_SECRET) as any;
     (req as any).user = decoded;
     next();
   } catch (error) {

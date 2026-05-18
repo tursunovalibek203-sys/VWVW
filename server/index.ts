@@ -249,23 +249,26 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Auth test endpoint
-app.get('/api/test-auth', (req, res) => {
-  const auth = req.headers.authorization;
+// Auth test endpoint - DEVELOPMENT ONLY (never expose decoded token
+// claims in production)
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/api/test-auth', (req, res) => {
+    const auth = req.headers.authorization;
 
-  if (!auth) {
-    return res.status(401).json({ error: 'No auth header' });
-  }
+    if (!auth) {
+      return res.status(401).json({ error: 'No auth header' });
+    }
 
-  const token = auth.split(' ')[1];
+    const token = auth.split(' ')[1];
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    res.json({ valid: true, user: decoded });
-  } catch (e) {
-    res.status(401).json({ valid: false, error: e instanceof Error ? e.message : 'Unknown error' });
-  }
-});
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+      res.json({ valid: true, user: decoded });
+    } catch (e) {
+      res.status(401).json({ valid: false, error: e instanceof Error ? e.message : 'Unknown error' });
+    }
+  });
+}
 
 // Global error handler - must be last (BEFORE app.listen)
 app.use(errorHandler);

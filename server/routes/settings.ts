@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../utils/prisma';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
@@ -46,8 +46,8 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// Update setting
-router.put('/:key', authenticate, async (req, res) => {
+// Update setting - faqat ADMIN (global sozlama/valyuta kursi barcha pul hisobiga ta'sir qiladi)
+router.put('/:key', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const { key } = req.params;
     const { value, description } = req.body;
@@ -75,8 +75,8 @@ router.put('/:key', authenticate, async (req, res) => {
   }
 });
 
-// Update multiple settings
-router.put('/', authenticate, async (req, res) => {
+// Update multiple settings - faqat ADMIN
+router.put('/', authenticate, authorize('ADMIN'), async (req, res) => {
   try {
     const settings = req.body;
     const userId = (req as any).user?.id;

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../utils/prisma';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { OrderWorkflow } from '../services/order-workflow';
 
 const router = Router();
@@ -33,24 +33,50 @@ router.get('/orders', async (req, res) => {
 
 router.post('/orders', authorize('ADMIN', 'WAREHOUSE_MANAGER'), async (req, res) => {
   try {
-    const { productId, targetQuantity, plannedDate, shift, supervisorId, notes } = req.body;
-    
+    const userId = (req as AuthRequest).user?.id;
+    const {
+      productId,
+      targetQuantity,
+      quantity, // frontend (Orders.tsx) bu nom bilan yuboradi
+      plannedDate,
+      shift,
+      supervisorId,
+      notes,
+    } = req.body;
+
+    // Contract: frontend faqat { productId, quantity, notes } yuboradi.
+    // Operatsion maydonlar uchun oqilona default'lar (model ularni majburiy qiladi).
+    const resolvedQuantity = Number(targetQuantity ?? quantity);
+    if (!productId || !Number.isFinite(resolvedQuantity) || resolvedQuantity <= 0) {
+      return res.status(400).json({ error: 'productId va musbat quantity (yoki targetQuantity) majburiy' });
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { name: true },
+    });
+    if (!product) {
+      return res.status(404).json({ error: 'Mahsulot topilmadi' });
+    }
+
     const orderNumber = `PRD-${Date.now()}`;
-    
+
     const order = await prisma.productionOrder.create({
       data: {
         orderNumber,
         productId,
-        targetQuantity,
-        plannedDate: new Date(plannedDate),
-        shift,
-        supervisorId,
-        notes,
-      }
+        targetQuantity: resolvedQuantity,
+        plannedDate: plannedDate ? new Date(plannedDate) : new Date(),
+        shift: shift || 'DAY',
+        supervisorId: supervisorId || userId || 'system',
+        notes: notes || null,
+      },
     });
 
-    res.json(order);
+    // Frontend response.data.productName ni o'qiydi
+    res.json({ ...order, productName: product.name });
   } catch (error) {
+    console.error('Create production order error:', error);
     res.status(500).json({ error: 'Failed to create production order' });
   }
 });
