@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Phone, 
-  MapPin, 
+import {
+  ArrowLeft,
+  Phone,
+  MapPin,
   Calendar,
   Wallet,
   AlertTriangle,
@@ -13,16 +13,20 @@ import {
   RefreshCw,
   FileSpreadsheet,
   Coins,
-  Trash2,
   Plus,
-  User
+  Hash,
+  CreditCard,
+  Crown,
+  ShieldAlert,
 } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
 import { formatDate, formatCurrency } from '../lib/utils';
-import DashboardCard from '../components/cards/DashboardCard';
 import api from '../lib/professionalApi';
 import { extractData, extractPaginatedData } from '../lib/apiHelpers';
-import MainLayout from '../components/layout/MainLayout';
+import { useToast, toast } from '../components/ui/Toast';
+import { PageLoading, TableSkeleton } from '../components/ui/LoadingSpinner';
+import { Badge } from '../components/ui/Badge';
+import EmptyState from '../components/EmptyState';
 
 interface Customer {
   id: string;
@@ -30,6 +34,7 @@ interface Customer {
   phone: string;
   address?: string;
   code?: string;
+  category?: string;
   balanceUSD: number;
   balanceUZS: number;
   debtUSD: number;
@@ -66,6 +71,7 @@ interface Sale {
 export default function CustomerProfileModern() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,15 +84,21 @@ export default function CustomerProfileModern() {
         api.get(`/customers/${id}`),
         api.get(`/sales?customerId=${id}`)
       ]);
-      
-      // âœ… Handle standardized API response format
+
+      // Handle standardized API response format
       const customerData = extractData<Customer | null>(customerRes, null);
       const { data: salesData } = extractPaginatedData<Sale>(salesRes, 'sales', []);
-      
+
       setCustomer(customerData);
       setSales(salesData);
     } catch (error) {
       console.error('Mijoz ma\'lumotlarini yuklashda xatolik:', error);
+      addToast(
+        toast.error(
+          latinToCyrillic('Xatolik'),
+          latinToCyrillic("Mijoz ma'lumotlarini yuklashda xatolik yuz berdi")
+        )
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -104,6 +116,12 @@ export default function CustomerProfileModern() {
   const handleExportExcel = () => {
     // Excel export logic
     console.log('Exporting to Excel...');
+    addToast(
+      toast.info(
+        latinToCyrillic('Tayyorlanmoqda'),
+        latinToCyrillic('Eksport funksiyasi tez orada')
+      )
+    );
   };
 
   const handlePayment = () => {
@@ -115,33 +133,66 @@ export default function CustomerProfileModern() {
   };
 
   if (loading) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-pulse rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600" />
-        </div>
-      </MainLayout>
-    );
+    return <PageLoading text={latinToCyrillic("Mijoz ma'lumotlari yuklanmoqda...")} />;
   }
 
   if (!customer) {
     return (
-      <MainLayout>
-        <div className="flex flex-col items-center justify-center min-h-screen p-4">
-          <p className="text-gray-500">{latinToCyrillic('Mijoz topilmadi')}</p>
-          <button
-            onClick={() => navigate('/cashier/customers')}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg"
-          >
-            {latinToCyrillic('Orqaga')}
-          </button>
+      <div className="max-w-7xl mx-auto space-y-8">
+        <div className="bg-white rounded-2xl border border-slate-200/70">
+          <EmptyState
+            icon={AlertTriangle}
+            title={latinToCyrillic('Mijoz topilmadi')}
+            description={latinToCyrillic('Bu mijoz mavjud emas')}
+            action={
+              <button
+                onClick={() => navigate('/cashier/customers')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                {latinToCyrillic('Qaytish')}
+              </button>
+            }
+          />
         </div>
-      </MainLayout>
+      </div>
     );
   }
 
   const totalPurchases = sales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0);
   const averagePurchase = sales.length > 0 ? totalPurchases / sales.length : 0;
+  const hasDebt = (customer.debtUSD || 0) > 0 || (customer.debtUZS || 0) > 0;
+
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+  };
+
+  // Kategoriya Badge varianti: VIP=info, WHOLESALE=success, NORMAL=neutral, RISK/PROBLEMATIC=error
+  const getCategoryVariant = (category?: string): 'success' | 'warning' | 'error' | 'info' | 'neutral' => {
+    switch (category) {
+      case 'VIP': return 'info';
+      case 'WHOLESALE': return 'success';
+      case 'PROBLEMATIC':
+      case 'RISK': return 'error';
+      case 'NORMAL': return 'neutral';
+      default: return 'neutral';
+    }
+  };
+
+  const getCategoryLabel = (category?: string) => {
+    switch (category) {
+      case 'VIP': return 'VIP';
+      case 'WHOLESALE': return latinToCyrillic('Optom');
+      case 'NORMAL': return latinToCyrillic('Oddiy');
+      case 'PROBLEMATIC':
+      case 'RISK': return latinToCyrillic('Xavfli');
+      case 'NEW': return latinToCyrillic('Yangi');
+      default: return null;
+    }
+  };
 
   const getProductNames = (sale: Sale) => {
     if (sale.items && sale.items.length > 0) {
@@ -153,263 +204,361 @@ export default function CustomerProfileModern() {
     return '-';
   };
 
+  const getStatusBadge = (status: string) => {
+    if (status === 'PAID') {
+      return <Badge variant="success">{latinToCyrillic("To'langan")}</Badge>;
+    }
+    if (status === 'PARTIAL') {
+      return <Badge variant="warning">{latinToCyrillic('Qisman')}</Badge>;
+    }
+    return <Badge variant="error">{latinToCyrillic('Qarz')}</Badge>;
+  };
+
+  const categoryLabel = getCategoryLabel(customer.category);
+  // Avatar: soft slate/indigo tint (premium, not rainbow). Qarz holatda nozik rose ishorasi.
+  const avatarTint = hasDebt ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600';
+
+  const infoCards = [
+    {
+      icon: Phone,
+      label: latinToCyrillic('Telefon'),
+      value: customer.phone || '-',
+      tint: 'bg-indigo-50 text-indigo-600',
+    },
+    {
+      icon: MapPin,
+      label: latinToCyrillic('Manzil'),
+      value: customer.address || '-',
+      tint: 'bg-sky-50 text-sky-600',
+    },
+    {
+      icon: Hash,
+      label: latinToCyrillic('Mijoz kodi'),
+      value: customer.code || 'N/A',
+      tint: 'bg-violet-50 text-violet-600',
+    },
+    {
+      icon: Calendar,
+      label: latinToCyrillic("Ro'yxat sanasi"),
+      value: formatDate(customer.createdAt),
+      tint: 'bg-emerald-50 text-emerald-600',
+    },
+  ];
+
+  const financialCards = [
+    {
+      icon: Wallet,
+      label: latinToCyrillic('Balans'),
+      main: formatCurrency(customer.balanceUSD || 0, 'USD'),
+      sub: `${(customer.balanceUZS || 0).toLocaleString('en-US')} UZS`,
+      mainClass: 'text-slate-900',
+      tint: 'bg-emerald-50 text-emerald-600',
+    },
+    {
+      icon: AlertTriangle,
+      label: latinToCyrillic('Qarz'),
+      main: formatCurrency(customer.debtUSD || 0, 'USD'),
+      sub: `${(customer.debtUZS || 0).toLocaleString('en-US')} UZS`,
+      mainClass: hasDebt ? 'text-rose-600' : 'text-slate-900',
+      tint: hasDebt ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-600',
+    },
+    {
+      icon: ShoppingCart,
+      label: latinToCyrillic('Jami xaridlar'),
+      main: `${sales.length} ${latinToCyrillic('ta')}`,
+      sub: formatCurrency(totalPurchases, 'USD'),
+      mainClass: 'text-slate-900',
+      tint: 'bg-sky-50 text-sky-600',
+    },
+    {
+      icon: TrendingUp,
+      label: latinToCyrillic("O'rtacha"),
+      main: formatCurrency(averagePurchase, 'USD'),
+      sub: latinToCyrillic('Har bir savdo'),
+      mainClass: 'text-slate-900',
+      tint: 'bg-amber-50 text-amber-600',
+    },
+  ];
+
   return (
-    <MainLayout>
-      <div className="min-h-screen bg-gray-50/50 pb-24">
-        {/* Header */}
-        <div className="bg-white shadow-sm border-b border-gray-100">
-          {/* Company Info */}
-          <div className="px-4 py-3 border-b border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">LP</span>
-              </div>
-              <div>
-                <h1 className="text-sm font-bold text-blue-700 uppercase tracking-wide">
-                  LUX PET PLAST
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Header: back + clean identity + actions */}
+      <div className="space-y-4">
+        <button
+          onClick={() => navigate('/cashier/customers')}
+          className="inline-flex items-center gap-2 px-3 py-1.5 -ml-1 text-sm font-semibold text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors active:scale-[0.98]"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          {latinToCyrillic('Mijozlar')}
+        </button>
+
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-bold flex-shrink-0 ${avatarTint}`}>
+              {getInitials(customer.name)}
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight truncate">
+                  {customer.name}
                 </h1>
-                <p className="text-xs text-gray-500 uppercase">
-                  {latinToCyrillic('BUXORO VILOYATI VOBKENT TUMAN')}
-                </p>
+                {categoryLabel && (
+                  <Badge variant={getCategoryVariant(customer.category)}>
+                    <span className="inline-flex items-center gap-1">
+                      {customer.category === 'VIP' && <Crown className="w-3 h-3" />}
+                      {(customer.category === 'RISK' || customer.category === 'PROBLEMATIC') && <ShieldAlert className="w-3 h-3" />}
+                      {categoryLabel}
+                    </span>
+                  </Badge>
+                )}
               </div>
-              <div className="ml-auto flex items-center gap-2">
-                <span className="text-xs text-gray-500">{latinToCyrillic('Kassir')}</span>
-                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-gray-600" />
-                </div>
-              </div>
+              <p className="mt-1 text-sm text-slate-500 flex items-center gap-1.5 tabular-nums">
+                <Phone className="w-3.5 h-3.5 text-slate-400" />
+                {customer.phone || '-'}
+              </p>
             </div>
           </div>
 
-          {/* Customer Header */}
-          <div className="px-4 py-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => navigate('/cashier/customers')}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  aria-label={latinToCyrillic('ÐžÑ€Ò›Ð°Ð³Ð°')}
-                >
-                  <ArrowLeft className="w-5 h-5 text-gray-600" />
-                </button>
-                <div>
-                  <h2 className="text-xl font-bold text-blue-600">
-                    {customer.name}
-                  </h2>
-                  <p className="text-xs text-gray-500">
-                    {latinToCyrillic('Mijoz kodi')}: {customer.code || 'N/A'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleRefresh}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium transition-colors"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-pulse' : ''}`} />
-                  {latinToCyrillic('Yangilash')}
-                </button>
-                <button
-                  onClick={handleExportExcel}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-xs font-medium transition-colors"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  Excel
-                </button>
-                <button
-                  onClick={() => {}}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg text-xs font-medium transition-colors"
-                  aria-label={latinToCyrillic('ÐÐ°Ò›Ð´ ÑÐ°Ð²Ð´Ð¾Ð»Ð°Ñ€')}
-                >
-                  {latinToCyrillic('ÐÐ°Ò›Ð´ ÑÐ°Ð²Ð´Ð¾Ð»Ð°Ñ€')}
-                </button>
-                <button
-                  onClick={handlePayment}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-xs font-medium transition-colors"
-                >
-                  <Coins className="w-3.5 h-3.5" />
-                  {latinToCyrillic('Ð¢ÑžÐ»Ð¾Ð² Ò›Ð¸Ð»Ð¸Ñˆ')}
-                </button>
-                <button
-                  onClick={() => {}}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-medium transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  {latinToCyrillic('Ð£Ñ‡Ð¸Ñ€Ð¼Ð¾Ò›')}
-                </button>
-              </div>
-            </div>
+          <div className="flex flex-wrap items-center gap-2.5 self-start">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-60 rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-600 transition-colors active:scale-[0.98]"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{latinToCyrillic('Yangilash')}</span>
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-600 transition-colors active:scale-[0.98]"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span className="hidden sm:inline">Excel</span>
+            </button>
+            <button
+              onClick={handlePayment}
+              className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 transition-colors active:scale-[0.98]"
+            >
+              <Coins className="w-4 h-4 text-indigo-600" />
+              {latinToCyrillic("To'lov")}
+            </button>
+            <button
+              onClick={handleNewSale}
+              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.98]"
+            >
+              <Plus className="w-4 h-4" />
+              {latinToCyrillic('Yangi savdo')}
+            </button>
           </div>
         </div>
+      </div>
 
-        <div className="p-4 space-y-4">
-          {/* Contact Info Cards */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Phone className="w-5 h-5 text-blue-600" />
+      {/* Financial cards: premium white */}
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+          {latinToCyrillic("Moliyaviy ma'lumot")}
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          {financialCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <div
+                key={card.label}
+                className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">
+                    {card.label}
+                  </p>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${card.tint}`}>
+                    <Icon className="w-[18px] h-[18px]" />
+                  </div>
+                </div>
+                <p className={`mt-3 text-2xl font-bold tracking-tight tabular-nums ${card.mainClass}`}>
+                  {card.main}
+                </p>
+                <p className="mt-1 text-xs text-slate-400 truncate tabular-nums">{card.sub}</p>
               </div>
-              <div>
-                <p className="text-xs text-gray-500">{latinToCyrillic('Ð¢ÐµÐ»ÐµÑ„Ð¾Ð½')}</p>
-                <p className="text-sm font-semibold text-gray-900">{customer.phone || '-'}</p>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Contact info cards: premium white */}
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+          {latinToCyrillic("Aloqa ma'lumotlari")}
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          {infoCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <div
+                key={card.label}
+                className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">
+                    {card.label}
+                  </p>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${card.tint}`}>
+                    <Icon className="w-[18px] h-[18px]" />
+                  </div>
+                </div>
+                <p className="mt-3 text-sm font-bold text-slate-900 break-words" title={card.value}>
+                  {card.value}
+                </p>
               </div>
-            </div>
-            <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <MapPin className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">{latinToCyrillic('ÐœÐ°Ð½Ð·Ð¸Ð»')}</p>
-                <p className="text-sm font-semibold text-gray-900">{customer.address || '-'}</p>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">{latinToCyrillic('Ð ÑžÐ¹Ñ…Ð°Ñ‚Ð´Ð°Ð½ ÑžÑ‚Ð³Ð°Ð½')}</p>
-                <p className="text-sm font-semibold text-gray-900">{formatDate(customer.createdAt)}</p>
-              </div>
-            </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Sales history */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+            <Package className="w-3.5 h-3.5" />
+            {latinToCyrillic('Savdolar tarixi')}
+          </h2>
+          <span className="text-xs font-medium text-slate-400 tabular-nums">
+            {sales.length} {latinToCyrillic('ta savdo')}
+          </span>
+        </div>
+
+        {/* Loading */}
+        {refreshing && sales.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-6">
+            <TableSkeleton rows={6} cols={6} />
           </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-4 gap-3">
-            <DashboardCard
-              icon={Wallet}
-              title={latinToCyrillic('Ð‘Ð°Ð»Ð°Ð½Ñ')}
-              mainValue={customer.balanceUSD || 0}
-              subValue={`${(customer.balanceUZS || 0).toLocaleString()} sum`}
-              variant="success"
-            />
-            <DashboardCard
-              icon={AlertTriangle}
-              title={latinToCyrillic('ÒšÐ°Ñ€Ð·')}
-              mainValue={customer.debtUSD || 0}
-              subValue={`${(customer.debtUZS || 0).toLocaleString()} sum`}
-              variant="danger"
-            />
-            <DashboardCard
-              icon={ShoppingCart}
-              title={latinToCyrillic('Ð¥Ð°Ñ€Ð¸Ð´Ð»Ð°Ñ€')}
-              mainValue={`${sales.length} ${latinToCyrillic('Ñ‚Ð°')}`}
-              subValue={`$${totalPurchases.toFixed(2)}`}
-              variant="info"
-            />
-            <DashboardCard
-              icon={TrendingUp}
-              title={latinToCyrillic('ÐŽÑ€Ñ‚Ð°Ñ‡Ð°')}
-              mainValue={`$${averagePurchase.toFixed(2)}`}
-              subValue={latinToCyrillic('Ð¥Ð°Ñ€ Ð±Ð¸Ñ€ ÑÐ¾Ñ‚ÑƒÐ²')}
-              variant="warning"
+        ) : sales.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200/70">
+            <EmptyState
+              icon={Package}
+              title={latinToCyrillic("Savdolar yo'q")}
+              description={latinToCyrillic('Bu mijoz hali xarid qilmadi')}
+              action={
+                <button
+                  onClick={handleNewSale}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+                >
+                  <Plus className="w-4 h-4" />
+                  {latinToCyrillic('Yangi savdo')}
+                </button>
+              }
             />
           </div>
-
-          {/* Sales History Table */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Package className="w-5 h-5 text-gray-600" />
-                <h3 className="font-bold text-gray-900">
-                  {latinToCyrillic('Ð¡Ð¾Ñ‚ÑƒÐ²Ð»Ð°Ñ€ Ñ‚Ð°Ñ€Ð¸Ñ…Ð¸')}
-                </h3>
-              </div>
-              <span className="text-sm text-gray-500">
-                {sales.length} {latinToCyrillic('Ñ‚Ð° ÑÐ¾Ñ‚ÑƒÐ²')}
-              </span>
-            </div>
-
-            {sales.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                <p>{latinToCyrillic('Ð¡Ð¾Ñ‚ÑƒÐ²Ð»Ð°Ñ€ Ð¼Ð°Ð²Ð¶ÑƒÐ´ ÑÐ¼Ð°Ñ')}</p>
-              </div>
-            ) : (
+        ) : (
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {latinToCyrillic('Ð¡Ð°Ð½Ð°')}
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {latinToCyrillic('ÐœÐ°Ò³ÑÑƒÐ»Ð¾Ñ‚Ð»Ð°Ñ€')}
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {latinToCyrillic('Ð–Ð°Ð¼Ð¸')}
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {latinToCyrillic('Ð¢ÑžÐ»Ð°Ð½Ð³Ð°Ð½')}
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {latinToCyrillic('ÒšÐ°Ñ€Ð·')}
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {latinToCyrillic('Ò²Ð¾Ð»Ð°Ñ‚')}
-                      </th>
+                  <thead>
+                    <tr className="border-b border-slate-200/70 bg-slate-50/60">
+                      <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Sana')}</th>
+                      <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Mahsulotlar')}</th>
+                      <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Jami')}</th>
+                      <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic("To'langan")}</th>
+                      <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Qarz')}</th>
+                      <th className="text-center text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Holat')}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-slate-100">
                     {sales.map((sale) => (
-                      <tr key={sale.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-4 py-3 text-sm text-gray-900">
+                      <tr key={sale.id} className="group hover:bg-slate-50/70 transition-colors">
+                        <td className="px-5 py-4 text-sm text-slate-600 whitespace-nowrap tabular-nums">
                           {formatDate(sale.createdAt)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          <div className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                            <span className="truncate max-w-[200px]">{getProductNames(sale)}</span>
+                        <td className="px-5 py-4 text-sm text-slate-600">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full flex-shrink-0" />
+                            <span className="truncate max-w-[260px]" title={getProductNames(sale)}>
+                              {getProductNames(sale)}
+                            </span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                        <td className="px-5 py-4 text-sm font-semibold text-slate-900 text-right whitespace-nowrap tabular-nums">
                           {formatCurrency(sale.totalAmount, sale.currency)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-emerald-600 text-right">
+                        <td className="px-5 py-4 text-sm text-emerald-600 font-medium text-right whitespace-nowrap tabular-nums">
                           {formatCurrency(sale.paidAmount, sale.currency)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-right">
+                        <td className="px-5 py-4 text-sm text-right whitespace-nowrap tabular-nums">
                           {(sale.debtAmount || 0) > 0 ? (
-                            <span className="text-rose-600 font-medium">
+                            <span className="text-rose-600 font-semibold">
                               {formatCurrency(sale.debtAmount, sale.currency)}
                             </span>
                           ) : (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-slate-300">&mdash;</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                            sale.paymentStatus === 'PAID' 
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : sale.paymentStatus === 'PARTIAL'
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-rose-100 text-rose-700'
-                          }`}>
-                            {sale.paymentStatus === 'PAID' 
-                              ? latinToCyrillic('Ð¢ÑžÐ»Ð°Ð½Ð³Ð°Ð½')
-                              : sale.paymentStatus === 'PARTIAL'
-                              ? latinToCyrillic('ÒšÐ¸ÑÐ¼Ð°Ð½')
-                              : latinToCyrillic('ÒšÐ°Ñ€Ð·')}
-                          </span>
+                        <td className="px-5 py-4 text-center">
+                          {getStatusBadge(sale.paymentStatus)}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* Floating Action Button */}
-        <button
-          onClick={handleNewSale}
-          className="fixed bottom-20 right-4 w-14 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 z-40"
-          aria-label={latinToCyrillic('Ð¯Ð½Ð³Ð¸ ÑÐ¾Ñ‚ÑƒÐ²')}
-        >
-          <Plus className="w-6 h-6" />
-        </button>
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-3">
+              {sales.map((sale) => (
+                <div
+                  key={sale.id}
+                  className="bg-white rounded-2xl border border-slate-200/70 p-4 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs text-slate-400 flex items-center gap-1.5 tabular-nums">
+                        <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                        {formatDate(sale.createdAt)}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-slate-700 break-words" title={getProductNames(sale)}>
+                        {getProductNames(sale)}
+                      </p>
+                    </div>
+                    {getStatusBadge(sale.paymentStatus)}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-3 gap-2.5">
+                    <div className="bg-slate-50 rounded-xl p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic('Jami')}</p>
+                      <p className="mt-0.5 text-sm font-bold text-slate-900 tabular-nums">
+                        {formatCurrency(sale.totalAmount, sale.currency)}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 rounded-xl p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic("To'langan")}</p>
+                      <p className="mt-0.5 text-sm font-bold text-emerald-600 tabular-nums">
+                        {formatCurrency(sale.paidAmount, sale.currency)}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 rounded-xl p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic('Qarz')}</p>
+                      <p className={`mt-0.5 text-sm font-bold tabular-nums ${(sale.debtAmount || 0) > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                        {(sale.debtAmount || 0) > 0
+                          ? formatCurrency(sale.debtAmount, sale.currency)
+                          : '—'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
-    </MainLayout>
+
+      {/* Footer hint */}
+      {sales.length > 0 && (
+        <div className="flex items-center justify-center gap-2 pt-2 text-xs text-slate-400">
+          <CreditCard className="w-3.5 h-3.5" />
+          <span>{latinToCyrillic('Barcha savdolar shu yerda')}</span>
+        </div>
+      )}
+    </div>
   );
 }

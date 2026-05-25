@@ -2,16 +2,18 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/professionalApi';
-import { 
-  Factory, 
-  ShieldCheck, 
-  Banknote, 
-  Eye, 
+import { latinToCyrillic } from '../lib/transliterator';
+import {
+  Factory,
+  ShieldCheck,
+  Banknote,
+  Eye,
   EyeOff,
   ArrowRight,
   Lock,
   User,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 
 export default function Login() {
@@ -88,124 +90,166 @@ export default function Login() {
                 <Factory className="w-10 h-10 text-white animate-pulse-soft" />
               </div>
 
-              <h1 className="text-2xl font-bold text-gradient text-center mb-1">
+              <h1 className="text-2xl font-bold text-gradient text-center mb-1 tracking-tight">
                 LUX PET PLAST
               </h1>
-              <p className="text-sm text-gray-500">Завод Бошқарув Тизими</p>
+              <p className="text-sm text-slate-500">{latinToCyrillic('Zavod Boshqaruv Tizimi')}</p>
             </div>
-            
+
             {/* Login Type Toggle - Modern Design */}
-            <div className="mb-6">
-              <div className="flex p-1.5 bg-slate-100 rounded-2xl">
+            <div
+              className="mb-6"
+              role="tablist"
+              aria-label={latinToCyrillic('Kirish turi')}
+            >
+              <div className="flex p-1.5 bg-slate-100 rounded-2xl gap-1">
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={loginType === 'admin'}
                   onClick={() => setLoginType('admin')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-300 ${
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-200 ease-out ${
                     loginType === 'admin'
                       ? 'btn-gradient-primary shadow-lg'
                       : 'text-slate-600 hover:text-blue-600 hover:bg-white/80'
                   }`}
                 >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Админ</span>
+                  <ShieldCheck className="w-4 h-4 shrink-0" />
+                  <span>{latinToCyrillic('Admin')}</span>
                 </button>
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={loginType === 'cashier'}
                   onClick={() => setLoginType('cashier')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-300 ${
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-200 ease-out ${
                     loginType === 'cashier'
                       ? 'btn-gradient-primary shadow-lg'
                       : 'text-slate-600 hover:text-blue-600 hover:bg-white/80'
                   }`}
                 >
-                  <Banknote className="w-4 h-4" />
-                  <span>Кассир</span>
+                  <Banknote className="w-4 h-4 shrink-0" />
+                  <span>{latinToCyrillic('Kassir')}</span>
                 </button>
               </div>
             </div>
-            
+
             {/* Error Message */}
             {error && (
-              <div className="mb-5 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 animate-shake">
-                <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5 animate-pulse" />
-                <p className="text-sm text-rose-600 font-medium">{error}</p>
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 animate-shake"
+              >
+                <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+                <p className="text-sm text-rose-700 font-medium leading-snug">{error}</p>
               </div>
             )}
             
             {/* Login Form */}
-            <form onSubmit={handleLogin} className="space-y-5">
+            <form onSubmit={handleLogin} className="space-y-4" noValidate>
               {/* Login Input */}
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-all duration-300 group-focus-within:scale-110">
-                  <User className="w-5 h-5" />
-                </div>
-                <input
-                  type="text"
-                  value={login}
-                  onChange={(e) => setLogin(e.target.value)}
-                  placeholder="Фойдаланувчи номи"
-                  required
-                  className="input-glass w-full pl-12 pr-4 text-slate-900 placeholder-slate-400"
-                />
-              </div>
-              
-              {/* Password Input */}
-              <div className="relative group">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-all duration-300 group-focus-within:scale-110">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Парол"
-                  required
-                  className="input-glass w-full pl-12 pr-12 text-slate-900 placeholder-slate-400"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-all duration-300 p-1.5 rounded-lg hover:bg-blue-50 hover:scale-110"
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="login"
+                  className="block text-sm font-semibold text-slate-700 px-1"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
+                  {latinToCyrillic('Foydalanuvchi nomi')}
+                </label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors duration-200 pointer-events-none">
+                    <User className="w-5 h-5" />
+                  </div>
+                  <input
+                    id="login"
+                    name="login"
+                    type="text"
+                    value={login}
+                    onChange={(e) => setLogin(e.target.value)}
+                    placeholder={latinToCyrillic('Foydalanuvchi nomini kiriting')}
+                    required
+                    autoFocus
+                    autoComplete="username"
+                    className="input-glass w-full pl-12 pr-4 text-slate-900 placeholder-slate-400"
+                  />
+                </div>
               </div>
-              
+
+              {/* Password Input */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-semibold text-slate-700 px-1"
+                >
+                  {latinToCyrillic('Parol')}
+                </label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors duration-200 pointer-events-none">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={latinToCyrillic('Parolni kiriting')}
+                    required
+                    autoComplete="current-password"
+                    className="input-glass w-full pl-12 pr-12 text-slate-900 placeholder-slate-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={latinToCyrillic(showPassword ? 'Parolni yashirish' : "Parolni ko'rsatish")}
+                    aria-pressed={showPassword}
+                    tabIndex={-1}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors duration-200 p-1.5 rounded-lg hover:bg-blue-50"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
               {/* Submit Button */}
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-gradient-primary w-full py-3.5 text-base disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:transform-none"
+                aria-busy={loading}
+                className="btn-gradient-primary group w-full py-3.5 mt-2 text-base disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:transform-none"
               >
                 {loading ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-pulse"></div>
-                    <span>Тизимга киришмоқда...</span>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    {/* 'Tizimga' transliteratsiyada g harfi lotin qoladi, shu sabab literal Cyrillic */}
+                    <span>Тизимга {latinToCyrillic('kirilmoqda...')}</span>
                   </>
                 ) : (
                   <>
-                    <span>Тизимга кириш</span>
-                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    <span>Тизимга {latinToCyrillic('kirish')}</span>
+                    <ArrowRight className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-1" />
                   </>
                 )}
               </button>
             </form>
             
             {/* Footer */}
-            <div className="mt-6 pt-5 border-t border-slate-200/50">
-              <div className="flex items-center justify-center gap-4 text-sm text-slate-500">
+            <div className="mt-6 pt-5 border-t border-slate-200/60">
+              <div className="flex items-center justify-center gap-3 text-sm text-slate-500">
                 <span className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span className="font-medium text-emerald-700">Сервер Онлайн</span>
+                  <span className="font-medium text-emerald-700">{latinToCyrillic('Server Onlayn')}</span>
                 </span>
-                <span className="text-slate-300">|</span>
+                <span className="text-slate-300" aria-hidden="true">|</span>
                 <span className="font-semibold text-slate-400">v2.0</span>
               </div>
             </div>
           </div>
         </div>
-        
+
         {/* Bottom text */}
-        <p className="text-center text-sm text-white/70 mt-6 backdrop-blur-sm">
-          © 2025 LUX PET PLAST. Барча ҳуқуқлар ҳимояланган.
+        <p className="text-center text-sm text-white/70 mt-6">
+          © 2025 LUX PET PLAST. {latinToCyrillic('Barcha huquqlar himoyalangan.')}
         </p>
       </div>
     </div>

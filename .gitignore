@@ -116,3 +116,8 @@ scripts/api-runtime-report.json
 prisma/*corrupt*
 prisma/*stripped-backup*
 prisma/*.backup*
+
+# Playwright review artifacts
+.playwright-mcp/
+*.review.png
+tsconfig.tsbuildinfo

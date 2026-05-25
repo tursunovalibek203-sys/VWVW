@@ -1,37 +1,34 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  Send, 
-  Search, 
-  Phone, 
-  Video, 
-  MoreVertical, 
-  Paperclip, 
-  Smile, 
-  Mic, 
-  Check, 
-  CheckCheck,
-  User,
-  RefreshCw,
+import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Send,
+  Search,
   MessageCircle,
   X,
   MapPin,
   Pin,
   Star,
-  Info,
   Forward,
-  Image,
+  Image as ImageIcon,
   FileText,
   Download,
   Reply,
   Square,
   BarChart,
-  Calendar,
-  Moon,
-  Sun,
-  Bell
+  Mic,
+  Check,
+  CheckCheck,
+  Loader2,
+  ArrowLeft,
+  RefreshCw,
+  Inbox,
+  Paperclip,
+  Smile,
 } from 'lucide-react';
 import api from '../lib/professionalApi';
 import { latinToCyrillic } from '../lib/transliterator';
+import { useToast } from '../components/ui/Toast';
+import { Badge } from '../components/ui/Badge';
+import EmptyState from '../components/EmptyState';
 
 interface Message {
   id: string;
@@ -145,28 +142,29 @@ interface Conversation {
   };
 }
 
+// Bitta belgidan iborat avatar harfini olish
+const initialOf = (name: string) => (name?.trim()?.[0] || '?').toUpperCase();
+
 export default function ModernChat() {
+  const { addToast } = useToast();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'unread' | 'starred' | 'archived'>('all');
   const [sortBy, setSortBy] = useState<'recent' | 'unread' | 'priority'>('recent');
-  
-  // New Telegram features
+
+  // Ovozli xabar yozish holati
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [selectedTheme, setSelectedTheme] = useState<'light' | 'dark'>('light');
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [isVideoMode, setIsVideoMode] = useState(false);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
@@ -182,12 +180,19 @@ export default function ModernChat() {
       setLoading(true);
       const response = await api.get('/customer-chat/conversations');
       setConversations(response.data || []);
+      setLoadError(false);
     } catch (error) {
-      // Error handled by error state
+      console.error('Fetch conversations error:', error);
+      setLoadError(true);
+      addToast({
+        type: 'error',
+        title: latinToCyrillic('Suhbatlarni yuklab bolmadi'),
+        message: latinToCyrillic('Internet aloqasini tekshirib qayta urinib koring.'),
+      });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [addToast]);
 
   // Fetch messages for selected conversation
   const fetchMessages = useCallback(async (conversationId: string) => {
@@ -196,9 +201,14 @@ export default function ModernChat() {
       setMessages(response.data || []);
       scrollToBottom();
     } catch (error) {
-      // Error handled by error state
+      console.error('Fetch messages error:', error);
+      addToast({
+        type: 'error',
+        title: latinToCyrillic('Xabarlarni yuklab bolmadi'),
+        message: latinToCyrillic('Server bilan aloqa uzildi. Qayta urinib koring.'),
+      });
     }
-  }, [scrollToBottom]);
+  }, [scrollToBottom, addToast]);
 
   const handleVoiceRecord = () => {
     setIsRecording(!isRecording);
@@ -217,38 +227,32 @@ export default function ModernChat() {
     }
   };
 
-  const handleVideoRecord = () => {
-    setIsVideoMode(!isVideoMode);
-  };
-
   const handleLocationShare = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          sendMessage('', 'location', [], { 
-            location: { 
-              latitude: position.coords.latitude, 
-              longitude: position.coords.longitude 
-            } 
+          sendMessage('', 'location', [], {
+            location: {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            }
           });
         },
         (_error) => {
-          alert(latinToCyrillic('Geolokatsiya olishda xatolik: Ruxsat berilmagan yoki GPS yoqilmagan'));
+          addToast({
+            type: 'error',
+            title: latinToCyrillic('Joylashuv olinmadi'),
+            message: latinToCyrillic('Ruxsat berilmadi yoki joylashuv faol emas.'),
+          });
         }
       );
     } else {
-      alert(latinToCyrillic('Brauzeringiz geolokatsiyani qo\'llab-quvvatlamaydi'));
+      addToast({
+        type: 'warning',
+        title: latinToCyrillic('Joylashuv mavjud emas'),
+        message: latinToCyrillic('Brauzeringiz buni qollab-quvvatlamaydi.'),
+      });
     }
-  };
-
-  const handleThemeToggle = () => {
-    const newTheme = selectedTheme === 'light' ? 'dark' : 'light';
-    setSelectedTheme(newTheme);
-    document.documentElement.classList.toggle('dark');
-  };
-
-  const handleNotificationToggle = () => {
-    setNotificationsEnabled(!notificationsEnabled);
   };
 
   // Send message
@@ -268,20 +272,25 @@ export default function ModernChat() {
       };
 
       await api.post(`/customer-chat/${selectedConversation.id}/send`, messageData);
-      
+
       // Clear input and reply state
       setNewMessage('');
       setReplyingTo(null);
-      
+
       // Refresh messages and conversations
       await fetchMessages(selectedConversation.id);
       await fetchConversations();
     } catch (error) {
-      // Error handled by UI state
+      console.error('Send message error:', error);
+      addToast({
+        type: 'error',
+        title: latinToCyrillic('Xabar yuborilmadi'),
+        message: latinToCyrillic('Server bilan aloqa uzildi. Qayta urinib koring.'),
+      });
     } finally {
       setSending(false);
     }
-  }, [newMessage, selectedConversation, sending, replyingTo, fetchMessages, fetchConversations]);
+  }, [newMessage, selectedConversation, sending, replyingTo, fetchMessages, fetchConversations, addToast]);
 
   // Handle form submit
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
@@ -294,13 +303,11 @@ export default function ModernChat() {
     if (!typing) {
       setTyping(true);
     }
-    
-    // Clear existing timeout
+
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
-    
-    // Set new timeout to stop typing indicator after 3 seconds
+
     typingTimeoutRef.current = setTimeout(() => {
       setTyping(false);
     }, 3000);
@@ -312,7 +319,7 @@ export default function ModernChat() {
       const matchesSearch = conv.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            conv.customerPhone.includes(searchQuery) ||
                            conv.lastMessage?.text.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
       switch (filterStatus) {
         case 'unread':
           return matchesSearch && conv.unreadCount > 0;
@@ -341,7 +348,7 @@ export default function ModernChat() {
     const now = new Date();
     const messageDate = new Date(date);
     const diffInHours = (now.getTime() - messageDate.getTime()) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 24) {
       return messageDate.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
     } else if (diffInHours < 24 * 7) {
@@ -354,13 +361,13 @@ export default function ModernChat() {
   // Get message status icon
   const getMessageStatusIcon = (message: Message) => {
     if (message.senderType !== 'admin') return null;
-    
+
     if (message.isRead) {
-      return <CheckCheck className="w-4 h-4 text-blue-500" />;
+      return <CheckCheck className="w-3.5 h-3.5 text-indigo-200" />;
     } else if (message.deliveredAt) {
-      return <CheckCheck className="w-4 h-4 text-gray-400" />;
+      return <CheckCheck className="w-3.5 h-3.5 text-indigo-200/70" />;
     } else {
-      return <Check className="w-4 h-4 text-gray-400" />;
+      return <Check className="w-3.5 h-3.5 text-indigo-200/70" />;
     }
   };
 
@@ -383,446 +390,471 @@ export default function ModernChat() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
-      <div className={`${sidebarCollapsed ? 'w-20' : 'w-80'} bg-white border-r border-gray-200 flex flex-col transition-all duration-300`}>
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <div className={`flex items-center gap-3 ${sidebarCollapsed ? 'justify-center' : ''}`}>
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                <MessageCircle className="w-5 h-5 text-white" />
-              </div>
-              {!sidebarCollapsed && (
-                <div>
-                  <h1 className="font-bold text-gray-900">{latinToCyrillic('Chat')}</h1>
-                  <p className="text-xs text-gray-500">{conversations.length} {latinToCyrillic('suhbat')}</p>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="Menyu"
-            >
-              <MoreVertical className="w-5 h-5 text-gray-600" />
-            </button>
-          </div>
-          
-          {!sidebarCollapsed && (
-            <>
-              {/* Search */}
-              <div className="relative mb-3">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder={latinToCyrillic('Qidiruv...')}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              
-              {/* Filters */}
-              <div className="flex gap-2 mb-3">
-                <select
-                  id="filter-status"
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
-                  className="flex-1 px-3 py-1 text-sm bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  aria-label="Holat bo'yicha filtr"
-                >
-                  <option value="all">{latinToCyrillic('Barchasi')}</option>
-                  <option value="unread">{latinToCyrillic('O\'qilmagan')}</option>
-                  <option value="starred">{latinToCyrillic('Yulduzcha')}</option>
-                </select>
-                <select
-                  id="sort-by"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                  className="flex-1 px-3 py-1 text-sm bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  aria-label="Saralash"
-                >
-                  <option value="recent">{latinToCyrillic('So\'nggi')}</option>
-                  <option value="unread">{latinToCyrillic('O\'qilmagan')}</option>
-                  <option value="priority">{latinToCyrillic('Muhim')}</option>
-                </select>
-              </div>
-            </>
-          )}
-        </div>
+  const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
 
-        {/* Conversations List */}
-        <div className="flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="flex items-center justify-center h-32">
-              <RefreshCw className="w-6 h-6 text-blue-500 animate-pulse" />
-            </div>
-          ) : (
-            filteredConversations.map((conversation) => (
-              <div
-                key={conversation.id}
-                onClick={() => setSelectedConversation(conversation)}
-                className={`flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors ${
-                  selectedConversation?.id === conversation.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
-                }`}
+  return (
+    <div className="max-w-7xl mx-auto h-[calc(100vh-1rem)] sm:h-[calc(100vh-2rem)]">
+      <div className="h-full flex bg-white rounded-2xl border border-slate-200/70 shadow-[0_4px_20px_rgba(15,23,42,0.06)] overflow-hidden">
+        {/* ============ LEFT PANE: conversation list ============ */}
+        <aside
+          className={`${
+            selectedConversation ? 'hidden lg:flex' : 'flex'
+          } w-full lg:w-[340px] xl:w-[380px] flex-col border-r border-slate-200/70 bg-white`}
+        >
+          {/* Clean list header */}
+          <div className="px-5 pt-5 pb-4 flex-shrink-0 border-b border-slate-200/70">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="min-w-0">
+                <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+                  {latinToCyrillic('Suhbatlar')}
+                </h1>
+                <p className="text-xs text-slate-500 truncate tabular-nums">
+                  {conversations.length} {latinToCyrillic('suhbat')}
+                  {totalUnread > 0 && ` · ${totalUnread} ўқилмаган`}
+                </p>
+              </div>
+              <button
+                onClick={fetchConversations}
+                disabled={loading}
+                title={latinToCyrillic('Qayta yuklash')}
+                aria-label={latinToCyrillic('Qayta yuklash')}
+                className="ml-auto flex-shrink-0 p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 transition-colors active:scale-[0.98] disabled:opacity-60"
               >
-                <div className="relative">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-400 to-blue-500 rounded-full flex items-center justify-center">
-                    {conversation.customerAvatar ? (
-                      <img src={conversation.customerAvatar} alt="" className="w-full h-full rounded-full object-cover" />
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder={latinToCyrillic('Qidiruv...')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label={latinToCyrillic('Qidiruv')}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Filter / sort row */}
+          <div className="flex gap-2 px-4 py-3 border-b border-slate-200/70 flex-shrink-0">
+            <select
+              id="filter-status"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+              className="flex-1 px-3 py-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              aria-label="Holat boyicha filtr"
+            >
+              <option value="all">{latinToCyrillic('Barchasi')}</option>
+              <option value="unread">Ўқилмаган</option>
+              <option value="starred">{latinToCyrillic('Yulduzcha')}</option>
+            </select>
+            <select
+              id="sort-by"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="flex-1 px-3 py-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              aria-label="Saralash"
+            >
+              <option value="recent">{latinToCyrillic('Songi')}</option>
+              <option value="unread">Ўқилмаган</option>
+              <option value="priority">{latinToCyrillic('Muhim')}</option>
+            </select>
+          </div>
+
+          {/* Conversation list */}
+          <div className="flex-1 overflow-y-auto">
+            {loading && conversations.length === 0 ? (
+              <ConversationListSkeleton />
+            ) : loadError && conversations.length === 0 ? (
+              <EmptyState
+                icon={RefreshCw}
+                title={latinToCyrillic('Xatolik yuz berdi')}
+                description={latinToCyrillic('Suhbatlarni yuklab bolmadi.')}
+                action={
+                  <button
+                    onClick={fetchConversations}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors active:scale-[0.98]"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    {latinToCyrillic('Qayta yuklash')}
+                  </button>
+                }
+              />
+            ) : filteredConversations.length === 0 ? (
+              <EmptyState
+                icon={Inbox}
+                title={latinToCyrillic('Suhbatlar yoq')}
+                description={latinToCyrillic('Hozircha hech qanday suhbat mavjud emas. Mijoz xabar yozsa shu yerda paydo boladi.')}
+              />
+            ) : (
+              <ul className="py-2 px-2 space-y-0.5">
+                {filteredConversations.map((conversation) => {
+                  const active = selectedConversation?.id === conversation.id;
+                  return (
+                    <li key={conversation.id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedConversation(conversation)}
+                        className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-colors ${
+                          active
+                            ? 'bg-indigo-50'
+                            : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        {/* Avatar */}
+                        <div className="relative flex-shrink-0">
+                          <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-semibold overflow-hidden ${
+                            active ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {conversation.customerAvatar ? (
+                              <img src={conversation.customerAvatar} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-base">{initialOf(conversation.customerName)}</span>
+                            )}
+                          </div>
+                          {conversation.isOnline && (
+                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
+                          )}
+                        </div>
+
+                        {/* Body */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <h3 className={`text-sm font-semibold truncate ${active ? 'text-indigo-900' : 'text-slate-900'}`}>
+                              {conversation.customerName}
+                            </h3>
+                            {conversation.isPinned && <Pin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />}
+                            {conversation.isStarred && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 flex-shrink-0" />}
+                            <span className="ml-auto text-[11px] text-slate-400 flex-shrink-0 tabular-nums">
+                              {conversation.lastMessage && formatMessageTime(conversation.lastMessage.createdAt)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <p className={`text-sm truncate ${conversation.unreadCount > 0 ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
+                              {conversation.lastMessage?.text || latinToCyrillic('Yangi suhbat')}
+                            </p>
+                            {conversation.unreadCount > 0 && (
+                              <span className="ml-auto flex-shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-indigo-600 text-white text-[11px] font-bold rounded-full tabular-nums">
+                                {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </aside>
+
+        {/* ============ RIGHT PANE: message thread ============ */}
+        <section
+          className={`${
+            selectedConversation ? 'flex' : 'hidden lg:flex'
+          } flex-1 flex-col min-w-0 bg-slate-50/50`}
+        >
+          {selectedConversation ? (
+            <>
+              {/* Thread header */}
+              <header className="flex items-center gap-3 px-4 sm:px-6 py-3.5 bg-white border-b border-slate-200/70 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedConversation(null)}
+                  className="lg:hidden p-2 -ml-1 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
+                  aria-label="Орқага"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div className="relative flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-semibold overflow-hidden">
+                    {selectedConversation.customerAvatar ? (
+                      <img src={selectedConversation.customerAvatar} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <User className="w-6 h-6 text-white" />
+                      <span className="text-sm">{initialOf(selectedConversation.customerName)}</span>
                     )}
                   </div>
-                  {conversation.isOnline && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                  {selectedConversation.isOnline && (
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
                   )}
                 </div>
-                
-                {!sidebarCollapsed && (
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="font-semibold text-gray-900 truncate">{conversation.customerName}</h3>
-                      <span className="text-xs text-gray-500">
-                        {conversation.lastMessage && formatMessageTime(conversation.lastMessage.createdAt)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-gray-600 truncate">
-                        {conversation.lastMessage?.text || latinToCyrillic('Yangi suhbat')}
-                      </p>
-                      <div className="flex items-center gap-1">
-                        {conversation.isPinned && <Pin className="w-3 h-3 text-yellow-500" />}
-                        {conversation.isStarred && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
-                        {conversation.unreadCount > 0 && (
-                          <span className="bg-blue-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center">
-                            {conversation.unreadCount}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {selectedConversation ? (
-          <>
-            {/* Chat Header */}
-            <div className="bg-white border-b border-gray-200 px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="w-10 h-10 bg-gradient-to-r from-blue-400 to-blue-500 rounded-full flex items-center justify-center">
-                      {selectedConversation.customerAvatar ? (
-                        <img src={selectedConversation.customerAvatar} alt="" className="w-full h-full rounded-full object-cover" />
-                      ) : (
-                        <User className="w-5 h-5 text-white" />
-                      )}
-                    </div>
-                    {selectedConversation.isOnline && (
-                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                    )}
-                  </div>
-                  <div>
-                    <h2 className="font-semibold text-gray-900">{selectedConversation.customerName}</h2>
-                    <p className="text-sm text-gray-500">
-                      {selectedConversation.isOnline ? latinToCyrillic('Onlayn') : 
-                       selectedConversation.lastSeen ? `${latinToCyrillic('So\'nggi ko\'rilgan')}: ${formatMessageTime(selectedConversation.lastSeen)}` :
-                       latinToCyrillic('Oflayn')}
-                    </p>
-                  </div>
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-slate-900 truncate">{selectedConversation.customerName}</h2>
+                  <p className="text-xs text-slate-500 truncate">
+                    {selectedConversation.isOnline
+                      ? latinToCyrillic('Onlayn')
+                      : selectedConversation.lastSeen
+                        ? `${latinToCyrillic('Songi faollik')}: ${formatMessageTime(selectedConversation.lastSeen)}`
+                        : latinToCyrillic('Oflayn')}
+                  </p>
                 </div>
-                
-                <div className="flex items-center gap-2">
-                  <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Qo'ng'iroq">
-                    <Phone className="w-5 h-5 text-gray-600" />
-                  </button>
-                  <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Video qo'ng'iroq">
-                    <Video className="w-5 h-5 text-gray-600" />
-                  </button>
-                  <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Ma'lumot">
-                    <Info className="w-5 h-5 text-gray-600" />
-                  </button>
-                  <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Ko'proq">
-                    <MoreVertical className="w-5 h-5 text-gray-600" />
-                  </button>
-                </div>
-              </div>
-            </div>
+                {selectedConversation.priority === 'urgent' || selectedConversation.priority === 'high' ? (
+                  <Badge variant={selectedConversation.priority === 'urgent' ? 'error' : 'warning'} className="ml-auto flex-shrink-0">
+                    {latinToCyrillic('Muhim')}
+                  </Badge>
+                ) : null}
+              </header>
 
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.senderType === 'admin' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className={`max-w-xs lg:max-w-md xl:max-w-lg ${message.senderType === 'admin' ? 'order-2' : 'order-1'}`}>
-                    {/* Reply to message */}
-                    {message.replyTo && (
-                      <div className="mb-2 p-2 bg-gray-100 rounded-lg border-l-4 border-blue-500">
-                        <p className="text-xs text-gray-600 mb-1">
-                          {latinToCyrillic('Javob berilmoqda')} {message.replyTo.senderName}
-                        </p>
-                        <p className="text-sm text-gray-800 truncate">{message.replyTo.text}</p>
-                      </div>
-                    )}
-                    
-                    <div
-                      className={`px-4 py-2 rounded-2xl ${
-                        message.senderType === 'admin'
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-white text-gray-900 border border-gray-200'
-                      }`}
-                    >
-                      {message.isForwarded && (
-                        <div className="flex items-center gap-1 mb-1 text-xs opacity-70">
-                          <Forward className="w-3 h-3" />
-                          <span>{latinToCyrillic('Forwarded')}</span>
-                        </div>
-                      )}
-                      
-                      <p className="text-sm leading-relaxed">{message.text}</p>
-                      
-                      {message.attachments && message.attachments.length > 0 && (
-                        <div className="mt-2 space-y-2">
-                          {message.attachments.map((attachment, index) => (
-                            <div key={index} className="flex items-center gap-2 p-2 bg-black/10 rounded-lg">
-                              {attachment.type === 'image' ? (
-                                <Image className="w-4 h-4" />
-                              ) : (
-                                <FileText className="w-4 h-4" />
-                              )}
-                              <span className="text-xs truncate">{attachment.name}</span>
-                              <Download className="w-3 h-3 ml-auto cursor-pointer" />
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-3">
+                {messages.length === 0 ? (
+                  <div className="h-full flex items-center justify-center">
+                    <EmptyState
+                      icon={MessageCircle}
+                      title={latinToCyrillic('Hali xabar yoq')}
+                      description={latinToCyrillic('Birinchi xabarni yozib suhbatni boshlang.')}
+                    />
+                  </div>
+                ) : (
+                  messages.map((message) => {
+                    const isAdmin = message.senderType === 'admin';
+                    return (
+                      <div key={message.id} className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
+                        <div className="max-w-[78%] sm:max-w-md lg:max-w-lg">
+                          {/* Reply preview */}
+                          {message.replyTo && (
+                            <div className={`mb-1.5 px-3 py-1.5 rounded-xl border-l-2 ${isAdmin ? 'bg-indigo-50 border-indigo-400 ml-auto' : 'bg-slate-100 border-slate-300'}`}>
+                              <p className="text-[11px] font-semibold text-slate-600 mb-0.5">
+                                {latinToCyrillic('Javob berilmoqda')} · {message.replyTo.senderName}
+                              </p>
+                              <p className="text-xs text-slate-600 truncate">{message.replyTo.text}</p>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className={`flex items-center gap-2 mt-1 text-xs text-gray-500 ${message.senderType === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                      <span>{formatMessageTime(message.createdAt)}</span>
-                      {message.isEdited && <span>({latinToCyrillic('tahrirlandi')})</span>}
-                      {getMessageStatusIcon(message)}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
+                          )}
 
-            {/* Reply to indicator */}
-            {replyingTo && (
-              <div className="px-4 py-2 bg-blue-50 border-t border-blue-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Reply className="w-4 h-4 text-blue-500" />
-                    <span className="text-sm text-blue-700">
-                      {latinToCyrillic('Javob berilmoqda')} {replyingTo.senderName}
+                          <div
+                            className={`px-4 py-2.5 ${
+                              isAdmin
+                                ? 'bg-indigo-600 text-white rounded-2xl rounded-br-md'
+                                : 'bg-white text-slate-800 border border-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] rounded-2xl rounded-bl-md'
+                            }`}
+                          >
+                            {message.isForwarded && (
+                              <div className={`flex items-center gap-1 mb-1 text-[11px] ${isAdmin ? 'text-indigo-200' : 'text-slate-400'}`}>
+                                <Forward className="w-3 h-3" />
+                                <span>Йуборилган</span>
+                              </div>
+                            )}
+
+                            {message.text && (
+                              <p className="text-sm leading-relaxed whitespace-pre-line break-words">{message.text}</p>
+                            )}
+
+                            {message.attachments && message.attachments.length > 0 && (
+                              <div className="mt-2 space-y-1.5">
+                                {message.attachments.map((attachment, index) => (
+                                  <div
+                                    key={index}
+                                    className={`flex items-center gap-2 p-2 rounded-xl ${isAdmin ? 'bg-white/15' : 'bg-slate-50'}`}
+                                  >
+                                    {attachment.type === 'image' ? (
+                                      <ImageIcon className="w-4 h-4 flex-shrink-0" />
+                                    ) : (
+                                      <FileText className="w-4 h-4 flex-shrink-0" />
+                                    )}
+                                    <span className="text-xs truncate">{attachment.name}</span>
+                                    <Download className="w-3.5 h-3.5 ml-auto cursor-pointer flex-shrink-0 opacity-70 hover:opacity-100" />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Inline meta inside bubble */}
+                            <div className={`flex items-center gap-1.5 mt-1 text-[10px] tabular-nums ${isAdmin ? 'text-indigo-200 justify-end' : 'text-slate-400 justify-start'}`}>
+                              {message.isEdited && <span>({latinToCyrillic('tahrirlandi')})</span>}
+                              <span>{formatMessageTime(message.createdAt)}</span>
+                              {getMessageStatusIcon(message)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Reply indicator */}
+              {replyingTo && (
+                <div className="px-4 sm:px-6 py-2.5 bg-indigo-50 border-t border-indigo-100 flex items-center justify-between flex-shrink-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Reply className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                    <span className="text-sm font-medium text-indigo-700 flex-shrink-0">
+                      {latinToCyrillic('Javob berilmoqda')}
                     </span>
-                    <p className="text-sm text-blue-600 truncate max-w-xs">{replyingTo.text}</p>
+                    <p className="text-sm text-indigo-600/80 truncate">{replyingTo.text}</p>
                   </div>
                   <button
                     onClick={() => setReplyingTo(null)}
-                    className="text-blue-500 hover:text-blue-700"
-                    aria-label="Bekor qilish"
+                    className="p-1 rounded-lg text-indigo-600 hover:bg-indigo-100 transition-colors flex-shrink-0"
+                    aria-label={latinToCyrillic('Bekor qilish')}
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Message Input with Advanced Features */}
-            <div className="bg-white border-t border-gray-200 p-4">
-              {/* Recording Indicator */}
+              {/* Recording indicator */}
               {isRecording && (
-                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                    <span className="text-red-700 font-medium">
+                <div className="px-4 sm:px-6 py-2.5 bg-red-50 border-t border-red-100 flex items-center justify-between flex-shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                    <span className="text-sm font-medium text-red-700 tabular-nums">
                       {latinToCyrillic('Yozilmoqda')} {recordingTime}s
                     </span>
                   </div>
                   <button
                     onClick={handleVoiceRecord}
-                    className="p-1 hover:bg-red-100 rounded transition-colors"
-                    aria-label="Yozishni to'xtatish"
+                    className="p-1.5 rounded-lg text-red-600 hover:bg-red-100 transition-colors"
+                    aria-label={latinToCyrillic('Toxtatish')}
                   >
-                    <Square className="w-4 h-4 text-red-600" />
+                    <Square className="w-4 h-4" />
                   </button>
                 </div>
               )}
 
-              {/* Advanced Toolbar */}
-              <div className="flex items-center gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => sendMessage(latinToCyrillic('Yangi so\'rovnom'), 'poll', [], { 
-                    poll: {
-                      question: latinToCyrillic('Sizga bu qulaymi?'),
-                      options: [
-                        { text: latinToCyrillic('Ha'), votes: 0, voters: [] },
-                        { text: latinToCyrillic('Yo\'q'), votes: 0, voters: [] }
-                      ],
-                      isAnonymous: false,
-                      allowsMultipleAnswers: false,
-                      isClosed: false,
-                      totalVoters: 0
-                    }
-                  })}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title={latinToCyrillic('So\'rovnom')}
-                >
-                  <BarChart className="w-5 h-5 text-gray-600" />
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={handleLocationShare}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title={latinToCyrillic('Lokatsiya')}
-                >
-                  <MapPin className="w-5 h-5 text-gray-600" />
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => sendMessage('', 'contact', [], { 
-                    contact: {
-                      firstName: latinToCyrillic('Ism'),
-                      phoneNumber: '+998901234567'
-                    }
-                  })}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title={latinToCyrillic('Kontakt')}
-                >
-                  <User className="w-5 h-5 text-gray-600" />
-                </button>
-                
-                <button
-                  type="button"
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title={latinToCyrillic('Rejalashtirish')}
-                  aria-label={latinToCyrillic('Rejalashtirish')}
-                >
-                  <Calendar className="w-5 h-5 text-gray-600" />
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={handleVoiceRecord}
-                  className={`p-2 rounded-lg transition-colors ${isRecording ? 'bg-red-100 text-red-600' : 'hover:bg-gray-100'}`}
-                  title={latinToCyrillic('Ovozli xabar')}
-                  aria-label={latinToCyrillic('Ovozli xabar')}
-                >
-                  <Mic className="w-5 h-5" />
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={handleVideoRecord}
-                  className={`p-2 rounded-lg transition-colors ${isVideoMode ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'}`}
-                  title={latinToCyrillic('Video xabar')}
-                  aria-label={latinToCyrillic('Video xabar')}
-                >
-                  <Video className="w-5 h-5" />
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={handleThemeToggle}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title={selectedTheme === 'light' ? latinToCyrillic('Tungi rejim') : latinToCyrillic('Kunduzgi rejim')}
-                >
-                  {selectedTheme === 'light' ? <Moon className="w-5 h-5 text-gray-600" /> : <Sun className="w-5 h-5 text-gray-600" />}
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={handleNotificationToggle}
-                  className={`p-2 rounded-lg transition-colors ${notificationsEnabled ? 'text-green-600' : 'text-gray-400'}`}
-                  title={latinToCyrillic('Bildirishnomalar')}
-                  aria-label={latinToCyrillic('Bildirishnomalar')}
-                >
-                  <Bell className="w-5 h-5" />
-                </button>
-              </div>
+              {/* Sticky input bar */}
+              <div className="bg-white border-t border-slate-200/70 px-3 sm:px-4 py-3 flex-shrink-0">
+                <form onSubmit={handleSubmit} className="flex items-end gap-2">
+                  {/* Attach group */}
+                  <div className="flex items-center gap-1 pb-0.5">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                      title={latinToCyrillic('Fayl biriktirish')}
+                      aria-label={latinToCyrillic('Fayl biriktirish')}
+                    >
+                      <Paperclip className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLocationShare}
+                      className="hidden sm:inline-flex p-2 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                      title={latinToCyrillic('Lokatsiya')}
+                      aria-label={latinToCyrillic('Lokatsiya')}
+                    >
+                      <MapPin className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendMessage(latinToCyrillic('Yangi sorovnoma'), 'poll', [], {
+                        poll: {
+                          question: latinToCyrillic('Bu xizmat qulaymi?'),
+                          options: [
+                            { text: latinToCyrillic('Ha'), votes: 0, voters: [] },
+                            { text: latinToCyrillic('Yoq'), votes: 0, voters: [] }
+                          ],
+                          isAnonymous: false,
+                          allowsMultipleAnswers: false,
+                          isClosed: false,
+                          totalVoters: 0
+                        }
+                      })}
+                      className="hidden sm:inline-flex p-2 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                      title={latinToCyrillic('Sorovnoma')}
+                      aria-label={latinToCyrillic('Sorovnoma')}
+                    >
+                      <BarChart className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      className="hidden sm:inline-flex p-2 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                      title="Emoji"
+                      aria-label="Emoji"
+                    >
+                      <Smile className="w-5 h-5" />
+                    </button>
+                  </div>
 
-              <form onSubmit={handleSubmit} className="flex items-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title={latinToCyrillic('Fayl biriktirish')}
-                  aria-label={latinToCyrillic('Fayl biriktirish')}
-                >
-                  <Paperclip className="w-5 h-5 text-gray-600" />
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title={latinToCyrillic('Emoji')}
-                  aria-label={latinToCyrillic('Emoji')}
-                >
-                  <Smile className="w-5 h-5 text-gray-600" />
-                </button>
-                
-                <div className="flex-1">
-                  <textarea
-                    value={newMessage}
-                    onChange={(e) => {
-                      setNewMessage(e.target.value);
-                      handleTyping();
-                    }}
-                    placeholder={latinToCyrillic('Xabar yozing...')}
-                    className="w-full px-4 py-2 bg-gray-100 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px] max-h-32"
-                    rows={1}
-                  />
-                </div>
-                
-                <button
-                  type="submit"
-                  disabled={(!newMessage.trim() && !isRecording) || sending}
-                  className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  aria-label={sending ? latinToCyrillic('Yuborilmoqda...') : latinToCyrillic('Yuborish')}
-                >
-                  {sending ? (
-                    <RefreshCw className="w-5 h-5 animate-pulse" />
-                  ) : (
-                    <Send className="w-5 h-5" />
-                  )}
-                </button>
-              </form>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center bg-gray-50">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MessageCircle className="w-10 h-10 text-gray-400" />
+                  {/* Text input */}
+                  <div className="flex-1">
+                    <textarea
+                      value={newMessage}
+                      onChange={(e) => {
+                        setNewMessage(e.target.value);
+                        handleTyping();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSubmit();
+                        }
+                      }}
+                      placeholder={latinToCyrillic('Xabar yozing...')}
+                      aria-label={latinToCyrillic('Xabar yozing')}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white text-sm text-slate-800 placeholder-slate-400 min-h-[44px] max-h-32 transition-all"
+                      rows={1}
+                    />
+                  </div>
+
+                  {/* Voice / Send */}
+                  <div className="flex items-center gap-1 pb-0.5">
+                    <button
+                      type="button"
+                      onClick={handleVoiceRecord}
+                      className={`p-2 rounded-xl transition-colors ${
+                        isRecording ? 'bg-red-100 text-red-600' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                      }`}
+                      title={latinToCyrillic('Ovozli xabar')}
+                      aria-label={latinToCyrillic('Ovozli xabar')}
+                    >
+                      <Mic className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={(!newMessage.trim() && !isRecording) || sending}
+                      className="flex-shrink-0 inline-flex items-center justify-center w-11 h-11 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
+                      title={sending ? latinToCyrillic('Yuborilmoqda...') : latinToCyrillic('Yuborish')}
+                      aria-label={sending ? latinToCyrillic('Yuborilmoqda...') : latinToCyrillic('Yuborish')}
+                    >
+                      {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                    </button>
+                  </div>
+
+                  <input ref={fileInputRef} type="file" className="hidden" aria-hidden="true" tabIndex={-1} />
+                </form>
               </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                {latinToCyrillic('Chat ilovasi')}
-              </h2>
-              <p className="text-gray-600">
-                {latinToCyrillic('Suhbat boshlash uchun mijozni tanlang')}
-              </p>
+            </>
+          ) : (
+            /* No conversation selected (desktop) */
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="text-center max-w-sm">
+                <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-indigo-50 flex items-center justify-center">
+                  <MessageCircle className="w-8 h-8 text-indigo-600" />
+                </div>
+                <h2 className="text-xl font-bold text-slate-900 mb-2">
+                  {latinToCyrillic('Suhbatni tanlang')}
+                </h2>
+                <p className="text-sm text-slate-500">
+                  {latinToCyrillic('Chap tomondan suhbatni tanlang va yozishni boshlang.')}
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </section>
       </div>
+    </div>
+  );
+}
+
+// Conversation list loading skeleton (matches CardSkeleton style)
+function ConversationListSkeleton() {
+  return (
+    <div className="py-2 px-2 space-y-0.5">
+      {Array.from({ length: 7 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 p-2.5">
+          <div className="w-11 h-11 rounded-xl bg-slate-100 animate-pulse flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="h-4 bg-slate-100 rounded w-1/2 mb-2 animate-pulse" />
+            <div className="h-3 bg-slate-100 rounded w-3/4 animate-pulse" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

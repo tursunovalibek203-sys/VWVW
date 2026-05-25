@@ -1,120 +1,78 @@
 import { useState, useRef, useEffect } from 'react';
-import { 
-  Bot, Send, Sparkles, Wand2, BarChart3, Package, 
-  TrendingUp, Lightbulb, MessageSquare, Clock, User,
-  ChevronRight, MoreHorizontal, RefreshCw, Copy, ThumbsUp, ThumbsDown
+import {
+  Bot,
+  Send,
+  Sparkles,
+  BarChart3,
+  Package,
+  TrendingUp,
+  Lightbulb,
+  User,
+  RefreshCw,
+  Loader2,
+  AlertTriangle,
 } from 'lucide-react';
 import api from '../lib/professionalApi';
+import { useToast } from '../components/ui/Toast';
+import { latinToCyrillic } from '../lib/transliterator';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  suggestions?: string[];
+  isError?: boolean;
 }
 
-interface QuickAction {
+interface QuickPrompt {
   icon: React.ReactNode;
   label: string;
   prompt: string;
-  color: string;
+  gradient: string;
 }
 
-const quickActions: QuickAction[] = [
-  { icon: <BarChart3 className="w-4 h-4" />, label: 'Sotuv tahlili', prompt: 'Oxirgi oy sotuvlarimni tahlil qil', color: 'bg-blue-500' },
-  { icon: <Package className="w-4 h-4" />, label: 'Ombor holati', prompt: 'Ombordagi mahsulotlar holatini ko\'rsat', color: 'bg-emerald-500' },
-  { icon: <TrendingUp className="w-4 h-4" />, label: 'Moliyaviy prognoz', prompt: 'Keyingi oy daromadimni bashorat qil', color: 'bg-purple-500' },
-  { icon: <Lightbulb className="w-4 h-4" />, label: 'Tavsiyalar', prompt: 'Biznesimni rivojlantirish uchun tavsiyalar', color: 'bg-amber-500' },
+// AI yordamchi hozircha mavjud emas — backend /ai/chat route'i yo'q.
+// Bu yerda hech qanday soxta javob ko'rsatilmaydi: so'rov yuboriladi,
+// muvaffaqiyatsiz bo'lsa — halol xato holati + Toast ko'rsatiladi.
+const AI_UNAVAILABLE = 'AI ёрдамчи ҳозирча мавжуд эмас';
+
+const quickPrompts: QuickPrompt[] = [
+  {
+    icon: <BarChart3 className="w-5 h-5" />,
+    label: 'Сотув таҳлили',
+    prompt: 'Охирги ой сотувларимни таҳлил қил',
+    gradient: 'from-blue-500 to-blue-600',
+  },
+  {
+    icon: <Package className="w-5 h-5" />,
+    label: 'Омбор ҳолати',
+    prompt: 'Омбордаги маҳсулотлар ҳолатини кўрсат',
+    gradient: 'from-emerald-500 to-emerald-600',
+  },
+  {
+    icon: <TrendingUp className="w-5 h-5" />,
+    label: 'Молиявий прогноз',
+    prompt: 'Кейинги ой даромадимни башорат қил',
+    gradient: 'from-purple-500 to-purple-600',
+  },
+  {
+    icon: <Lightbulb className="w-5 h-5" />,
+    label: 'Тавсиялар',
+    prompt: 'Бизнесимни ривожлантириш учун тавсиялар',
+    gradient: 'from-amber-500 to-amber-600',
+  },
 ];
 
-const mockResponses: Record<string, string> = {
-  'Oxirgi oy sotuvlarimni tahlil qil': `Oxirgi oy sotuvlar tahlili:
-
-📈 **Umumiy ko'rsatkichlar:**
-• Jami sotuv: 234 ta
-• Daromad: 67,000,000 so'm
-• O'rtacha chek: 286,000 so'm
-
-🏆 **Eng sotiladigan mahsulotlar:**
-1. Plastik konteyner 5L - 89 ta
-2. PET butilka 1.5L - 76 ta
-3. Qopqoq universal - 45 ta
-
-📊 **O'sish dinamikasi:**
-• Oldingi oyga nisbatan: +23%
-• Eng yaxshi kun: 15-yanvar (12,500,000 so'm)`,
-
-  'Ombordagi mahsulotlar holatini ko\'rsat': `Ombor holati:
-
-📦 **Umumiy:**
-• Jami mahsulot turlari: 156
-• Umumiy qiymat: 1.2 mlrd so'm
-• Bo'sh joy: 35%
-
-⚠️ **Diqqat talab qiluvchi:**
-• Kam qolgan: Plastik idish 2L (12 dona qoldi)
-• Ortiqcha: PET butilka 0.5L (450 dona)
-
-✅ **Normal holat:**
-• Qolgan mahsulotlar yetarli darajada`,
-
-  'Keyingi oy daromadimni bashorat qil': `Moliyaviy prognoz (Fevral 2024):
-
-💰 **Kutilayotgan ko'rsatkichlar:**
-• Daromad: 72-78 mln so'm (+8-12%)
-• Xarajatlar: 42 mln so'm
-• Sof foyda: 30-36 mln so'm
-
-📊 **Bashorat asoslari:**
-• Mavsumiy o'sish
-• Yangi mijozlar oqimi
-• Marketing kampaniyalari
-
-⚠️ **Xatarlar:**
-• Xom ashyo narxlari o'zgarishi
-• Transport xarajatlari`,
-
-  'Biznesimni rivojlantirish uchun tavsiyalar': `Biznes rivojlantirish tavsiyalari:
-
-🎯 **Qisqa muddatli:**
-• Eng sotiladigan 3 mahsulotga aksiya qiling
-• Mijozlar bazasini kengaytiring
-• Sotuvchilar uchun bonus tizimi yarating
-
-📈 **O'rta muddatli:**
-• Yangi mahsulot liniyasi qo'shing
-• Onlayn savdo kanallarini oching
-• Avtomatlashtirish tizimlarini joriy qiling
-
-🏢 **Uzoq muddatli:**
-• Yangi filial ochish
-• Eksport imkoniyatlarini o'rganish
-• Xodimlar malakasini oshirish`,
-};
-
-const welcomeMessage = `Salom! 👋 Men sizning AI yordamchingizman.
-
-Quyidagi mavzular bo'yicha yordam bera olaman:
-• 📊 Sotuvlar tahlili
-• 📦 Ombor boshqaruvi
-• 💰 Moliyaviy prognozlar
-• 💡 Biznes tavsiyalari
-
-Savolingizni yozing yoki tezkor tugmalardan foydalaning!`;
+const nowTime = () =>
+  new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
 
 export default function AIAssistant() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '0',
-      role: 'assistant',
-      content: welcomeMessage,
-      timestamp: new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }),
-    }
-  ]);
+  const { addToast } = useToast();
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -122,221 +80,281 @@ export default function AIAssistant() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isTyping]);
 
   const handleSend = async (text: string = input) => {
-    if (!text.trim()) return;
+    const trimmed = text.trim();
+    if (!trimmed || isTyping) return;
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: `${Date.now()}-u`,
       role: 'user',
-      content: text,
-      timestamp: new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }),
+      content: trimmed,
+      timestamp: nowTime(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsTyping(true);
 
-    // Real AI API call
+    // Haqiqiy backend so'rovi. /ai/chat route'i hali mavjud emas —
+    // shuning uchun bu deyarli har doim catch'ga tushadi. Biz soxta
+    // javob ясамаймиз, faqat halol xato holatini ko'rsatamiz.
     try {
-      const response = await api.post('/ai/chat', { message: text });
-      const aiResponse = response.data?.response || response.data?.message || 'Kechirasiz, javob berishda muammo yuz berdi.';
-      
+      const response = await api.post('/ai/chat', { message: trimmed });
+      const aiResponse: string | undefined =
+        response.data?.response || response.data?.message;
+
+      if (!aiResponse) {
+        throw new Error('empty-response');
+      }
+
       const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: `${Date.now()}-a`,
         role: 'assistant',
         content: aiResponse,
-        timestamp: new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }),
-        suggestions: response.data?.suggestions || ['Rahmat', 'Batafsilroq', 'Boshqa savol'],
+        timestamp: nowTime(),
       };
-
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       console.error('AI chat error:', error);
+
       const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: `${Date.now()}-e`,
         role: 'assistant',
-        content: 'Kechirasiz, xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko\'ring.',
-        timestamp: new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }),
-        suggestions: ['Qayta urinish', 'Boshqa savol'],
+        content:
+          'AI ёрдамчи ҳозирча мавжуд эмас. Хизмат уланганидан сўнг саволларингизга жавоб бера оламан.',
+        timestamp: nowTime(),
+        isError: true,
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
+
+      addToast({
+        type: 'error',
+        title: AI_UNAVAILABLE,
+        message: 'Сервер билан боғланиб бўлмади. Кейинроқ қайта уриниб кўринг.',
+      });
     } finally {
       setIsTyping(false);
+      inputRef.current?.focus();
     }
   };
 
-  const handleQuickAction = (action: QuickAction) => {
-    handleSend(action.prompt);
+  const handleReset = () => {
+    setMessages([]);
+    setInput('');
+    inputRef.current?.focus();
   };
 
+  const hasMessages = messages.length > 0;
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Sparkles className="w-5 h-5 text-white" />
+    <div className="max-w-4xl mx-auto p-4 sm:p-6">
+      <div className="flex flex-col h-[calc(100vh-7rem)]">
+        {/* Gradient hero header */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-5 sm:p-6 shadow-glass-lg flex-shrink-0">
+          <div className="absolute -top-10 -right-8 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+          <div className="absolute -bottom-12 -left-6 w-44 h-44 bg-white/5 rounded-full blur-2xl" />
+          <div className="relative flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0 ring-1 ring-white/20">
+                <Sparkles className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
               </div>
-              <div>
-                <h1 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  AI Assistant
-                  <span className="px-2 py-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 text-xs rounded-full">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
+                    AI ёрдамчи
+                  </h1>
+                  <span className="px-2 py-0.5 bg-white/20 text-white text-[11px] font-semibold rounded-full backdrop-blur-sm flex-shrink-0">
                     Beta
                   </span>
-                </h1>
-                <p className="text-xs text-gray-500 dark:text-gray-400">LuxPetPlast AI yordamchi</p>
+                </div>
+                <p className="text-sm text-blue-100/90 truncate">
+                  {latinToCyrillic('Looks Pet Plus')} · ақлли бизнес таҳлилчи
+                </p>
               </div>
             </div>
-            <button 
-              title="Yangi suhbat"
-              aria-label="Yangi suhbat boshlash"
-              onClick={() => setMessages([messages[0]])}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              <RefreshCw className="w-5 h-5" />
-            </button>
+            {hasMessages && (
+              <button
+                onClick={handleReset}
+                title="Янги суҳбат"
+                aria-label="Янги суҳбат бошлаш"
+                className="flex-shrink-0 inline-flex items-center gap-2 px-3 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold rounded-xl backdrop-blur-sm transition-colors active:scale-95"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span className="hidden sm:inline">Янги суҳбат</span>
+              </button>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-          {messages.map((message) => (
-            <div key={message.id} className={`flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                message.role === 'user' 
-                  ? 'bg-blue-100 dark:bg-blue-900/30' 
-                  : 'bg-gradient-to-br from-violet-500 to-purple-600'
-              }`}>
-                {message.role === 'user' ? (
-                  <User className="w-4 h-4 text-blue-600" />
-                ) : (
-                  <Bot className="w-4 h-4 text-white" />
-                )}
-              </div>
-              <div className={`max-w-[80%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
-                <div className={`p-4 rounded-2xl ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white rounded-br-none'
-                    : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-bl-none shadow-sm'
-                }`}>
-                  <p className={`text-sm whitespace-pre-line ${message.role === 'user' ? 'text-white' : 'text-gray-700 dark:text-gray-300'}`}>
-                    {message.content}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-xs text-gray-400">{message.timestamp}</span>
-                  {message.role === 'assistant' && (
-                    <div className="flex items-center gap-1">
-                      <button 
-                        title="Nusxa olish"
-                        aria-label="Nusxa olish"
-                        className="p-1 text-gray-400 hover:text-gray-600 rounded"
-                      >
-                        <Copy className="w-3 h-3" />
-                      </button>
-                      <button 
-                        title="Yoqdi"
-                        aria-label="Yoqdi"
-                        className="p-1 text-gray-400 hover:text-emerald-600 rounded"
-                      >
-                        <ThumbsUp className="w-3 h-3" />
-                      </button>
-                      <button 
-                        title="Yoqmadi"
-                        aria-label="Yoqmadi"
-                        className="p-1 text-gray-400 hover:text-rose-600 rounded"
-                      >
-                        <ThumbsDown className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {message.suggestions && message.suggestions.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {message.suggestions.map((suggestion, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleSend(suggestion)}
-                        className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-full hover:bg-violet-100 dark:hover:bg-violet-900/30 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-          {isTyping && (
-            <div className="flex gap-4">
-              <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <Bot className="w-4 h-4 text-white" />
-              </div>
-              <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl rounded-bl-none p-4 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 bg-violet-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
+        {/* Conversation area */}
+        <div className="flex-1 overflow-y-auto mt-4 -mx-1 px-1">
+          {!hasMessages ? (
+            <EmptyConversation onPick={handleSend} />
+          ) : (
+            <div className="space-y-5 pb-2">
+              {messages.map((message) => (
+                <MessageBubble key={message.id} message={message} />
+              ))}
+              {isTyping && <TypingIndicator />}
+              <div ref={messagesEndRef} />
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
-      </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {quickActions.map((action, index) => (
+        {/* Sticky input bar */}
+        <div className="flex-shrink-0 pt-4">
+          <div className="bg-white rounded-2xl shadow-glass border border-gray-100 p-2">
+            <div className="flex items-end gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                disabled={isTyping}
+                placeholder="Саволингизни ёзинг…"
+                aria-label="Саволингизни ёзинг"
+                className="flex-1 px-4 py-3 bg-transparent border-none focus:outline-none text-gray-800 placeholder-gray-400 disabled:opacity-60 text-sm"
+              />
               <button
-                key={index}
-                onClick={() => handleQuickAction(action)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-xl transition-colors flex-shrink-0"
+                onClick={() => handleSend()}
+                disabled={!input.trim() || isTyping}
+                title="Юбориш"
+                aria-label="Юбориш"
+                className="flex-shrink-0 inline-flex items-center justify-center w-11 h-11 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white rounded-xl shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
               >
-                <div className={`w-6 h-6 ${action.color} rounded-lg flex items-center justify-center`}>
-                  <span className="text-white">{action.icon}</span>
-                </div>
-                <span className="text-sm text-gray-700 dark:text-gray-300">{action.label}</span>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
+                {isTyping ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
               </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Input */}
-      <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-end gap-3 bg-gray-50 dark:bg-gray-700 rounded-2xl p-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Savolingizni yozing..."
-              className="flex-1 px-4 py-3 bg-transparent border-none focus:outline-none text-gray-700 dark:text-gray-300 placeholder-gray-400"
-            />
-            <button
-              onClick={() => handleSend()}
-              disabled={!input.trim() || isTyping}
-              title="Yuborish"
-              aria-label="Yuborish"
-              className="p-3 bg-gradient-to-br from-violet-500 to-purple-600 text-white rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-            >
-              <Send className="w-5 h-5" />
-            </button>
+            </div>
           </div>
           <p className="text-center text-xs text-gray-400 mt-3">
-            AI yordamchi eksperimental xizmat. Javoblar aniqligi kafolatlanmaydi.
+            AI ёрдамчи эксперيментал хизмат. Жавоблар аниқлиги кафолатланмайди.
           </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyConversation({ onPick }: { onPick: (prompt: string) => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
+      <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center shadow-glass mb-5">
+        <Bot className="w-8 h-8 text-white" />
+      </div>
+      <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">
+        Сизга қандай ёрдам бера оламан?
+      </h2>
+      <p className="text-sm text-gray-500 max-w-md mb-8">
+        Сотувлар, омбор, молия ва бизнес ривожи бўйича савол беринг ёки қуйидаги
+        тайёр мавзулардан бирини танланг.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl">
+        {quickPrompts.map((item) => (
+          <button
+            key={item.label}
+            onClick={() => onPick(item.prompt)}
+            className="group flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-glass hover:border-gray-200 transition-all text-left active:scale-[0.98]"
+          >
+            <div
+              className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-white flex-shrink-0 shadow-sm`}
+            >
+              {item.icon}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-900 truncate">
+                {item.label}
+              </p>
+              <p className="text-xs text-gray-500 truncate">{item.prompt}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MessageBubble({ message }: { message: Message }) {
+  const isUser = message.role === 'user';
+
+  return (
+    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+      <div
+        className={`w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${
+          isUser
+            ? 'bg-blue-100'
+            : message.isError
+            ? 'bg-amber-100'
+            : 'bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700'
+        }`}
+      >
+        {isUser ? (
+          <User className="w-4 h-4 text-blue-600" />
+        ) : message.isError ? (
+          <AlertTriangle className="w-4 h-4 text-amber-600" />
+        ) : (
+          <Bot className="w-4 h-4 text-white" />
+        )}
+      </div>
+
+      <div className={`max-w-[80%] ${isUser ? 'items-end' : 'items-start'}`}>
+        <div
+          className={`px-4 py-3 rounded-2xl ${
+            isUser
+              ? 'bg-blue-600 text-white rounded-br-md shadow-sm'
+              : message.isError
+              ? 'bg-amber-50 border border-amber-200 text-amber-800 rounded-bl-md'
+              : 'bg-white border border-gray-100 text-gray-700 rounded-bl-md shadow-sm'
+          }`}
+        >
+          <p className="text-sm leading-relaxed whitespace-pre-line">
+            {message.content}
+          </p>
+        </div>
+        <span
+          className={`block text-[11px] text-gray-400 mt-1.5 ${
+            isUser ? 'text-right' : 'text-left'
+          }`}
+        >
+          {message.timestamp}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function TypingIndicator() {
+  return (
+    <div className="flex gap-3">
+      <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+        <Bot className="w-4 h-4 text-white" />
+      </div>
+      <div className="bg-white border border-gray-100 rounded-2xl rounded-bl-md px-4 py-4 shadow-sm">
+        <div className="flex items-center gap-1.5">
+          <span
+            className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"
+            style={{ animationDelay: '0ms' }}
+          />
+          <span
+            className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"
+            style={{ animationDelay: '150ms' }}
+          />
+          <span
+            className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"
+            style={{ animationDelay: '300ms' }}
+          />
         </div>
       </div>
     </div>

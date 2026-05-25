@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
-import { 
-  Activity, Clock, User, FileText, ShoppingCart, Package, 
-  DollarSign, AlertTriangle, CheckCircle, XCircle, Filter,
-  Search, Download, Calendar, ChevronDown, MoreHorizontal, Eye,
-  Monitor, BarChart3, TrendingUp, Users, Zap
+import {
+  Activity, Clock, User, FileText, ShoppingCart, Package,
+  DollarSign, AlertTriangle, CheckCircle, XCircle,
+  Search, Download, Monitor, Users, Zap, RefreshCw, X, Eye, Filter,
 } from 'lucide-react';
+import { latinToCyrillic } from '../lib/transliterator';
+import { TableSkeleton } from '../components/ui/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import { Badge } from '../components/ui/Badge';
+import { useToast } from '../components/ui/Toast';
+
+const L = latinToCyrillic;
 
 interface ActivityLog {
   id: string;
@@ -22,7 +28,7 @@ interface SystemMetric {
   value: string;
   change: string;
   icon: React.ReactNode;
-  color: string;
+  tint: string;
 }
 
 const mockActivities: ActivityLog[] = [
@@ -36,18 +42,41 @@ const mockActivities: ActivityLog[] = [
   { id: '8', user: 'S. Rakhimov', action: 'Ombor yangiladi', target: 'B-003', timestamp: '2024-01-15 08:15:45', type: 'product', status: 'success', details: '-25 dona' },
 ];
 
+const TYPE_LABEL: Record<ActivityLog['type'], string> = {
+  sale: 'Sotuv',
+  product: 'Mahsulot',
+  user: 'Foydalanuvchi',
+  system: 'Tizim',
+  expense: 'Xarajat',
+};
+
+const STATUS_LABEL: Record<ActivityLog['status'], string> = {
+  success: 'Muvaffaqiyatli',
+  error: 'Xatolik',
+  warning: 'Ogohlantirish',
+};
+
 export default function ActivityMonitor() {
-  const [activities, setActivities] = useState<ActivityLog[]>(mockActivities);
+  const { addToast } = useToast();
+  const [activities] = useState<ActivityLog[]>(mockActivities);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedActivity, setSelectedActivity] = useState<ActivityLog | null>(null);
 
+  // Simulate initial load so skeletons get a chance to render (no real API here)
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const metrics: SystemMetric[] = [
-    { label: 'Faol foydalanuvchilar', value: '24', change: '+12%', icon: <Users className="w-5 h-5" />, color: 'text-blue-600' },
-    { label: 'Jami harakatlar', value: '1,847', change: '+8%', icon: <Activity className="w-5 h-5" />, color: 'text-emerald-600' },
-    { label: 'Tizim yuklanishi', value: '42%', change: '-5%', icon: <Zap className="w-5 h-5" />, color: 'text-amber-600' },
-    { label: 'Oxirgi zaxira', value: '2 soat', change: 'Yaxshi', icon: <CheckCircle className="w-5 h-5" />, color: 'text-emerald-600' },
+    { label: 'Faol foydalanuvchilar', value: '24', change: '+12%', icon: <Users className="w-[18px] h-[18px]" />, tint: 'bg-sky-50 text-sky-600' },
+    { label: 'Jami harakatlar', value: '1,847', change: '+8%', icon: <Activity className="w-[18px] h-[18px]" />, tint: 'bg-indigo-50 text-indigo-600' },
+    { label: 'Tizim yuklanishi', value: '42%', change: '-5%', icon: <Zap className="w-[18px] h-[18px]" />, tint: 'bg-amber-50 text-amber-600' },
+    { label: 'Oxirgi zaxira', value: '2 soat', change: 'Yaxshi', icon: <CheckCircle className="w-[18px] h-[18px]" />, tint: 'bg-emerald-50 text-emerald-600' },
   ];
 
   const filteredActivities = activities.filter(activity => {
@@ -58,6 +87,26 @@ export default function ActivityMonitor() {
     const matchesStatus = filterStatus === 'all' || activity.status === filterStatus;
     return matchesSearch && matchesType && matchesStatus;
   });
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setLoading(true);
+    setTimeout(() => {
+      setRefreshing(false);
+      setLoading(false);
+      addToast({ type: 'success', title: L('Yangilandi'), message: L('Faoliyat jurnali yangilandi') });
+    }, 600);
+  };
+
+  const handleExport = () => {
+    addToast({ type: 'info', title: L('Eksport'), message: L('Eksport funksiyasi tez orada qo\'shiladi') });
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setFilterType('all');
+    setFilterStatus('all');
+  };
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -72,12 +121,21 @@ export default function ActivityMonitor() {
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'sale': return 'bg-emerald-100 text-emerald-700';
-      case 'product': return 'bg-blue-100 text-blue-700';
-      case 'user': return 'bg-purple-100 text-purple-700';
-      case 'system': return 'bg-gray-100 text-gray-700';
-      case 'expense': return 'bg-rose-100 text-rose-700';
-      default: return 'bg-gray-100 text-gray-700';
+      case 'sale': return 'bg-emerald-50 text-emerald-600';
+      case 'product': return 'bg-sky-50 text-sky-600';
+      case 'user': return 'bg-violet-50 text-violet-600';
+      case 'system': return 'bg-slate-100 text-slate-600';
+      case 'expense': return 'bg-rose-50 text-rose-600';
+      default: return 'bg-slate-100 text-slate-600';
+    }
+  };
+
+  const getStatusBadgeVariant = (status: string): 'success' | 'error' | 'warning' | 'neutral' => {
+    switch (status) {
+      case 'success': return 'success';
+      case 'error': return 'error';
+      case 'warning': return 'warning';
+      default: return 'neutral';
     }
   };
 
@@ -90,215 +148,333 @@ export default function ActivityMonitor() {
     }
   };
 
+  const hasActiveFilters = searchTerm !== '' || filterType !== 'all' || filterStatus !== 'all';
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Monitor className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Faoliyat monitoringi</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Tizim faoliyati va audit jurnali</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                <Download className="w-4 h-4" />
-                Eksport
-              </button>
-            </div>
+    <>
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div>
+            <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
+              {L('Faoliyat monitoringi')}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              {loading
+                ? L('Yuklanmoqda...')
+                : `${filteredActivities.length} ${L('ta harakat')}`}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 self-start">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing || loading}
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{L('Yangilash')}</span>
+            </button>
+            <button
+              onClick={handleExport}
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">{L('Eksport')}</span>
+            </button>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {metrics.map((metric, index) => (
-            <div key={index} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-lg ${metric.color} bg-opacity-10`}>
-                  {metric.icon}
+        {/* Stats cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          {loading
+            ? Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[116px] animate-pulse" />
+              ))
+            : metrics.map((metric) => (
+                <div
+                  key={metric.label}
+                  className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">
+                      {L(metric.label)}
+                    </p>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${metric.tint}`}>
+                      {metric.icon}
+                    </div>
+                  </div>
+                  <p className="mt-3 text-2xl font-bold text-slate-900 tracking-tight tabular-nums">{metric.value}</p>
+                  <p className={`mt-1 text-xs font-medium ${metric.change.startsWith('+') ? 'text-emerald-600' : metric.change.startsWith('-') ? 'text-rose-600' : 'text-slate-400'}`}>
+                    {L(metric.change)}
+                  </p>
                 </div>
-                <span className={`text-xs ${metric.change.startsWith('+') ? 'text-emerald-600' : metric.change.startsWith('-') ? 'text-rose-600' : 'text-blue-600'}`}>
-                  {metric.change}
-                </span>
-              </div>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">{metric.value}</p>
-              <p className={`text-sm ${metric.color} mt-1`}>{metric.label}</p>
-            </div>
-          ))}
+              ))}
         </div>
 
-        {/* Filters */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
-          <div className="p-4 flex flex-col sm:flex-row gap-4">
+        {/* Filters bar */}
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-4">
+          <div className="flex flex-col lg:flex-row gap-3">
+            {/* Search */}
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Qidirish (foydalanuvchi, harakat, obyekt)"
+                placeholder={L('Qidirish (foydalanuvchi, harakat, obyekt)')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-800 dark:text-white"
+                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white transition-all"
               />
             </div>
-            <div className="flex items-center gap-3">
-              <select
-                title="Turi bo'yicha filter"
-                aria-label="Turi bo'yicha filter"
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="all">Barcha turlar</option>
-                <option value="sale">Sotuv</option>
-                <option value="product">Mahsulot</option>
-                <option value="user">Foydalanuvchi</option>
-                <option value="system">Tizim</option>
-                <option value="expense">Xarajat</option>
-              </select>
-              <select
-                title="Status bo'yicha filter"
-                aria-label="Status bo'yicha filter"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="all">Barcha statuslar</option>
-                <option value="success">Muvaffaqiyatli</option>
-                <option value="error">Xatolik</option>
-                <option value="warning">Ogohlantirish</option>
-              </select>
+
+            <div className="grid grid-cols-2 sm:flex gap-3">
+              {/* Type Filter */}
+              <div className="relative">
+                <label htmlFor="activity-type-filter" className="sr-only">{L('Turi bo\'yicha filter')}</label>
+                <Filter className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <select
+                  id="activity-type-filter"
+                  title={L('Turi bo\'yicha filter')}
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="w-full sm:w-auto pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                >
+                  <option value="all">{L('Barcha turlar')}</option>
+                  <option value="sale">{L('Sotuv')}</option>
+                  <option value="product">{L('Mahsulot')}</option>
+                  <option value="user">{L('Foydalanuvchi')}</option>
+                  <option value="system">{L('Tizim')}</option>
+                  <option value="expense">{L('Xarajat')}</option>
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div className="relative">
+                <label htmlFor="activity-status-filter" className="sr-only">{L('Status bo\'yicha filter')}</label>
+                <Filter className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <select
+                  id="activity-status-filter"
+                  title={L('Status bo\'yicha filter')}
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full sm:w-auto pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                >
+                  <option value="all">{L('Barcha statuslar')}</option>
+                  <option value="success">{L('Muvaffaqiyatli')}</option>
+                  <option value="error">{L('Xatolik')}</option>
+                  <option value="warning">{L('Ogohlantirish')}</option>
+                </select>
+              </div>
             </div>
           </div>
+          {hasActiveFilters && (
+            <div className="mt-3 flex items-center justify-between gap-3 pt-3 border-t border-slate-100">
+              <p className="text-xs text-slate-500 tabular-nums">
+                {filteredActivities.length} {L('ta natija topildi')}
+              </p>
+              <button
+                onClick={handleClearFilters}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+                {L('Filterlarni tozalash')}
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Activity Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700/50">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Vaqt</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Foydalanuvchi</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Harakat</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Obyekt</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Turi</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tafsilot</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amal</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {filteredActivities.map((activity) => (
-                  <tr key={activity.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-600 dark:text-gray-400">{activity.timestamp}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                          <User className="w-4 h-4 text-purple-600" />
-                        </div>
-                        <span className="font-medium text-gray-900 dark:text-white">{activity.user}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-700 dark:text-gray-300">{activity.action}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-medium text-gray-900 dark:text-white">{activity.target}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg ${getTypeColor(activity.type)}`}>
-                        {getTypeIcon(activity.type)}
-                        {activity.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1">
-                        {getStatusIcon(activity.status)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">{activity.details}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button 
-                        onClick={() => setSelectedActivity(activity)}
-                        title="Ko'rish"
-                        aria-label="Batafsil ko'rish"
-                        className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Activity feed */}
+        {loading ? (
+          <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-6">
+            <TableSkeleton rows={6} cols={5} />
           </div>
-        </div>
+        ) : filteredActivities.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200/70">
+            <EmptyState
+              icon={Activity}
+              title={L('Faoliyat topilmadi')}
+              description={
+                hasActiveFilters
+                  ? L('Qidiruv yoki filterlarga mos faoliyat yo\'q. Filterlarni o\'zgartirib ko\'ring')
+                  : L('Hozircha hech qanday faoliyat qayd etilmagan')
+              }
+              action={
+                hasActiveFilters ? (
+                  <button
+                    onClick={handleClearFilters}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+                  >
+                    <X className="w-4 h-4" />
+                    {L('Filterlarni tozalash')}
+                  </button>
+                ) : undefined
+              }
+            />
+          </div>
+        ) : (
+          <>
+            {/* Desktop: table */}
+            <div className="hidden lg:block bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-200/70 bg-slate-50/60">
+                      <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{L('Vaqt')}</th>
+                      <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{L('Foydalanuvchi')}</th>
+                      <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{L('Harakat')}</th>
+                      <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{L('Turi')}</th>
+                      <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{L('Status')}</th>
+                      <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{L('Amal')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredActivities.map((activity) => (
+                      <tr key={activity.id} className="group hover:bg-slate-50/70 transition-colors">
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2 text-sm text-slate-600 tabular-nums">
+                            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                            <span>{activity.timestamp}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {activity.user.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-sm font-medium text-slate-900">{activity.user}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-medium text-slate-900">{activity.action}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{activity.target}</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${getTypeColor(activity.type)}`}>
+                            {getTypeIcon(activity.type)}
+                            {L(TYPE_LABEL[activity.type])}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <Badge variant={getStatusBadgeVariant(activity.status)}>
+                            {L(STATUS_LABEL[activity.status])}
+                          </Badge>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <button
+                            onClick={() => setSelectedActivity(activity)}
+                            title={L('Ko\'rish')}
+                            aria-label={L('Batafsil ko\'rish')}
+                            className="inline-flex p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Mobile: timeline card list */}
+            <div className="lg:hidden space-y-3">
+              {filteredActivities.map((activity) => (
+                <button
+                  key={activity.id}
+                  onClick={() => setSelectedActivity(activity)}
+                  className="w-full text-left bg-white rounded-2xl border border-slate-200/70 p-4 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200 active:scale-[0.99]"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${getTypeColor(activity.type)}`}>
+                      {getTypeIcon(activity.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{activity.action}</p>
+                        <Badge variant={getStatusBadgeVariant(activity.status)}>
+                          {L(STATUS_LABEL[activity.status])}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5 truncate">{activity.target}</p>
+                      <div className="mt-2 flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
+                        <span className="inline-flex items-center gap-1">
+                          <User className="w-3.5 h-3.5" />
+                          {activity.user}
+                        </span>
+                        <span className="inline-flex items-center gap-1 tabular-nums">
+                          <Clock className="w-3.5 h-3.5" />
+                          {activity.timestamp}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Detail Modal */}
       {selectedActivity && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          onClick={() => setSelectedActivity(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-[0_24px_60px_rgba(15,23,42,0.18)] border border-slate-200/70"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Harakat tafsilotlari</h2>
-              <button 
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight">{L('Harakat tafsilotlari')}</h2>
+              <button
                 onClick={() => setSelectedActivity(null)}
-                title="Yopish"
-                aria-label="Yopish"
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg"
+                title={L('Yopish')}
+                aria-label={L('Yopish')}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <MoreHorizontal className="w-5 h-5 rotate-45" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-4">
-              <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${getTypeColor(selectedActivity.type)}`}>
-                  {getTypeIcon(selectedActivity.type)}
+              <div className="flex items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${getTypeColor(selectedActivity.type)}`}>
+                    {getTypeIcon(selectedActivity.type)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900 truncate">{selectedActivity.action}</p>
+                    <p className="text-sm text-slate-400 truncate">{selectedActivity.target}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">{selectedActivity.action}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{selectedActivity.target}</p>
+                <Badge variant={getStatusBadgeVariant(selectedActivity.status)}>
+                  {L(STATUS_LABEL[selectedActivity.status])}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 border border-slate-200/70 rounded-xl p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{L('Foydalanuvchi')}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{selectedActivity.user}</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-200/70 rounded-xl p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{L('Vaqt')}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900 tabular-nums">{selectedActivity.timestamp}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Foydalanuvchi</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{selectedActivity.user}</p>
-                </div>
-                <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Vaqt</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{selectedActivity.timestamp}</p>
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Status</p>
+              <div className="bg-slate-50 border border-slate-200/70 rounded-xl p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-2">{L('Status')}</p>
                 <div className="flex items-center gap-2">
                   {getStatusIcon(selectedActivity.status)}
-                  <span className="font-medium text-gray-900 dark:text-white capitalize">{selectedActivity.status}</span>
+                  <span className="text-sm font-semibold text-slate-900">{L(STATUS_LABEL[selectedActivity.status])}</span>
                 </div>
               </div>
-              <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Tafsilotlar</p>
-                <p className="text-sm text-gray-700 dark:text-gray-300">{selectedActivity.details}</p>
+              <div className="bg-slate-50 border border-slate-200/70 rounded-xl p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-2">{L('Tafsilotlar')}</p>
+                <p className="text-sm text-slate-700">{selectedActivity.details}</p>
               </div>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

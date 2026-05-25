@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
-import Button from '../components/Button';
 import api from '../lib/professionalApi';
 import { formatCurrency } from '../lib/utils';
 import { formatDateTime } from '../lib/dateUtils';
-import { 
-  Brain, 
-  TrendingUp, 
+import { latinToCyrillic } from '../lib/transliterator';
+import { useToast } from '../components/ui/Toast';
+import { CardSkeleton } from '../components/ui/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import {
+  Brain,
+  TrendingUp,
   TrendingDown,
   AlertTriangle,
   CheckCircle,
@@ -14,32 +16,40 @@ import {
   Users,
   Package,
   DollarSign,
-  Zap,
+  RefreshCw,
   BarChart3,
   Activity,
   Award,
-  Clock
+  Clock,
+  Lightbulb,
+  ShieldAlert,
+  XCircle,
 } from 'lucide-react';
-import { 
-  BarChart, 
+import {
+  BarChart,
   Bar,
   AreaChart,
   Area,
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
 } from 'recharts';
 
 export default function AIManager() {
+  const t = latinToCyrillic;
+  const { addToast } = useToast();
+
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [timeRange, setTimeRange] = useState('30');
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     loadAnalytics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRange]);
 
   const loadAnalytics = async () => {
@@ -49,397 +59,564 @@ export default function AIManager() {
       setAnalytics(data);
     } catch (error) {
       console.error('Analytics yuklashda xatolik');
+      setAnalytics(null);
+      addToast({ type: 'error', title: t('Tahlilni yuklashda xatolik') });
     } finally {
       setLoading(false);
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await loadAnalytics();
+      addToast({ type: 'success', title: t('Malumotlar yangilandi') });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const periodLabel: Record<string, string> = {
+    '7': t('Oxirgi 7 kun'),
+    '30': t('Oxirgi 30 kun'),
+    '90': t('Oxirgi 90 kun'),
+    '365': t('Oxirgi 1 yil'),
+  };
+
+  const tabs = [
+    { id: 'overview', label: t('Umumiy'), icon: BarChart3 },
+    { id: 'performance', label: t('Natijalar'), icon: Target },
+    { id: 'insights', label: t('Tahlil'), icon: Brain },
+    { id: 'risks', label: t('Xavflar'), icon: AlertTriangle },
+  ];
+
+  // ── Header: clean title + period selector + refresh (reused in all states) ──
+  const Header = () => (
+    <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+      <div>
+        <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
+          {t('AI Manager')}
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          {t('Suniy intellekt asosida tahlil va tavsiyalar')} · {periodLabel[timeRange]}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 self-start">
+        <select
+          title={t('Vaqt oraligini tanlash')}
+          aria-label={t('Vaqt oraligini tanlash')}
+          className="px-3.5 py-2 bg-white hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900/10 cursor-pointer"
+          value={timeRange}
+          onChange={(e) => setTimeRange(e.target.value)}
+        >
+          <option value="7">{t('Oxirgi 7 kun')}</option>
+          <option value="30">{t('Oxirgi 30 kun')}</option>
+          <option value="90">{t('Oxirgi 90 kun')}</option>
+          <option value="365">{t('Oxirgi 1 yil')}</option>
+        </select>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {t('Yangilash')}
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── Loading: clean header + dark hero + KPI skeletons matching house style ──
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Brain className="w-16 h-16 text-primary mx-auto mb-4 animate-pulse" />
-          <p className="text-lg font-semibold">AI Manager Tayyorlanmoqda...</p>
+      <div className="max-w-7xl mx-auto space-y-8">
+        <Header />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="rounded-2xl bg-slate-900 p-6 h-[200px] animate-pulse" />
+          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-5">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[200px] animate-pulse" />
+            ))}
+          </div>
+        </div>
+        <CardSkeleton count={4} />
+      </div>
+    );
+  }
+
+  // ── Error / no data ─────────────────────────────────────────────────────
+  if (!analytics) {
+    return (
+      <div className="max-w-7xl mx-auto space-y-8">
+        <Header />
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+          <EmptyState
+            icon={XCircle}
+            title={t('Malumotlarni yuklashda xatolik')}
+            description={t('AI Manager malumotlarini olishda muammo yuz berdi. Iltimos qaytadan urinib koring.')}
+            action={
+              <button
+                onClick={loadAnalytics}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+              >
+                <RefreshCw className="w-4 h-4" />
+                {t('Qayta urinish')}
+              </button>
+            }
+          />
         </div>
       </div>
     );
   }
 
+  const m = analytics.metrics || {};
+  const adv = analytics.advancedMetrics || {};
+  const revenueUp = (m.revenueGrowth || 0) >= 0;
+  const profitUp = (m.profitGrowth || 0) >= 0;
+  const confidence = typeof analytics.aiConfidence === 'number' ? analytics.aiConfidence : null;
 
+  const confidenceMeta =
+    confidence === null
+      ? { label: t('Malumot yetarli emas'), tone: 'bg-white/10 text-slate-300' }
+      : confidence > 80
+        ? { label: t('Yuqori aniqlik'), tone: 'bg-emerald-500/20 text-emerald-300' }
+        : confidence > 60
+          ? { label: t('Ortacha aniqlik'), tone: 'bg-amber-500/20 text-amber-300' }
+          : { label: t('Past aniqlik'), tone: 'bg-rose-500/20 text-rose-300' };
+
+  const insightStyle = (type: string) => {
+    switch (type) {
+      case 'success':
+        return { wrap: 'bg-emerald-50 border-emerald-500', icon: <CheckCircle className="w-5 h-5 text-emerald-600" /> };
+      case 'warning':
+        return { wrap: 'bg-amber-50 border-amber-500', icon: <AlertTriangle className="w-5 h-5 text-amber-600" /> };
+      case 'danger':
+        return { wrap: 'bg-rose-50 border-rose-500', icon: <XCircle className="w-5 h-5 text-rose-600" /> };
+      default:
+        return { wrap: 'bg-indigo-50 border-indigo-500', icon: <Brain className="w-5 h-5 text-indigo-600" /> };
+    }
+  };
+
+  const severityMeta = (level: string) => {
+    switch (level) {
+      case 'high':
+        return { text: 'text-rose-600', badge: 'bg-rose-100 text-rose-700', border: 'border-rose-500', icon: 'text-rose-600' };
+      case 'medium':
+        return { text: 'text-amber-600', badge: 'bg-amber-100 text-amber-700', border: 'border-amber-500', icon: 'text-amber-600' };
+      default:
+        return { text: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-500', icon: 'text-emerald-600' };
+    }
+  };
+
+  // Secondary KPI metric cards (overview) — white tiles with soft tinted icon
+  const kpiCards = [
+    {
+      title: t('Daromad'),
+      value: formatCurrency(m.totalRevenue || 0, 'USD'),
+      icon: DollarSign,
+      tint: 'bg-emerald-50 text-emerald-600',
+      delta: m.revenueGrowth,
+      deltaUp: revenueUp,
+    },
+    {
+      title: t('Sof Foyda'),
+      value: formatCurrency(m.netProfit || 0, 'USD'),
+      icon: Target,
+      tint: 'bg-indigo-50 text-indigo-600',
+      delta: m.profitGrowth,
+      deltaUp: profitUp,
+    },
+    {
+      title: t('Sotuvlar'),
+      value: (m.totalQuantity || 0).toLocaleString('en-US'),
+      icon: Package,
+      tint: 'bg-sky-50 text-sky-600',
+      sub: `${(m.totalSales || 0).toLocaleString('en-US')} ${t('ta savdo')}`,
+    },
+    {
+      title: t('Mijozlar'),
+      value: (m.totalCustomers || 0).toLocaleString('en-US'),
+      icon: Users,
+      tint: 'bg-amber-50 text-amber-600',
+      sub: `${(m.activeCustomers || 0).toLocaleString('en-US')} ${t('faol')}`,
+    },
+  ];
+
+  // Advanced metric tiles (performance)
+  const advancedTiles: { key: string; label: string; value?: number; format: string }[] = [
+    { key: 'clv', label: t('Mijoz qiymati (CLV)'), value: adv.customerLifetimeValue, format: 'currency' },
+    { key: 'retention', label: t('Ushlab qolish'), value: adv.customerRetentionRate, format: 'percent' },
+    { key: 'roi', label: t('Investitsiya rentabelligi'), value: adv.returnOnInvestment, format: 'percent' },
+    { key: 'turnover', label: t('Aylanma koeffitsienti'), value: adv.inventoryTurnoverRatio, format: 'number' },
+    { key: 'cash', label: t('Pul aylanish sikli'), value: adv.cashConversionCycle, format: 'days' },
+    { key: 'profitability', label: t('Foydalilik indeksi'), value: adv.profitabilityIndex, format: 'number' },
+  ];
+
+  const formatTile = (value: number | undefined, format: string) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) return '—';
+    if (format === 'currency') return formatCurrency(value, 'USD');
+    if (format === 'percent') return `${value.toFixed(1)}%`;
+    if (format === 'days') return `${value.toFixed(0)} ${t('kun')}`;
+    return value.toFixed(2);
+  };
+
+  const risk = analytics.riskAssessment;
+  const riskMeta = risk ? severityMeta(risk.riskLevel) : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-2 sm:p-4 md:p-6">
-      {/* Header */}
-      <div className="mb-4 sm:mb-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold flex items-center gap-2 sm:gap-3">
-              <Brain className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
-              AI Manager Dashboard
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-              Professional Business Intelligence & Analytics
-            </p>
-          </div>
-          
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <select
-              title="Vaqt oralig'ini tanlash"
-              aria-label="Vaqt oralig'ini tanlash"
-              className="flex-1 sm:flex-none px-3 py-2 text-sm bg-background border border-border rounded-lg"
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
-            >
-              <option value="7">7 kun</option>
-              <option value="30">30 kun</option>
-              <option value="90">90 kun</option>
-              <option value="365">1 yil</option>
-            </select>
-            <Button onClick={loadAnalytics} className="flex-1 sm:flex-none">
-              <Zap className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Yangilash</span>
-              <span className="sm:hidden">↻</span>
-            </Button>
-          </div>
-        </div>
+    <div className="max-w-7xl mx-auto space-y-8">
+      <Header />
 
-        {/* Tabs */}
-        <div className="flex gap-1 sm:gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          {[
-            { id: 'overview', label: 'Umumiy', icon: BarChart3 },
-            { id: 'performance', label: 'Natijalar', icon: Target },
-            { id: 'insights', label: 'Tahlil', icon: Brain },
-            { id: 'risks', label: 'Xavflar', icon: AlertTriangle },
-          ].map((tab) => (
+      {/* Pill tabs */}
+      <div className="bg-white rounded-2xl p-1.5 border border-slate-200/70 flex gap-1 overflow-x-auto">
+        {tabs.map((tab) => {
+          const active = activeTab === tab.id;
+          return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-background hover:bg-muted'
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+                active
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
-              <tab.icon className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">{tab.label}</span>
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      {/* AI Score Card */}
-      <Card className="mb-4 sm:mb-6 bg-gradient-to-r from-purple-500 to-blue-500 text-white border-0">
-        <CardContent className="p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-center sm:text-left">
-              <p className="text-xs sm:text-sm opacity-90 mb-1">AI Ishonch Darajasi</p>
-              <p className="text-3xl sm:text-4xl md:text-5xl font-bold">
-                {analytics?.aiConfidence?.toFixed(1)}%
-              </p>
-              <p className="text-xs sm:text-sm opacity-75 mt-1">
-                {analytics?.aiConfidence > 80 ? '✅ Yuqori aniqlik' :
-                 analytics?.aiConfidence > 60 ? '⚠️ O\'rtacha aniqlik' :
-                 '❌ Past aniqlik'}
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 w-full sm:w-auto">
-              <div className="bg-white/20 backdrop-blur-sm rounded-lg p-2 sm:p-3 text-center">
-                <Award className="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1" />
-                <p className="text-lg sm:text-xl font-bold">
-                  {analytics?.advancedMetrics?.growthPotential?.toFixed(0)}
-                </p>
-                <p className="text-[10px] sm:text-xs opacity-75">O'sish</p>
-              </div>
-              <div className="bg-white/20 backdrop-blur-sm rounded-lg p-2 sm:p-3 text-center">
-                <Activity className="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1" />
-                <p className="text-lg sm:text-xl font-bold">
-                  {analytics?.advancedMetrics?.riskScore?.toFixed(0)}
-                </p>
-                <p className="text-[10px] sm:text-xs opacity-75">Xavf</p>
-              </div>
-              <div className="bg-white/20 backdrop-blur-sm rounded-lg p-2 sm:p-3 text-center col-span-2 sm:col-span-1">
-                <Clock className="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1" />
-                <p className="text-xs sm:text-sm font-semibold">
-                  {formatDateTime(new Date())}
-                </p>
-                <p className="text-[10px] sm:text-xs opacity-75">Oxirgi yangilanish</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Content based on active tab */}
+      {/* ── Overview ──────────────────────────────────────────────────── */}
       {activeTab === 'overview' && (
-        <div className="space-y-4 sm:space-y-6">
-          {/* Key Metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-            <Card className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-green-500" />
-                  <div className={`flex items-center gap-1 text-xs ${
-                    analytics?.metrics?.revenueGrowth >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {analytics?.metrics?.revenueGrowth >= 0 ? (
-                      <TrendingUp className="w-3 h-3" />
-                    ) : (
-                      <TrendingDown className="w-3 h-3" />
-                    )}
-                    {Math.abs(analytics?.metrics?.revenueGrowth || 0).toFixed(1)}%
+        <div className="space-y-8 animate-in fade-in duration-500">
+          {/* Top: dark AI-confidence hero + KPI grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Premium dark hero: AI confidence (headline metric) */}
+            <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-6 text-white">
+              <div className="absolute -top-16 -right-16 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl" />
+              <div className="relative">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                    {t('AI ishonch darajasi')}
+                  </p>
+                  <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
+                    <Brain className="w-[18px] h-[18px] text-indigo-300" />
                   </div>
                 </div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Daromad</p>
-                <p className="text-base sm:text-lg md:text-xl font-bold truncate">
-                  {formatCurrency(analytics?.metrics?.totalRevenue || 0, 'USD')}
+                <p className="mt-3 text-4xl font-bold tracking-tight tabular-nums">
+                  {confidence === null ? '—' : `${confidence.toFixed(1)}%`}
                 </p>
-              </CardContent>
-            </Card>
-
-            <Card className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <Target className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500" />
-                  <div className={`flex items-center gap-1 text-xs ${
-                    analytics?.metrics?.profitGrowth >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {analytics?.metrics?.profitGrowth >= 0 ? (
-                      <TrendingUp className="w-3 h-3" />
-                    ) : (
-                      <TrendingDown className="w-3 h-3" />
-                    )}
-                    {Math.abs(analytics?.metrics?.profitGrowth || 0).toFixed(1)}%
+                <span className={`mt-3 inline-block px-2.5 py-1 rounded-lg text-xs font-semibold ${confidenceMeta.tone}`}>
+                  {confidenceMeta.label}
+                </span>
+                <div className="mt-6 pt-5 border-t border-white/10 flex items-center gap-8">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-4 h-4 text-slate-400" />
+                    <div>
+                      <p className="text-xl font-bold tabular-nums">
+                        {typeof adv.growthPotential === 'number' ? adv.growthPotential.toFixed(0) : '—'}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5">{t('Osish salohiyati')}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-slate-400" />
+                    <div>
+                      <p className="text-xl font-bold tabular-nums">
+                        {typeof adv.riskScore === 'number' ? adv.riskScore.toFixed(0) : '—'}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5">{t('Xavf bali')}</p>
+                    </div>
                   </div>
                 </div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Foyda</p>
-                <p className="text-base sm:text-lg md:text-xl font-bold truncate">
-                  {formatCurrency(analytics?.metrics?.netProfit || 0, 'USD')}
+                <p className="mt-4 flex items-center gap-1.5 text-xs text-slate-400">
+                  <Clock className="w-3.5 h-3.5" />
+                  {t('Oxirgi yangilanish')}: {formatDateTime(new Date())}
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            <Card className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <Package className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
-                  <span className="text-xs text-blue-600">
-                    {analytics?.metrics?.totalSales || 0}
-                  </span>
+            {/* Secondary KPI cards */}
+            <div className="lg:col-span-2 grid grid-cols-2 gap-5">
+              {kpiCards.map((kpi, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">
+                      {kpi.title}
+                    </p>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${kpi.tint}`}>
+                      <kpi.icon className="w-[18px] h-[18px]" />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-2xl font-bold text-slate-900 tracking-tight tabular-nums truncate">{kpi.value}</p>
+                  {typeof kpi.delta === 'number' ? (
+                    <p
+                      className={`mt-1 text-xs flex items-center gap-1 font-medium ${
+                        kpi.deltaUp ? 'text-emerald-600' : 'text-rose-600'
+                      }`}
+                    >
+                      {kpi.deltaUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                      <span className="tabular-nums">{Math.abs(kpi.delta).toFixed(1)}%</span>
+                    </p>
+                  ) : (
+                    kpi.sub && <p className="mt-1 text-xs text-slate-400 tabular-nums">{kpi.sub}</p>
+                  )}
                 </div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Sotuvlar</p>
-                <p className="text-base sm:text-lg md:text-xl font-bold">
-                  {analytics?.metrics?.totalQuantity || 0}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <Users className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500" />
-                  <span className="text-xs text-orange-600">
-                    {analytics?.metrics?.activeCustomers || 0}
-                  </span>
-                </div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Mijozlar</p>
-                <p className="text-base sm:text-lg md:text-xl font-bold">
-                  {analytics?.metrics?.totalCustomers || 0}
-                </p>
-              </CardContent>
-            </Card>
+              ))}
+            </div>
           </div>
 
           {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  <span className="text-sm sm:text-base">Daromad Trendi</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <AreaChart data={analytics?.trends?.daily || []}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                  <TrendingUp className="w-[18px] h-[18px]" />
+                </div>
+                <h2 className="font-semibold text-slate-900 tracking-tight">{t('Daromad trendi')}</h2>
+              </div>
+              {analytics.trends?.daily && analytics.trends.daily.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <AreaChart data={analytics.trends.daily}>
                     <defs>
                       <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip />
-                    <Area 
-                      type="monotone" 
-                      dataKey="revenue" 
-                      stroke="#3b82f6" 
-                      fillOpacity={1} 
-                      fill="url(#colorRevenue)"
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} />
+                    <YAxis stroke="#94a3b8" fontSize={11} />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: '0.75rem',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      }}
                     />
+                    <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRevenue)" />
                   </AreaChart>
                 </ResponsiveContainer>
-              </CardContent>
-            </Card>
+              ) : (
+                <EmptyState
+                  icon={TrendingUp}
+                  title={t('Malumot yoq')}
+                  description={t('Tanlangan davr uchun daromad trendi topilmadi')}
+                />
+              )}
+            </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  <span className="text-sm sm:text-base">Top Mahsulotlar</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={analytics?.topProducts?.slice(0, 5) || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip />
-                    <Bar dataKey="revenue" fill="#8b5cf6" />
+            <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Package className="w-[18px] h-[18px]" />
+                </div>
+                <h2 className="font-semibold text-slate-900 tracking-tight">{t('Eng kop sotilgan mahsulotlar')}</h2>
+              </div>
+              {analytics.topProducts && analytics.topProducts.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={analytics.topProducts.slice(0, 5)}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} />
+                    <YAxis stroke="#94a3b8" fontSize={11} />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: '0.75rem',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      }}
+                    />
+                    <Bar dataKey="revenue" fill="#6366f1" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              </CardContent>
-            </Card>
+              ) : (
+                <EmptyState
+                  icon={Package}
+                  title={t('Malumot yoq')}
+                  description={t('Tanlangan davr uchun mahsulot malumotlari topilmadi')}
+                />
+              )}
+            </div>
           </div>
         </div>
       )}
 
+      {/* ── Performance ───────────────────────────────────────────────── */}
       {activeTab === 'performance' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {analytics?.advancedMetrics && Object.entries({
-            'CLV': { value: analytics.advancedMetrics.customerLifetimeValue, format: 'currency' },
-            'Retention': { value: analytics.advancedMetrics.customerRetentionRate, format: 'percent' },
-            'ROI': { value: analytics.advancedMetrics.returnOnInvestment, format: 'percent' },
-            'Turnover': { value: analytics.advancedMetrics.inventoryTurnoverRatio, format: 'number' },
-            'Cash Cycle': { value: analytics.advancedMetrics.cashConversionCycle, format: 'days' },
-            'Profitability': { value: analytics.advancedMetrics.profitabilityIndex, format: 'number' },
-          }).map(([key, data]: [string, any]) => (
-            <Card key={key} className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-3 sm:p-4">
-                <p className="text-xs sm:text-sm text-muted-foreground mb-2">{key}</p>
-                <p className="text-xl sm:text-2xl font-bold">
-                  {data.format === 'currency' ? formatCurrency(data.value, 'USD') :
-                   data.format === 'percent' ? `${data.value.toFixed(1)}%` :
-                   data.format === 'days' ? `${data.value.toFixed(0)} kun` :
-                   data.value.toFixed(2)}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {activeTab === 'insights' && (
-        <div className="space-y-3 sm:space-y-4">
-          {analytics?.insights?.map((insight: any, index: number) => (
-            <Card 
-              key={index}
-              className={`border-l-4 ${
-                insight.type === 'success' ? 'border-green-500' :
-                insight.type === 'warning' ? 'border-yellow-500' :
-                insight.type === 'danger' ? 'border-red-500' :
-                'border-blue-500'
-              }`}
-            >
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-start gap-2 sm:gap-3">
-                  {insight.type === 'success' ? (
-                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-sm sm:text-base mb-1">{insight.title}</h4>
-                    <p className="text-xs sm:text-sm text-muted-foreground">{insight.description}</p>
-                    {insight.action && (
-                      <p className="text-xs sm:text-sm font-medium mt-2 text-primary">
-                        💡 {insight.action}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {activeTab === 'risks' && analytics?.riskAssessment && (
-        <div className="space-y-4 sm:space-y-6">
-          <Card className={`border-2 ${
-            analytics.riskAssessment.riskLevel === 'high' ? 'border-red-500' :
-            analytics.riskAssessment.riskLevel === 'medium' ? 'border-yellow-500' :
-            'border-green-500'
-          }`}>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-center sm:text-left">
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-1">Umumiy Xavf Darajasi</p>
-                  <p className={`text-2xl sm:text-3xl font-bold ${
-                    analytics.riskAssessment.riskLevel === 'high' ? 'text-red-600' :
-                    analytics.riskAssessment.riskLevel === 'medium' ? 'text-yellow-600' :
-                    'text-green-600'
-                  }`}>
-                    {analytics.riskAssessment.riskLevel.toUpperCase()}
-                  </p>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                    Ball: {analytics.riskAssessment.riskScore}/100
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-3xl sm:text-4xl font-bold">{analytics.riskAssessment.totalRisks}</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Aniqlangan xavflar</p>
-                </div>
+        <div className="animate-in fade-in duration-500">
+          <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Target className="w-[18px] h-[18px]" />
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <h2 className="font-semibold text-slate-900 tracking-tight">{t('Kengaytirilgan metrikalar')}</h2>
+                <p className="text-sm text-slate-500">{t('Biznes samaradorligini chuqur korsatkichlari')}</p>
+              </div>
+            </div>
+            {analytics.advancedMetrics ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {advancedTiles.map((tile) => (
+                  <div
+                    key={tile.key}
+                    className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-4 transition-all hover:bg-white hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)]"
+                  >
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-1">{tile.label}</p>
+                    <p className="text-2xl font-bold text-slate-900 tracking-tight tabular-nums">{formatTile(tile.value, tile.format)}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={Target}
+                title={t('Metrikalar topilmadi')}
+                description={t('Tanlangan davr uchun kengaytirilgan metrikalar mavjud emas')}
+              />
+            )}
+          </div>
+        </div>
+      )}
 
-          <div className="space-y-3 sm:space-y-4">
-            {analytics.riskAssessment.risks.map((risk: any, index: number) => (
-              <Card key={index} className={`border-l-4 ${
-                risk.severity === 'high' ? 'border-red-500' :
-                risk.severity === 'medium' ? 'border-yellow-500' :
-                'border-green-500'
-              }`}>
-                <CardContent className="p-3 sm:p-4">
-                  <div className="flex items-start gap-2 sm:gap-3">
-                    <AlertTriangle className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5 ${
-                      risk.severity === 'high' ? 'text-red-600' :
-                      risk.severity === 'medium' ? 'text-yellow-600' :
-                      'text-green-600'
-                    }`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <span className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold text-white ${
-                          risk.severity === 'high' ? 'bg-red-600' :
-                          risk.severity === 'medium' ? 'bg-yellow-600' :
-                          'bg-green-600'
-                        }`}>
-                          {risk.severity.toUpperCase()}
-                        </span>
-                        <span className="px-2 py-1 rounded text-[10px] sm:text-xs font-bold bg-muted">
-                          {risk.category.toUpperCase()}
-                        </span>
-                      </div>
-                      <h4 className="font-bold text-sm sm:text-base mb-1">{risk.title}</h4>
-                      <p className="text-xs sm:text-sm text-muted-foreground mb-2">{risk.description}</p>
-                      <div className="space-y-2">
-                        <div className="p-2 bg-muted rounded text-xs sm:text-sm">
-                          <p className="font-semibold mb-1">⚠️ Ta'sir:</p>
-                          <p className="text-muted-foreground">{risk.impact}</p>
-                        </div>
-                        <div className="p-2 bg-muted rounded text-xs sm:text-sm">
-                          <p className="font-semibold mb-1">💡 Yechim:</p>
-                          <p className="text-muted-foreground">{risk.mitigation}</p>
+      {/* ── Insights ──────────────────────────────────────────────────── */}
+      {activeTab === 'insights' && (
+        <div className="animate-in fade-in duration-500">
+          <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Brain className="w-[18px] h-[18px]" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-slate-900 tracking-tight">{t('AI xulosalari va tavsiyalar')}</h2>
+                <p className="text-sm text-slate-500">{t('Malumotlar asosida aqlli tahlil')}</p>
+              </div>
+            </div>
+            {analytics.insights && analytics.insights.length > 0 ? (
+              <div className="space-y-3">
+                {analytics.insights.map((insight: any, index: number) => {
+                  const s = insightStyle(insight.type);
+                  return (
+                    <div key={index} className={`p-4 rounded-xl border-l-4 ${s.wrap}`}>
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex-shrink-0">{s.icon}</div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-slate-900">{insight.title}</h4>
+                          <p className="text-sm text-slate-600 mt-1">{insight.description}</p>
+                          {insight.action && (
+                            <p className="inline-flex items-center gap-1.5 text-sm font-medium mt-2 text-indigo-600">
+                              <Lightbulb className="w-4 h-4" />
+                              {insight.action}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState
+                icon={Brain}
+                title={t('Hozircha xulosa yoq')}
+                description={t('Tanlangan davr uchun AI tavsiyalari topilmadi')}
+              />
+            )}
           </div>
+        </div>
+      )}
+
+      {/* ── Risks ─────────────────────────────────────────────────────── */}
+      {activeTab === 'risks' && (
+        <div className="space-y-6 animate-in fade-in duration-500">
+          {risk && riskMeta ? (
+            <>
+              {/* Risk summary card */}
+              <div className={`bg-white rounded-2xl border-l-4 ${riskMeta.border} border-y border-r border-slate-200/70 p-5 sm:p-6`}>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${riskMeta.badge}`}>
+                      <ShieldAlert className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('Umumiy xavf darajasi')}</p>
+                      <p className={`text-2xl sm:text-3xl font-bold tracking-tight ${riskMeta.text}`}>
+                        {String(risk.riskLevel || '').toUpperCase()}
+                      </p>
+                      {typeof risk.riskScore === 'number' && (
+                        <p className="mt-0.5 text-sm text-slate-500 tabular-nums">{t('Ball')}: {risk.riskScore}/100</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="sm:text-right">
+                    <p className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight tabular-nums">{risk.totalRisks ?? 0}</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('Aniqlangan xavflar')}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Risk list */}
+              {risk.risks && risk.risks.length > 0 ? (
+                <div className="space-y-4">
+                  {risk.risks.map((r: any, index: number) => {
+                    const rm = severityMeta(r.severity);
+                    return (
+                      <div
+                        key={index}
+                        className={`bg-white rounded-2xl border-l-4 ${rm.border} border-y border-r border-slate-200/70 p-5`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${rm.icon}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold ${rm.badge}`}>
+                                {String(r.severity || '').toUpperCase()}
+                              </span>
+                              <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-slate-100 text-slate-600">
+                                {String(r.category || '').toUpperCase()}
+                              </span>
+                            </div>
+                            <h4 className="font-semibold text-slate-900">{r.title}</h4>
+                            <p className="text-sm text-slate-600 mt-1 mb-3">{r.description}</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="rounded-xl bg-rose-50 border border-rose-100 p-3">
+                                <p className="text-xs font-bold text-rose-700 uppercase tracking-wide mb-1">{t('Tasir')}</p>
+                                <p className="text-sm text-slate-600">{r.impact}</p>
+                              </div>
+                              <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3">
+                                <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-1">{t('Yechim')}</p>
+                                <p className="text-sm text-slate-600">{r.mitigation}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+                  <EmptyState
+                    icon={CheckCircle}
+                    title={t('Xavflar aniqlanmadi')}
+                    description={t('Tanlangan davr uchun jiddiy xavflar topilmadi')}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+              <EmptyState
+                icon={ShieldAlert}
+                title={t('Xavf tahlili mavjud emas')}
+                description={t('Tanlangan davr uchun xavf baholash malumotlari topilmadi')}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

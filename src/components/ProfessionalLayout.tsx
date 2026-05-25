@@ -1,318 +1,260 @@
 import { ReactNode, useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { 
-  LayoutDashboard, Package, ShoppingCart, Users, 
-  DollarSign, Moon, Sun, LogOut, FileText, 
-  Settings as SettingsIcon, ChevronDown, ChevronUp,
+import {
+  LayoutDashboard, Package, ShoppingCart, Users,
+  DollarSign, LogOut, FileText,
+  Settings as SettingsIcon,
   Factory, Package2, Truck, CheckSquare,
   Wallet, Brain, Menu, X, Bot,
-  BarChart3, Activity, Zap, Cloud, Shield
+  BarChart3, Activity, Zap, Cloud, Shield,
+  PanelLeftClose, PanelLeft, User as UserIcon,
 } from 'lucide-react';
-import { useThemeStore } from '../store/themeStore';
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/utils';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { latinToCyrillic } from '../lib/transliterator';
-import LanguageSwitcher from './LanguageSwitcher';
 
 interface NavigationItem {
   name: string;
   href: string;
   icon: any;
   adminOnly?: boolean;
-  cashierRestricted?: boolean;
-  badge?: string | number;
-  category?: 'main' | 'analytics' | 'management' | 'tools';
 }
 
-const getNavigation = (t: (key: string) => string): { main: NavigationItem[]; analytics: NavigationItem[]; management: NavigationItem[]; tools: NavigationItem[] } => ({
-  main: [
-    { name: t('navigation.dashboard'), href: '/', icon: LayoutDashboard, category: 'main' },
-    { name: t('navigation.sales'), href: '/sales', icon: ShoppingCart, category: 'main' },
-    { name: t('navigation.orders'), href: '/orders', icon: Package, category: 'main' },
-    { name: t('navigation.products'), href: '/products', icon: Package, category: 'main' },
-    { name: t('navigation.customers'), href: '/customers', icon: Users, category: 'main' },
-    { name: t('navigation.cashbox'), href: '/cashbox', icon: Wallet, category: 'main' },
-    { name: t('navigation.cashierManagement'), href: '/cashiers', icon: Shield, adminOnly: true, category: 'main' },
-    { name: t('navigation.reports'), href: '/reports', icon: FileText, category: 'main' },
-    { name: t('navigation.settings'), href: '/settings', icon: SettingsIcon, category: 'main' },
-  ],
-  analytics: [
-    { name: t('navigation.analytics'), href: '/analytics', icon: BarChart3, category: 'analytics' },
-    { name: t('navigation.revenueCalculator'), href: '/revenue', icon: DollarSign, category: 'analytics' },
-    { name: t('navigation.activityMonitor'), href: '/activity', icon: Activity, category: 'analytics' },
-  ],
-  management: [
-    { name: t('navigation.inventory'), href: '/inventory', icon: Package2, category: 'management' },
-    { name: t('navigation.suppliers'), href: '/suppliers', icon: Truck, category: 'management' },
-    { name: t('navigation.production'), href: '/production', icon: Factory, category: 'management' },
-    { name: t('navigation.qualityControl'), href: '/quality', icon: CheckSquare, category: 'management' },
-    { name: t('navigation.logistics'), href: '/logistics', icon: Truck, category: 'management' },
-  ],
-  tools: [
-    { name: t('navigation.aiAssistant'), href: '/ai-assistant', icon: Brain, category: 'tools' },
-    { name: t('navigation.bots'), href: '/bots', icon: Bot, category: 'tools' },
-    { name: t('navigation.cloudBackup'), href: '/cloud-backup', icon: Cloud, category: 'tools' },
-    { name: t('navigation.shortcuts'), href: '/shortcuts', icon: Zap, category: 'tools' },
-  ],
-});
+interface NavSection {
+  key: string;
+  label: string;
+  items: NavigationItem[];
+}
+
+const getSections = (t: (key: string) => string): NavSection[] => [
+  {
+    key: 'main',
+    label: 'Asosiy',
+    items: [
+      { name: t('navigation.dashboard'), href: '/dashboard', icon: LayoutDashboard },
+      { name: t('navigation.sales'), href: '/sales', icon: ShoppingCart },
+      { name: t('navigation.orders'), href: '/orders', icon: Package },
+      { name: t('navigation.products'), href: '/products', icon: Package2 },
+      { name: t('navigation.customers'), href: '/customers', icon: Users },
+      { name: t('navigation.cashbox'), href: '/cashbox', icon: Wallet },
+      { name: t('navigation.cashierManagement'), href: '/cashiers', icon: Shield, adminOnly: true },
+      { name: t('navigation.reports'), href: '/reports', icon: FileText },
+      { name: t('navigation.settings'), href: '/settings', icon: SettingsIcon },
+    ],
+  },
+  {
+    key: 'analytics',
+    label: 'Analitika',
+    items: [
+      { name: t('navigation.analytics'), href: '/analytics', icon: BarChart3 },
+      { name: t('navigation.revenueCalculator'), href: '/revenue', icon: DollarSign },
+      { name: t('navigation.activityMonitor'), href: '/activity', icon: Activity },
+    ],
+  },
+  {
+    key: 'management',
+    label: 'Boshqaruv',
+    items: [
+      { name: t('navigation.inventory'), href: '/inventory', icon: Package2 },
+      { name: t('navigation.suppliers'), href: '/suppliers', icon: Truck },
+      { name: t('navigation.production'), href: '/production', icon: Factory },
+      { name: t('navigation.qualityControl'), href: '/quality', icon: CheckSquare },
+      { name: t('navigation.logistics'), href: '/logistics', icon: Truck },
+    ],
+  },
+  {
+    key: 'tools',
+    label: 'Vositalar',
+    items: [
+      { name: t('navigation.aiAssistant'), href: '/ai-assistant', icon: Brain },
+      { name: t('navigation.bots'), href: '/bots', icon: Bot },
+      { name: t('navigation.cloudBackup'), href: '/cloud-backup', icon: Cloud },
+      { name: t('navigation.shortcuts'), href: '/shortcuts', icon: Zap },
+    ],
+  },
+];
 
 export default function ProfessionalLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
-  const { theme, toggleTheme } = useThemeStore();
   const { user, logout } = useAuthStore();
   const location = useLocation();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['main', 'management']));
-    
-  const sidebarRef = useRef<HTMLDivElement>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
 
-  useKeyboardShortcuts({
-    'Ctrl+B': () => setIsSidebarOpen(!isSidebarOpen),
-  });
+  useKeyboardShortcuts({ 'Ctrl+B': () => setCollapsed((c) => !c) });
 
   useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth < 1024;
-      setIsMobile(mobile);
-      if (mobile) {
-        setIsSidebarOpen(false);
-      }
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const onResize = () => setIsMobile(window.innerWidth < 1024);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
-        if (isMobile) {
-          setIsSidebarOpen(false);
-        }
-      }
-    };
+    setMobileOpen(false); // route o'zgarsa mobil menyuni yopish
+  }, [location.pathname]);
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isMobile]);
-
-  const navigation = getNavigation(t);
   const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
-  const isCashier = user?.role?.toUpperCase() === 'CASHIER' || user?.role?.toUpperCase() === 'SELLER';
+  const sections = getSections(t);
 
-  const toggleCategory = (category: string) => {
-    const newExpanded = new Set(expandedCategories);
-    if (newExpanded.has(category)) {
-      newExpanded.delete(category);
-    } else {
-      newExpanded.add(category);
-    }
-    setExpandedCategories(newExpanded);
-  };
+  const isItemActive = (href: string) =>
+    location.pathname === href || (href !== '/dashboard' && location.pathname.startsWith(href));
 
-  const renderNavigationItem = (item: NavigationItem) => {
-    const isActive = location.pathname === item.href || 
-                   (item.href !== '/' && location.pathname.startsWith(item.href));
-    
+  // collapsed faqat desktop'da; mobil drawerda doim to'liq (labellar bilan)
+  const iconOnly = collapsed && !isMobile;
+
+  const renderItem = (item: NavigationItem) => {
     if (item.adminOnly && !isAdmin) return null;
-    if (item.cashierRestricted && isCashier) return null;
-
+    const active = isItemActive(item.href);
     return (
       <Link
-        key={item.name}
+        key={item.href}
         to={item.href}
+        title={iconOnly ? latinToCyrillic(item.name) : undefined}
         className={cn(
-          "group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ease-out",
-          "hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-blue-700 hover:shadow-md",
-          "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
-          isActive 
-            ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-glow hover:shadow-glow-lg" 
-            : "text-gray-600"
+          'relative flex items-center gap-3 rounded-xl text-sm font-medium transition-colors duration-150',
+          iconOnly ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5',
+          active
+            ? 'bg-indigo-50 text-indigo-700'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
         )}
       >
-        <item.icon className={cn(
-          "w-5 h-5 transition-all duration-300 ease-out",
-          "group-hover:scale-110 group-hover:rotate-3",
-          isActive && "text-white drop-shadow-md"
-        )} />
-        <span className="font-medium">{latinToCyrillic(item.name)}</span>
-        {item.badge && (
-          <span className={cn(
-            "ml-auto px-2 py-1 text-xs font-bold rounded-full badge",
-            isActive 
-              ? "bg-white/30 text-white shadow-inner" 
-              : "badge-blue"
-          )}>
-            {item.badge}
-          </span>
-        )}
+        {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-indigo-600" />}
+        <item.icon className={cn('w-5 h-5 flex-shrink-0', active ? 'text-indigo-600' : 'text-slate-400')} strokeWidth={2} />
+        {!iconOnly && <span className="truncate">{latinToCyrillic(item.name)}</span>}
       </Link>
     );
   };
 
-  // Kategoriya nomlarini o'zbek tiliga tarjima qilish
-  const getCategoryName = (category: string) => {
-    const translations: Record<string, string> = {
-      'main': 'Asosiy',
-      'analytics': 'Analitika',
-      'management': 'Boshqaruv',
-      'tools': 'Vositalar'
-    };
-    return latinToCyrillic(translations[category] || category);
-  };
-
-  const renderNavigationCategory = (category: string, items: NavigationItem[]) => {
-    const isExpanded = expandedCategories.has(category);
-    const hasActiveItem = items.some(item => 
-      location.pathname === item.href || 
-      (item.href !== '/' && location.pathname.startsWith(item.href))
-    );
-
-    return (
-      <div key={category} className="mb-2">
-        <button
-          onClick={() => toggleCategory(category)}
-          className={cn(
-            "w-full flex items-center justify-between px-4 py-2 rounded-lg transition-all duration-200",
-            "hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500",
-            hasActiveItem && "bg-blue-50 text-blue-700"
-          )}
-        >
-          <span className="font-semibold text-sm uppercase tracking-wider">
-            {getCategoryName(category)}
-          </span>
-          {isExpanded ? (
-            <ChevronUp className="w-4 h-4" />
-          ) : (
-            <ChevronDown className="w-4 h-4" />
-          )}
-        </button>
-        
-        {isExpanded && (
-          <div className="mt-1 space-y-1 animate-slide-in">
-            {items.map(renderNavigationItem)}
+  const sidebar = (
+    <aside
+      ref={sidebarRef}
+      className={cn(
+        'flex flex-col bg-white border-r border-slate-200 h-full transition-[width] duration-200',
+        iconOnly ? 'w-[72px]' : 'w-64'
+      )}
+    >
+      {/* Brand */}
+      <div className={cn('flex items-center h-16 border-b border-slate-100 flex-shrink-0', iconOnly ? 'justify-center px-2' : 'justify-between px-4')}>
+        {!iconOnly && (
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center flex-shrink-0">
+              <span className="text-white font-bold text-sm">LP</span>
+            </div>
+            <span className="font-extrabold text-slate-900 tracking-tight truncate">LUX PET PLAST</span>
           </div>
         )}
+        {iconOnly && (
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
+            <span className="text-white font-bold text-sm">LP</span>
+          </div>
+        )}
+        {!isMobile && !iconOnly && (
+          <button
+            onClick={() => setCollapsed(true)}
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+            title="Yig'ish (Ctrl+B)"
+          >
+            <PanelLeftClose className="w-5 h-5" />
+          </button>
+        )}
       </div>
-    );
-  };
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+        {iconOnly && (
+          <button
+            onClick={() => setCollapsed(false)}
+            className="w-full flex justify-center p-2 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+            title="Ochish (Ctrl+B)"
+          >
+            <PanelLeft className="w-5 h-5" />
+          </button>
+        )}
+        {sections.map((section) => {
+          const visible = section.items.filter((i) => !(i.adminOnly && !isAdmin));
+          if (visible.length === 0) return null;
+          return (
+            <div key={section.key} className="space-y-1">
+              {!iconOnly && (
+                <p className="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  {latinToCyrillic(section.label)}
+                </p>
+              )}
+              {section.items.map(renderItem)}
+            </div>
+          );
+        })}
+      </nav>
+
+      {/* Footer: user + logout */}
+      <div className="border-t border-slate-100 p-3 flex-shrink-0">
+        <div className={cn('flex items-center gap-3', iconOnly && 'justify-center')}>
+          <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <UserIcon className="w-5 h-5 text-slate-500" />
+          </div>
+          {!iconOnly && (
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-800 truncate">{user?.name || 'Foydalanuvchi'}</p>
+              <p className="text-xs text-indigo-600 capitalize truncate">{user?.role?.toLowerCase()}</p>
+            </div>
+          )}
+          <button
+            onClick={logout}
+            title={latinToCyrillic('Chiqish')}
+            className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors flex-shrink-0"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 bg-dots-pattern">
-      {/* Sidebar */}
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased">
+      {/* Desktop sidebar (fixed) */}
+      {!isMobile && (
+        <div className="fixed inset-y-0 left-0 z-40">{sidebar}</div>
+      )}
+
+      {/* Mobile drawer */}
+      {isMobile && mobileOpen && (
+        <>
+          <div className="fixed inset-0 bg-slate-900/40 z-40" onClick={() => setMobileOpen(false)} />
+          <div className="fixed inset-y-0 left-0 z-50">{sidebar}</div>
+        </>
+      )}
+
+      {/* Mobile top bar */}
+      {isMobile && (
+        <header className="fixed top-0 left-0 right-0 z-30 h-14 bg-white border-b border-slate-200 flex items-center gap-3 px-4">
+          <button onClick={() => setMobileOpen(true)} className="p-2 -ml-2 rounded-lg text-slate-600 hover:bg-slate-100">
+            <Menu className="w-6 h-6" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
+              <span className="text-white font-bold text-xs">LP</span>
+            </div>
+            <span className="font-bold text-slate-900 text-sm">LUX PET PLAST</span>
+          </div>
+        </header>
+      )}
+
+      {/* Main content */}
       <div
-        ref={sidebarRef}
         className={cn(
-          "fixed left-0 top-0 h-full glass-card border-r border-gray-200/50 shadow-2xl z-50 transition-all duration-300 ease-out",
-          isSidebarOpen ? "w-56" : "w-12",
-          isMobile && !isSidebarOpen && "-translate-x-full"
+          'transition-[padding] duration-200',
+          !isMobile && (iconOnly ? 'pl-[72px]' : 'pl-64'),
+          isMobile && 'pt-14'
         )}
       >
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-gray-200/50 bg-gradient-to-r from-blue-600 to-indigo-600">
-          <div className="flex items-center justify-between">
-            {isSidebarOpen && (
-              <div className="text-white font-bold text-lg">
-                <span className="text-gradient animate-gradient">LUX PET PLAST</span>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              {isSidebarOpen && (
-                <div className="scale-90">
-                  <LanguageSwitcher />
-                </div>
-              )}
-              <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all duration-200 hover:scale-105"
-              >
-                {isSidebarOpen ? (
-                  <ChevronUp className="w-5 h-5" />
-                ) : (
-                  <ChevronDown className="w-5 h-5" />
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {Object.entries(navigation).map(([category, items]) => 
-            renderNavigationCategory(category, items)
-          )}
-        </nav>
-
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t border-gray-200/50 bg-gradient-to-b from-transparent to-gray-50/50">
-          <div className="space-y-2">
-            <button
-              onClick={toggleTheme}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/80 hover:shadow-md transition-all duration-300 group"
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-5 h-5 text-amber-500 group-hover:animate-pulse-slow" />
-              ) : (
-                <Moon className="w-5 h-5 text-indigo-500 group-hover:animate-bounce-gentle" />
-              )}
-              {isSidebarOpen && (
-                <span className="font-medium text-gray-700">{t('settings.theme')}</span>
-              )}
-            </button>
-            
-            <button
-              onClick={logout}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 hover:shadow-md text-red-600 transition-all duration-300 group"
-            >
-              <LogOut className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              {isSidebarOpen && (
-                <span className="font-medium">{t('auth.logout')}</span>
-              )}
-            </button>
-          </div>
-        </div>
+        <main className="p-4 sm:p-6">{children}</main>
       </div>
-
-      {/* Mobile Menu Toggle */}
-      {isMobile && (
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="fixed top-4 left-4 z-50 p-3 bg-white/90 backdrop-blur-xl rounded-xl shadow-float hover:shadow-glow transition-all duration-300 hover:scale-105"
-        >
-          {isSidebarOpen ? (
-            <X className="w-6 h-6 text-gray-700" />
-          ) : (
-            <Menu className="w-6 h-6 text-blue-600" />
-          )}
-        </button>
-      )}
-
-      {/* Main Content */}
-      <div className={cn(
-        "transition-all duration-300",
-        isSidebarOpen ? "ml-56" : "ml-12",
-        isMobile && "ml-0"
-      )}>
-        
-        {/* Page Content */}
-        <main className="p-6">
-          <div className="animate-fade-in transition-all duration-500">
-            {children}
-          </div>
-        </main>
-      </div>
-
-      {/* Overlay for mobile */}
-      {isMobile && isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 animate-fade-in"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
     </div>
   );
 }

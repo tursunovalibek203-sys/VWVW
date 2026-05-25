@@ -1,18 +1,20 @@
-import { useState, useEffect } from 'react';
-import { 
-  Package, 
-  Trash2, 
-  Plus, 
-  Search, 
-  RefreshCw, 
-  Pencil, 
-  Check, 
+import { useState, useEffect, useMemo } from 'react';
+import {
+  Package,
+  Trash2,
+  Plus,
+  Search,
+  RefreshCw,
+  Pencil,
+  Check,
   X,
   AlertTriangle,
-  TrendingUp,
-  TrendingDown,
   Eye,
-  Table2
+  Table2,
+  Boxes,
+  DollarSign,
+  PackageX,
+  Download
 } from 'lucide-react';
 import api from '../lib/professionalApi';
 import { latinToCyrillic } from '../lib/transliterator';
@@ -23,6 +25,10 @@ import { productSchema, ProductFormData } from '../lib/validation';
 import { ValidatedForm } from '../components/forms/ValidatedForm';
 import { FormField, FormActions } from '../components/forms/FormField';
 import { useToast, toast } from '../components/ui/Toast';
+import { Badge } from '../components/ui/Badge';
+import { TableSkeleton } from '../components/ui/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 interface Product {
   id: string;
@@ -31,11 +37,14 @@ interface Product {
   pricePerPiece: number;
   currentStock: number;
   optimalStock: number;
+  minStockLimit?: number;
   unitsPerBag: number;
   warehouse: string;
   bagType: string;
   active: boolean;
 }
+
+type CategoryId = 'all' | 'preform' | 'krishka' | 'ruchka' | 'other';
 
 export default function SimplifiedInventory() {
   const navigate = useNavigate();
@@ -43,15 +52,15 @@ export default function SimplifiedInventory() {
   const { addToast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [, setExpandedGroups] = useState<string[]>([]);
-  const [activeCategory, setActiveCategory] = useState<'all' | 'preform' | 'krishka' | 'ruchka' | 'other'>('all');
+  const [activeCategory, setActiveCategory] = useState<CategoryId>('all');
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [editingPriceBag, setEditingPriceBag] = useState('');
   const [editingPricePiece, setEditingPricePiece] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  
+
   // Yangi mahsulot qo'shish modal uchun state
   const [showAddModal, setShowAddModal] = useState(false);
   // Narxlari jadvali modal uchun state
@@ -69,11 +78,15 @@ export default function SimplifiedInventory() {
     unitsPerBag: '2000',
     warehouse: 'preform'
   });
-  
+
   // Form validation states
   const [productFormLoading, setProductFormLoading] = useState(false);
   const [productFormError, setProductFormError] = useState<string | null>(null);
   const [productFormSuccess, setProductFormSuccess] = useState<string | null>(null);
+
+  // Delete confirmation (replaces window.confirm)
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadProducts();
@@ -96,18 +109,20 @@ export default function SimplifiedInventory() {
     };
   }, []);
 
-  const loadProducts = async () => {
-    setLoading(true);
+  const loadProducts = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     // Add timeout to prevent infinite loading
     const timeout = setTimeout(() => {
       setLoading(false);
+      setRefreshing(false);
       console.warn('Loading timeout reached for products');
     }, 10000); // 10 second timeout
-    
+
     try {
       const response = await api.get('/products');
       clearTimeout(timeout);
-      // âœ… Handle standardized API response format { success, data }
+      // Handle standardized API response format { success, data }
       const productsData = extractArray<Product>(response, []);
       setProducts(productsData);
       setLastUpdated(new Date());
@@ -117,6 +132,7 @@ export default function SimplifiedInventory() {
     } finally {
       clearTimeout(timeout);
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -130,23 +146,29 @@ export default function SimplifiedInventory() {
   const saveProductData = async (productId: string) => {
     try {
       if (!editingName || !editingPriceBag) {
-        alert(latinToCyrillic('Iltimos, mahsulot nomi va narxini to\'ldiring!'));
+        addToast(toast.warning(
+          latinToCyrillic('Diqqat'),
+          latinToCyrillic('Iltimos, mahsulot nomi va narxini to\'ldiring!')
+        ));
         return;
       }
-      
+
       const updateData = {
         name: editingName,
         pricePerBag: parseFloat(editingPriceBag) || 0,
         pricePerPiece: parseFloat(editingPricePiece) || 0
       };
-      
+
       await api.put(`/products/${productId}`, updateData);
-      loadProducts();
+      loadProducts(true);
       setEditingProduct(null);
-      alert(latinToCyrillic('âœ… Ma\'lumotlar yangilandi!'));
+      addToast(toast.success(
+        latinToCyrillic('Muvaffaqiyatli'),
+        latinToCyrillic('Ma\'lumotlar yangilandi!')
+      ));
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Noma\'lum xatolik';
-      alert(latinToCyrillic(`âŒ Xatolik: ${errorMessage}`));
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic(errorMessage)));
     }
   };
 
@@ -154,15 +176,31 @@ export default function SimplifiedInventory() {
     setEditingProduct(null);
   };
 
-  const deleteProduct = async (productId: string) => {
-    if (!confirm(latinToCyrillic('Rostdan ham ushbu mahsulotni o\'chirmoqchimisiz?'))) return;
-    
+  // Soft-delete flow: open ConfirmDialog instead of window.confirm
+  const requestDelete = (product: Product) => {
+    setDeleteTarget(product);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const productId = deleteTarget.id;
+    setDeleting(true);
     try {
       await api.delete(`/products/${productId}`);
-      loadProducts();
-      alert(latinToCyrillic('âœ… Mahsulot muvaffaqiyatli o\'chirildi!'));
+      loadProducts(true);
+      addToast(toast.success(
+        latinToCyrillic('Muvaffaqiyatli'),
+        latinToCyrillic('Mahsulot o\'chirildi!')
+      ));
     } catch (error) {
       errorHandler.handleError(error, { action: 'deleteProduct', productId });
+      addToast(toast.error(
+        latinToCyrillic('Xatolik'),
+        latinToCyrillic('Mahsulotni o\'chirishda xatolik yuz berdi')
+      ));
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -170,22 +208,22 @@ export default function SimplifiedInventory() {
     setProductFormLoading(true);
     setProductFormError(null);
     setProductFormSuccess(null);
-    
+
     try {
       const productData = {
         ...data,
         bagType: data.warehouse,
         active: true
       };
-      
+
       await api.post('/products', productData);
-      
+
       // Modalni yopish
       setShowAddModal(false);
-      
+
       // Mahsulotlar ro'yxatini yangilash
-      loadProducts();
-      
+      loadProducts(true);
+
       // Show success message
       addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic('Yangi mahsulot muvaffaqiyatli qo\'shildi!')));
     } catch (error: any) {
@@ -200,7 +238,7 @@ export default function SimplifiedInventory() {
     // Check if form has any data
     const hasData = newProduct.name || newProduct.pricePerBag || newProduct.currentStock;
     if (hasData) {
-      const confirmed = confirm(latinToCyrillic('Formda ma\'lumotlar bor. Yopishni xohlaysizmi?'));
+      const confirmed = window.confirm(latinToCyrillic('Formda ma\'lumotlar bor. Yopishni xohlaysizmi?'));
       if (!confirmed) return;
     }
     setShowAddModal(false);
@@ -214,255 +252,97 @@ export default function SimplifiedInventory() {
     });
   };
 
+  // Stock-level threshold (UI only - never changes API/data).
+  // Red/danger: at or below the minimum limit. Amber/warning: near the
+  // limit (within +50%). Green/success: healthy stock.
+  const getStockThreshold = (product: Product) =>
+    product.minStockLimit ?? product.optimalStock ?? 0;
 
-  const getStockStatus = (product: Product) => {
-    if (product.currentStock === 0) {
-      return { 
-        color: 'text-slate-600', 
-        bgColor: 'bg-slate-100 border-2 border-slate-300',
-        label: latinToCyrillic('Tugagan'),
-        emoji: 'âŒ',
-        icon: AlertTriangle
+  type StockLevel = {
+    variant: 'error' | 'warning' | 'success';
+    label: string;
+  };
+
+  const getStockLevel = (product: Product): StockLevel => {
+    const stock = product.currentStock || 0;
+    const limit = getStockThreshold(product);
+
+    if (stock <= limit) {
+      return {
+        variant: 'error',
+        label: stock === 0 ? latinToCyrillic('Tugagan') : latinToCyrillic('Kam')
       };
     }
-    
-    if (product.currentStock < (product.optimalStock || 100)) {
-      return { 
-        color: 'text-slate-500', 
-        bgColor: 'bg-slate-50 border-2 border-slate-200',
-        label: latinToCyrillic('Kam'),
-        emoji: 'âš ï¸',
-        icon: TrendingDown
-      };
+    if (stock <= limit * 1.5) {
+      return { variant: 'warning', label: latinToCyrillic('Tugayapti') };
     }
-    
-    return { 
-      color: 'text-blue-600', 
-      bgColor: 'bg-blue-50 border-2 border-blue-200',
-      label: latinToCyrillic('Yaxshi'),
-      emoji: 'âœ…',
-      icon: TrendingUp
-    };
+    return { variant: 'success', label: latinToCyrillic('Yetarli') };
   };
 
-  const extractColor = (productName: string): string => {
-    const name = productName.toLowerCase();
-    
-    const colorPatterns = [
-      { pattern: /oq|white|belyy|Ð±ÐµÐ»Ñ‹Ð¹/i, label: latinToCyrillic('Oq'), hex: '#FFFFFF' },
-      { pattern: /qora|black|chernyy|Ñ‡ÐµÑ€Ð½Ñ‹Ð¹/i, label: latinToCyrillic('Qora'), hex: '#1F2937' },
-      { pattern: /kok|ko'k|blue|siniy|ÑÐ¸Ð½Ð¸Ð¹|Ð³Ð¾Ð»ÑƒÐ±Ð¾Ð¹/i, label: latinToCyrillic('Ko\'k'), hex: '#3B82F6' },
-      { pattern: /yashil|green|zelenyy|Ð·ÐµÐ»ÐµÐ½Ñ‹Ð¹/i, label: latinToCyrillic('Yashil'), hex: '#10B981' },
-      { pattern: /qizil|red|krasnyy|ÐºÑ€Ð°ÑÐ½Ñ‹Ð¹/i, label: latinToCyrillic('Qizil'), hex: '#EF4444' },
-      { pattern: /sariq|yellow|zheltyy|Ð¶ÐµÐ»Ñ‚Ñ‹Ð¹/i, label: latinToCyrillic('Sariq'), hex: '#F59E0B' },
-      { pattern: /jigarrang|brown|korichnevyy|ÐºÐ¾Ñ€Ð¸Ñ‡Ð½ÐµÐ²Ñ‹Ð¹/i, label: latinToCyrillic('Jigarrang'), hex: '#92400E' },
-      { pattern: /kul|gray|seryy|ÑÐµÑ€Ñ‹Ð¹/i, label: latinToCyrillic('Kul'), hex: '#6B7280' },
-      { pattern: /binafsha|purple|fioletovyy|Ñ„Ð¸Ð¾Ð»ÐµÑ‚Ð¾Ð²Ñ‹Ð¹/i, label: latinToCyrillic('Binafsha'), hex: '#8B5CF6' },
-      { pattern: /pushti|pink|rozovyy|Ñ€Ð¾Ð·Ð¾Ð²Ñ‹Ð¹/i, label: latinToCyrillic('Pushti'), hex: '#EC4899' },
-      { pattern: /to'q|dark|temnyy/i, label: latinToCyrillic('To\'q'), hex: '#374151' },
-      { pattern: /och|light|svetlyy/i, label: latinToCyrillic('Och'), hex: '#D1D5DB' }
-    ];
-    
-    for (const color of colorPatterns) {
-      if (color.pattern.test(name)) {
-        return color.label;
-      }
+  // Mahsulot kategoriyasini aniqlash (warehouse yoki nom bo'yicha)
+  const matchesCategory = (product: Product, category: CategoryId): boolean => {
+    if (category === 'all') return true;
+
+    if (product.warehouse) {
+      return product.warehouse === category;
     }
-    
-    return latinToCyrillic('Boshqa');
+
+    const name = product.name.toLowerCase();
+    if (category === 'preform') {
+      const gramMatch = name.match(/(\d+)\s*(?:g|gr|gram|г|гр|грамм)/i);
+      const gramValue = gramMatch ? parseInt(gramMatch[1]) : 0;
+      const hasPreform = name.includes('preform') || name.includes('преформ');
+      return (hasPreform || (!!gramMatch && gramValue >= 10)) &&
+        !name.includes('krishka') && !name.includes('cap') && !name.includes('крышка') &&
+        !name.includes('ruchka') && !name.includes('handle') && !name.includes('ручка');
+    }
+    if (category === 'krishka') {
+      return name.includes('krishka') || name.includes('cap') || name.includes('qopqoq') || name.includes('крышка') || name.includes('копкок');
+    }
+    if (category === 'ruchka') {
+      return name.includes('ruchka') || name.includes('handle') || name.includes('ручка');
+    }
+    return category === 'other';
   };
 
-  const extractProductType = (productName: string): string => {
-    const name = productName.toLowerCase();
-    
-    // 1. AVVAL Preform mahsulotlarni gramm bo'yicha guruhlash (eng ustuvor)
-    // Preform yoki gramajga ega mahsulotlar
-    // Katta grammalar (10 dan katta) - preform
-    const gramMatch = name.match(/(\d+)\s*(?:g|gr|gram|Ð³|Ð³Ñ€|Ð³Ñ€Ð°Ð¼Ð¼)/i);
-    const hasPreform = name.includes('preform') || name.includes('Ð¿Ñ€ÐµÑ„Ð¾Ñ€Ð¼');
-    
-    if (hasPreform || gramMatch) {
-      const gramValue = gramMatch ? parseInt(gramMatch[1]) : null;
-      
-      // Gram qiymati 10 dan katta bo'lsa - preform deb hisoblash (masalan: 15gr, 20gr, 52gr)
-      if (gramValue && gramValue >= 10) {
-        return `${gramValue}gr Preform`;
-      }
-      
-      // Faqat preform so'zi bo'lsa
-      if (hasPreform) {
-        return latinToCyrillic('Preform');
-      }
-    }
-    
-    // 2. Krishka/Qopqoqlarni o'lchami bo'yicha guruhlash (mm/ml)
-    if (name.includes('krishka') || name.includes('cap') || name.includes('qopqoq') || name.includes('ÐºÑ€Ñ‹ÑˆÐºÐ°') || name.includes('ÐºÐ¾Ð¿ÐºÐ¾Ðº')) {
-      // O'lchamni topish (masalan: 28mm, 28, 30mm, 38mm, 38, 48mm, 48)
-      // Avval mm/ml bilan qidirish, keyin faqat raqam
-      let sizeMatch = name.match(/(\d+)\s*(mm|ml|Ð¼Ð¼|Ð¼Ð»)/i);
-      if (!sizeMatch) {
-        // Agar mm/ml yo'q bo'lsa, faqat raqamni qidirish (krishka 28, 28 krishka)
-        // Faqat kichik sonlarni (28, 30, 38, 48, 52) krishka o'lchami deb qabul qilish
-        sizeMatch = name.match(/(?:krishka|cap|qopqoq|ÐºÑ€Ñ‹ÑˆÐºÐ°).*?(\d{2})|(\d{2}).*?(?:krishka|cap|qopqoq|ÐºÑ€Ñ‹ÑˆÐºÐ°)/i);
-        if (sizeMatch) {
-          const size = sizeMatch[1] || sizeMatch[2];
-          // Krishka o'lchamlari: 28, 30, 38, 48, 52
-          if (['28', '30', '38', '48', '52'].includes(size)) {
-            return `${size}mm Qopqoqlar`;
-          }
+  const filteredProducts = useMemo(() => {
+    return products
+      .filter((product) => {
+        if (searchQuery && !product.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+          return false;
         }
-      } else {
-        const size = sizeMatch[1];
-        return `${size}mm Qopqoqlar`;
-      }
-      
-      // Rangni topish
-      const colorPatterns = [
-        { pattern: /oq|white|belyy|Ð±ÐµÐ»Ñ‹Ð¹/i, label: latinToCyrillic('Oq') },
-        { pattern: /qora|black|chernyy|Ñ‡ÐµÑ€Ð½Ñ‹Ð¹/i, label: latinToCyrillic('Qora') },
-        { pattern: /kok|ko'k|blue|siniy|ÑÐ¸Ð½Ð¸Ð¹|Ð³Ð¾Ð»ÑƒÐ±Ð¾Ð¹/i, label: latinToCyrillic('Ko\'k') },
-        { pattern: /yashil|green|zelenyy|Ð·ÐµÐ»ÐµÐ½Ñ‹Ð¹/i, label: latinToCyrillic('Yashil') },
-        { pattern: /qizil|red|krasnyy|ÐºÑ€Ð°ÑÐ½Ñ‹Ð¹/i, label: latinToCyrillic('Qizil') },
-        { pattern: /sariq|yellow|zheltyy|Ð¶ÐµÐ»Ñ‚Ñ‹Ð¹/i, label: latinToCyrillic('Sariq') }
-      ];
-      
-      // Agar o'lcham topilmasa, rang bo'yicha guruhlash
-      let colorLabel = '';
-      for (const color of colorPatterns) {
-        if (color.pattern.test(name)) {
-          colorLabel = color.label;
-          break;
-        }
-      }
-      
-      if (colorLabel) {
-        return `${colorLabel} ${latinToCyrillic('Qopqoqlar')}`;
-      }
-      return latinToCyrillic('Qopqoqlar');
-    }
-    
-    // 3. Ruchkalarni hajmi/o'lchami bo'yicha guruhlash (28mm, 38mm, 48mm)
-    if (name.includes('ruchka') || name.includes('handle') || name.includes('Ñ€ÑƒÑ‡ÐºÐ°')) {
-      // O'lchamni topish (masalan: 28mm, 28, 38mm, 38, 48mm, 48)
-      let sizeMatch = name.match(/(\d+)\s*(mm|ml|Ð¼Ð¼|Ð¼Ð»)/i);
-      if (!sizeMatch) {
-        // Agar mm/ml yo'q bo'lsa, faqat raqamni qidirish (ruchka 28, 28 ruchka)
-        sizeMatch = name.match(/(?:ruchka|handle|Ñ€ÑƒÑ‡ÐºÐ°).*?(\d{2})|(\d{2}).*?(?:ruchka|handle|Ñ€ÑƒÑ‡ÐºÐ°)/i);
-        if (sizeMatch) {
-          const size = sizeMatch[1] || sizeMatch[2];
-          // Ruchka o'lchamlari: 28, 30, 38, 48
-          if (['28', '30', '38', '48'].includes(size)) {
-            return `${size}mm Ruchkalar`;
-          }
-        }
-      } else {
-        const size = sizeMatch[1];
-        return `${size}mm Ruchkalar`;
-      }
-      
-      return latinToCyrillic('Ruchkalar');
-    }
-    
-    // 4. Kichik grammali mahsulotlar (10 dan kichik) - boshqa kategoriya
-    if (gramMatch) {
-      const gramValue = parseInt(gramMatch[1]);
-      if (gramValue < 10) {
-        return `${gramValue}gr ${latinToCyrillic('Boshqa')}`;
-      }
-    }
-    
-    return latinToCyrillic('Boshqa');
-  };
+        return matchesCategory(product, activeCategory);
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [products, searchQuery, activeCategory]);
 
-  const groupProducts = (products: Product[]) => {
-    const groups: { [key: string]: { color: string; products: Product[] }[] } = {};
-    
-    const filteredProducts = products.filter(product => {
-      if (searchQuery && !product.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
-      }
+  // Kam qolgan mahsulotlar (qizil/sariq darajada)
+  const lowStockProducts = useMemo(
+    () => products.filter((p) => (p.currentStock || 0) <= getStockThreshold(p)),
+    [products]
+  );
 
-      if (activeCategory === 'all') return true;
-
-      if (product.warehouse) {
-        return product.warehouse === activeCategory;
-      }
-
-      const name = product.name.toLowerCase();
-      if (activeCategory === 'preform') {
-        // Preform yoki gramajga ega mahsulotlar (10g va undan katta)
-        const hasGram = /(\d+)\s*(?:g|gr|gram|Ð³|Ð³Ñ€|Ð³Ñ€Ð°Ð¼Ð¼)/i.test(name);
-        const gramMatch = name.match(/(\d+)\s*(?:g|gr|gram|Ð³|Ð³Ñ€|Ð³Ñ€Ð°Ð¼Ð¼)/i);
-        const gramValue = gramMatch ? parseInt(gramMatch[1]) : 0;
-        const hasPreform = name.includes('preform') || name.includes('Ð¿Ñ€ÐµÑ„Ð¾Ñ€Ð¼');
-        
-        // Preform so'zi bor yoki 10g+ gramajga ega va krishka/ruchka emas
-        return (hasPreform || (hasGram && gramValue >= 10)) && 
-               !name.includes('krishka') && !name.includes('cap') && !name.includes('ÐºÑ€Ñ‹ÑˆÐºÐ°') &&
-               !name.includes('ruchka') && !name.includes('handle') && !name.includes('Ñ€ÑƒÑ‡ÐºÐ°');
-      }
-      if (activeCategory === 'krishka') {
-        return name.includes('krishka') || name.includes('cap') || name.includes('qopqoq') || name.includes('ÐºÑ€Ñ‹ÑˆÐºÐ°') || name.includes('ÐºÐ¾Ð¿ÐºÐ¾Ðº');
-      }
-      if (activeCategory === 'ruchka') {
-        return name.includes('ruchka') || name.includes('handle') || name.includes('Ñ€ÑƒÑ‡ÐºÐ°');
-      }
-      return activeCategory === 'other';
-    });
-    
-    filteredProducts.forEach((product) => {
-      const productType = extractProductType(product.name);
-      const color = extractColor(product.name);
-      
-      if (!groups[productType]) {
-        groups[productType] = [];
-      }
-      
-      // Rang bo'yicha guruhlash
-      let colorGroup = groups[productType].find(g => g.color === color);
-      if (!colorGroup) {
-        colorGroup = { color, products: [] };
-        groups[productType].push(colorGroup);
-      }
-      
-      colorGroup.products.push(product);
-    });
-    
-    return groups;
-  };
-
-  const groupedProducts = groupProducts(products);
-  const groupNames = Object.keys(groupedProducts).sort((a, b) => {
-    // Raqamli guruhlarni (masalan: 15gr, 20gr) avval tartiblash
-    const aMatch = a.match(/^(\d+)gr/);
-    const bMatch = b.match(/^(\d+)gr/);
-
-    if (aMatch && bMatch) {
-      return parseInt(aMatch[1]) - parseInt(bMatch[1]);
-    }
-    if (aMatch) return -1; // Raqamli guruhlarni boshqalardan oldin qo'yish
-    if (bMatch) return 1;
-
-    // Qolganlarini alifbo tartibida
-    return a.localeCompare(b);
-  });
-
-  // Doim barcha guruhlarni ochiq qilish
-  useEffect(() => {
-    setExpandedGroups(groupNames);
-  }, [groupNames.join(',')]);
-
-  const categories = [
-    { id: 'all', label: latinToCyrillic('Barchasi'), icon: '', color: 'blue' },
-    { id: 'preform', label: 'Preform', icon: '', color: 'slate' },
-    { id: 'krishka', label: latinToCyrillic('Krishka'), icon: '', color: 'slate' },
-    { id: 'ruchka', label: latinToCyrillic('Ruchka'), icon: '', color: 'gray' },
-    { id: 'other', label: latinToCyrillic('Boshqa'), icon: '', color: 'blue' }
+  const categories: { id: CategoryId; label: string }[] = [
+    { id: 'all', label: latinToCyrillic('Barchasi') },
+    { id: 'preform', label: 'Preform' },
+    { id: 'krishka', label: latinToCyrillic('Krishka') },
+    { id: 'ruchka', label: latinToCyrillic('Ruchka') },
+    { id: 'other', label: latinToCyrillic('Boshqa') }
   ];
 
   const formatPrice = (price: number) => {
-    return price.toFixed(2) + ' $';
+    return (price || 0).toFixed(2) + ' $';
   };
+
+  // Umumiy statistikalar
+  const totalValue = useMemo(
+    () => products.reduce((sum, p) => sum + (p.currentStock || 0) * (p.pricePerBag || 0), 0),
+    [products]
+  );
+  const totalStock = useMemo(
+    () => products.reduce((sum, p) => sum + (p.currentStock || 0), 0),
+    [products]
+  );
 
   // Narxlari jadvalida tahrirni boshlash
   const startPriceRowEditing = (product: Product) => {
@@ -476,7 +356,7 @@ export default function SimplifiedInventory() {
   const savePriceRowData = async (productId: string) => {
     try {
       if (!editPriceBag) {
-        alert(latinToCyrillic('Iltimos, qop narxini kiriting!'));
+        addToast(toast.warning(latinToCyrillic('Diqqat'), latinToCyrillic('Iltimos, qop narxini kiriting!')));
         return;
       }
 
@@ -487,12 +367,12 @@ export default function SimplifiedInventory() {
       };
 
       await api.put(`/products/${productId}`, updateData);
-      loadProducts();
+      loadProducts(true);
       setEditingPriceRow(null);
-      alert(latinToCyrillic('âœ… Narxlar yangilandi!'));
+      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic('Narxlar yangilandi!')));
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Noma\'lum xatolik';
-      alert(latinToCyrillic(`âŒ Xatolik: ${errorMessage}`));
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic(errorMessage)));
     }
   };
 
@@ -518,11 +398,11 @@ export default function SimplifiedInventory() {
       ];
 
       // Barcha mahsulotlarni birlashtirish
-      const allProducts: Array<{product: Product; category: string}> = [];
+      const allProducts: Array<{ product: Product; category: string }> = [];
 
       // Preformlar
       products
-        .filter(p => p.warehouse === 'preform' || p.name.toLowerCase().includes('preform') || /\d+\s*(gr|g|Ð³Ñ€|Ð³)/i.test(p.name))
+        .filter(p => p.warehouse === 'preform' || p.name.toLowerCase().includes('preform') || /\d+\s*(gr|g|гр|г)/i.test(p.name))
         .forEach(p => allProducts.push({ product: p, category: 'Preform' }));
 
       // Krishkalar
@@ -539,7 +419,7 @@ export default function SimplifiedInventory() {
       products
         .filter(p => {
           const name = p.name.toLowerCase();
-          const isPreform = p.warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|Ð³Ñ€|Ð³)/i.test(name);
+          const isPreform = p.warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|гр|г)/i.test(name);
           const isKrishka = p.warehouse === 'krishka' || name.includes('krishka') || name.includes('qopqoq');
           const isRuchka = p.warehouse === 'ruchka' || name.includes('ruchka') || name.includes('handle');
           return !isPreform && !isKrishka && !isRuchka;
@@ -576,7 +456,7 @@ export default function SimplifiedInventory() {
       ].join('\n');
 
       // BOM (Byte Order Mark) qo'shish - Excel uchun UTF-8
-      const BOM = '\uFEFF';
+      const BOM = '﻿';
       const fullContent = BOM + csvContent;
 
       // Faylni yuklab olish
@@ -592,352 +472,479 @@ export default function SimplifiedInventory() {
       link.click();
       document.body.removeChild(link);
 
-      alert(latinToCyrillic('âœ… Narxlar jadvali muvaffaqiyatli yuklandi!'));
+      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic('Narxlar jadvali yuklandi!')));
     } catch (error) {
       console.error('Export xatolik:', error);
-      alert(latinToCyrillic('âŒ Yuklashda xatolik yuz berdi'));
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Yuklashda xatolik yuz berdi')));
     }
   };
 
-  // Har bir gramm guruhi uchun alohida rang va ikonka
-  const getGroupStyle = (groupName: string) => {
-    // Preform grammalar uchun ranglar
-    const gramColors: { [key: string]: { from: string; to: string; icon: string } } = {
-      '15gr': { from: 'from-blue-400', to: 'to-blue-500', icon: '' },
-      '21gr': { from: 'from-blue-500', to: 'to-blue-600', icon: '' },
-      '26gr': { from: 'from-slate-400', to: 'to-slate-500', icon: '' },
-      '30gr': { from: 'from-slate-500', to: 'to-slate-600', icon: '' },
-      '36gr': { from: 'from-gray-400', to: 'to-gray-500', icon: '' },
-      '52gr': { from: 'from-gray-500', to: 'to-gray-600', icon: '' },
-      '70gr': { from: 'from-blue-600', to: 'to-blue-700', icon: '' },
-      '75gr': { from: 'from-blue-700', to: 'to-blue-800', icon: '' },
-      '80gr': { from: 'from-slate-600', to: 'to-slate-700', icon: '' },
-      '85gr': { from: 'from-slate-700', to: 'to-slate-800', icon: '' },
-      '86gr': { from: 'from-gray-600', to: 'to-gray-700', icon: '' },
-      '135gr': { from: 'from-gray-700', to: 'to-gray-800', icon: '' },
-    };
+  const hasActiveFilters = !!searchQuery || activeCategory !== 'all';
 
-    // Guruh nomidan gramm qiymatini olish
-    const gramMatch = groupName.match(/^(\d+)gr/);
-    if (gramMatch) {
-      const gramKey = gramMatch[0];
-      if (gramColors[gramKey]) {
-        return gramColors[gramKey];
-      }
+  // Bitta mahsulot uchun amallar (jadval va karta uchun umumiy)
+  const renderRowActions = (product: Product) => (
+    <div className="flex items-center justify-end gap-1.5">
+      <button
+        type="button"
+        onClick={() => navigate(isCashierRoute ? `/cashier/products/${product.id}` : `/products/${product.id}`)}
+        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+        aria-label={latinToCyrillic('Batafsil')}
+        title={latinToCyrillic('Batafsil')}
+      >
+        <Eye className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => startEditing(product)}
+        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+        aria-label={latinToCyrillic('Tahrirlash')}
+        title={latinToCyrillic('Tahrirlash')}
+      >
+        <Pencil className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => requestDelete(product)}
+        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+        aria-label={latinToCyrillic('O\'chirish')}
+        title={latinToCyrillic('O\'chirish')}
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
+  );
+
+  const summaryStats = [
+    {
+      label: latinToCyrillic('Jami mahsulot'),
+      value: products.length.toString(),
+      icon: Boxes,
+      tint: 'bg-indigo-50 text-indigo-600'
+    },
+    {
+      label: latinToCyrillic('Jami zaxira'),
+      value: `${totalStock.toLocaleString()} ${latinToCyrillic('qop')}`,
+      icon: Package,
+      tint: 'bg-emerald-50 text-emerald-600'
+    },
+    {
+      label: latinToCyrillic('Jami qiymat'),
+      value: formatPrice(totalValue),
+      icon: DollarSign,
+      tint: 'bg-violet-50 text-violet-600'
+    },
+    {
+      label: latinToCyrillic('Kam qolgan'),
+      value: lowStockProducts.length.toString(),
+      icon: AlertTriangle,
+      tint: lowStockProducts.length > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500',
+      alert: lowStockProducts.length > 0
     }
-
-    // Krishka uchun ranglar
-    if (groupName.includes('Qopqoqlar')) {
-      const sizeMatch = groupName.match(/^(\d+)mm/);
-      if (sizeMatch) {
-        const size = sizeMatch[1];
-        if (size === '28') return { from: 'from-slate-500', to: 'to-slate-600', icon: '' };
-        if (size === '38') return { from: 'from-slate-600', to: 'to-slate-700', icon: '' };
-        if (size === '48') return { from: 'from-blue-500', to: 'to-blue-600', icon: '' };
-      }
-      return { from: 'from-gray-500', to: 'to-gray-600', icon: '' };
-    }
-
-    // Ruchka uchun ranglar
-    if (groupName.includes('Ruchkalar')) {
-      const sizeMatch = groupName.match(/^(\d+)mm/);
-      if (sizeMatch) {
-        const size = sizeMatch[1];
-        if (size === '28') return { from: 'from-slate-400', to: 'to-slate-500', icon: '' };
-        if (size === '38') return { from: 'from-blue-500', to: 'to-blue-600', icon: '' };
-        if (size === '48') return { from: 'from-blue-600', to: 'to-blue-700', icon: '' };
-      }
-      return { from: 'from-gray-500', to: 'to-gray-600', icon: '' };
-    }
-
-    // Default
-    return { from: 'from-blue-600', to: 'to-slate-600', icon: '' };
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen professional-bg-pattern flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl animate-pulse">
-            <Package className="w-10 h-10 text-white animate-pulse" />
-          </div>
-          <p className="text-xl font-bold text-gray-700">{latinToCyrillic("Mahsulotlar yuklanmoqda...")}</p>
-        </div>
-      </div>
-    );
-  }
+  ];
 
   return (
-    <div className="min-h-screen professional-bg-pattern">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-xl">
-              <Package className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-black text-gray-900">{latinToCyrillic("Ombor")}</h1>
-              <p className="text-sm text-gray-600 font-medium">
-                {products.length} {latinToCyrillic("ta mahsulot")}
-                {lastUpdated && (
-                  <span className="text-xs text-gray-400 ml-2">
-                    ({latinToCyrillic("Oxirgi yangilanish")}: {lastUpdated.toLocaleTimeString()})
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setShowPriceTableModal(true)}
-              className="professional-button px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl font-bold shadow-xl hover:shadow-2xl flex items-center gap-3 hover-lift"
-            >
-              <Table2 className="w-5 h-5" />
-              {latinToCyrillic("Narxlari Jadvali")}
-            </button>
-            
-            <button
-              type="button"
-              onClick={loadProducts}
-              className="professional-button px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 rounded-2xl font-bold shadow-lg hover:shadow-xl flex items-center gap-3 hover-lift"
-            >
-              <RefreshCw className="w-5 h-5" />
-              {latinToCyrillic("Yangilash")}
-            </button>
-            
-            <button
-              type="button"
-              onClick={() => {
-                const isCashierRoute = window.location.pathname.startsWith('/cashier');
-                navigate(isCashierRoute ? '/cashier/add-product' : '/add-product');
-              }}
-              className="professional-button px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl font-bold shadow-xl hover:shadow-2xl flex items-center gap-3 hover-lift"
-            >
-              <Plus className="w-5 h-5" />
-              {latinToCyrillic("Mahsulot Qo'shish")}
-            </button>
-          </div>
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Clean header: title + meta + actions */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
+            {latinToCyrillic('Ombor')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {loading
+              ? latinToCyrillic('Yuklanmoqda...')
+              : `${products.length} ${latinToCyrillic('ta mahsulot')}`}
+            {lastUpdated && !loading && (
+              <span className="text-slate-400 ml-1.5">
+                &middot; {latinToCyrillic('yangilandi')} {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
+          </p>
         </div>
-
-        {/* Qidiruv va Kategoriyalar */}
-        <div className="professional-card p-6 mb-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Qidiruv */}
-            <div className="relative">
-              <Search className="absolute left-5 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-400" />
-              <input
-                type="text"
-                placeholder={latinToCyrillic("Mahsulot nomini kiriting...")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="professional-input pl-14 pr-5 py-4 text-lg font-bold w-full"
-              />
-            </div>
-
-            {/* Kategoriya tugmalari */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-              {categories.map((cat) => (
-                <button
-                  type="button"
-                  key={cat.id}
-                  onClick={() => setActiveCategory(cat.id as typeof activeCategory)}
-                  className={`group py-4 px-3 rounded-2xl text-sm font-black transition-all duration-300 hover:scale-105 hover:shadow-lg ${
-                    activeCategory === cat.id
-                      ? `bg-gradient-to-br from-${cat.color}-500 via-${cat.color}-600 to-${cat.color}-700 text-white shadow-xl shadow-${cat.color}-500/30 ring-2 ring-${cat.color}-300/50`
-                      : 'bg-gradient-to-br from-gray-100 to-gray-200 text-gray-600 hover:from-gray-200 hover:to-gray-300 border-2 border-transparent hover:border-gray-400 hover:shadow-gray-400/20'
-                  }`}
-                >
-                  <div className="text-2xl mb-1 group-hover:scale-110 transition-transform duration-300">{cat.icon}</div>
-                  <div className="group-hover:font-extrabold transition-all">{cat.label}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setShowPriceTableModal(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+          >
+            <Table2 className="w-4 h-4" />
+            <span className="hidden sm:inline">{latinToCyrillic('Narxlar jadvali')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => loadProducts(true)}
+            disabled={refreshing || loading}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{latinToCyrillic('Yangilash')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(isCashierRoute ? '/cashier/add-product' : '/add-product')}
+            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.98]"
+          >
+            <Plus className="w-4 h-4" />
+            {latinToCyrillic('Mahsulot qo\'shish')}
+          </button>
         </div>
+      </div>
 
-        {/* Mahsulotlar guruhlari */}
-        <div className="space-y-4">
-          {groupNames.length === 0 ? (
-            <div className="professional-card p-16 text-center">
-              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                <Package className="w-12 h-12 text-gray-400" />
-              </div>
-              <p className="text-2xl font-bold text-gray-500 mb-2">{latinToCyrillic("Mahsulot topilmadi")}</p>
-              <p className="text-gray-400">{latinToCyrillic("Qidiruv shartlarini o'zgartiring")}</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {groupNames.map((groupName) => {
-              const colorGroups = groupedProducts[groupName];
-              const totalStock = colorGroups.reduce((sum, cg) => sum + cg.products.reduce((s, p) => s + (p.currentStock || 0), 0), 0);
-              const totalValue = colorGroups.reduce((sum, cg) => sum + cg.products.reduce((s, p) => s + ((p.currentStock || 0) * (p.pricePerBag || 0)), 0), 0);
-              const groupStyle = getGroupStyle(groupName);
-              
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        {loading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[108px] animate-pulse" />
+            ))
+          : summaryStats.map((stat) => {
+              const Icon = stat.icon;
               return (
-                <div key={groupName} className={`group border-2 rounded-3xl overflow-hidden bg-white shadow-lg hover:shadow-2xl transition-all duration-500 hover:scale-[1.02] border-gray-200/60 hover:border-opacity-80`}>
-                  {/* Guruh headeri - har bir gramm uchun alohida rang */}
-                  <div
-                    className={`w-full p-4 bg-gradient-to-br ${groupStyle.from} ${groupStyle.to} border-b-2 border-white/20 relative overflow-hidden text-left`}
-                  >
-                    {/* Background gradient orqali */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-
-                    <div className="relative flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {/* Ikonka container */}
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-white/20 backdrop-blur-sm text-2xl shadow-lg scale-100 group-hover:scale-110 transition-transform duration-300`}>
-                          {groupStyle.icon}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-black text-white truncate max-w-[160px] drop-shadow-md">{groupName}</h3>
-                          <p className="text-xs font-bold text-white/80">
-                            {colorGroups.length} {latinToCyrillic("ta rang")} â€¢ {totalStock} {latinToCyrillic("qop jami")}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <p className="text-sm font-black text-white drop-shadow-md">
-                          {formatPrice(totalValue)}
-                        </p>
-                        <p className="text-xs text-white/70">
-                          {latinToCyrillic("Jami qiymat")}
-                        </p>
-                      </div>
+                <div
+                  key={stat.label}
+                  className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">
+                      {stat.label}
+                    </p>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${stat.tint}`}>
+                      <Icon className="w-[18px] h-[18px]" />
                     </div>
                   </div>
-
-                  {/* Ranglar bo'yicha guruhlangan mahsulotlar */}
-                  <div className="p-4 bg-gradient-to-br from-gray-50/50 via-white to-blue-50/20">
-                    <div className="space-y-4">
-                      {colorGroups.map((colorGroup) => {
-                        const colorStock = colorGroup.products.reduce((sum, p) => sum + (p.currentStock || 0), 0);
-                        const colorValue = colorGroup.products.reduce((sum, p) => sum + ((p.currentStock || 0) * (p.pricePerBag || 0)), 0);
-                        
-                        return (
-                          <div key={colorGroup.color} className="border-2 border-gray-200/60 rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">
-                            {/* Rang header */}
-                            <div className="p-3 bg-gradient-to-r from-gray-100 to-gray-200 border-b border-gray-300/60">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 shadow-md"></div>
-                                  <h4 className="font-black text-gray-800 text-sm">{colorGroup.color}</h4>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-xs font-bold text-gray-600">{colorStock} {latinToCyrillic('qop')}</p>
-                                  <p className="text-xs font-bold text-gray-500">{formatPrice(colorValue)}</p>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Mahsulotlar ro'yxati */}
-                            <div className="p-3 space-y-2">
-                              {colorGroup.products.map((product) => {
-                                const stockStatus = getStockStatus(product);
-                                const StatusIcon = stockStatus.icon;
-                                const isEditing = editingProduct === product.id;
-                                
-                                return (
-                                  <div key={product.id} className="group bg-gradient-to-br from-white via-gray-50/50 to-blue-50/30 rounded-xl border border-gray-200/60 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 hover:scale-[1.01] hover:border-blue-300/60">
-                                    <div className="p-3">
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex-1 min-w-0">
-                                          {isEditing ? (
-                                            <input
-                                              type="text"
-                                              value={editingName}
-                                              onChange={(e) => setEditingName(e.target.value)}
-                                              aria-label="Mahsulot nomini tahrirlash"
-                                              className="w-full px-3 py-2 border-2 border-gray-300 rounded-xl font-black text-gray-900 text-sm bg-white/90 backdrop-blur-sm shadow-inner focus:border-blue-500 focus:ring-2 focus:ring-blue-200/50 transition-all"
-                                            />
-                                          ) : (
-                                            <div className="flex items-center gap-2">
-                                              <h5 className="font-black text-gray-900 text-xs truncate group-hover:text-blue-700 transition-colors">{product.name}</h5>
-                                              <span className={`text-xs font-black px-2 py-0.5 rounded-full shadow-sm ${
-                                                product.currentStock === 0 
-                                                  ? 'bg-gradient-to-r from-slate-600 to-slate-700 text-white' 
-                                                  : product.currentStock < 50 
-                                                    ? 'bg-gradient-to-r from-slate-500 to-slate-600 text-white'
-                                                    : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
-                                              }`}>
-                                                {product.currentStock || 0}
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
-                                        
-                                        <div className="flex items-center gap-1 ml-2">
-                                          {isEditing ? (
-                                            <>
-                                              <button
-                                                type="button"
-                                                onClick={() => saveProductData(product.id)}
-                                                className="w-7 h-7 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center transition-all"
-                                                aria-label="Save"
-                                              >
-                                                <Check className="w-3 h-3" />
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={cancelEditing}
-                                                className="w-7 h-7 bg-slate-500 hover:bg-slate-600 text-white rounded-lg flex items-center justify-center transition-all"
-                                                aria-label="Cancel"
-                                              >
-                                                <X className="w-3 h-3" />
-                                              </button>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <button
-                                                type="button"
-                                                onClick={() => navigate(isCashierRoute ? `/cashier/products/${product.id}` : `/products/${product.id}`)}
-                                                className="h-7 px-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg flex items-center gap-1 transition-all duration-300 hover:scale-105 shadow-md text-xs font-black"
-                                                title={latinToCyrillic("Ð‘Ð°Ñ‚Ð°Ñ„ÑÐ¸Ð»")}
-                                              >
-                                                <Eye className="w-3 h-3" />
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => startEditing(product)}
-                                                className="w-7 h-7 bg-gradient-to-br from-blue-100 to-blue-200 hover:from-blue-500 hover:to-blue-600 text-blue-600 hover:text-white rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-md"
-                                                title={latinToCyrillic("Ð¢Ð°Ò³Ñ€Ð¸Ñ€")}
-                                              >
-                                                <Pencil className="w-3 h-3" />
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => deleteProduct(product.id)}
-                                                className="w-7 h-7 bg-gradient-to-br from-red-100 to-red-200 hover:from-red-500 hover:to-red-600 text-red-600 hover:text-white rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-md"
-                                                title={latinToCyrillic("ÐŽÑ‡Ð¸Ñ€Ð¸Ñˆ")}
-                                                aria-label={latinToCyrillic("ÐŽÑ‡Ð¸Ñ€Ð¸Ñˆ")}
-                                              >
-                                                <Trash2 className="w-3 h-3" />
-                                              </button>
-                                            </>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <p className={`mt-3 text-2xl font-bold tracking-tight tabular-nums ${stat.alert ? 'text-amber-600' : 'text-slate-900'}`}>
+                    {stat.value}
+                  </p>
                 </div>
               );
             })}
-            </div>
-          )}
+      </div>
+
+      {/* Low-stock alert banner */}
+      {!loading && lowStockProducts.length > 0 && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-[18px] h-[18px] text-amber-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-amber-900">
+              {lowStockProducts.length} {latinToCyrillic('ta mahsulot kam qoldi')}
+            </p>
+            <p className="mt-0.5 text-xs text-amber-700 truncate">
+              {lowStockProducts.slice(0, 4).map((p) => p.name).join(', ')}
+              {lowStockProducts.length > 4 && ` +${lowStockProducts.length - 4}`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Filters bar */}
+      <div className="bg-white rounded-2xl border border-slate-200/70 p-4">
+        <div className="flex flex-col lg:flex-row gap-3">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 pointer-events-none" />
+            <input
+              id="inventory-search"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={latinToCyrillic('Mahsulot nomini kiriting...')}
+              className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white transition-all"
+            />
+          </div>
+
+          {/* Category pills */}
+          <div className="flex flex-wrap gap-2">
+            {categories.map((cat) => (
+              <button
+                type="button"
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors active:scale-[0.98] ${
+                  activeCategory === cat.id
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* Loading state */}
+      {loading && (
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-6">
+          <TableSkeleton rows={8} cols={5} />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && filteredProducts.length === 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200/70">
+          <EmptyState
+            icon={hasActiveFilters ? PackageX : Package}
+            title={
+              hasActiveFilters
+                ? latinToCyrillic('Mahsulot topilmadi')
+                : latinToCyrillic('Hali mahsulotlar yo\'q')
+            }
+            description={
+              hasActiveFilters
+                ? latinToCyrillic('Qidiruv shartlarini o\'zgartirib qayta urinib ko\'ring')
+                : latinToCyrillic('Birinchi mahsulotni qo\'shing va u shu yerda ko\'rinadi')
+            }
+            action={
+              hasActiveFilters ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setActiveCategory('all');
+                  }}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-200 transition-colors active:scale-[0.98]"
+                >
+                  <X className="w-4 h-4" />
+                  {latinToCyrillic('Filtrlarni tozalash')}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate(isCashierRoute ? '/cashier/add-product' : '/add-product')}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+                >
+                  <Plus className="w-4 h-4" />
+                  {latinToCyrillic('Mahsulot qo\'shish')}
+                </button>
+              )
+            }
+          />
+        </div>
+      )}
+
+      {/* Products table (desktop) */}
+      {!loading && filteredProducts.length > 0 && (
+        <div className="hidden md:block bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/60">
+                  <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Mahsulot')}</th>
+                  <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Narx (qop)')}</th>
+                  <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Narx (dona)')}</th>
+                  <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Zaxira')}</th>
+                  <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Holat')}</th>
+                  <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Amallar')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredProducts.map((product) => {
+                  const level = getStockLevel(product);
+                  const isEditing = editingProduct === product.id;
+                  const unitsPerBag = product.unitsPerBag || 2000;
+                  const pricePerPiece = product.pricePerPiece || (product.pricePerBag / unitsPerBag) || 0;
+
+                  return (
+                    <tr key={product.id} className="group hover:bg-slate-50/70 transition-colors">
+                      <td className="px-5 py-4">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            aria-label={latinToCyrillic('Mahsulot nomi')}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                        ) : (
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                              <Package className="w-[18px] h-[18px]" />
+                            </div>
+                            <span className="text-sm font-medium text-slate-900">{product.name}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editingPriceBag}
+                            onChange={(e) => setEditingPriceBag(e.target.value)}
+                            aria-label={latinToCyrillic('Narx (qop)')}
+                            className="w-28 px-2 py-1.5 border border-slate-300 rounded-lg text-right text-sm font-semibold text-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            placeholder="0.00"
+                          />
+                        ) : (
+                          <span className="text-sm font-semibold text-emerald-600 tabular-nums">{formatPrice(product.pricePerBag)}</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            step="0.0001"
+                            value={editingPricePiece}
+                            onChange={(e) => setEditingPricePiece(e.target.value)}
+                            aria-label={latinToCyrillic('Narx (dona)')}
+                            className="w-28 px-2 py-1.5 border border-slate-300 rounded-lg text-right text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder="0.0000"
+                          />
+                        ) : (
+                          <span className="text-sm text-slate-500 tabular-nums">${pricePerPiece.toFixed(4)}</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <span className="text-sm font-bold text-slate-900 tabular-nums">
+                          {(product.currentStock || 0).toLocaleString()}
+                        </span>
+                        <span className="text-xs text-slate-400 ml-1">{latinToCyrillic('qop')}</span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <Badge variant={level.variant}>{level.label}</Badge>
+                      </td>
+                      <td className="px-5 py-4">
+                        {isEditing ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => saveProductData(product.id)}
+                              className="p-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                              aria-label={latinToCyrillic('Saqlash')}
+                              title={latinToCyrillic('Saqlash')}
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEditing}
+                              className="p-2 text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                              aria-label={latinToCyrillic('Bekor qilish')}
+                              title={latinToCyrillic('Bekor qilish')}
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          renderRowActions(product)
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Products cards (mobile) */}
+      {!loading && filteredProducts.length > 0 && (
+        <div className="md:hidden space-y-3">
+          {filteredProducts.map((product) => {
+            const level = getStockLevel(product);
+            const isEditing = editingProduct === product.id;
+            const unitsPerBag = product.unitsPerBag || 2000;
+            const pricePerPiece = product.pricePerPiece || (product.pricePerBag / unitsPerBag) || 0;
+
+            return (
+              <div
+                key={product.id}
+                className="bg-white rounded-2xl border border-slate-200/70 p-4 transition-all hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                      <Package className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          aria-label={latinToCyrillic('Mahsulot nomi')}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      ) : (
+                        <p className="text-sm font-semibold text-slate-900 truncate">{product.name}</p>
+                      )}
+                      {!isEditing && (
+                        <p className="text-xs text-slate-400 mt-0.5 tabular-nums">
+                          {(product.currentStock || 0).toLocaleString()} {latinToCyrillic('qop')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Badge variant={level.variant}>{level.label}</Badge>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {isEditing ? (
+                    <>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={editingPriceBag}
+                        onChange={(e) => setEditingPriceBag(e.target.value)}
+                        aria-label={latinToCyrillic('Narx (qop)')}
+                        className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        placeholder={latinToCyrillic('Narx (qop)')}
+                      />
+                      <input
+                        type="number"
+                        step="0.0001"
+                        value={editingPricePiece}
+                        onChange={(e) => setEditingPricePiece(e.target.value)}
+                        aria-label={latinToCyrillic('Narx (dona)')}
+                        className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder={latinToCyrillic('Narx (dona)')}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <div className="rounded-xl bg-slate-50 px-3 py-2">
+                        <p className="text-[11px] text-slate-400">{latinToCyrillic('Narx (qop)')}</p>
+                        <p className="text-sm font-semibold text-emerald-600 tabular-nums">{formatPrice(product.pricePerBag)}</p>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 px-3 py-2">
+                        <p className="text-[11px] text-slate-400">{latinToCyrillic('Narx (dona)')}</p>
+                        <p className="text-sm font-semibold text-slate-700 tabular-nums">${pricePerPiece.toFixed(4)}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-end">
+                  {isEditing ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => saveProductData(product.id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                      >
+                        <Check className="w-4 h-4" />
+                        {latinToCyrillic('Saqlash')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEditing}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                        {latinToCyrillic('Bekor')}
+                      </button>
+                    </div>
+                  ) : (
+                    renderRowActions(product)
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Yangi mahsulot qo'shish modal oynasi */}
       {showAddModal && (
@@ -951,13 +958,13 @@ export default function SimplifiedInventory() {
                     <Plus className="w-6 h-6 text-white" />
                   </div>
                   <h2 className="text-2xl font-black text-gray-900">
-                    {latinToCyrillic("Yangi Mahsulot")}
+                    {latinToCyrillic('Yangi Mahsulot')}
                   </h2>
                 </div>
                 <button
                   type="button"
                   onClick={closeAddModal}
-                  aria-label={latinToCyrillic("Yopish")}
+                  aria-label={latinToCyrillic('Yopish')}
                   className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-xl flex items-center justify-center transition-all"
                 >
                   <X className="w-5 h-5 text-gray-600" />
@@ -983,15 +990,15 @@ export default function SimplifiedInventory() {
               >
                 <FormField
                   name="name"
-                  label={latinToCyrillic("Mahsulot nomi")}
-                  placeholder={latinToCyrillic("Masalan: 15gr Preform Oq")}
+                  label={latinToCyrillic('Mahsulot nomi')}
+                  placeholder={latinToCyrillic('Masalan: 15gr Preform Oq')}
                   required
                 />
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     name="pricePerBag"
-                    label={latinToCyrillic("Narx (qop)")}
+                    label={latinToCyrillic('Narx (qop)')}
                     type="number"
                     placeholder="0.00"
                     step="0.01"
@@ -1000,7 +1007,7 @@ export default function SimplifiedInventory() {
                   />
                   <FormField
                     name="currentStock"
-                    label={latinToCyrillic("Zaxira (qop)")}
+                    label={latinToCyrillic('Zaxira (qop)')}
                     type="number"
                     placeholder="0"
                     min="0"
@@ -1011,7 +1018,7 @@ export default function SimplifiedInventory() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     name="pricePerPiece"
-                    label={latinToCyrillic("Narx (dona)")}
+                    label={latinToCyrillic('Narx (dona)')}
                     type="number"
                     step="0.01"
                     min="0"
@@ -1019,7 +1026,7 @@ export default function SimplifiedInventory() {
                   />
                   <FormField
                     name="unitsPerBag"
-                    label={latinToCyrillic("1 qopda (dona)")}
+                    label={latinToCyrillic('1 qopda (dona)')}
                     type="number"
                     placeholder="2000"
                     min="1"
@@ -1028,7 +1035,7 @@ export default function SimplifiedInventory() {
 
                 <FormField
                   name="warehouse"
-                  label={latinToCyrillic("Ombor kategoriyasi")}
+                  label={latinToCyrillic('Ombor kategoriyasi')}
                   type="select"
                   options={[
                     { value: 'preform', label: 'Preform' },
@@ -1044,8 +1051,8 @@ export default function SimplifiedInventory() {
                     setProductFormError(null);
                     setProductFormSuccess(null);
                   }}
-                  submitText={latinToCyrillic("Saqlash")}
-                  cancelText={latinToCyrillic("Bekor qilish")}
+                  submitText={latinToCyrillic('Saqlash')}
+                  cancelText={latinToCyrillic('Bekor qilish')}
                   loading={productFormLoading}
                 />
               </ValidatedForm>
@@ -1062,7 +1069,7 @@ export default function SimplifiedInventory() {
             <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-6 flex justify-between items-center">
               <h2 className="text-2xl font-black text-white flex items-center gap-3">
                 <Table2 className="w-7 h-7" />
-                {latinToCyrillic("Narxlari Jadvali")}
+                {latinToCyrillic('Narxlari Jadvali')}
               </h2>
               <div className="flex items-center gap-3">
                 {/* Yuklab olish tugmasi */}
@@ -1070,51 +1077,49 @@ export default function SimplifiedInventory() {
                   type="button"
                   onClick={exportPriceTableToExcel}
                   className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl font-bold transition-all flex items-center gap-2"
-                  title={latinToCyrillic("Excel formatida yuklab olish")}
+                  title={latinToCyrillic('Excel formatida yuklab olish')}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  {latinToCyrillic("Yuklab olish")}
+                  <Download className="w-5 h-5" />
+                  {latinToCyrillic('Yuklab olish')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowPriceTableModal(false)}
-                  aria-label="Yopish"
-                  title="Yopish"
+                  aria-label={latinToCyrillic('Yopish')}
+                  title={latinToCyrillic('Yopish')}
                   className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white transition-all"
                 >
                   <X className="w-6 h-6" />
                 </button>
               </div>
             </div>
-            
+
             {/* Table Content */}
             <div className="p-6 overflow-auto flex-1">
               <table className="w-full border-collapse">
                 <thead className="bg-gray-100 sticky top-0">
                   <tr>
                     <th className="text-left px-4 py-3 font-bold text-gray-700 border-b-2 border-gray-200">
-                      {latinToCyrillic("Mahsulot")}
+                      {latinToCyrillic('Mahsulot')}
                     </th>
                     <th className="text-right px-4 py-3 font-bold text-gray-700 border-b-2 border-gray-200">
-                      {latinToCyrillic("Qop Narx ($)")}
+                      {latinToCyrillic('Qop Narx ($)')}
                     </th>
                     <th className="text-right px-4 py-3 font-bold text-gray-700 border-b-2 border-gray-200">
-                      {latinToCyrillic("Dona/qop")}
+                      {latinToCyrillic('Dona/qop')}
                     </th>
                     <th className="text-right px-4 py-3 font-bold text-gray-700 border-b-2 border-gray-200">
-                      {latinToCyrillic("Dona Narx ($)")}
+                      {latinToCyrillic('Dona Narx ($)')}
                     </th>
                     <th className="text-right px-4 py-3 font-bold text-gray-700 border-b-2 border-gray-200">
-                      {latinToCyrillic("Zaxira (qop)")}
+                      {latinToCyrillic('Zaxira (qop)')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {/* Preformlar */}
                   {products
-                    .filter(p => p.warehouse === 'preform' || p.name.toLowerCase().includes('preform') || /\d+\s*(gr|g|Ð³Ñ€|Ð³)/i.test(p.name))
+                    .filter(p => p.warehouse === 'preform' || p.name.toLowerCase().includes('preform') || /\d+\s*(gr|g|гр|г)/i.test(p.name))
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map((product, index) => {
                       const isEditingRow = editingPriceRow === product.id;
@@ -1134,7 +1139,7 @@ export default function SimplifiedInventory() {
                                     type="button"
                                     onClick={() => savePriceRowData(product.id)}
                                     className="w-7 h-7 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg flex items-center justify-center transition-all"
-                                    title={latinToCyrillic("Saqlash")}
+                                    title={latinToCyrillic('Saqlash')}
                                   >
                                     <Check className="w-3 h-3" />
                                   </button>
@@ -1142,7 +1147,7 @@ export default function SimplifiedInventory() {
                                     type="button"
                                     onClick={cancelPriceRowEditing}
                                     className="w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center transition-all"
-                                    title={latinToCyrillic("Bekor")}
+                                    title={latinToCyrillic('Bekor')}
                                   >
                                     <X className="w-3 h-3" />
                                   </button>
@@ -1152,7 +1157,7 @@ export default function SimplifiedInventory() {
                                   type="button"
                                   onClick={() => startPriceRowEditing(product)}
                                   className="w-7 h-7 bg-blue-100 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg flex items-center justify-center transition-all"
-                                  title={latinToCyrillic("Tahrirlash")}
+                                  title={latinToCyrillic('Tahrirlash')}
                                 >
                                   <Pencil className="w-3 h-3" />
                                 </button>
@@ -1183,7 +1188,7 @@ export default function SimplifiedInventory() {
                                 placeholder="2000"
                               />
                             ) : (
-                              <span className="text-gray-600">{unitsPerBag.toLocaleString()} {latinToCyrillic("dona")}</span>
+                              <span className="text-gray-600">{unitsPerBag.toLocaleString()} {latinToCyrillic('dona')}</span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-right border-b border-gray-100">
@@ -1201,7 +1206,7 @@ export default function SimplifiedInventory() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-right text-gray-600 border-b border-gray-100">
-                            {typeof product.currentStock === 'number' ? product.currentStock.toFixed(2) : (product.currentStock || '0.00')} {latinToCyrillic("qop")}
+                            {typeof product.currentStock === 'number' ? product.currentStock.toFixed(2) : (product.currentStock || '0.00')} {latinToCyrillic('qop')}
                           </td>
                         </tr>
                       );
@@ -1229,7 +1234,7 @@ export default function SimplifiedInventory() {
                                     type="button"
                                     onClick={() => savePriceRowData(product.id)}
                                     className="w-7 h-7 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg flex items-center justify-center transition-all"
-                                    title={latinToCyrillic("Saqlash")}
+                                    title={latinToCyrillic('Saqlash')}
                                   >
                                     <Check className="w-3 h-3" />
                                   </button>
@@ -1237,7 +1242,7 @@ export default function SimplifiedInventory() {
                                     type="button"
                                     onClick={cancelPriceRowEditing}
                                     className="w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center transition-all"
-                                    title={latinToCyrillic("Bekor")}
+                                    title={latinToCyrillic('Bekor')}
                                   >
                                     <X className="w-3 h-3" />
                                   </button>
@@ -1247,7 +1252,7 @@ export default function SimplifiedInventory() {
                                   type="button"
                                   onClick={() => startPriceRowEditing(product)}
                                   className="w-7 h-7 bg-blue-100 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg flex items-center justify-center transition-all"
-                                  title={latinToCyrillic("Tahrirlash")}
+                                  title={latinToCyrillic('Tahrirlash')}
                                 >
                                   <Pencil className="w-3 h-3" />
                                 </button>
@@ -1278,7 +1283,7 @@ export default function SimplifiedInventory() {
                                 placeholder="2000"
                               />
                             ) : (
-                              <span className="text-gray-600">{unitsPerBag.toLocaleString()} {latinToCyrillic("dona")}</span>
+                              <span className="text-gray-600">{unitsPerBag.toLocaleString()} {latinToCyrillic('dona')}</span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-right border-b border-gray-100">
@@ -1296,7 +1301,7 @@ export default function SimplifiedInventory() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-right text-gray-600 border-b border-gray-100">
-                            {typeof product.currentStock === 'number' ? product.currentStock.toFixed(2) : (product.currentStock || '0.00')} {latinToCyrillic("qop")}
+                            {typeof product.currentStock === 'number' ? product.currentStock.toFixed(2) : (product.currentStock || '0.00')} {latinToCyrillic('qop')}
                           </td>
                         </tr>
                       );
@@ -1324,7 +1329,7 @@ export default function SimplifiedInventory() {
                                     type="button"
                                     onClick={() => savePriceRowData(product.id)}
                                     className="w-7 h-7 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg flex items-center justify-center transition-all"
-                                    title={latinToCyrillic("Saqlash")}
+                                    title={latinToCyrillic('Saqlash')}
                                   >
                                     <Check className="w-3 h-3" />
                                   </button>
@@ -1332,7 +1337,7 @@ export default function SimplifiedInventory() {
                                     type="button"
                                     onClick={cancelPriceRowEditing}
                                     className="w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center transition-all"
-                                    title={latinToCyrillic("Bekor")}
+                                    title={latinToCyrillic('Bekor')}
                                   >
                                     <X className="w-3 h-3" />
                                   </button>
@@ -1342,7 +1347,7 @@ export default function SimplifiedInventory() {
                                   type="button"
                                   onClick={() => startPriceRowEditing(product)}
                                   className="w-7 h-7 bg-blue-100 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg flex items-center justify-center transition-all"
-                                  title={latinToCyrillic("Tahrirlash")}
+                                  title={latinToCyrillic('Tahrirlash')}
                                 >
                                   <Pencil className="w-3 h-3" />
                                 </button>
@@ -1373,7 +1378,7 @@ export default function SimplifiedInventory() {
                                 placeholder="2000"
                               />
                             ) : (
-                              <span className="text-gray-600">{unitsPerBag.toLocaleString()} {latinToCyrillic("dona")}</span>
+                              <span className="text-gray-600">{unitsPerBag.toLocaleString()} {latinToCyrillic('dona')}</span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-right border-b border-gray-100">
@@ -1391,7 +1396,7 @@ export default function SimplifiedInventory() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-right text-gray-600 border-b border-gray-100">
-                            {typeof product.currentStock === 'number' ? product.currentStock.toFixed(2) : (product.currentStock || '0.00')} {latinToCyrillic("qop")}
+                            {typeof product.currentStock === 'number' ? product.currentStock.toFixed(2) : (product.currentStock || '0.00')} {latinToCyrillic('qop')}
                           </td>
                         </tr>
                       );
@@ -1401,7 +1406,7 @@ export default function SimplifiedInventory() {
                   {products
                     .filter(p => {
                       const name = p.name.toLowerCase();
-                      const isPreform = p.warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|Ð³Ñ€|Ð³)/i.test(name);
+                      const isPreform = p.warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|гр|г)/i.test(name);
                       const isKrishka = p.warehouse === 'krishka' || name.includes('krishka') || name.includes('qopqoq');
                       const isRuchka = p.warehouse === 'ruchka' || name.includes('ruchka') || name.includes('handle');
                       return !isPreform && !isKrishka && !isRuchka;
@@ -1425,7 +1430,7 @@ export default function SimplifiedInventory() {
                                     type="button"
                                     onClick={() => savePriceRowData(product.id)}
                                     className="w-7 h-7 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg flex items-center justify-center transition-all"
-                                    title={latinToCyrillic("Saqlash")}
+                                    title={latinToCyrillic('Saqlash')}
                                   >
                                     <Check className="w-3 h-3" />
                                   </button>
@@ -1433,7 +1438,7 @@ export default function SimplifiedInventory() {
                                     type="button"
                                     onClick={cancelPriceRowEditing}
                                     className="w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center transition-all"
-                                    title={latinToCyrillic("Bekor")}
+                                    title={latinToCyrillic('Bekor')}
                                   >
                                     <X className="w-3 h-3" />
                                   </button>
@@ -1443,7 +1448,7 @@ export default function SimplifiedInventory() {
                                   type="button"
                                   onClick={() => startPriceRowEditing(product)}
                                   className="w-7 h-7 bg-blue-100 hover:bg-blue-500 text-blue-600 hover:text-white rounded-lg flex items-center justify-center transition-all"
-                                  title={latinToCyrillic("Tahrirlash")}
+                                  title={latinToCyrillic('Tahrirlash')}
                                 >
                                   <Pencil className="w-3 h-3" />
                                 </button>
@@ -1474,7 +1479,7 @@ export default function SimplifiedInventory() {
                                 placeholder="2000"
                               />
                             ) : (
-                              <span className="text-gray-600">{unitsPerBag.toLocaleString()} {latinToCyrillic("dona")}</span>
+                              <span className="text-gray-600">{unitsPerBag.toLocaleString()} {latinToCyrillic('dona')}</span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-right border-b border-gray-100">
@@ -1492,7 +1497,7 @@ export default function SimplifiedInventory() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-right text-gray-600 border-b border-gray-100">
-                            {typeof product.currentStock === 'number' ? product.currentStock.toFixed(2) : (product.currentStock || '0.00')} {latinToCyrillic("qop")}
+                            {typeof product.currentStock === 'number' ? product.currentStock.toFixed(2) : (product.currentStock || '0.00')} {latinToCyrillic('qop')}
                           </td>
                         </tr>
                       );
@@ -1500,26 +1505,41 @@ export default function SimplifiedInventory() {
                 </tbody>
               </table>
             </div>
-            
+
             {/* Modal Footer */}
             <div className="p-6 border-t border-gray-200 bg-gray-50">
               <div className="flex justify-between items-center">
                 <p className="text-sm text-gray-500">
-                  {products.length} {latinToCyrillic("ta mahsulot")}
+                  {products.length} {latinToCyrillic('ta mahsulot')}
                 </p>
                 <button
                   type="button"
                   onClick={() => setShowPriceTableModal(false)}
                   className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold transition-all"
                 >
-                  {latinToCyrillic("Yopish")}
+                  {latinToCyrillic('Yopish')}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Delete confirmation dialog (replaces window.confirm) */}
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        onClose={() => { if (!deleting) setDeleteTarget(null); }}
+        onConfirm={confirmDelete}
+        title={latinToCyrillic('Mahsulotni o\'chirish')}
+        message={
+          deleteTarget
+            ? `"${deleteTarget.name}" ${latinToCyrillic('mahsulotini o\'chirmoqchimisiz? Bu amalni qaytarib bo\'lmaydi.')}`
+            : ''
+        }
+        confirmText={latinToCyrillic('O\'chirish')}
+        cancelText={latinToCyrillic('Bekor qilish')}
+        variant="danger"
+      />
     </div>
   );
 }
-  

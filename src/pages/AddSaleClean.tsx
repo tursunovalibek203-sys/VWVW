@@ -1,22 +1,22 @@
 /**
  * AddSaleClean.tsx - Sotuv qo'shish sahifasi (yangilangan versiya)
- * 
+ *
  * Xususiyatlar:
  * 1. Komplekt rejimi: Preform tanlanganda avtomatik ravishda mos keluvchi krishka va ruchka qo'shiladi
  * 2. 48 ruchka: 1000 dona/qop, dona narxi: $0.016
  * 3. 48 krishka: 2000 dona/qop, dona narxi: $0.016
  * 4. 28 krishka (bezgaz): dona narxi $0.007, (gazlik): $0.008
  * 5. 38 ruchka: 1000 dona/qop, dona narxi: $0.010
- * 
+ *
  * Komplekt qoidalari:
- * - 15, 21, 26, 30gr preform â†’ 28 krishka (faqat krishka)
- * - 36gr preform â†’ 28 krishka + 28 ruchka
- * - 52, 70gr preform â†’ 38 krishka + 38 ruchka
- * - 75, 80, 85, 86, 135gr preform â†’ 48 krishka + 48 ruchka
+ * - 15, 21, 26, 30gr preform → 28 krishka (faqat krishka)
+ * - 36gr preform → 28 krishka + 28 ruchka
+ * - 52, 70gr preform → 38 krishka + 38 ruchka
+ * - 75, 80, 85, 86, 135gr preform → 48 krishka + 48 ruchka
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Package, ShoppingCart, User, WifiOff, AlertCircle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Package, ShoppingCart, User, WifiOff, AlertCircle, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { latinToCyrillic } from '../lib/transliterator';
 import { useSaleForm } from '../hooks/useSaleForm';
@@ -26,6 +26,9 @@ import { useRealtime } from '../hooks/useRealtime';
 import api from '../lib/professionalApi';
 import { extractArray } from '../lib/apiHelpers';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { PageLoading } from '../components/ui/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import { useToast, toast } from '../components/ui/Toast';
 import type { Product } from '../types';
 
 // Product Section Component - Yangi tip kartochkalar
@@ -51,27 +54,27 @@ const ProductSection = ({
   onQuickAdd: (product: Product) => void;
 }) => {
   const categories = [
-    { id: 'all', label: 'All' },
-    { id: 'preform', label: 'Pre' },
-    { id: 'krishka', label: 'Kri' },
-    { id: 'ruchka', label: 'Ruc' },
-    { id: 'other', label: 'Bsh' },
+    { id: 'all', label: latinToCyrillic('Hammasi') },
+    { id: 'preform', label: latinToCyrillic('Preform') },
+    { id: 'krishka', label: latinToCyrillic('Krishka') },
+    { id: 'ruchka', label: latinToCyrillic('Ruchka') },
+    { id: 'other', label: latinToCyrillic('Boshqa') },
   ];
 
   // Group products by type
   const allPreforms = filteredProducts.filter((p) => {
     const name = p.name?.toLowerCase() || '';
     const warehouse = p.warehouse?.toLowerCase() || '';
-    return warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|Ð³Ñ€|Ð³)/.test(name);
+    return warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|гр|г)/.test(name);
   });
 
   // Preformlarni gram bo'yicha dinamik guruhlash - ma'lumotdan avtomatik olish
   const gramSizeMap = new Map<number, Product[]>();
-  
+
   allPreforms.forEach((p) => {
     const name = p.name?.toLowerCase() || '';
     // Gramajni nomdan olish (96g, 96gr, 96 g, va h.k.)
-    const gramMatch = name.match(/(\d+)\s*(gr|g|Ð³Ñ€|Ð³)\b/i);
+    const gramMatch = name.match(/(\d+)\s*(gr|g|гр|г)\b/i);
     if (gramMatch) {
       const gramSize = parseInt(gramMatch[1]);
       if (!gramSizeMap.has(gramSize)) {
@@ -80,11 +83,11 @@ const ProductSection = ({
       gramSizeMap.get(gramSize)!.push(p);
     }
   });
-  
+
   // Gram o'lchamlarini tartiblash va guruhlarni yaratish
   const sortedGramSizes = Array.from(gramSizeMap.keys()).sort((a, b) => a - b);
   const preformGroups: { key: string; title: string; products: Product[] }[] = [];
-  
+
   sortedGramSizes.forEach((gram) => {
     const groupProducts = gramSizeMap.get(gram)!;
     if (groupProducts.length > 0) {
@@ -99,7 +102,7 @@ const ProductSection = ({
   // Gramaj aniqlanmagan preformlar uchun alohida guruh
   const undefinedGramPreforms = allPreforms.filter((p) => {
     const name = p.name?.toLowerCase() || '';
-    return !/\d+\s*(gr|g|Ð³Ñ€|Ð³)\b/i.test(name);
+    return !/\d+\s*(gr|g|гр|г)\b/i.test(name);
   });
   if (undefinedGramPreforms.length > 0) {
     preformGroups.push({
@@ -115,13 +118,13 @@ const ProductSection = ({
     const warehouse = p.warehouse?.toLowerCase() || '';
     return warehouse === 'krishka' || name.includes('krishka') || name.includes('qopqoq') || name.includes('cap');
   });
-  
+
   const krishkaSizeMap = new Map<number, Product[]>();
-  
+
   allKrishka.forEach((p) => {
     const name = p.name?.toLowerCase() || '';
     // O'lchamni nomdan olish (28mm, 28 mm, 28-mm, va h.k.)
-    let sizeMatch = name.match(/(\d+)\s*(mm|ml|Ð¼Ð¼|Ð¼Ð»)/i);
+    let sizeMatch = name.match(/(\d+)\s*(mm|ml|мм|мл)/i);
     if (!sizeMatch) {
       // Agar mm yo'q bo'lsa, krishka yoki qopqoq dan keyingi/o'ndingi raqamni qidirish
       sizeMatch = name.match(/(?:krishka|qopqoq|cap).*?(\d{2})|(\d{2}).*?(?:krishka|qopqoq|cap)/i);
@@ -137,11 +140,11 @@ const ProductSection = ({
       }
     }
   });
-  
+
   // O'lchamlarni tartiblash va guruhlarni yaratish
   const sortedKrishkaSizes = Array.from(krishkaSizeMap.keys()).sort((a, b) => a - b);
   const krishkaGroups: { key: string; title: string; products: Product[] }[] = [];
-  
+
   sortedKrishkaSizes.forEach((size) => {
     const groupProducts = krishkaSizeMap.get(size)!;
     if (groupProducts.length > 0) {
@@ -152,11 +155,11 @@ const ProductSection = ({
       });
     }
   });
-  
+
   // O'lcham aniqlanmagan krishkalar uchun alohida guruh
   const undefinedSizeKrishka = allKrishka.filter((p) => {
     const name = p.name?.toLowerCase() || '';
-    const hasSize = /(\d+)\s*(mm|ml|Ð¼Ð¼|Ð¼Ð»)/i.test(name) || 
+    const hasSize = /(\d+)\s*(mm|ml|мм|мл)/i.test(name) ||
                     /(?:krishka|qopqoq|cap).*?(\d{2})|(\d{2}).*?(?:krishka|qopqoq|cap)/i.test(name);
     return !hasSize;
   });
@@ -174,13 +177,13 @@ const ProductSection = ({
     const warehouse = p.warehouse?.toLowerCase() || '';
     return warehouse === 'ruchka' || name.includes('ruchka') || name.includes('handle');
   });
-  
+
   const ruchkaSizeMap = new Map<number, Product[]>();
-  
+
   allRuchka.forEach((p) => {
     const name = p.name?.toLowerCase() || '';
     // O'lchamni nomdan olish (28mm, 28 mm, 28-mm, va h.k.)
-    let sizeMatch = name.match(/(\d+)\s*(mm|ml|Ð¼Ð¼|Ð¼Ð»)/i);
+    let sizeMatch = name.match(/(\d+)\s*(mm|ml|мм|мл)/i);
     if (!sizeMatch) {
       // Agar mm yo'q bo'lsa, ruchka yoki handle dan keyingi/o'ndingi raqamni qidirish
       sizeMatch = name.match(/(?:ruchka|handle).*?(\d{2})|(\d{2}).*?(?:ruchka|handle)/i);
@@ -196,11 +199,11 @@ const ProductSection = ({
       }
     }
   });
-  
+
   // O'lchamlarni tartiblash va guruhlarni yaratish
   const sortedRuchkaSizes = Array.from(ruchkaSizeMap.keys()).sort((a, b) => a - b);
   const ruchkaGroups: { key: string; title: string; products: Product[] }[] = [];
-  
+
   sortedRuchkaSizes.forEach((size) => {
     const groupProducts = ruchkaSizeMap.get(size)!;
     if (groupProducts.length > 0) {
@@ -211,11 +214,11 @@ const ProductSection = ({
       });
     }
   });
-  
+
   // O'lcham aniqlanmagan ruchkalar uchun alohida guruh
   const undefinedSizeRuchka = allRuchka.filter((p) => {
     const name = p.name?.toLowerCase() || '';
-    const hasSize = /(\d+)\s*(mm|ml|Ð¼Ð¼|Ð¼Ð»)/i.test(name) || 
+    const hasSize = /(\d+)\s*(mm|ml|мм|мл)/i.test(name) ||
                     /(?:ruchka|handle).*?(\d{2})|(\d{2}).*?(?:ruchka|handle)/i.test(name);
     return !hasSize;
   });
@@ -233,7 +236,7 @@ const ProductSection = ({
     const warehouse = p.warehouse || '';
     return warehouse.startsWith('custom-');
   });
-  
+
   // Custom turlarni guruhlash
   const customWarehouses = Array.from(new Set(customProducts.map(p => p.warehouse)));
   customWarehouses.forEach(warehouse => {
@@ -256,7 +259,7 @@ const ProductSection = ({
   const otherProducts = filteredProducts.filter((p) => {
     const name = p.name?.toLowerCase() || '';
     const warehouse = p.warehouse?.toLowerCase() || '';
-    const isPreform = warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|Ð³Ñ€|Ð³)/.test(name);
+    const isPreform = warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|гр|г)/.test(name);
     const isKrishka = warehouse === 'krishka' || name.includes('krishka') || name.includes('qopqoq') || name.includes('cap');
     const isRuchka = warehouse === 'ruchka' || name.includes('ruchka') || name.includes('handle');
     const isCustom = warehouse.startsWith('custom-');
@@ -264,126 +267,120 @@ const ProductSection = ({
   });
 
   return (
-    <div className="space-y-3">
-      <div className="glass-card p-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-            <Package className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">{latinToCyrillic('Mahsulotlar')}</h2>
-            <p className="text-sm text-gray-500">{filteredProducts.length} {latinToCyrillic('mahsulot')}</p>
-          </div>
+    <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] p-4 sm:p-5 space-y-4">
+      {/* Section title */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+          <Package className="w-[18px] h-[18px]" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold text-slate-900 tracking-tight">{latinToCyrillic('Mahsulotlar')}</h2>
+          <p className="text-xs text-slate-400 tabular-nums">{filteredProducts.length} {latinToCyrillic('mahsulot')}</p>
         </div>
       </div>
 
-      <div className="space-y-2">
-        {/* Search */}
-        <div className="relative">
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-            <Package className="w-5 h-5" />
-          </div>
-          <input
-            type="text"
-            placeholder={latinToCyrillic('Mahsulot qidirish...')}
-            value={productSearch}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full h-12 px-4 pl-12 text-sm font-bold rounded-xl border-2 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white shadow-sm"
+      {/* Search */}
+      <div className="relative">
+        <Search className="w-[18px] h-[18px] text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <input
+          type="text"
+          placeholder={latinToCyrillic('Mahsulot qidirish...')}
+          value={productSearch}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="w-full h-11 pl-11 pr-4 text-sm font-medium text-slate-900 placeholder:text-slate-400 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+        />
+      </div>
+
+      {/* Categories */}
+      <div className="flex flex-wrap gap-2">
+        {categories.map((cat) => (
+          <button
+            type="button"
+            key={cat.id}
+            onClick={() => onCategoryChange(cat.id)}
+            className={`min-h-[40px] px-4 rounded-xl text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
+              activeCategory === cat.id
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:text-slate-900'
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Product Type Cards */}
+      <div className="space-y-3 max-h-[60vh] lg:max-h-[calc(100vh-22rem)] overflow-y-auto pr-1 -mr-1">
+        {filteredProducts.length === 0 ? (
+          <EmptyState
+            icon={Package}
+            title={latinToCyrillic('Mahsulot topilmadi')}
+            description={latinToCyrillic('Qidiruvni o\'zgartiring yoki boshqa turkumni tanlang')}
           />
-        </div>
-
-        {/* Categories */}
-        <div className="grid grid-cols-5 gap-1 p-2 bg-gradient-to-r from-gray-100 to-gray-200 rounded-2xl shadow-inner">
-          {categories.map((cat) => (
-            <button
-              type="button"
-              key={cat.id}
-              onClick={() => onCategoryChange(cat.id)}
-              className={`py-2.5 px-2 rounded-xl text-sm font-bold transition-all duration-200 ${
-                activeCategory === cat.id
-                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg transform scale-105'
-                  : 'bg-transparent text-gray-600 hover:bg-white/50'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Product Type Cards */}
-        <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
-          {filteredProducts.length === 0 ? (
-            <div className="p-12 text-center bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl border-2 border-dashed border-gray-300">
-              <div className="w-20 h-20 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Package className="w-10 h-10 text-gray-500" />
-              </div>
-              <p className="text-gray-600 font-bold text-lg">{latinToCyrillic('Mahsulot topilmadi')}</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {preformGroups.map((group) => (
-                <ProductTypeCard
-                  key={group.key}
-                  title={group.title}
-                  color="blue"
-                  products={group.products}
-                  currency={currency}
-                  onSelectProduct={onSelectProduct}
-                  onQuickAdd={onQuickAdd}
-                  latinToCyrillic={latinToCyrillic}
-                />
-              ))}
-              {krishkaGroups.map((group) => (
-                <ProductTypeCard
-                  key={group.key}
-                  title={latinToCyrillic(group.title)}
-                  color="purple"
-                  products={group.products}
-                  currency={currency}
-                  onSelectProduct={onSelectProduct}
-                  onQuickAdd={onQuickAdd}
-                  latinToCyrillic={latinToCyrillic}
-                />
-              ))}
-              {ruchkaGroups.map((group) => (
-                <ProductTypeCard
-                  key={group.key}
-                  title={latinToCyrillic(group.title)}
-                  color="pink"
-                  products={group.products}
-                  currency={currency}
-                  onSelectProduct={onSelectProduct}
-                  onQuickAdd={onQuickAdd}
-                  latinToCyrillic={latinToCyrillic}
-                />
-              ))}
-              {/* Custom turlar */}
-              {customGroups.map((group) => (
-                <ProductTypeCard
-                  key={group.key}
-                  title={group.title}
-                  color="green"
-                  products={group.products}
-                  currency={currency}
-                  onSelectProduct={onSelectProduct}
-                  onQuickAdd={onQuickAdd}
-                  latinToCyrillic={latinToCyrillic}
-                />
-              ))}
-              {otherProducts.length > 0 && (
-                <ProductTypeCard
-                  title={latinToCyrillic('Boshqa mahsulotlar')}
-                  color="orange"
-                  products={otherProducts}
-                  currency={currency}
-                  onSelectProduct={onSelectProduct}
-                  onQuickAdd={onQuickAdd}
-                  latinToCyrillic={latinToCyrillic}
-                />
-              )}
-            </div>
-          )}
-        </div>
+        ) : (
+          <div className="space-y-3">
+            {preformGroups.map((group) => (
+              <ProductTypeCard
+                key={group.key}
+                title={latinToCyrillic(group.title)}
+                color="blue"
+                products={group.products}
+                currency={currency}
+                onSelectProduct={onSelectProduct}
+                onQuickAdd={onQuickAdd}
+                latinToCyrillic={latinToCyrillic}
+              />
+            ))}
+            {krishkaGroups.map((group) => (
+              <ProductTypeCard
+                key={group.key}
+                title={latinToCyrillic(group.title)}
+                color="purple"
+                products={group.products}
+                currency={currency}
+                onSelectProduct={onSelectProduct}
+                onQuickAdd={onQuickAdd}
+                latinToCyrillic={latinToCyrillic}
+              />
+            ))}
+            {ruchkaGroups.map((group) => (
+              <ProductTypeCard
+                key={group.key}
+                title={latinToCyrillic(group.title)}
+                color="pink"
+                products={group.products}
+                currency={currency}
+                onSelectProduct={onSelectProduct}
+                onQuickAdd={onQuickAdd}
+                latinToCyrillic={latinToCyrillic}
+              />
+            ))}
+            {/* Custom turlar */}
+            {customGroups.map((group) => (
+              <ProductTypeCard
+                key={group.key}
+                title={group.title}
+                color="green"
+                products={group.products}
+                currency={currency}
+                onSelectProduct={onSelectProduct}
+                onQuickAdd={onQuickAdd}
+                latinToCyrillic={latinToCyrillic}
+              />
+            ))}
+            {otherProducts.length > 0 && (
+              <ProductTypeCard
+                title={latinToCyrillic('Boshqa mahsulotlar')}
+                color="orange"
+                products={otherProducts}
+                currency={currency}
+                onSelectProduct={onSelectProduct}
+                onQuickAdd={onQuickAdd}
+                latinToCyrillic={latinToCyrillic}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -393,6 +390,7 @@ const ProductSection = ({
 export default function AddSaleClean() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { addToast } = useToast();
   const editSale = location.state?.editSale;
   const orderData = location.state?.orderData;
   const { isOnline } = useOnlineStatus();
@@ -417,7 +415,7 @@ export default function AddSaleClean() {
     if (saleForm.form.items.length > 0) {
       const updatedItems = saleForm.form.items.map(item => {
         if (item.productId === updatedProduct.id) {
-          console.log('ðŸ”„ Realtime sync updating item:', item.productName, 'Old price:', item.pricePerBag, 'New price:', updatedProduct.pricePerBag);
+          console.log('🔄 Realtime sync updating item:', item.productName, 'Old price:', item.pricePerBag, 'New price:', updatedProduct.pricePerBag);
           return {
             ...item,
             // Faqat ombor qoldig'ini yangilaymiz, narxni yo'q
@@ -429,17 +427,17 @@ export default function AddSaleClean() {
         }
         return item;
       });
-      
+
       // Update cart with new product data
       if (JSON.stringify(updatedItems) !== JSON.stringify(saleForm.form.items)) {
-        console.log('ðŸ”„ Realtime sync: Updating cart items');
+        console.log('🔄 Realtime sync: Updating cart items');
         saleForm.form.items = updatedItems;
       }
     }
   }, [saleForm.setProducts]);
 
   const handleProductDelete = useCallback((deletedProduct: { id: string }) => {
-    saleForm.setProducts((prev: Product[]) => 
+    saleForm.setProducts((prev: Product[]) =>
       prev.filter(p => p.id !== deletedProduct.id)
     );
   }, [saleForm.setProducts]);
@@ -461,10 +459,10 @@ export default function AddSaleClean() {
     // Add timeout to prevent infinite loading
     const timeout = setTimeout(() => {
       setLoading(false);
-      setError('Loading timeout. Please check your connection.');
+      setError(latinToCyrillic('Yuklash vaqti tugadi. Internet aloqasini tekshiring.'));
       console.warn('Loading timeout reached for initial data');
     }, 10000); // 10 second timeout
-    
+
     try {
       const [productsRes, customersRes] = await Promise.all([
         api.get('/products'),
@@ -472,10 +470,10 @@ export default function AddSaleClean() {
       ]);
       clearTimeout(timeout);
 
-      // âœ… Handle standardized API response format
+      // ✅ Handle standardized API response format
       const productsData = extractArray<Product>(productsRes, []);
       const customersData = extractArray<any>(customersRes, []);
-      
+
       if (productsData.length > 0) {
         saleForm.setProducts(productsData);
       }
@@ -486,9 +484,9 @@ export default function AddSaleClean() {
       clearTimeout(timeout);
       console.error('Failed to load initial data:', error);
       if (error.code === 'NETWORK_ERROR' || !error.response) {
-        setError('Internet not connected. Cannot load products.');
+        setError(latinToCyrillic('Internet ulanmagan. Mahsulotlarni yuklab bo\'lmadi.'));
       } else {
-        setError('Failed to load data. Please try again.');
+        setError(latinToCyrillic('Ma\'lumotlarni yuklab bo\'lmadi. Qaytadan urinib ko\'ring.'));
       }
     } finally {
       clearTimeout(timeout);
@@ -507,7 +505,7 @@ export default function AddSaleClean() {
         const reloadProducts = async () => {
           try {
             const res = await api.get('/products');
-            // âœ… Handle standardized API response format
+            // ✅ Handle standardized API response format
             const productsData = extractArray<Product>(res, []);
             if (productsData.length > 0) {
               saleForm.setProducts(productsData);
@@ -529,11 +527,11 @@ export default function AddSaleClean() {
     p.name?.toLowerCase().includes(saleForm.productSearch.toLowerCase())
   );
   const filteredProducts = filterProductsByCategory(searchFiltered, saleForm.activeCategory);
-  
+
   // Faqat kerakli mahsulotlarni ko'rsatish
 
   // Handlers
-  
+
   const handleSelectProduct = useCallback(
     async (product: Product) => {
       // Tezlashtirilgan - endi API chaqiruvi yo'q
@@ -558,23 +556,23 @@ export default function AddSaleClean() {
     try {
       await saleForm.submitSale();
     } catch (error: any) {
-      console.error('âŒ Sotuv yaratishda xatolik:', error);
+      console.error('❌ Sotuv yaratishda xatolik:', error);
       // Extract detailed error message from server response
-      let errorMessage = 'Sotuv yaratib bo\'lmadi';
+      let errorMessage = latinToCyrillic('Sotuv yaratib bo\'lmadi');
       if (error.response?.data?.error?.message) {
         errorMessage = error.response.data.error.message;
       } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.response?.data?.error) {
-        errorMessage = typeof error.response.data.error === 'string' 
-          ? error.response.data.error 
+        errorMessage = typeof error.response.data.error === 'string'
+          ? error.response.data.error
           : JSON.stringify(error.response.data.error);
       } else if (error.message) {
         errorMessage = error.message;
       }
-      alert('Xatolik: ' + errorMessage);
+      addToast(toast.error(latinToCyrillic('Xatolik'), errorMessage));
     }
-  }, [saleForm]);
+  }, [saleForm, addToast]);
 
   // Handle retry
   const handleRetry = useCallback(() => {
@@ -582,248 +580,242 @@ export default function AddSaleClean() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <div className="animate-pulse rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
-      </div>
-    );
+    return <PageLoading text={latinToCyrillic('Yuklanmoqda...')} />;
   }
 
+  const itemCount = saleForm.form.items.length;
+
   return (
-    <div className="modern-bg page-container">
-      <div className="content-wrapper">
+    <div className="min-h-screen bg-slate-50/60 pb-24">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
         {/* Offline Warning Banner */}
         {!isOnline && (
-          <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-4 mb-4 flex items-center gap-3">
-            <WifiOff className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
-                Internet not connected. Data will not be updated.
-              </p>
-            </div>
+          <div className="bg-amber-50 border border-amber-200/70 rounded-2xl p-4 flex items-center gap-3">
+            <WifiOff className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <p className="flex-1 text-sm font-medium text-amber-800">
+              {latinToCyrillic('Internet ulanmagan. Ma\'lumotlar yangilanmaydi.')}
+            </p>
             <button
+              type="button"
               onClick={handleRetry}
-              className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
             >
               <RefreshCw className="w-4 h-4" />
-              Retry
+              {latinToCyrillic('Qayta urinish')}
             </button>
           </div>
         )}
 
         {/* Error Banner */}
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4 mb-4 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-red-800 dark:text-red-200">
-                {error}
-              </p>
-            </div>
+          <div className="bg-rose-50 border border-rose-200/70 rounded-2xl p-4 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0" />
+            <p className="flex-1 text-sm font-medium text-rose-800">{error}</p>
             <button
+              type="button"
               onClick={handleRetry}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
             >
               <RefreshCw className="w-4 h-4" />
-              Retry
+              {latinToCyrillic('Qayta urinish')}
             </button>
           </div>
         )}
-        {/* Header */}
-        <div className="glass-card p-4 mb-4 fade-in">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/cashier/sales')}
-                className="btn-gradient-primary px-4 py-2 flex items-center gap-2 text-sm"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                {latinToCyrillic('Orqaga')}
-              </button>
 
-              <div>
-                <h1 className="text-2xl font-bold text-blue-600 mb-0.5">
-                  {saleForm.isEditMode ? latinToCyrillic('Sotuvni Tahrirlash') : latinToCyrillic('Yangi Sotuv')}
-                </h1>
-                <p className="text-gray-500 text-sm font-medium">
-                  {saleForm.form.items.length} {latinToCyrillic('ta mahsulot tanlandi')}
+        {/* Header: back + title */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/cashier/sales')}
+            aria-label={latinToCyrillic('Orqaga')}
+            className="w-11 h-11 flex-shrink-0 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl flex items-center justify-center transition-all active:scale-[0.97]"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
+              {saleForm.isEditMode ? latinToCyrillic('Sotuvni tahrirlash') : latinToCyrillic('Yangi sotuv')}
+            </h1>
+            <p className="mt-0.5 text-sm text-slate-500 tabular-nums">
+              {itemCount} {latinToCyrillic('ta mahsulot tanlandi')}
+            </p>
+          </div>
+        </div>
+
+        {/* Hero: running TOTAL (the most prominent thing on screen) + currency toggle */}
+        <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-5 text-white">
+          <div className="absolute -top-16 -right-16 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl" />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4 text-indigo-300" />
+                <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                  {latinToCyrillic('Jami summa')}
                 </p>
               </div>
+              <p className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight tabular-nums">
+                {getCurrencySymbol(saleForm.form.currency)}
+                {getDisplayAmount(saleForm.totalAmount, saleForm.form.currency)}
+              </p>
+              <p className="mt-1 text-sm text-slate-400 tabular-nums">
+                {itemCount} {latinToCyrillic('ta mahsulot savatda')}
+              </p>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="toggle-modern">
-                <button
-                  type="button"
-                  onClick={() => saleForm.updateFormField('currency', 'UZS')}
-                  className={`toggle-option ${saleForm.form.currency === 'UZS' ? 'active' : ''}`}
-                >
-                  UZS
-                </button>
-                <button
-                  type="button"
-                  onClick={() => saleForm.updateFormField('currency', 'USD')}
-                  className={`toggle-option ${saleForm.form.currency === 'USD' ? 'active' : ''}`}
-                >
-                  $
-                </button>
-              </div>
+            {/* Currency toggle */}
+            <div className="flex p-1 bg-white/10 rounded-xl self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => saleForm.updateFormField('currency', 'UZS')}
+                className={`min-h-[40px] px-4 rounded-lg text-sm font-semibold transition-all active:scale-[0.97] ${
+                  saleForm.form.currency === 'UZS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                UZS
+              </button>
+              <button
+                type="button"
+                onClick={() => saleForm.updateFormField('currency', 'USD')}
+                className={`min-h-[40px] px-4 rounded-lg text-sm font-semibold transition-all active:scale-[0.97] ${
+                  saleForm.form.currency === 'USD' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                $
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Main Content - 3 Column Layout */}
-        <div className="glass-card p-5 slide-up">
-          {/* Row 1: Products + Cart */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            {/* Products Column */}
-            <ProductSection
-              filteredProducts={filteredProducts}
-              currency={saleForm.form.currency}
-              activeCategory={saleForm.activeCategory}
-              productSearch={saleForm.productSearch}
-              latinToCyrillic={latinToCyrillic}
-              onCategoryChange={(cat) => saleForm.setActiveCategory(cat as any)}
-              onSearchChange={saleForm.setProductSearch}
-              onSelectProduct={handleSelectProduct}
-              onQuickAdd={handleQuickAdd}
-            />
+        {/* Zone 1: Product picker (left) + Cart (right) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Products */}
+          <ProductSection
+            filteredProducts={filteredProducts}
+            currency={saleForm.form.currency}
+            activeCategory={saleForm.activeCategory}
+            productSearch={saleForm.productSearch}
+            latinToCyrillic={latinToCyrillic}
+            onCategoryChange={(cat) => saleForm.setActiveCategory(cat as any)}
+            onSearchChange={saleForm.setProductSearch}
+            onSelectProduct={handleSelectProduct}
+            onQuickAdd={handleQuickAdd}
+          />
 
-            {/* Cart Column */}
-            <div className="space-y-3">
-              <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-2xl p-4 shadow-lg">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
-                    <ShoppingCart className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-white">{latinToCyrillic('Savat')}</h2>
-                    <p className="text-sm text-emerald-100">{saleForm.form.items.length} {latinToCyrillic('ta mahsulot')}</p>
-                  </div>
+          {/* Cart */}
+          <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden lg:sticky lg:top-6">
+            {/* Cart header */}
+            <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-slate-200/70">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                  <ShoppingCart className="w-[18px] h-[18px]" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900 tracking-tight">{latinToCyrillic('Savat')}</h2>
+                  <p className="text-xs text-slate-400 tabular-nums">{itemCount} {latinToCyrillic('ta mahsulot')}</p>
                 </div>
               </div>
-
-              {saleForm.form.items.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="bg-white p-4 rounded-xl border border-gray-200">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="font-bold text-gray-900">{latinToCyrillic('Savat')}</h3>
-                      <button
-                        type="button"
-                        onClick={saleForm.clearItems}
-                        className="text-xs text-red-600 hover:text-red-700 font-medium"
-                      >
-                        {latinToCyrillic('Tozalash')}
-                      </button>
-                    </div>
-
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {saleForm.form.items.map((item, index) => (
-                        <CartItem
-                          key={index}
-                          item={item}
-                          index={index}
-                          isEditing={editingItemIndex === index}
-                          products={saleForm.products}
-                          currency={saleForm.form.currency}
-                          latinToCyrillic={latinToCyrillic}
-                          onUpdate={(idx, updates) => {
-                            saleForm.updateItem(idx, updates);
-                            setEditingItemIndex(idx);
-                          }}
-                          onRemove={saleForm.removeItem}
-                        />
-                      ))}
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-gray-200">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-gray-900">{latinToCyrillic('Jami')}:</span>
-                        <span className="text-xl font-bold text-blue-600">
-                          {getCurrencySymbol(saleForm.form.currency)}
-                          {getDisplayAmount(saleForm.totalAmount, saleForm.form.currency)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-12 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                  <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <ShoppingCart className="w-10 h-10 text-gray-400" />
-                  </div>
-                  <p className="text-gray-500 font-bold mb-2">{latinToCyrillic("Savat bo'sh")}</p>
-                  <p className="text-gray-400">{latinToCyrillic("Mahsulot qo'shing")}</p>
-                </div>
+              {itemCount > 0 && (
+                <button
+                  type="button"
+                  onClick={saleForm.clearItems}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors active:scale-[0.97]"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {latinToCyrillic('Tozalash')}
+                </button>
               )}
+            </div>
+
+            {itemCount > 0 ? (
+              <div className="p-4 sm:p-5 space-y-2 max-h-[55vh] overflow-y-auto">
+                {saleForm.form.items.map((item, index) => (
+                  <CartItem
+                    key={index}
+                    item={item}
+                    index={index}
+                    isEditing={editingItemIndex === index}
+                    products={saleForm.products}
+                    currency={saleForm.form.currency}
+                    latinToCyrillic={latinToCyrillic}
+                    onUpdate={(idx, updates) => {
+                      saleForm.updateItem(idx, updates);
+                      setEditingItemIndex(idx);
+                    }}
+                    onRemove={saleForm.removeItem}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={ShoppingCart}
+                title={latinToCyrillic('Savat bo\'sh')}
+                description={latinToCyrillic('Chapdagi ro\'yxatdan mahsulot tanlab savatga qo\'shing')}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Zone 2: Customer & Payment (checkout) */}
+        <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden">
+          <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-slate-200/70">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+              <User className="w-[18px] h-[18px]" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-slate-900 tracking-tight">{latinToCyrillic('Mijoz va to\'lov')}</h2>
+              <p className="text-xs text-slate-400 tabular-nums">
+                {latinToCyrillic('Sotuvni yakunlash')} • {saleForm.customers.length} {latinToCyrillic('ta mijoz')}
+              </p>
             </div>
           </div>
 
-          {/* Row 2: Customer & Payment (Full Width) */}
-          <div className="border-t border-gray-200 pt-6">
-            <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl p-6 shadow-lg mb-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
-                  <User className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white">{latinToCyrillic("Mijoz va To'lov")}</h2>
-                  <p className="text-sm text-purple-100">
-                    {latinToCyrillic('Sotuvni yakunlash')} ({saleForm.customers.length} {latinToCyrillic('ta mijoz')})
-                  </p>
-                </div>
-              </div>
-            </div>
+          <div className="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Customer Selector */}
+            <CustomerSelector
+              customers={saleForm.customers}
+              selectedCustomerId={saleForm.form.customerId}
+              isKocha={saleForm.form.isKocha}
+              customerSearch={saleForm.customerSearch}
+              manualCustomerName={saleForm.form.manualCustomerName}
+              manualCustomerPhone={saleForm.form.manualCustomerPhone}
+              latinToCyrillic={latinToCyrillic}
+              onSelectCustomer={(customer) => {
+                saleForm.updateFormField('customerId', customer.id);
+                saleForm.updateFormField('customerName', customer.name);
+                saleForm.updateFormField('isKocha', false);
+                saleForm.setCustomerSearch('');
+              }}
+              onSelectKocha={() => {
+                saleForm.updateFormField('customerId', '');
+                saleForm.updateFormField('customerName', '');
+                saleForm.updateFormField('isKocha', true);
+              }}
+              onSearchChange={saleForm.setCustomerSearch}
+              onManualNameChange={(val) => saleForm.updateFormField('manualCustomerName', val)}
+              onManualPhoneChange={(val) => saleForm.updateFormField('manualCustomerPhone', val)}
+            />
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Customer Selector */}
-              <CustomerSelector
-                customers={saleForm.customers}
-                selectedCustomerId={saleForm.form.customerId}
-                isKocha={saleForm.form.isKocha}
-                customerSearch={saleForm.customerSearch}
-                manualCustomerName={saleForm.form.manualCustomerName}
-                manualCustomerPhone={saleForm.form.manualCustomerPhone}
-                latinToCyrillic={latinToCyrillic}
-                onSelectCustomer={(customer) => {
-                  saleForm.updateFormField('customerId', customer.id);
-                  saleForm.updateFormField('customerName', customer.name);
-                  saleForm.updateFormField('isKocha', false);
-                  saleForm.setCustomerSearch('');
-                }}
-                onSelectKocha={() => {
-                  saleForm.updateFormField('customerId', '');
-                  saleForm.updateFormField('customerName', '');
-                  saleForm.updateFormField('isKocha', true);
-                }}
-                onSearchChange={saleForm.setCustomerSearch}
-                onManualNameChange={(val) => saleForm.updateFormField('manualCustomerName', val)}
-                onManualPhoneChange={(val) => saleForm.updateFormField('manualCustomerPhone', val)}
-              />
-
-              {/* Payment Section */}
-              <PaymentSection
-                form={saleForm.form}
-                totalAmount={saleForm.totalAmount}
-                paidAmount={saleForm.paidAmount}
-                debtAmount={saleForm.debtAmount}
-                exchangeRate={saleForm.exchangeRate}
-                currency={saleForm.form.currency}
-                isSubmitting={saleForm.isSubmitting}
-                isEditMode={saleForm.isEditMode}
-                latinToCyrillic={latinToCyrillic}
-                onUpdateForm={(updates) => {
-                  Object.entries(updates).forEach(([key, value]) => {
-                    saleForm.updateFormField(key as any, value);
-                  });
-                }}
-                onExchangeRateChange={saleForm.setExchangeRate}
-                onSubmit={handleSubmit}
-                onCancel={() => navigate('/cashier/sales')}
-                onReset={saleForm.resetForm}
-              />
-            </div>
+            {/* Payment Section */}
+            <PaymentSection
+              form={saleForm.form}
+              totalAmount={saleForm.totalAmount}
+              paidAmount={saleForm.paidAmount}
+              debtAmount={saleForm.debtAmount}
+              exchangeRate={saleForm.exchangeRate}
+              currency={saleForm.form.currency}
+              isSubmitting={saleForm.isSubmitting}
+              isEditMode={saleForm.isEditMode}
+              latinToCyrillic={latinToCyrillic}
+              onUpdateForm={(updates) => {
+                Object.entries(updates).forEach(([key, value]) => {
+                  saleForm.updateFormField(key as any, value);
+                });
+              }}
+              onExchangeRateChange={saleForm.setExchangeRate}
+              onSubmit={handleSubmit}
+              onCancel={() => navigate('/cashier/sales')}
+              onReset={saleForm.resetForm}
+            />
           </div>
         </div>
       </div>

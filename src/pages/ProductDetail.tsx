@@ -1,19 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import Modal from '../components/Modal';
 import api from '../lib/professionalApi';
 import { extractData, extractArray } from '../lib/apiHelpers';
-import { 
-  Package, 
+import { latinToCyrillic } from '../lib/transliterator';
+import { Badge } from '../components/ui/Badge';
+import { PageLoading } from '../components/ui/LoadingSpinner';
+import { useToast, toast } from '../components/ui/Toast';
+import EmptyState from '../components/EmptyState';
+import {
+  Package,
   Plus,
-  Minus, 
-  ArrowLeft, 
+  Minus,
+  ArrowLeft,
   TrendingUp,
   AlertCircle,
-  CheckCircle,
   Settings,
   DollarSign,
   ShoppingCart,
@@ -21,12 +24,30 @@ import {
   Users,
   Puzzle,
   X,
-  Search
+  Search,
+  Warehouse,
+  Boxes,
+  Layers,
+  Calendar,
+  User,
+  Receipt
 } from 'lucide-react';
+
+// Stock-level UI helper (display only — never touches API/data).
+// Red/error: at or below the minimum limit. Amber/warning: near the
+// limit (within +50%). Green/success: healthy stock.
+type StockLevel = { variant: 'success' | 'warning' | 'error'; label: string };
+
+const warehouseMeta: Record<string, { label: string; icon: typeof Package }> = {
+  preform: { label: latinToCyrillic('Preforma'), icon: Boxes },
+  krishka: { label: latinToCyrillic('Qopqoq'), icon: Layers },
+  ruchka: { label: latinToCyrillic('Ruchka'), icon: Package },
+};
 
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const isCashier = window.location.pathname.startsWith('/cashier');
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -40,7 +61,8 @@ export default function ProductDetail() {
     totalProfit: 0,
     salesCount: 0,
   });
-  
+  const [salesHistory, setSalesHistory] = useState<any[]>([]);
+
   const [adjustForm, setAdjustForm] = useState({
     value: '',
     type: 'ADD',
@@ -99,19 +121,25 @@ export default function ProductDetail() {
       await api.post(`/products/${id}/komplekt`, {
         items: komplektItems
       });
-      
+
       // Modalni yopish
       setShowKomplektModal(false);
       setKomplektItems([]);
       setKomplektSearch('');
-      
+
       // Mahsulotni qayta yuklash
       loadProduct();
-      
-      alert('Komplekt muvaffaqiyatli saqlandi!');
+
+      addToast(toast.success(
+        latinToCyrillic('Muvaffaqiyatli'),
+        latinToCyrillic('Komplekt saqlandi!')
+      ));
     } catch (error) {
       console.error('Komplektni saqlashda xatolik:', error);
-      alert('Komplektni saqlashda xatolik yuz berdi');
+      addToast(toast.error(
+        latinToCyrillic('Xatolik'),
+        latinToCyrillic('Komplektni saqlashda xatolik yuz berdi')
+      ));
     }
   };
 
@@ -128,29 +156,30 @@ export default function ProductDetail() {
         pricePerBag: (data.pricePerBag || 0).toString(),
         pricePerPiece: (data.pricePerPiece || 0).toString(),
       });
-      
+
       // Sotuv statistikasini yuklash
       try {
         const salesResponse = await api.get(`/sales?productId=${id}`);
         const sales = extractArray<any>(salesResponse, []);
-        
+        setSalesHistory(sales);
+
         // Statistikani hisoblash
         const totalSold = sales.reduce((sum: number, sale: any) => {
           const item = sale.items?.find((i: any) => i.productId === id);
           return sum + (item?.quantity || 0);
         }, 0);
-        
+
         const totalRevenue = sales.reduce((sum: number, sale: any) => {
           const item = sale.items?.find((i: any) => i.productId === id);
           return sum + (item?.totalPrice || 0);
         }, 0);
-        
+
         const totalProfit = sales.reduce((sum: number, sale: any) => {
           const item = sale.items?.find((i: any) => i.productId === id);
           const profit = (item?.totalPrice || 0) - ((item?.quantity || 0) * data.pricePerBag);
           return sum + profit;
         }, 0);
-        
+
         setSalesStats({
           totalSold,
           totalRevenue,
@@ -170,31 +199,43 @@ export default function ProductDetail() {
   const deleteProduct = async () => {
     try {
       await api.delete(`/products/${id}`);
-      alert('âœ… Mahsulot muvaffaqiyatli o\'chirildi!');
+      addToast(toast.success(
+        latinToCyrillic('Muvaffaqiyatli'),
+        latinToCyrillic('Mahsulot o\'chirildi!')
+      ));
       navigate(isCashier ? '/cashier/products' : '/products');
     } catch (error) {
       console.error('Mahsulotni o\'chirishda xatolik:', error);
-      alert('âŒ Xatolik yuz berdi!');
+      addToast(toast.error(
+        latinToCyrillic('Xatolik'),
+        latinToCyrillic('Mahsulotni o\'chirishda xatolik yuz berdi')
+      ));
     }
   };
 
   const handleUpdateSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation
     const pBag = parseFloat(settingsForm.pricePerBag);
     const pPiece = parseFloat(settingsForm.pricePerPiece);
     const units = parseInt(settingsForm.unitsPerBag);
-    
+
     if (isNaN(units) || units <= 0) {
-      alert('Qopdagi donalar soni musbat bo\'lishi kerak');
+      addToast(toast.warning(
+        latinToCyrillic('Diqqat'),
+        latinToCyrillic('Qopdagi donalar soni musbat bo\'lishi kerak')
+      ));
       return;
     }
     if (!isNaN(pBag) && pBag < 0) {
-      alert('Narx manfiy bo\'lishi mumkin emas');
+      addToast(toast.warning(
+        latinToCyrillic('Diqqat'),
+        latinToCyrillic('Narx manfiy bo\'lishi mumkin emas')
+      ));
       return;
     }
-    
+
     try {
       await api.put(`/products/${id}`, {
         unitsPerBag: parseInt(settingsForm.unitsPerBag),
@@ -203,17 +244,26 @@ export default function ProductDetail() {
         pricePerBag: isNaN(pBag) ? 0 : pBag,
         pricePerPiece: isNaN(pPiece) ? 0 : pPiece,
       });
-      
+
       setShowSettingsModal(false);
       loadProduct();
-      alert('âœ… Sozlamalar yangilandi!');
+      addToast(toast.success(
+        latinToCyrillic('Muvaffaqiyatli'),
+        latinToCyrillic('Sozlamalar yangilandi!')
+      ));
     } catch (error: any) {
       if (error.response?.status === 403) {
         const requiredRoles = error.response?.data?.requiredRoles?.join(', ') || 'ADMIN, WAREHOUSE_MANAGER, MANAGER';
         const yourRole = error.response?.data?.yourRole || 'unknown';
-        alert(`âŒ Ruxsat yo'q! Sizning rolingiz: ${yourRole}\nKerakli rollar: ${requiredRoles}`);
+        addToast(toast.error(
+          latinToCyrillic('Ruxsat yo\'q'),
+          `${latinToCyrillic('Sizning rolingiz')}: ${yourRole}. ${latinToCyrillic('Kerakli rollar')}: ${requiredRoles}`
+        ));
       } else {
-        alert('âŒ Sozlamalarni yangilashda xatolik');
+        addToast(toast.error(
+          latinToCyrillic('Xatolik'),
+          latinToCyrillic('Sozlamalarni yangilashda xatolik')
+        ));
       }
     }
   };
@@ -221,383 +271,425 @@ export default function ProductDetail() {
 
   const handleAdjust = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation
     const value = parseInt(adjustForm.value);
     if (isNaN(value) || value <= 0) {
-      alert('Iltimos, musbat son kiriting');
+      addToast(toast.warning(
+        latinToCyrillic('Diqqat'),
+        latinToCyrillic('Iltimos, musbat son kiriting')
+      ));
       return;
     }
-    
+
     // Agar sabab tanlanmagan bo'lsa, "Boshqa" deb o'rnatish
     const reason = adjustForm.reason || 'Boshqa';
-    
+
     try {
       const endpoint = adjustType === 'units' ? 'adjust-units' : 'adjust-bags';
-      const payload = adjustType === 'units' 
+      const payload = adjustType === 'units'
         ? { units: value, type: adjustForm.type, reason, notes: adjustForm.notes }
         : { bags: value, type: adjustForm.type, reason, notes: adjustForm.notes };
-      
+
       await api.post(`/products/${id}/${endpoint}`, payload);
-      
+
       setShowAdjustModal(false);
       setAdjustForm({ value: '', type: 'ADD', reason: '', notes: '' });
       loadProduct();
+      addToast(toast.success(
+        latinToCyrillic('Muvaffaqiyatli'),
+        latinToCyrillic('Zaxira yangilandi!')
+      ));
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Xatolik yuz berdi');
+      addToast(toast.error(
+        latinToCyrillic('Xatolik'),
+        latinToCyrillic(error.response?.data?.error || 'Xatolik yuz berdi')
+      ));
     }
   };
 
-  const getStockStatus = () => {
-    if (!product) return { color: 'text-gray-500', label: 'Noma\'lum', icon: AlertCircle };
-    if (product.currentStock === 0) return { color: 'text-red-500', label: 'Tugagan', icon: AlertCircle };
-    if (product.currentStock < product.minStockLimit) return { color: 'text-red-500', label: 'Kritik', icon: AlertCircle };
-    if (product.currentStock < product.optimalStock) return { color: 'text-yellow-500', label: 'Kam', icon: AlertCircle };
-    return { color: 'text-green-500', label: 'Yaxshi', icon: CheckCircle };
+  const getStockLevel = (): StockLevel => {
+    const stock = product?.currentStock || 0;
+    const min = product?.minStockLimit || 0;
+    const optimal = product?.optimalStock || 0;
+    if (stock === 0) return { variant: 'error', label: latinToCyrillic('Tugagan') };
+    if (stock <= min) return { variant: 'error', label: latinToCyrillic('Kritik') };
+    if (stock < optimal) return { variant: 'warning', label: latinToCyrillic('Kam') };
+    return { variant: 'success', label: latinToCyrillic('Yetarli') };
   };
 
-
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <Package className="w-16 h-16 text-primary mx-auto mb-4 animate-pulse rounded-lg" />
-          <p className="text-lg font-semibold">Yuklanmoqda...</p>
-        </div>
-      </div>
-    );
+    return <PageLoading text={latinToCyrillic('Mahsulot yuklanmoqda...')} />;
   }
 
   if (!product) {
     return (
-      <div className="text-center py-12">
-        <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4 rounded-lg" />
-        <p className="text-muted-foreground">Mahsulot topilmadi</p>
-        <Button onClick={() => navigate(isCashier ? '/cashier/products' : '/products')} className="mt-4">
-          Orqaga
-        </Button>
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <EmptyState
+            icon={AlertCircle}
+            title={latinToCyrillic('Mahsulot topilmadi')}
+            description={latinToCyrillic('Bu mahsulot o\'chirilgan yoki mavjud emas')}
+            action={
+              <button
+                type="button"
+                onClick={() => navigate(isCashier ? '/cashier/products' : '/products')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                {latinToCyrillic('Orqaga')}
+              </button>
+            }
+          />
+        </div>
       </div>
     );
   }
 
-  const status = getStockStatus();
-  const StatusIcon = status.icon;
+  const level = getStockLevel();
+  const wh = warehouseMeta[product.warehouse] || { label: latinToCyrillic('Boshqa'), icon: Warehouse };
+  const WarehouseIcon = wh.icon;
+
+  const infoCards = [
+    {
+      label: latinToCyrillic('Qop narxi'),
+      value: `${(product.pricePerBag || 0).toLocaleString()} UZS`,
+      sub: `$${(product.pricePerBag / exchangeRates.USD_TO_UZS).toFixed(2)}`,
+      icon: DollarSign,
+      gradient: 'from-emerald-500 to-teal-600',
+    },
+    {
+      label: latinToCyrillic('Dona narxi'),
+      value: `${(product.pricePerPiece || 0).toLocaleString()} UZS`,
+      sub: `$${(product.pricePerPiece / exchangeRates.USD_TO_UZS).toFixed(4)}`,
+      icon: DollarSign,
+      gradient: 'from-blue-500 to-indigo-600',
+    },
+    {
+      label: latinToCyrillic('Qopdagi dona'),
+      value: `${(product.unitsPerBag || 0).toLocaleString()}`,
+      sub: latinToCyrillic('dona / qop'),
+      icon: Layers,
+      gradient: 'from-purple-500 to-pink-600',
+    },
+    {
+      label: latinToCyrillic('Ombor'),
+      value: wh.label,
+      sub: `${latinToCyrillic('Jami')}: ${(product.currentUnits || 0).toLocaleString()} ${latinToCyrillic('dona')}`,
+      icon: WarehouseIcon,
+      gradient: 'from-amber-500 to-orange-600',
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => navigate(isCashier ? '/cashier/products' : '/products')}>
-            <ArrowLeft className="w-4 h-4 mr-2 rounded-lg" />
-            Orqaga
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">{product.name}</h1>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-[10px] font-semibold uppercase tracking-widest">
-                {product.warehouse === 'preform' ? 'ðŸ“¦ PREFORMA' : 
-                 product.warehouse === 'krishka' ? 'â­• QOPQOQ' : 
-                 product.warehouse === 'ruchka' ? 'ðŸŽ—ï¸ RUCHKA' : 'ðŸ› ï¸ BOSHQA'}
-              </span>
-              {product.productType && (
-                <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded text-[10px] font-semibold uppercase tracking-widest">
-                  {product.productType.name}
-                </span>
-              )}
-              {product.category && (
-                <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded text-[10px] font-semibold uppercase tracking-widest">
-                  {product.category.name}
-                </span>
-              )}
-              {product.bagType && (
-                <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 rounded text-[10px] font-semibold uppercase tracking-widest">
-                  {product.bagType}
-                </span>
-              )}
-              {product.subType && (
-                <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded text-[10px] font-semibold uppercase tracking-widest">
-                  {product.subType}
-                </span>
-              )}
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+      {/* Hero header */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-6 sm:p-8 shadow-glass-lg">
+        <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-12 -left-8 w-40 h-40 bg-white/5 rounded-full blur-2xl" />
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => navigate(isCashier ? '/cashier/products' : '/products')}
+            className="inline-flex items-center gap-2 px-3 py-1.5 -ml-1 mb-4 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium text-white/90 backdrop-blur-sm transition-all duration-200 active:scale-95"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {latinToCyrillic('Orqaga')}
+          </button>
+
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+            <div className="flex items-start gap-4 min-w-0">
+              <div className="w-14 h-14 bg-white/15 rounded-2xl flex items-center justify-center backdrop-blur-sm flex-shrink-0">
+                <Package className="w-7 h-7 text-white" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight break-words">
+                  {product.name}
+                </h1>
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 rounded-lg text-xs font-semibold text-white backdrop-blur-sm">
+                    <WarehouseIcon className="w-3.5 h-3.5" />
+                    {wh.label}
+                  </span>
+                  {product.productType?.name && (
+                    <span className="px-2.5 py-1 bg-white/10 rounded-lg text-xs font-medium text-white/90 backdrop-blur-sm">
+                      {product.productType.name}
+                    </span>
+                  )}
+                  {product.category?.name && (
+                    <span className="px-2.5 py-1 bg-white/10 rounded-lg text-xs font-medium text-white/90 backdrop-blur-sm">
+                      {product.category.name}
+                    </span>
+                  )}
+                  {product.bagType && (
+                    <span className="px-2.5 py-1 bg-white/10 rounded-lg text-xs font-medium text-white/90 backdrop-blur-sm">
+                      {product.bagType}
+                    </span>
+                  )}
+                  {product.subType && (
+                    <span className="px-2.5 py-1 bg-white/10 rounded-lg text-xs font-medium text-white/90 backdrop-blur-sm">
+                      {product.subType}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Key stock figure */}
+            <div className="flex-shrink-0 bg-white/10 backdrop-blur-sm rounded-2xl px-5 py-4 self-start lg:self-auto">
+              <div className="flex items-center justify-between gap-6">
+                <div>
+                  <p className="text-xs font-medium text-white/70 uppercase tracking-wider">
+                    {latinToCyrillic('Joriy zaxira')}
+                  </p>
+                  <p className="mt-1 text-3xl font-extrabold text-white leading-none">
+                    {(product.currentStock || 0).toLocaleString()}
+                    <span className="text-base font-medium text-white/70 ml-1.5">{latinToCyrillic('qop')}</span>
+                  </p>
+                </div>
+                <Badge variant={level.variant} className="text-sm px-3 py-1">{level.label}</Badge>
+              </div>
+              <p className="mt-2 text-[11px] text-white/60">
+                {latinToCyrillic('Minimal')}: {(product.minStockLimit || 0).toLocaleString()} {latinToCyrillic('qop')}
+                {' · '}
+                {latinToCyrillic('Optimal')}: {(product.optimalStock || 0).toLocaleString()} {latinToCyrillic('qop')}
+              </p>
             </div>
           </div>
         </div>
-        
-        <div className="flex gap-2">
-          <Button 
-            variant="outline"
-            onClick={() => setShowSettingsModal(true)}
-            className="border-purple-500 text-purple-500 hover:bg-purple-50"
-          >
-            <Settings className="w-4 h-4 mr-2 rounded-lg" />
-            Sozlamalar
-          </Button>
-          <Button 
-            variant="outline"
-            onClick={() => setShowPriceModal(true)}
-            className="border-blue-500 text-blue-500 hover:bg-blue-50"
-          >
-            <DollarSign className="w-4 h-4 mr-2 rounded-lg" />
-            Narx Belgilash
-          </Button>
-          <Button 
-            variant="outline"
-            onClick={() => {
-              setShowKomplektModal(true);
-              loadAllProducts();
-            }}
-            className="border-orange-500 text-orange-500 hover:bg-orange-50"
-          >
-            <Puzzle className="w-4 h-4 mr-2 rounded-lg" />
-            Komplekt
-          </Button>
-          <Button 
+      </div>
+
+      {/* Action bar */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
             onClick={() => {
               setAdjustType('bags');
               setAdjustForm({ ...adjustForm, type: 'ADD' });
               setShowAdjustModal(true);
             }}
-            className="bg-green-600 hover:bg-green-700"
-            title="Omborga qop qo'shish (ishlab chiqarish, import)"
+            title={latinToCyrillic('Omborga qop qo\'shish')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-xl text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
           >
-            <Plus className="w-4 h-4 mr-2 rounded-lg" />
-            Qop Qo'shish
-          </Button>
-          <Button 
+            <Plus className="w-4 h-4" />
+            {latinToCyrillic('Qop qo\'shish')}
+          </button>
+          <button
+            type="button"
             onClick={() => {
               setAdjustType('bags');
               setAdjustForm({ ...adjustForm, type: 'REMOVE' });
               setShowAdjustModal(true);
             }}
-            variant="outline"
-            className="border-red-500 text-red-500 hover:bg-red-50"
-            title="Ombordan qop ayirish (yaroqsiz, yo'qotish)"
+            title={latinToCyrillic('Ombordan qop ayirish')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-100 transition-all duration-200 active:scale-95"
           >
-            <Minus className="w-4 h-4 mr-2 rounded-lg" />
-            Qop Ayirish
-          </Button>
+            <Minus className="w-4 h-4" />
+            {latinToCyrillic('Qop ayirish')}
+          </button>
+
+          <div className="hidden sm:block w-px h-7 bg-gray-200 mx-1" />
+
+          <button
+            type="button"
+            onClick={() => setShowPriceModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-600 rounded-xl text-sm font-semibold hover:bg-blue-100 transition-all duration-200 active:scale-95"
+          >
+            <DollarSign className="w-4 h-4" />
+            {latinToCyrillic('Narx belgilash')}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowKomplektModal(true);
+              loadAllProducts();
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-50 text-orange-600 rounded-xl text-sm font-semibold hover:bg-orange-100 transition-all duration-200 active:scale-95"
+          >
+            <Puzzle className="w-4 h-4" />
+            {latinToCyrillic('Komplekt')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowSettingsModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all duration-200 active:scale-95 ml-auto"
+          >
+            <Settings className="w-4 h-4" />
+            {latinToCyrillic('Sozlamalar')}
+          </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Jami Qoplar</span>
-              <Package className="w-5 h-5 text-blue-500 rounded-lg" />
+      {/* Info cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {infoCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={card.label}
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 transition-all duration-200 hover:shadow-md"
+            >
+              <div className={`w-11 h-11 bg-gradient-to-br ${card.gradient} rounded-2xl flex items-center justify-center shadow-sm mb-3`}>
+                <Icon className="w-5 h-5 text-white" />
+              </div>
+              <p className="text-xs font-medium text-gray-500">{card.label}</p>
+              <p className="mt-1 text-base sm:text-lg font-bold text-gray-900 tracking-tight truncate">{card.value}</p>
+              <p className="mt-0.5 text-xs text-gray-400 truncate">{card.sub}</p>
             </div>
-            <p className="text-3xl font-bold">{product.currentStock}</p>
-            <p className="text-xs text-muted-foreground mt-1">qop</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Qopdagi Dona</span>
-              <Package className="w-5 h-5 text-orange-500 rounded-lg" />
-            </div>
-            <p className="text-3xl font-bold">{product.unitsPerBag}</p>
-            <p className="text-xs text-muted-foreground mt-1">dona/qop</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Jami Donalar</span>
-              <Package className="w-5 h-5 text-purple-500 rounded-lg" />
-            </div>
-            <p className="text-3xl font-bold">{product.currentUnits}</p>
-            <p className="text-xs text-muted-foreground mt-1">dona</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Holat</span>
-              <StatusIcon className={`w-5 h-5 ${status.color} rounded-lg`} />
-            </div>
-            <p className={`text-2xl font-bold ${status.color}`}>{status.label}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Min: {product.minStockLimit} qop
-            </p>
-          </CardContent>
-        </Card>
+          );
+        })}
       </div>
 
-      {/* Product Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Mahsulot Ma'lumotlari</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Qop Narxi (UZS)</p>
-              <p className="text-xl font-bold text-emerald-600">{(product.pricePerBag || 0).toLocaleString()} UZS</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Qop Narxi ($)</p>
-              <p className="text-xl font-bold text-blue-600">${(product.pricePerBag / exchangeRates.USD_TO_UZS).toFixed(2)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Dona Narxi (UZS)</p>
-              <p className="text-xl font-bold text-emerald-600">{(product.pricePerPiece || 0).toLocaleString()} UZS</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Dona Narxi ($)</p>
-              <p className="text-xl font-bold text-blue-600">${(product.pricePerPiece / exchangeRates.USD_TO_UZS).toFixed(4)}</p>
-            </div>
-            <div className="pt-4 border-t col-span-2 md:col-span-4 grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div>
-                <p className="text-sm text-muted-foreground">Minimal Zaxira</p>
-                <p className="font-semibold">{product.minStockLimit} qop</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Optimal Zaxira</p>
-                <p className="font-semibold">{product.optimalStock} qop</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Qopdagi dona</p>
-                <p className="font-semibold">{product.unitsPerBag} dona</p>
-              </div>
+      {/* Sales analytics summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-gray-500">{latinToCyrillic('Jami sotilgan')}</span>
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+              <ShoppingCart className="w-4 h-4 text-emerald-600" />
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Sales Analytics */}
-      {salesStats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">Jami Sotilgan</span>
-                <ShoppingCart className="w-5 h-5 text-green-500 rounded-lg" />
-              </div>
-              <p className="text-3xl font-bold text-green-600">{salesStats.totalSold}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {salesStats.salesCount} ta sotuv
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">Jami Daromad</span>
-                <DollarSign className="w-5 h-5 text-blue-500 rounded-lg" />
-              </div>
-              <p className="text-3xl font-bold text-blue-600">
-                {salesStats.totalRevenue.toLocaleString()}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">UZS</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">Jami Foyda</span>
-                <TrendingUp className="w-5 h-5 text-emerald-500 rounded-lg" />
-              </div>
-              <p className="text-3xl font-bold text-emerald-600">
-                {salesStats.totalProfit.toLocaleString()}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">UZS</p>
-            </CardContent>
-          </Card>
+          <p className="text-2xl font-extrabold text-gray-900 tracking-tight">{salesStats.totalSold.toLocaleString()}</p>
+          <p className="text-xs text-gray-400 mt-1">{salesStats.salesCount} {latinToCyrillic('ta sotuv')}</p>
         </div>
-      )}
 
-      {/* Sales Chart */}
-      {salesStats && salesStats.totalSold > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 rounded-lg" />
-              Sotuv Analitikasi
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Progress bars */}
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium">Sotilgan Mahsulotlar</span>
-                  <span className="text-sm text-muted-foreground">
-                    {salesStats.totalSold} / {product.currentStock + salesStats.totalSold}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
-                  <div 
-                    className="bg-green-500 h-3 rounded-full transition-all duration-500"
-                    style={{ 
-                      width: `${(salesStats.totalSold / (product.currentStock + salesStats.totalSold)) * 100}%` 
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium">Foyda Darajasi</span>
-                  <span className="text-sm text-muted-foreground">
-                    {((salesStats.totalProfit / salesStats.totalRevenue) * 100).toFixed(1)}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
-                  <div 
-                    className="bg-emerald-500 h-3 rounded-full transition-all duration-500"
-                    style={{ 
-                      width: `${(salesStats.totalProfit / salesStats.totalRevenue) * 100}%` 
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-green-600">{salesStats.salesCount}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Sotuvlar soni</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-blue-600">
-                    {(salesStats.totalRevenue / salesStats.salesCount).toLocaleString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">O'rtacha sotuv</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-purple-600">
-                    {(salesStats.totalSold / salesStats.salesCount).toFixed(1)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">O'rtacha miqdor</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-emerald-600">
-                    {(salesStats.totalProfit / salesStats.totalSold).toLocaleString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">Qop foyda</p>
-                </div>
-              </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-gray-500">{latinToCyrillic('Jami daromad')}</span>
+            <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+              <DollarSign className="w-4 h-4 text-blue-600" />
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+          <p className="text-2xl font-extrabold text-blue-600 tracking-tight">{salesStats.totalRevenue.toLocaleString()}</p>
+          <p className="text-xs text-gray-400 mt-1">UZS</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-gray-500">{latinToCyrillic('Jami foyda')}</span>
+            <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-purple-600" />
+            </div>
+          </div>
+          <p className="text-2xl font-extrabold text-emerald-600 tracking-tight">{salesStats.totalProfit.toLocaleString()}</p>
+          <p className="text-xs text-gray-400 mt-1">UZS</p>
+        </div>
+      </div>
+
+      {/* Sales history */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-5 sm:px-6 py-4 border-b border-gray-100">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center">
+            <BarChart3 className="w-4 h-4 text-indigo-600" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-gray-900">{latinToCyrillic('Sotuvlar tarixi')}</h2>
+            <p className="text-xs text-gray-400">{salesHistory.length} {latinToCyrillic('ta yozuv')}</p>
+          </div>
+        </div>
+
+        {salesHistory.length === 0 ? (
+          <EmptyState
+            icon={Receipt}
+            title={latinToCyrillic('Hali sotuvlar yo\'q')}
+            description={latinToCyrillic('Bu mahsulot sotilganda, sotuvlar shu yerda ko\'rinadi')}
+          />
+        ) : (
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/60">
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Sana')}</th>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Mijoz')}</th>
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Miqdor')}</th>
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Summa')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {salesHistory.map((sale: any) => {
+                    const item = sale.items?.find((i: any) => i.productId === id);
+                    const dateRaw = sale.createdAt || sale.date || sale.saleDate;
+                    const dateStr = dateRaw ? new Date(dateRaw).toLocaleDateString() : '—';
+                    const customerName = sale.manualCustomerName || sale.customer?.name || sale.customerName || latinToCyrillic('Noma\'lum');
+                    return (
+                      <tr key={sale.id} className="hover:bg-blue-50/40 transition-colors">
+                        <td className="px-5 py-4">
+                          <span className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+                            <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                            {dateStr}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-bold text-white">{customerName.charAt(0).toUpperCase()}</span>
+                            </div>
+                            <span className="text-sm font-medium text-gray-900">{customerName}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <span className="text-sm font-semibold text-gray-900">{(item?.quantity || 0).toLocaleString()}</span>
+                          <span className="text-xs text-gray-400 ml-1">{latinToCyrillic('dona')}</span>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <span className="text-sm font-bold text-emerald-600">{(item?.totalPrice || 0).toLocaleString()}</span>
+                          <span className="text-xs text-gray-400 ml-1">UZS</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="md:hidden divide-y divide-gray-50">
+              {salesHistory.map((sale: any) => {
+                const item = sale.items?.find((i: any) => i.productId === id);
+                const dateRaw = sale.createdAt || sale.date || sale.saleDate;
+                const dateStr = dateRaw ? new Date(dateRaw).toLocaleDateString() : '—';
+                const customerName = sale.manualCustomerName || sale.customer?.name || sale.customerName || latinToCyrillic('Noma\'lum');
+                return (
+                  <div key={sale.id} className="p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-bold text-white">{customerName.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">{customerName}</p>
+                          <p className="text-xs text-gray-400 inline-flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {dateStr}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-bold text-emerald-600">{(item?.totalPrice || 0).toLocaleString()} <span className="text-xs text-gray-400">UZS</span></p>
+                        <p className="text-xs text-gray-500">{(item?.quantity || 0).toLocaleString()} {latinToCyrillic('dona')}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Adjust Modal */}
       <Modal
         isOpen={showAdjustModal}
         onClose={() => setShowAdjustModal(false)}
-        title={`${adjustType === 'units' ? 'Dona' : 'Qop'} ${adjustForm.type === 'ADD' ? 'Qo\'shish' : 'Ayirish'}`}
+        title={`${adjustType === 'units' ? latinToCyrillic('Dona') : latinToCyrillic('Qop')} ${adjustForm.type === 'ADD' ? latinToCyrillic('Qo\'shish') : latinToCyrillic('Ayirish')}`}
       >
         <form onSubmit={handleAdjust} className="space-y-4">
           <Input
-            label={adjustType === 'units' ? 'Dona Soni' : 'Qop Soni'}
+            label={adjustType === 'units' ? latinToCyrillic('Dona soni') : latinToCyrillic('Qop soni')}
             type="number"
             min="1"
             value={adjustForm.value}
@@ -609,34 +701,34 @@ export default function ProductDetail() {
           {/* Sabab tanlash (ixtiyoriy) */}
           <div>
             <label htmlFor="adjust-reason" className="block text-sm font-medium text-gray-700 mb-1">
-              Sabab (ixtiyoriy)
+              {latinToCyrillic('Sabab (ixtiyoriy)')}
             </label>
             <select
               id="adjust-reason"
               value={adjustForm.reason}
               onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              aria-label="Sabab tanlash"
+              aria-label={latinToCyrillic('Sabab tanlash')}
             >
-              <option value="">-- Boshqa --</option>
-              <option value="Ishlab chiqarish">Ishlab chiqarish</option>
-              <option value="Import">Import</option>
-              <option value="Yaroqsiz">Yaroqsiz (brak)</option>
-              <option value="Yo'qotish">Yo'qotish</option>
-              <option value="Tuzatish">Tuzatish</option>
-              <option value="Sotuv qaytarish">Sotuv qaytarish</option>
+              <option value="">{latinToCyrillic('-- Boshqa --')}</option>
+              <option value="Ishlab chiqarish">{latinToCyrillic('Ishlab chiqarish')}</option>
+              <option value="Import">{latinToCyrillic('Import')}</option>
+              <option value="Yaroqsiz">{latinToCyrillic('Yaroqsiz (brak)')}</option>
+              <option value="Yo'qotish">{latinToCyrillic('Yo\'qotish')}</option>
+              <option value="Tuzatish">{latinToCyrillic('Tuzatish')}</option>
+              <option value="Sotuv qaytarish">{latinToCyrillic('Sotuv qaytarish')}</option>
             </select>
           </div>
 
           {/* Izoh (ixtiyoriy) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Izoh (ixtiyoriy)
+              {latinToCyrillic('Izoh (ixtiyoriy)')}
             </label>
             <textarea
               value={adjustForm.notes}
               onChange={(e) => setAdjustForm({ ...adjustForm, notes: e.target.value })}
-              placeholder="Qo'shimcha ma'lumot..."
+              placeholder={latinToCyrillic('Qo\'shimcha ma\'lumot...')}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               rows={2}
             />
@@ -644,15 +736,15 @@ export default function ProductDetail() {
 
           <div className="flex gap-2 pt-2">
             <Button type="submit" className="flex-1">
-              Tasdiqlash
+              {latinToCyrillic('Tasdiqlash')}
             </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => setShowAdjustModal(false)}
               className="flex-1"
             >
-              Bekor qilish
+              {latinToCyrillic('Bekor qilish')}
             </Button>
           </div>
         </form>
@@ -662,37 +754,37 @@ export default function ProductDetail() {
       <Modal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
-        title="Mahsulot Sozlamalari"
+        title={latinToCyrillic('Mahsulot sozlamalari')}
       >
         <form onSubmit={handleUpdateSettings} className="space-y-4">
-          <div className="bg-purple-50 dark:bg-purple-950 p-3 rounded-lg">
-            <p className="text-sm text-muted-foreground font-bold">
-              Mahsulotning asosiy parametrlarini tahrirlash
+          <div className="bg-purple-50 p-3 rounded-lg">
+            <p className="text-sm text-gray-600 font-bold">
+              {latinToCyrillic('Mahsulotning asosiy parametrlarini tahrirlash')}
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Qopdagi Dona Soni"
+              label={latinToCyrillic('Qopdagi dona soni')}
               numeric
               value={settingsForm.unitsPerBag}
               onChange={(e) => setSettingsForm({ ...settingsForm, unitsPerBag: e.target.value })}
               required
             />
-            
+
             <Input
-              label="Minimal Zaxira (qop)"
+              label={latinToCyrillic('Minimal zaxira (qop)')}
               numeric
               value={settingsForm.minStockLimit}
               onChange={(e) => setSettingsForm({ ...settingsForm, minStockLimit: e.target.value })}
               required
             />
-            
-            <div className="col-span-2 grid grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
-              <div className="col-span-2 text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Asosiy Narxlar (USD)</div>
-              
+
+            <div className="col-span-2 grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="col-span-2 text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">{latinToCyrillic('Asosiy narxlar (USD)')}</div>
+
               <div className="space-y-1">
-                <label className="text-[10px] font-semibold text-gray-400 uppercase">Qop Narxi ($)</label>
+                <label className="text-[10px] font-semibold text-gray-400 uppercase">{latinToCyrillic('Qop narxi ($)')}</label>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -702,12 +794,12 @@ export default function ProductDetail() {
                     setSettingsForm(prev => ({ ...prev, pricePerBag: val }));
                   }}
                   placeholder="0.00"
-                  className="w-full bg-white dark:bg-gray-900 border-2 border-blue-500 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none"
+                  className="w-full bg-white border-2 border-blue-500 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-semibold text-gray-400 uppercase">Dona Narxi ($)</label>
+                <label className="text-[10px] font-semibold text-gray-400 uppercase">{latinToCyrillic('Dona narxi ($)')}</label>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -717,17 +809,17 @@ export default function ProductDetail() {
                     setSettingsForm(prev => ({ ...prev, pricePerPiece: val }));
                   }}
                   placeholder="0.0000"
-                  className="w-full bg-white dark:bg-gray-900 border-2 border-emerald-500 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none"
+                  className="w-full bg-white border-2 border-emerald-500 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none"
                 />
               </div>
-              
+
               <div className="col-span-2 text-[10px] text-gray-500 mt-2">
-                * Narxlar USD da saqlanadi. Joriy kurs: 1 USD = {exchangeRates.USD_TO_UZS.toLocaleString()} UZS
+                {latinToCyrillic('* Narxlar USD da saqlanadi. Joriy kurs')}: 1 USD = {exchangeRates.USD_TO_UZS.toLocaleString()} UZS
               </div>
             </div>
-            
+
             <Input
-              label="Optimal Zaxira (qop)"
+              label={latinToCyrillic('Optimal zaxira (qop)')}
               numeric
               value={settingsForm.optimalStock}
               onChange={(e) => setSettingsForm({ ...settingsForm, optimalStock: e.target.value })}
@@ -737,15 +829,15 @@ export default function ProductDetail() {
 
           <div className="flex gap-2 pt-4">
             <Button type="submit" className="flex-1">
-              Saqlash
+              {latinToCyrillic('Saqlash')}
             </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => setShowSettingsModal(false)}
               className="flex-1"
             >
-              Bekor qilish
+              {latinToCyrillic('Bekor qilish')}
             </Button>
           </div>
 
@@ -754,13 +846,13 @@ export default function ProductDetail() {
               type="button"
               variant="outline"
               onClick={() => {
-                if (confirm(`Ð Ð¾ÑÑ‚Ð´Ð°Ð½ Ò³Ð°Ð¼ "${product.name}" Ð¼Ð°Ò³ÑÑƒÐ»Ð¾Ñ‚Ð½Ð¸ ÑžÑ‡Ð¸Ñ€Ð¼Ð¾Ò›Ñ‡Ð¸Ð¼Ð¸ÑÐ¸Ð·? Ð‘Ñƒ Ð°Ð¼Ð°Ð» Ð±ÐµÐºÐ¾Ñ€ Ò›Ð¸Ð»Ð¸Ð½Ð¼Ð°Ð¹di!`)) {
+                if (confirm(latinToCyrillic(`Rostdan ham "${product.name}" mahsulotni o'chirmoqchimisiz? Bu amal bekor qilinmaydi!`))) {
                   deleteProduct();
                 }
               }}
               className="w-full bg-red-50 text-red-600 border-red-100 hover:bg-red-600 hover:text-white"
             >
-              Mahsulotni butunlay o'chirish
+              {latinToCyrillic('Mahsulotni butunlay o\'chirish')}
             </Button>
           </div>
         </form>
@@ -771,7 +863,7 @@ export default function ProductDetail() {
         <Modal
           isOpen={showPriceModal}
           onClose={() => setShowPriceModal(false)}
-          title="Mijozlar uchun narx belgilash"
+          title={latinToCyrillic('Mijozlar uchun narx belgilash')}
         >
           <PriceModalInner />
         </Modal>
@@ -786,7 +878,7 @@ export default function ProductDetail() {
             setKomplektItems([]);
             setKomplektSearch('');
           }}
-          title={`${product.name} - Komplekt qo'shish`}
+          title={`${product.name} - ${latinToCyrillic('Komplekt qo\'shish')}`}
         >
           <div className="space-y-4">
             {/* Qidiruv */}
@@ -796,7 +888,7 @@ export default function ProductDetail() {
                 type="text"
                 value={komplektSearch}
                 onChange={(e) => setKomplektSearch(e.target.value)}
-                placeholder="Mahsulot qidirish..."
+                placeholder={latinToCyrillic('Mahsulot qidirish...')}
                 className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none"
               />
             </div>
@@ -804,7 +896,7 @@ export default function ProductDetail() {
             {/* Tanlangan mahsulotlar */}
             {komplektItems.length > 0 && (
               <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
-                <h4 className="font-semibold text-orange-800 mb-2">Komplekt tarkibi:</h4>
+                <h4 className="font-semibold text-orange-800 mb-2">{latinToCyrillic('Komplekt tarkibi')}:</h4>
                 <div className="space-y-2">
                   {komplektItems.map((item, index) => (
                     <div key={item.productId} className="flex items-center justify-between bg-white p-3 rounded-lg">
@@ -815,19 +907,19 @@ export default function ProductDetail() {
                           value={item.quantity}
                           onChange={(e) => {
                             const newQty = parseInt(e.target.value) || 1;
-                            setKomplektItems(prev => prev.map((it, i) => 
+                            setKomplektItems(prev => prev.map((it, i) =>
                               i === index ? { ...it, quantity: newQty } : it
                             ));
                           }}
                           min="1"
-                          aria-label="Quantity"
+                          aria-label={latinToCyrillic('Miqdor')}
                           className="w-20 px-2 py-1 border rounded text-center"
                         />
-                        <span className="text-sm text-gray-500">dona</span>
+                        <span className="text-sm text-gray-500">{latinToCyrillic('dona')}</span>
                         <button
                           onClick={() => setKomplektItems(prev => prev.filter((_, i) => i !== index))}
                           className="p-1 text-red-500 hover:bg-red-50 rounded"
-                          aria-label="Remove item"
+                          aria-label={latinToCyrillic('O\'chirish')}
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -858,7 +950,7 @@ export default function ProductDetail() {
                   >
                     <div>
                       <span className="font-medium">{p.name}</span>
-                      <p className="text-sm text-gray-500">{p.currentStock} qop qoldiq</p>
+                      <p className="text-sm text-gray-500">{p.currentStock} {latinToCyrillic('qop qoldiq')}</p>
                     </div>
                     <Plus className="w-5 h-5 text-orange-500" />
                   </button>
@@ -877,7 +969,7 @@ export default function ProductDetail() {
                 }}
                 className="flex-1"
               >
-                Bekor qilish
+                {latinToCyrillic('Bekor qilish')}
               </Button>
               <Button
                 type="button"
@@ -885,7 +977,7 @@ export default function ProductDetail() {
                 disabled={komplektItems.length === 0}
                 className="flex-1 bg-orange-600 hover:bg-orange-700"
               >
-                Saqlash
+                {latinToCyrillic('Saqlash')}
               </Button>
             </div>
           </div>
@@ -910,12 +1002,10 @@ export default function ProductDetail() {
     const loadModalData = async () => {
       setLoading(true);
       try {
-        console.log('ðŸ“¥ Mijozlar yuklanmoqda...');
         const customersResponse = await api.get('/customers');
         const customersData = extractArray<any>(customersResponse, []);
-        console.log('âœ… Mijozlar yuklandi:', customersData.length, 'ta');
         setLocalCustomers(customersData);
-        
+
         // Mijozlarning productPrices maydonidan ushbu mahsulot uchun narxni olish
         const prices: Record<string, string> = {};
         customersData.forEach((customer: any) => {
@@ -931,8 +1021,7 @@ export default function ProductDetail() {
           }
         });
         setLocalPrices(prices);
-        console.log('ðŸ’° Narxlar yuklandi:', Object.keys(prices).length, 'ta');
-        
+
         // Har bir mijoz uchun chegirma shablonini hisoblash
         const discounts: Record<string, number> = {};
         customersData.forEach((customer: any) => {
@@ -945,7 +1034,6 @@ export default function ProductDetail() {
                 const discount = standardPrice - customerPrice;
                 if (discount !== 0) {
                   discounts[customer.id] = discount;
-                  console.log(`ðŸ’Ž ${customer.name}: chegirma ${discount} UZS`);
                 }
               }
             } catch (error) {
@@ -954,9 +1042,8 @@ export default function ProductDetail() {
           }
         });
         setCustomerDiscounts(discounts);
-        console.log('ðŸŽ Chegirma shablonlari yuklandi:', Object.keys(discounts).length, 'ta');
       } catch (error) {
-        console.error('âŒ Mijozlarni yuklashda xatolik:', error);
+        console.error('Mijozlarni yuklashda xatolik:', error);
       } finally {
         setLoading(false);
       }
@@ -965,7 +1052,10 @@ export default function ProductDetail() {
     const applyBulkAdjustment = (increase: boolean) => {
       const amount = parseFloat(bulkAmount);
       if (!amount || amount <= 0) {
-        alert('âš ï¸ Iltimos, to\'g\'ri miqdor kiriting!');
+        addToast(toast.warning(
+          latinToCyrillic('Diqqat'),
+          latinToCyrillic('Iltimos, to\'g\'ri miqdor kiriting!')
+        ));
         return;
       }
 
@@ -997,149 +1087,148 @@ export default function ProductDetail() {
       });
 
       setLocalPrices(updatedPrices);
-      
-      const action = increase ? 'ko\'tarildi' : 'tushirildi';
+
+      const action = increase ? latinToCyrillic('ko\'tarildi') : latinToCyrillic('tushirildi');
       const typeText = bulkType === 'percent' ? `${amount}%` : `${amount} UZS`;
-      alert(`âœ… ${appliedCount} ta mijoz uchun narx ${typeText} ga ${action}!`);
+      addToast(toast.success(
+        latinToCyrillic('Bajarildi'),
+        `${appliedCount} ${latinToCyrillic('ta mijoz uchun narx')} ${typeText} ${latinToCyrillic('ga')} ${action}!`
+      ));
     };
 
     const applyDiscountTemplates = async () => {
       if (Object.keys(customerDiscounts).length === 0) {
-        alert('âš ï¸ Hech qanday chegirma shabloni topilmadi!\n\nAvval kamida bitta mijoz uchun narx belgilang.');
+        addToast(toast.warning(
+          latinToCyrillic('Diqqat'),
+          latinToCyrillic('Hech qanday chegirma shabloni topilmadi! Avval kamida bitta mijoz uchun narx belgilang.')
+        ));
         return;
       }
-      
-      const confirmMsg = `ðŸŽ Chegirma shablonlarini boshqa mahsulotlarga qo'llash:\n\n${
+
+      const confirmMsg = `${latinToCyrillic('Chegirma shablonlarini boshqa mahsulotlarga qo\'llash')}:\n\n${
         Object.entries(customerDiscounts).map(([customerId, discount]) => {
           const customer = localCustomers.find(c => c.id === customerId);
-          return `â€¢ ${customer?.name}: ${discount > 0 ? '-' : '+'}${Math.abs(discount)} UZS`;
+          return `- ${customer?.name}: ${discount > 0 ? '-' : '+'}${Math.abs(discount)} UZS`;
         }).join('\n')
-      }\n\nDavom ettirilsinmi?`;
-      
+      }\n\n${latinToCyrillic('Davom ettirilsinmi?')}`;
+
       if (!confirm(confirmMsg)) {
         return;
       }
-      
+
       try {
         let successCount = 0;
         let errorCount = 0;
-        
+
         for (const [customerId, discount] of Object.entries(customerDiscounts)) {
           try {
             await api.post(`/customers/${customerId}/apply-discount-template`, {
               discount
             });
             successCount++;
-            const customer = localCustomers.find(c => c.id === customerId);
-            console.log(`âœ… ${customer?.name} uchun chegirma qo'llandi`);
           } catch (error: any) {
             errorCount++;
-            console.error(`âŒ Xatolik:`, error);
+            console.error('Xatolik:', error);
           }
         }
-        
+
         if (errorCount === 0) {
-          alert(`âœ… Barcha chegirma shablonlari muvaffaqiyatli qo'llandi!\n\n${successCount} ta mijoz uchun barcha mahsulotlarga chegirma qo'llandi.`);
+          addToast(toast.success(
+            latinToCyrillic('Muvaffaqiyatli'),
+            `${successCount} ${latinToCyrillic('ta mijoz uchun barcha mahsulotlarga chegirma qo\'llandi')}!`
+          ));
         } else {
-          alert(`âš ï¸ ${successCount} ta muvaffaqiyatli, ${errorCount} ta xatolik!`);
+          addToast(toast.warning(
+            latinToCyrillic('Qisman bajarildi'),
+            `${successCount} ${latinToCyrillic('ta muvaffaqiyatli')}, ${errorCount} ${latinToCyrillic('ta xatolik')}!`
+          ));
         }
       } catch (error: any) {
-        console.error('âŒ Umumiy xatolik:', error);
-        alert(`Xatolik: ${error.response?.data?.error || error.message}`);
+        console.error('Umumiy xatolik:', error);
+        addToast(toast.error(
+          latinToCyrillic('Xatolik'),
+          latinToCyrillic(error.response?.data?.error || error.message || 'Xatolik yuz berdi')
+        ));
       }
     };
 
     const handleSave = async () => {
       try {
-        console.log('ðŸ’¾ Narxlar saqlanmoqda...');
-        console.log('ðŸ“ Kiritilgan narxlar:', localPrices);
-        console.log('ðŸ‘¥ Mijozlar soni:', localCustomers.length);
-        
-        // Debug
-        Object.keys(localPrices).forEach(key => {
-          console.log(`  - ${key}: "${localPrices[key]}" (${typeof localPrices[key]})`);
-        });
-        
         let savedCount = 0;
         let errorCount = 0;
-        
+
         for (const customer of localCustomers) {
           const price = localPrices[customer.id];
-          
+
           // Faqat narx kiritilgan mijozlar uchun
           if (price && price.toString().trim() !== '') {
             try {
               let existingPrices = {};
-              
+
               // Mavjud narxlarni olish
               if (customer.productPrices) {
                 try {
                   existingPrices = JSON.parse(customer.productPrices);
                 } catch (parseError) {
-                  console.warn(`âš ï¸ ${customer.name} uchun mavjud narxlarni parse qilishda xatolik:`, parseError);
+                  console.warn(`${customer.name} uchun mavjud narxlarni parse qilishda xatolik:`, parseError);
                   existingPrices = {};
                 }
               }
-              
+
               // Narxni raqamga aylantirish va tekshirish
               const priceNumber = parseFloat(price.toString());
               if (isNaN(priceNumber) || priceNumber < 0) {
-                console.error(`âŒ ${customer.name} uchun noto'g'ri narx:`, price);
+                console.error(`${customer.name} uchun noto'g'ri narx:`, price);
                 errorCount++;
                 continue;
               }
-              
+
               // Yangi narxni qo'shish
               const newPrices = {
                 ...existingPrices,
                 [id as string]: priceNumber
               };
-              
-              console.log(`ðŸ’° ${customer.name} uchun narx saqlanmoqda:`, priceNumber);
-              console.log(`ðŸ“Š Yangi narxlar obyekti:`, newPrices);
-              
+
               const pricesJson = JSON.stringify(newPrices);
-              console.log(`ðŸ“ JSON string:`, pricesJson);
-              console.log(`ðŸ“ JSON uzunligi:`, pricesJson.length);
-              
+
               // Saqlash - FAQAT productPrices maydonini yuborish
-              const response = await api.put(`/customers/${customer.id}`, {
+              await api.put(`/customers/${customer.id}`, {
                 productPrices: pricesJson
               });
-              
-              console.log(`âœ… Response:`, response.data);
-              
+
               savedCount++;
-              console.log(`âœ… ${customer.name} uchun narx saqlandi`);
             } catch (customerError: any) {
               errorCount++;
               const errorDetails = customerError.response?.data;
-              console.error(`âŒ ${customer.name} uchun xatolik:`, errorDetails);
-              console.error('Full error object:', {
-                message: customerError.message,
-                status: customerError.response?.status,
-                data: errorDetails,
-                code: errorDetails?.code,
-                meta: errorDetails?.meta
-              });
+              console.error(`${customer.name} uchun xatolik:`, errorDetails);
             }
           }
         }
-        
+
         setShowPriceModal(false);
-        
+
         if (savedCount === 0) {
-          alert(`âš ï¸ Hech qanday narx saqlanmadi!\n\nIltimos, kamida bitta mijoz uchun narx kiriting.`);
+          addToast(toast.warning(
+            latinToCyrillic('Diqqat'),
+            latinToCyrillic('Hech qanday narx saqlanmadi! Iltimos, kamida bitta mijoz uchun narx kiriting.')
+          ));
         } else if (errorCount === 0) {
-          alert(`âœ… ${savedCount} ta mijoz uchun narxlar muvaffaqiyatli saqlandi!`);
+          addToast(toast.success(
+            latinToCyrillic('Muvaffaqiyatli'),
+            `${savedCount} ${latinToCyrillic('ta mijoz uchun narxlar saqlandi')}!`
+          ));
         } else {
-          alert(`âš ï¸ ${savedCount} ta saqlandi, ${errorCount} ta xatolik!`);
+          addToast(toast.warning(
+            latinToCyrillic('Qisman bajarildi'),
+            `${savedCount} ${latinToCyrillic('ta saqlandi')}, ${errorCount} ${latinToCyrillic('ta xatolik')}!`
+          ));
         }
-        
-        console.log(`ðŸ“Š Natija: ${savedCount} saqlandi, ${errorCount} xatolik`);
       } catch (error: any) {
-        console.error('âŒ Umumiy xatolik:', error);
-        alert(`Xatolik: ${error.response?.data?.error || error.message || 'Narxlarni saqlashda xatolik!'}`);
+        console.error('Umumiy xatolik:', error);
+        addToast(toast.error(
+          latinToCyrillic('Xatolik'),
+          latinToCyrillic(error.response?.data?.error || error.message || 'Narxlarni saqlashda xatolik!')
+        ));
       }
     };
 
@@ -1147,42 +1236,41 @@ export default function ProductDetail() {
       return (
         <div className="text-center py-8">
           <div className="animate-pulse rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-sm text-gray-500">Mijozlar yuklanmoqda...</p>
+          <p className="text-sm text-gray-500">{latinToCyrillic('Mijozlar yuklanmoqda...')}</p>
         </div>
       );
     }
 
     return (
       <div className="space-y-4">
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 p-4 rounded-lg">
-          <p className="text-sm font-medium mb-2">
-            ðŸ“¦ <strong>{product?.name}</strong> mahsuloti uchun har bir mijozga alohida narx belgilang
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-xl border border-blue-100">
+          <p className="text-sm font-medium mb-1 text-gray-900">
+            <strong>{product?.name}</strong> {latinToCyrillic('mahsuloti uchun har bir mijozga alohida narx belgilang')}
           </p>
-          <p className="text-xs text-muted-foreground">
-            ðŸ’° Asosiy narx: <strong>{product?.pricePerBag?.toLocaleString()} UZS</strong>/qop
+          <p className="text-xs text-gray-500">
+            {latinToCyrillic('Asosiy narx')}: <strong>{product?.pricePerBag?.toLocaleString()} UZS</strong>/{latinToCyrillic('qop')}
           </p>
         </div>
 
         {/* Ommaviy narx o'zgartirish */}
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 p-4 rounded-lg border-2 border-green-200 dark:border-green-800">
-          <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-            <span className="text-lg">âš¡</span>
-            Barcha mijozlar uchun narxni birdan o'zgartirish
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-xl border-2 border-green-200">
+          <h3 className="text-sm font-bold mb-3 text-gray-900">
+            {latinToCyrillic('Barcha mijozlar uchun narxni birdan o\'zgartirish')}
           </h3>
-          
+
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
               <input
                 type="number"
                 value={bulkAmount}
                 onChange={(e) => setBulkAmount(e.target.value)}
-                placeholder="Miqdorni kiriting"
+                placeholder={latinToCyrillic('Miqdorni kiriting')}
                 min="0"
                 step="1"
-                className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg text-sm font-semibold focus:border-green-500 focus:ring-2 focus:ring-green-200 dark:bg-gray-800"
+                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm font-semibold focus:border-green-500 focus:ring-2 focus:ring-green-200"
               />
             </div>
-            
+
             <div className="flex gap-2">
               <button
                 type="button"
@@ -1190,10 +1278,10 @@ export default function ProductDetail() {
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   bulkType === 'percent'
                     ? 'bg-green-600 text-white shadow-md'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                % Foiz
+                {latinToCyrillic('Foiz')}
               </button>
               <button
                 type="button"
@@ -1201,10 +1289,10 @@ export default function ProductDetail() {
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   bulkType === 'fixed'
                     ? 'bg-green-600 text-white shadow-md'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                UZS So'm
+                UZS
               </button>
             </div>
           </div>
@@ -1215,68 +1303,71 @@ export default function ProductDetail() {
               onClick={() => applyBulkAdjustment(true)}
               className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
             >
-              <span className="text-lg">ðŸ“ˆ</span>
-              Ko'tarish
+              <TrendingUp className="w-4 h-4" />
+              {latinToCyrillic('Ko\'tarish')}
             </button>
             <button
               type="button"
               onClick={() => applyBulkAdjustment(false)}
               className="flex-1 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
             >
-              <span className="text-lg">ðŸ“‰</span>
-              Tushirish
+              <Minus className="w-4 h-4" />
+              {latinToCyrillic('Tushirish')}
             </button>
           </div>
 
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-            ðŸ’¡ Masalan: 10% yoki 5000 UZS ga barcha narxlarni birdan o'zgartiring
+          <p className="text-xs text-gray-600 mt-2">
+            {latinToCyrillic('Masalan: 10% yoki 5000 UZS ga barcha narxlarni birdan o\'zgartiring')}
           </p>
         </div>
 
-        <div className="bg-yellow-50 dark:bg-yellow-950 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800">
-          <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            â„¹ï¸ Jami <strong>{localCustomers.length}</strong> ta mijoz topildi
+        <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+          <p className="text-sm text-yellow-800">
+            {latinToCyrillic('Jami')} <strong>{localCustomers.length}</strong> {latinToCyrillic('ta mijoz topildi')}
           </p>
         </div>
 
         <div className="max-h-96 overflow-y-auto space-y-3 pr-2">
           {localCustomers.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 dark:bg-gray-900 rounded-lg">
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
               <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <p className="text-sm text-gray-500 font-medium mb-2">
-                Mijozlar yo'q
+                {latinToCyrillic('Mijozlar yo\'q')}
               </p>
               <p className="text-xs text-gray-400">
-                Avval mijozlar qo'shing
+                {latinToCyrillic('Avval mijozlar qo\'shing')}
               </p>
             </div>
           ) : (
             localCustomers.map((customer, index) => (
-              <div 
-                key={customer.id} 
-                className="flex items-center gap-3 p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-400 dark:hover:border-blue-600 transition-all hover:shadow-md bg-white dark:bg-gray-800"
+              <div
+                key={customer.id}
+                className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-400 transition-all hover:shadow-md bg-white"
               >
                 <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
                   {index + 1}
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className="font-semibold text-lg truncate">{customer.name}</h4>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-500">ðŸ“ž {customer.phone}</span>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className="text-xs text-gray-500 inline-flex items-center gap-1">
+                      <User className="w-3 h-3" />
+                      {customer.phone}
+                    </span>
                     {customer.pricePerBag && (
-                      <span className="text-xs text-blue-600 dark:text-blue-400">
-                        â€¢ Umumiy: {customer.pricePerBag} UZS/qop
+                      <span className="text-xs text-blue-600">
+                        · {latinToCyrillic('Umumiy')}: {customer.pricePerBag} UZS/{latinToCyrillic('qop')}
                       </span>
                     )}
                     {customerDiscounts[customer.id] && (
-                      <span className="text-xs font-bold text-green-600 dark:text-green-400">
-                        â€¢ Chegirma: {customerDiscounts[customer.id] > 0 ? '-' : '+'}{Math.abs(customerDiscounts[customer.id])} UZS
+                      <span className="text-xs font-bold text-green-600">
+                        · {latinToCyrillic('Chegirma')}: {customerDiscounts[customer.id] > 0 ? '-' : '+'}{Math.abs(customerDiscounts[customer.id])} UZS
                       </span>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-lg">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">UZS</span>
+                <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg">
+                  <span className="text-sm font-medium text-gray-600">UZS</span>
                   <input
                     type="number"
                     value={localPrices[customer.id] || ''}
@@ -1286,19 +1377,18 @@ export default function ProductDetail() {
                         ...prev,
                         [customer.id]: newPrice
                       }));
-                      
+
                       // Chegirma shablonini hisoblash va saqlash
                       if (newPrice && product?.pricePerBag) {
                         const customerPrice = parseFloat(newPrice);
                         const standardPrice = product.pricePerBag;
                         const discount = standardPrice - customerPrice;
-                        
+
                         if (discount !== 0) {
                           setCustomerDiscounts(prev => ({
                             ...prev,
                             [customer.id]: discount
                           }));
-                          console.log(`ðŸŽ ${customer.name} uchun chegirma saqlandi: ${discount} UZS`);
                         } else {
                           // Agar chegirma 0 bo'lsa, o'chirish
                           setCustomerDiscounts(prev => {
@@ -1312,9 +1402,10 @@ export default function ProductDetail() {
                     placeholder={product?.pricePerBag?.toString()}
                     min="0"
                     step="1"
-                    className="w-24 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg text-sm font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:bg-gray-800"
+                    aria-label={latinToCyrillic('Narx')}
+                    className="w-24 px-3 py-2 border-2 border-gray-300 rounded-lg text-sm font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">/qop</span>
+                  <span className="text-sm text-gray-600">/{latinToCyrillic('qop')}</span>
                 </div>
               </div>
             ))
@@ -1323,41 +1414,38 @@ export default function ProductDetail() {
 
         {/* Chegirma shablonlarini qo'llash */}
         {Object.keys(customerDiscounts).length > 0 && (
-          <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 p-4 rounded-lg border-2 border-purple-200 dark:border-purple-800">
-            <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
-              <span className="text-lg">ðŸŽ</span>
-              Chegirma shablonlari topildi
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-xl border-2 border-purple-200">
+            <h3 className="text-sm font-bold mb-2 text-gray-900">
+              {latinToCyrillic('Chegirma shablonlari topildi')}
             </h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-              {Object.keys(customerDiscounts).length} ta mijoz uchun chegirma shabloni mavjud. 
-              Ushbu chegirmalarni barcha boshqa mahsulotlarga ham qo'llashingiz mumkin.
+            <p className="text-xs text-gray-600 mb-3">
+              {Object.keys(customerDiscounts).length} {latinToCyrillic('ta mijoz uchun chegirma shabloni mavjud. Ushbu chegirmalarni barcha boshqa mahsulotlarga ham qo\'llashingiz mumkin.')}
             </p>
             <button
               type="button"
               onClick={applyDiscountTemplates}
-              className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all"
             >
-              <span className="text-lg">âœ¨</span>
-              Barcha mahsulotlarga qo'llash
+              {latinToCyrillic('Barcha mahsulotlarga qo\'llash')}
             </button>
           </div>
         )}
 
         <div className="flex gap-3 pt-4">
-          <Button 
-            type="button" 
-            variant="outline" 
+          <Button
+            type="button"
+            variant="outline"
             onClick={() => setShowPriceModal(false)}
             className="flex-1"
           >
-            Bekor qilish
+            {latinToCyrillic('Bekor qilish')}
           </Button>
-          <Button 
+          <Button
             type="button"
             onClick={handleSave}
             className="flex-1 bg-blue-600 hover:bg-blue-700"
           >
-            ðŸ’¾ Saqlash
+            {latinToCyrillic('Saqlash')}
           </Button>
         </div>
       </div>

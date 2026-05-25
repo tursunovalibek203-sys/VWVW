@@ -1,447 +1,576 @@
-import { useState, useEffect } from 'react';
-import { 
-  Search, 
-  Filter, 
-  FileText, 
-  Download, 
-  TrendingUp, 
-  DollarSign, 
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  ShoppingCart,
+  Package,
+  Users,
+  TrendingUp,
+  DollarSign,
+  RefreshCw,
+  AlertTriangle,
   Calendar,
-  BarChart3,
-  PieChart,
-  Plus,
-  Eye,
-  Printer,
-  RefreshCw
+  Download,
+  Wallet,
+  Percent,
+  Receipt,
+  Boxes,
 } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
-import ModernLayout from '../components/ModernLayout';
 import api from '../lib/professionalApi';
+import { TableSkeleton } from '../components/ui/LoadingSpinner';
+import { Badge } from '../components/ui/Badge';
+import EmptyState from '../components/EmptyState';
+import { useToast, toast } from '../components/ui/Toast';
 
-interface Report {
-  id: string;
-  name: string;
-  type: 'sales' | 'inventory' | 'customers' | 'financial';
-  date: string;
-  status: 'generated' | 'pending' | 'failed';
-  size: number;
-  generatedBy: string;
+// ---------------------------------------------------------------------------
+// Report types. Each tab maps 1:1 to an existing backend endpoint. The
+// endpoints below are UNCHANGED from the original page:
+//   GET /reports/sales, /reports/inventory,
+//   GET /reports/customer-analysis, /reports/profit-loss
+// ---------------------------------------------------------------------------
+type ReportType = 'sales' | 'inventory' | 'customers' | 'financial';
+
+const REPORT_ENDPOINT: Record<ReportType, string> = {
+  sales: '/reports/sales',
+  inventory: '/reports/inventory',
+  customers: '/reports/customer-analysis',
+  financial: '/reports/profit-loss',
+};
+
+interface ReportTab {
+  id: ReportType;
+  label: string;
+  icon: typeof ShoppingCart;
 }
 
+const REPORT_TABS: ReportTab[] = [
+  { id: 'sales', label: latinToCyrillic('Sotuvlar'), icon: ShoppingCart },
+  { id: 'inventory', label: latinToCyrillic('Ombor'), icon: Package },
+  { id: 'customers', label: latinToCyrillic('Mijozlar'), icon: Users },
+  { id: 'financial', label: latinToCyrillic('Foyda / Zarar'), icon: DollarSign },
+];
+
+const PERIODS = ['all', 'today', 'week', 'month', 'year'] as const;
+type Period = (typeof PERIODS)[number];
+
+interface KpiCard {
+  label: string;
+  value: string;
+  icon: typeof ShoppingCart;
+  tint: string;
+}
+
+const fmtNum = (n: number) => (Number.isFinite(n) ? Math.round(n).toLocaleString('en-US') : '0');
+const fmtMoney = (n: number, currency = 'UZS') => `${fmtNum(n)} ${currency}`;
+
+const formatDate = (value?: string | null) => {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toLocaleDateString('uz-UZ', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+// Compute the startDate query param for a given period (endDate = now).
+// This is sent only when supported by the endpoint; backend ignores it
+// otherwise, so data handling stays compatible.
+const periodToRange = (period: Period): { startDate?: string; endDate?: string } => {
+  if (period === 'all') return {};
+  const now = new Date();
+  const start = new Date();
+  switch (period) {
+    case 'today':
+      start.setHours(0, 0, 0, 0);
+      break;
+    case 'week':
+      start.setTime(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case 'month':
+      start.setTime(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      break;
+    case 'year':
+      start.setTime(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+      break;
+  }
+  return { startDate: start.toISOString(), endDate: now.toISOString() };
+};
+
 export default function ReportsModern() {
-  const [reports, setReports] = useState<Report[]>([]);
-  const [filteredReports, setFilteredReports] = useState<Report[]>([]);
+  const { addToast } = useToast();
+  const [activeTab, setActiveTab] = useState<ReportType>('sales');
+  const [period, setPeriod] = useState<Period>('all');
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedType, setSelectedType] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [error, setError] = useState(false);
+  // Raw payload for the active report. Each report has a different shape so we
+  // keep it as `any` here and narrow at render time.
+  const [data, setData] = useState<any>(null);
 
-  const types = ['all', 'sales', 'inventory', 'customers', 'financial'];
-  const statuses = ['all', 'generated', 'pending', 'failed'];
-
-  // Hisobotlarni API dan yuklash
-  const loadReports = async () => {
-    try {
+  const loadReport = useCallback(
+    async (type: ReportType, selectedPeriod: Period) => {
       setLoading(true);
-      
-      // Haqiqiy API dan ma'lumotlarni olish
-      const [salesRes, inventoryRes, customersRes, financialRes] = await Promise.all([
-        api.get('/reports/sales').catch(() => ({ data: [] })),
-        api.get('/reports/inventory').catch(() => ({ data: [] })),
-        api.get('/reports/customer-analysis').catch(() => ({ data: [] })),
-        api.get('/reports/profit-loss').catch(() => ({ data: null }))
-      ]);
-      
-      // Hisobotlar ro'yxatini yaratish
-      const generatedReports: Report[] = [
-        {
-          id: 'sales-' + Date.now(),
-          name: 'Sotuvlar Hisoboti',
-          type: 'sales',
-          date: new Date().toISOString().split('T')[0],
-          status: 'generated',
-          size: JSON.stringify(salesRes.data).length,
-          generatedBy: 'System'
-        },
-        {
-          id: 'inventory-' + Date.now(),
-          name: 'Ombor Hisoboti',
-          type: 'inventory',
-          date: new Date().toISOString().split('T')[0],
-          status: 'generated',
-          size: JSON.stringify(inventoryRes.data).length,
-          generatedBy: 'System'
-        },
-        {
-          id: 'customers-' + Date.now(),
-          name: 'Mijozlar Hisoboti',
-          type: 'customers',
-          date: new Date().toISOString().split('T')[0],
-          status: 'generated',
-          size: JSON.stringify(customersRes.data).length,
-          generatedBy: 'System'
-        }
-      ];
-      
-      if (financialRes.data) {
-        generatedReports.push({
-          id: 'financial-' + Date.now(),
-          name: 'Moliyaviy Hisobot',
-          type: 'financial',
-          date: new Date().toISOString().split('T')[0],
-          status: 'generated',
-          size: JSON.stringify(financialRes.data).length,
-          generatedBy: 'System'
-        });
+      setError(false);
+
+      // Guard against an indefinitely hanging request.
+      const timeout = setTimeout(() => {
+        setLoading(false);
+        setError(true);
+        console.warn('Loading timeout reached for report:', type);
+      }, 15000);
+
+      try {
+        const params = periodToRange(selectedPeriod);
+        const res = await api.get(REPORT_ENDPOINT[type], { params });
+        clearTimeout(timeout);
+        setData(res.data ?? null);
+      } catch (err) {
+        clearTimeout(timeout);
+        console.error('Hisobotni yuklashda xatolik:', err);
+        setError(true);
+        setData(null);
+        // Honest error surface — replaces the previous silent
+        // `.catch(() => ({ data: [] }))` which faked an empty success.
+        addToast(
+          toast.error(
+            latinToCyrillic('Xatolik'),
+            latinToCyrillic('Hisobotni yuklashda xatolik yuz berdi. Qayta urinib koring.')
+          )
+        );
+      } finally {
+        clearTimeout(timeout);
+        setLoading(false);
       }
-      
-      setReports(generatedReports);
-      
-    } catch (error) {
-      console.error('Error loading reports:', error);
-      // Xatolik yuz bersa, bo'sh ro'yxat ko'rsatish
-      setReports([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [addToast]
+  );
 
   useEffect(() => {
-    loadReports();
-  }, []);
+    loadReport(activeTab, period);
+  }, [activeTab, period, loadReport]);
 
-  useEffect(() => {
-    let filtered = reports;
-    
-    // Filter by type
-    if (selectedType !== 'all') {
-      filtered = filtered.filter(report => report.type === selectedType);
-    }
-    
-    // Filter by status
-    if (selectedStatus !== 'all') {
-      filtered = filtered.filter(report => report.status === selectedStatus);
-    }
-    
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(report => 
-        report.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        report.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        report.generatedBy.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    setFilteredReports(filtered);
-  }, [reports, selectedType, selectedStatus, searchTerm]);
-
-  const getTypeBadgeColor = (type: string) => {
-    switch (type) {
-      case 'sales': return 'badge-blue';
-      case 'inventory': return 'badge-success';
-      case 'customers': return 'badge-warning';
-      case 'financial': return 'badge-purple';
-      default: return 'badge-gray';
-    }
+  const handleRefresh = () => {
+    loadReport(activeTab, period);
   };
 
-  const getStatusBadgeColor = (status: string) => {
+  // Export is not implemented on the backend yet. Surface this honestly via a
+  // disabled button + tooltip instead of pretending with an alert().
+  const exportDisabledTitle = latinToCyrillic('Yuklab olish hozircha mavjud emas');
+
+  // ---- Derived rows + KPI cards per report ----------------------------------
+  const salesRows = useMemo(
+    () => (activeTab === 'sales' ? (Array.isArray(data?.sales) ? data.sales : []) : []),
+    [activeTab, data]
+  );
+  const inventoryRows = useMemo(
+    () => (activeTab === 'inventory' ? (Array.isArray(data) ? data : []) : []),
+    [activeTab, data]
+  );
+  const customerRows = useMemo(
+    () => (activeTab === 'customers' ? (Array.isArray(data) ? data : []) : []),
+    [activeTab, data]
+  );
+
+  const isEmpty = useMemo(() => {
+    if (loading || error) return false;
+    switch (activeTab) {
+      case 'sales':
+        return salesRows.length === 0;
+      case 'inventory':
+        return inventoryRows.length === 0;
+      case 'customers':
+        return customerRows.length === 0;
+      case 'financial':
+        return data == null;
+      default:
+        return true;
+    }
+  }, [activeTab, loading, error, salesRows, inventoryRows, customerRows, data]);
+
+  const kpiCards: KpiCard[] = useMemo(() => {
+    if (activeTab === 'sales') {
+      const s = data?.summary ?? {};
+      return [
+        { label: latinToCyrillic('Sotuvlar soni'), value: fmtNum(s.totalSales ?? salesRows.length), icon: Receipt, tint: 'bg-indigo-50 text-indigo-600' },
+        { label: latinToCyrillic('Umumiy tushum'), value: fmtMoney(s.totalRevenue ?? 0), icon: DollarSign, tint: 'bg-emerald-50 text-emerald-600' },
+        { label: latinToCyrillic('Sotilgan miqdor'), value: fmtNum(s.totalQuantity ?? 0), icon: Boxes, tint: 'bg-violet-50 text-violet-600' },
+        { label: latinToCyrillic('Ortacha chek'), value: fmtMoney(s.averageSale ?? 0), icon: TrendingUp, tint: 'bg-sky-50 text-sky-600' },
+      ];
+    }
+    if (activeTab === 'inventory') {
+      const totalValue = inventoryRows.reduce((sum: number, p: any) => sum + (p.totalValue || 0), 0);
+      const lowStock = inventoryRows.filter((p: any) => p.status === 'LOW' || p.status === 'CRITICAL').length;
+      const outStock = inventoryRows.filter((p: any) => p.status === 'OUT_OF_STOCK').length;
+      return [
+        { label: latinToCyrillic('Mahsulotlar'), value: fmtNum(inventoryRows.length), icon: Package, tint: 'bg-indigo-50 text-indigo-600' },
+        { label: latinToCyrillic('Ombor qiymati'), value: fmtMoney(totalValue), icon: Wallet, tint: 'bg-emerald-50 text-emerald-600' },
+        { label: latinToCyrillic('Kam qolgan'), value: fmtNum(lowStock), icon: AlertTriangle, tint: 'bg-amber-50 text-amber-600' },
+        { label: latinToCyrillic('Tugagan'), value: fmtNum(outStock), icon: Boxes, tint: 'bg-rose-50 text-rose-600' },
+      ];
+    }
+    if (activeTab === 'customers') {
+      const totalPurchases = customerRows.reduce((sum: number, c: any) => sum + (c.totalPurchases || 0), 0);
+      const totalDebt = customerRows.reduce((sum: number, c: any) => sum + (c.debt || 0), 0);
+      const debtors = customerRows.filter((c: any) => (c.debt || 0) > 0).length;
+      return [
+        { label: latinToCyrillic('Mijozlar'), value: fmtNum(customerRows.length), icon: Users, tint: 'bg-indigo-50 text-indigo-600' },
+        { label: latinToCyrillic('Jami xaridlar'), value: fmtMoney(totalPurchases), icon: ShoppingCart, tint: 'bg-emerald-50 text-emerald-600' },
+        { label: latinToCyrillic('Qarzdorlar'), value: fmtNum(debtors), icon: AlertTriangle, tint: 'bg-amber-50 text-amber-600' },
+        { label: latinToCyrillic('Umumiy qarz'), value: fmtMoney(totalDebt), icon: Wallet, tint: 'bg-rose-50 text-rose-600' },
+      ];
+    }
+    // financial
+    const f = data ?? {};
+    return [
+      { label: latinToCyrillic('Tushum'), value: fmtMoney(f.revenue ?? 0), icon: DollarSign, tint: 'bg-indigo-50 text-indigo-600' },
+      { label: latinToCyrillic('Xarajatlar'), value: fmtMoney(f.expenses ?? 0), icon: Receipt, tint: 'bg-amber-50 text-amber-600' },
+      { label: latinToCyrillic('Sof foyda'), value: fmtMoney(f.grossProfit ?? 0), icon: TrendingUp, tint: (f.grossProfit ?? 0) >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600' },
+      { label: latinToCyrillic('Foyda marjasi'), value: `${(f.profitMargin ?? 0).toLocaleString('en-US')}%`, icon: Percent, tint: 'bg-violet-50 text-violet-600' },
+    ];
+  }, [activeTab, data, salesRows, inventoryRows, customerRows]);
+
+  const activeTabMeta = REPORT_TABS.find((t) => t.id === activeTab)!;
+
+  const stockBadge = (status: string): { variant: 'success' | 'warning' | 'error' | 'neutral'; text: string } => {
     switch (status) {
-      case 'generated': return 'badge-success';
-      case 'pending': return 'badge-warning';
-      case 'failed': return 'badge-danger';
-      default: return 'badge-gray';
+      case 'GOOD':
+        return { variant: 'success', text: latinToCyrillic('Yetarli') };
+      case 'LOW':
+        return { variant: 'warning', text: latinToCyrillic('Kam') };
+      case 'CRITICAL':
+        return { variant: 'warning', text: latinToCyrillic('Kritik') };
+      case 'OUT_OF_STOCK':
+        return { variant: 'error', text: latinToCyrillic('Tugagan') };
+      default:
+        return { variant: 'neutral', text: status || '—' };
     }
   };
 
-  const getTypeText = (type: string) => {
-    switch (type) {
-      case 'sales': return latinToCyrillic('Sotuv');
-      case 'inventory': return latinToCyrillic('Ombor');
-      case 'customers': return latinToCyrillic('Mijozlar');
-      case 'financial': return latinToCyrillic('Moliya');
-      default: return type;
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'generated': return latinToCyrillic('Yaratilgan');
-      case 'pending': return latinToCyrillic('Kutilmoqda');
-      case 'failed': return latinToCyrillic('Xatolik');
-      default: return status;
-    }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    const f = (bytes / Math.pow(k, i)).toFixed(2);
-    return `${parseFloat(f)} ${sizes[i]}`;
-  };
+  const periodLabel = (p: Period) =>
+    p === 'all'
+      ? latinToCyrillic('Barcha vaqt')
+      : p === 'today'
+      ? latinToCyrillic('Bugun')
+      : p === 'week'
+      ? latinToCyrillic('Oxirgi 7 kun')
+      : p === 'month'
+      ? latinToCyrillic('Oylik')
+      : latinToCyrillic('Yillik');
 
   return (
-    <ModernLayout 
-      title={latinToCyrillic("Hisobotlar")}
-      subtitle={`${filteredReports.length} ${latinToCyrillic("ta hisobot")}`}
-    >
-      <div className="space-y-6">
-        {/* Actions Bar */}
-        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-          <div className="flex flex-col sm:flex-row gap-4 flex-1">
-            {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                <Search className="w-5 h-5" />
-              </div>
-              <input
-                id="reports-search"
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={latinToCyrillic("Ò²Ð¸ÑÐ±Ð¾Ñ‚Ð»Ð°Ñ€Ð½Ð¸ Ò›Ð¸Ð´Ð¸Ñ€Ð¸Ñˆ...")}
-                className="input-modern w-full pl-12"
-              />
-            </div>
-            
-            {/* Type Filter */}
-            <div className="relative">
-              <label htmlFor="reports-type-filter" className="sr-only">Type Filter</label>
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                <Filter className="w-5 h-5" />
-              </div>
-              <select
-                id="reports-type-filter"
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
-                className="input-modern pl-12 appearance-none cursor-pointer"
-              >
-                {types.map(type => (
-                  <option key={type} value={type}>
-                    {type === 'all' ? latinToCyrillic("Ð‘Ð°Ñ€Ñ‡Ð°ÑÐ¸") : getTypeText(type)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Status Filter */}
-            <div className="relative">
-              <label htmlFor="reports-status-filter" className="sr-only">Status Filter</label>
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                <Filter className="w-5 h-5" />
-              </div>
-              <select
-                id="reports-status-filter"
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="input-modern pl-12 appearance-none cursor-pointer"
-              >
-                {statuses.map(status => (
-                  <option key={status} value={status}>
-                    {status === 'all' ? latinToCyrillic("Ð‘Ð°Ñ€Ñ‡Ð°ÑÐ¸") : getStatusText(status)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          
-          {/* Action Buttons */}
-          <div className="flex gap-2">
-            {/* Refresh Button */}
-            <button
-              type="button"
-              onClick={loadReports}
-              disabled={loading}
-              className="btn-gradient-secondary px-4 py-3 flex items-center gap-2 disabled:opacity-50"
-            >
-              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} />
-              {latinToCyrillic("Ð¯Ð½Ð³Ð¸Ð»Ð°Ñˆ")}
-            </button>
-            
-            {/* Generate Report Button */}
-            <button
-              type="button"
-              onClick={loadReports}
-              disabled={loading}
-              className="btn-gradient-primary px-6 py-3 flex items-center gap-2 disabled:opacity-50"
-            >
-              <Plus className="w-5 h-5" />
-              {latinToCyrillic("Ð¯Ð½Ð³Ð¸ Ò²Ð¸ÑÐ±Ð¾Ñ‚")}
-            </button>
-          </div>
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Header: title + subtitle + period selector + refresh + export */}
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+        <div>
+          <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
+            {latinToCyrillic('Hisobotlar')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {loading
+              ? latinToCyrillic('Yuklanmoqda...')
+              : `${activeTabMeta.label} · ${periodLabel(period)}`}
+          </p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="glass-card-light p-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                <FileText className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("Ð–Ð°Ð¼Ð¸ Ò²Ð¸ÑÐ±Ð¾Ñ‚Ð»Ð°Ñ€")}</p>
-                <p className="text-2xl font-bold text-primary">{reports.length}</p>
-              </div>
-            </div>
+        <div className="flex items-center gap-2 self-start">
+          {/* Period selector */}
+          <div className="relative">
+            <label htmlFor="reports-period" className="sr-only">
+              {latinToCyrillic('Davr')}
+            </label>
+            <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <select
+              id="reports-period"
+              value={period}
+              onChange={(e) => setPeriod(e.target.value as Period)}
+              className="appearance-none cursor-pointer pl-10 pr-8 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+            >
+              {PERIODS.map((p) => (
+                <option key={p} value={p}>
+                  {periodLabel(p)}
+                </option>
+              ))}
+            </select>
           </div>
-          
-          <div className="glass-card-light p-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("Ð¯Ñ€Ð°Ñ‚Ð¸Ð»Ð³Ð°Ð½")}</p>
-                <p className="text-2xl font-bold text-primary">
-                  {reports.filter(r => r.status === 'generated').length}
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="glass-card-light p-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("ÐšÑƒÑ‚Ð¼Ð¾Ò›Ð´Ð°")}</p>
-                <p className="text-2xl font-bold text-primary">
-                  {reports.filter(r => r.status === 'pending').length}
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="glass-card-light p-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center">
-                <PieChart className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("Ð¥Ð°Ñ‚Ð¾Ð»Ð¸Ðº")}</p>
-                <p className="text-2xl font-bold text-primary">
-                  {reports.filter(r => r.status === 'failed').length}
-                </p>
-              </div>
-            </div>
-          </div>
+
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{latinToCyrillic('Yangilash')}</span>
+          </button>
+
+          {/* Honest export: disabled with explanatory tooltip */}
+          <button
+            type="button"
+            disabled
+            title={exportDisabledTitle}
+            aria-disabled="true"
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white rounded-xl text-sm font-semibold text-slate-300 border border-slate-200 cursor-not-allowed"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">{latinToCyrillic('Yuklab olish')}</span>
+          </button>
         </div>
+      </div>
 
-        {/* Loading State */}
-        {loading && (
-          <div className="glass-card-light p-12">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16">
-                <div className="animate-pulse rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
-              </div>
-              <p className="text-lg font-semibold text-primary mb-4">{latinToCyrillic("Yuklanmoqda...")}</p>
-            </div>
-          </div>
-        )}
+      {/* Report-type pill tabs */}
+      <div className="flex flex-wrap gap-2">
+        {REPORT_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = tab.id === activeTab;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors active:scale-[0.98] ${
+                isActive
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-        {/* Reports Table */}
-        {!loading && (
-          <div className="glass-card-light p-6">
-            <div className="overflow-x-auto">
-              <table className="table-modern w-full">
-                <thead>
-                  <tr>
-                    <th className="table-header">{latinToCyrillic("Nomi")}</th>
-                    <th className="table-header">{latinToCyrillic("Turi")}</th>
-                    <th className="table-header">{latinToCyrillic("Sana")}</th>
-                    <th className="table-header">{latinToCyrillic("Holat")}</th>
-                    <th className="table-header">{latinToCyrillic("Hajmi")}</th>
-                    <th className="table-header">{latinToCyrillic("Yaratdi")}</th>
-                    <th className="table-header">{latinToCyrillic("Amallar")}</th>
+      {/* Summary KPI cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        {loading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[116px] animate-pulse" />
+            ))
+          : kpiCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div
+                  key={card.label}
+                  className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">
+                      {card.label}
+                    </p>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${card.tint}`}>
+                      <Icon className="w-[18px] h-[18px]" />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-2xl font-bold text-slate-900 tracking-tight tabular-nums">{card.value}</p>
+                </div>
+              );
+            })}
+      </div>
+
+      {/* Loading state */}
+      {loading && (
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-6">
+          <TableSkeleton rows={8} cols={5} />
+        </div>
+      )}
+
+      {/* Error state */}
+      {!loading && error && (
+        <div className="bg-white rounded-2xl border border-slate-200/70">
+          <EmptyState
+            icon={AlertTriangle}
+            title={latinToCyrillic('Hisobotni yuklab bolmadi')}
+            description={latinToCyrillic('Server bilan boglanishda xatolik yuz berdi. Internet ulanishini tekshirib qayta urinib koring.')}
+            action={
+              <button
+                onClick={handleRefresh}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+              >
+                <RefreshCw className="w-4 h-4" />
+                {latinToCyrillic('Qayta urinish')}
+              </button>
+            }
+          />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && !error && isEmpty && (
+        <div className="bg-white rounded-2xl border border-slate-200/70">
+          <EmptyState
+            icon={activeTabMeta.icon}
+            title={latinToCyrillic('Malumot topilmadi')}
+            description={
+              period === 'all'
+                ? latinToCyrillic('Bu hisobot uchun hozircha malumot mavjud emas.')
+                : latinToCyrillic('Tanlangan davr uchun malumot topilmadi. Boshqa davrni tanlab koring.')
+            }
+          />
+        </div>
+      )}
+
+      {/* ---- SALES TABLE ---- */}
+      {!loading && !error && activeTab === 'sales' && salesRows.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200/70 bg-slate-50/60">
+                  <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Sana')}</th>
+                  <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Mijoz')}</th>
+                  <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Mahsulot')}</th>
+                  <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Miqdor')}</th>
+                  <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Summa')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {salesRows.map((sale: any, idx: number) => (
+                  <tr key={sale.id ?? idx} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-5 py-4">
+                      <span className="inline-flex items-center gap-2 text-sm text-slate-600 tabular-nums">
+                        <Calendar className="w-4 h-4 text-slate-400" />
+                        {formatDate(sale.createdAt || sale.date)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          {(sale.customer?.name || sale.manualCustomerName || '?').charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-sm font-medium text-slate-900">
+                          {sale.customer?.name || sale.manualCustomerName || latinToCyrillic('Nomalum')}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-slate-600">
+                      {sale.product?.name || '—'}
+                    </td>
+                    <td className="px-5 py-4 text-right text-sm text-slate-600 tabular-nums">{fmtNum(sale.quantity ?? 0)}</td>
+                    <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900 tabular-nums">{fmtMoney(sale.totalAmount ?? 0)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredReports.map((report) => (
-                    <tr key={report.id} className="hover:bg-gray-50">
-                      <td className="table-cell">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-secondary" />
-                          <span className="font-medium">{report.name}</span>
-                        </div>
-                      </td>
-                      <td className="table-cell">
-                        <span className={`text-xs ${getTypeBadgeColor(report.type)}`}>
-                          {getTypeText(report.type)}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ---- INVENTORY TABLE ---- */}
+      {!loading && !error && activeTab === 'inventory' && inventoryRows.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200/70 bg-slate-50/60">
+                  <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Mahsulot')}</th>
+                  <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Qoldiq')}</th>
+                  <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Birlik')}</th>
+                  <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Qiymati')}</th>
+                  <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Holat')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {inventoryRows.map((p: any, idx: number) => {
+                  const badge = stockBadge(p.status);
+                  return (
+                    <tr key={p.id ?? idx} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="px-5 py-4">
+                        <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+                          <Package className="w-4 h-4 text-slate-400" />
+                          {p.name || '—'}
                         </span>
                       </td>
-                      <td className="table-cell">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-secondary" />
-                          <span>{report.date}</span>
-                        </div>
-                      </td>
-                      <td className="table-cell">
-                        <span className={`text-xs ${getStatusBadgeColor(report.status)}`}>
-                          {getStatusText(report.status)}
-                        </span>
-                      </td>
-                      <td className="table-cell">
-                        <span className="text-sm">{formatFileSize(report.size)}</span>
-                      </td>
-                      <td className="table-cell">
-                        <span className="text-sm">{report.generatedBy}</span>
-                      </td>
-                      <td className="table-cell">
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => alert(`${report.name}\n${latinToCyrillic('Turi')}: ${getTypeText(report.type)}\n${latinToCyrillic('Sana')}: ${report.date}\n${latinToCyrillic('Hajmi')}: ${formatFileSize(report.size)}`)}
-                            className="btn-gradient-secondary p-1"
-                            aria-label="Hisobotni ko'rish"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => alert(latinToCyrillic('Yuklab olish funksiyasi tez orada qo\'shiladi!'))}
-                            className="btn-gradient-primary p-1"
-                            aria-label="Hisobotni yuklab olish"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => window.print()}
-                            className="btn-gradient-secondary p-1"
-                            aria-label="Chop etish"
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-                        </div>
+                      <td className="px-5 py-4 text-right text-sm text-slate-600 tabular-nums">{fmtNum(p.currentStock ?? 0)}</td>
+                      <td className="px-5 py-4 text-right text-sm text-slate-600 tabular-nums">{fmtNum(p.totalUnits ?? 0)}</td>
+                      <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900 tabular-nums">{fmtMoney(p.totalValue ?? 0)}</td>
+                      <td className="px-5 py-4">
+                        <Badge variant={badge.variant}>{badge.text}</Badge>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Empty State */}
-        {!loading && filteredReports.length === 0 && (
-          <div className="glass-card-light p-12">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <FileText className="w-8 h-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-primary mb-2">
-                {latinToCyrillic("Ò²Ð¸ÑÐ±Ð¾Ñ‚Ð»Ð°Ñ€ Ñ‚Ð¾Ð¿Ð¸Ð»Ð¼Ð°Ð´Ð¸")}
-              </h3>
-              <p className="text-secondary">
-                {latinToCyrillic("ÒšÐ¸Ð´Ð¸Ñ€Ð¸Ñˆ ÑˆÐ°Ñ€Ñ‚Ð»Ð°Ñ€Ð¸Ð½Ð¸ ÑžÐ·Ð³Ð°Ñ€Ñ‚Ð¸Ñ€Ð¸Ð± Ò›Ð°Ð¹Ñ‚Ð° ÑƒÑ€Ð¸Ð½Ð¸Ð± ÐºÑžÑ€Ð¸Ð½Ð³")}
-              </p>
+      {/* ---- CUSTOMER ANALYSIS TABLE ---- */}
+      {!loading && !error && activeTab === 'customers' && customerRows.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200/70 bg-slate-50/60">
+                  <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Mijoz')}</th>
+                  <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Sotuvlar')}</th>
+                  <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Xaridlar')}</th>
+                  <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Qarz')}</th>
+                  <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Oxirgi xarid')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {customerRows.map((c: any, idx: number) => (
+                  <tr key={c.id ?? idx} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          {(c.name || '?').charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-sm font-medium text-slate-900">{c.name || '—'}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-right text-sm text-slate-600 tabular-nums">{fmtNum(c.salesCount ?? 0)}</td>
+                    <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900 tabular-nums">{fmtMoney(c.totalPurchases ?? 0)}</td>
+                    <td className="px-5 py-4 text-right">
+                      {(c.debt ?? 0) > 0 ? (
+                        <span className="text-sm font-bold text-rose-600 tabular-nums">{fmtMoney(c.debt)}</span>
+                      ) : (
+                        <span className="text-sm text-slate-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-sm text-slate-600 tabular-nums">{formatDate(c.lastPurchase)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ---- PROFIT / LOSS BREAKDOWN ---- */}
+      {!loading && !error && activeTab === 'financial' && data != null && (
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+          <h3 className="text-sm font-semibold text-slate-900 mb-4">{latinToCyrillic('Foyda va zarar tafsiloti')}</h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between py-3 px-4 bg-emerald-50 rounded-xl">
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-emerald-800">
+                <DollarSign className="w-4 h-4" />
+                {latinToCyrillic('Umumiy tushum')}
+              </span>
+              <span className="text-sm font-bold text-emerald-700 tabular-nums">{fmtMoney(data.revenue ?? 0)}</span>
+            </div>
+            <div className="flex items-center justify-between py-3 px-4 bg-amber-50 rounded-xl">
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-amber-800">
+                <Receipt className="w-4 h-4" />
+                {latinToCyrillic('Xarajatlar')}
+              </span>
+              <span className="text-sm font-bold text-amber-700 tabular-nums">- {fmtMoney(data.expenses ?? 0)}</span>
+            </div>
+            <div className={`flex items-center justify-between py-4 px-4 rounded-xl border ${(data.grossProfit ?? 0) >= 0 ? 'bg-indigo-50 border-indigo-100' : 'bg-rose-50 border-rose-100'}`}>
+              <span className={`inline-flex items-center gap-2 text-sm font-bold ${(data.grossProfit ?? 0) >= 0 ? 'text-indigo-800' : 'text-rose-800'}`}>
+                <TrendingUp className="w-4 h-4" />
+                {latinToCyrillic('Sof foyda')}
+              </span>
+              <span className={`text-base font-extrabold tabular-nums ${(data.grossProfit ?? 0) >= 0 ? 'text-indigo-700' : 'text-rose-700'}`}>
+                {fmtMoney(data.grossProfit ?? 0)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-3 px-4 bg-violet-50 rounded-xl">
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-violet-800">
+                <Percent className="w-4 h-4" />
+                {latinToCyrillic('Foyda marjasi')}
+              </span>
+              <span className="text-sm font-bold text-violet-700 tabular-nums">{(data.profitMargin ?? 0).toLocaleString('en-US')}%</span>
             </div>
           </div>
-        )}
-      </div>
-    </ModernLayout>
+        </div>
+      )}
+    </div>
   );
 }

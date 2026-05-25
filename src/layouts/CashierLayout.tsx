@@ -1,5 +1,16 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Package, ShoppingCart, Calculator, LogOut, User, Users, ClipboardList, Plus, MessageCircle } from 'lucide-react';
+import {
+  Package,
+  ShoppingCart,
+  Calculator,
+  LogOut,
+  User,
+  Users,
+  ClipboardList,
+  Plus,
+  MessageCircle,
+  Bot,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/utils';
@@ -11,7 +22,7 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 10);
+    const handleScroll = () => setIsScrolled(window.scrollY > 8);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -22,62 +33,70 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
   };
 
   const isActive = (path: string) => location.pathname === path;
-  const isInventoryPage = location.pathname === '/cashier/products' || location.pathname === '/cashier/inventory';
+  const isInventoryPage =
+    location.pathname === '/cashier/products' || location.pathname === '/cashier/inventory';
 
+  // Bitta accent (indigo) — har element uchun alohida rang YO'Q (professional, izchil)
   const navItems = [
-    { path: '/cashier/sales', icon: ShoppingCart, label: 'Sotuv', color: 'bg-emerald-500' },
-    { path: '/cashier/products', icon: Package, label: 'Ombor', color: 'bg-blue-500' },
-    { path: '/cashier/customers', icon: Users, label: 'Mijozlar', color: 'bg-purple-500' },
-    { path: '/cashier/cashbox', icon: Calculator, label: 'Kassa', color: 'bg-orange-500' },
-    { path: '/cashier/orders', icon: ClipboardList, label: 'Buyurtma', color: 'bg-indigo-500' },
-    { path: '/cashier/bot', icon: MessageCircle, label: 'Bot', color: 'bg-pink-500' },
-    { path: '/cashier/chat', icon: MessageCircle, label: 'Chat', color: 'bg-green-500' },
+    { path: '/cashier/sales', icon: ShoppingCart, label: 'Sotuv' },
+    { path: '/cashier/products', icon: Package, label: 'Ombor' },
+    { path: '/cashier/customers', icon: Users, label: 'Mijozlar' },
+    { path: '/cashier/cashbox', icon: Calculator, label: 'Kassa' },
+    { path: '/cashier/orders', icon: ClipboardList, label: 'Buyurtma' },
+    { path: '/cashier/bot', icon: Bot, label: 'Bot' },
+    { path: '/cashier/chat', icon: MessageCircle, label: 'Chat' },
   ];
-  
+
   return (
-    <div className="min-h-screen bg-[#f8fafc] dark:bg-gray-950 font-sans antialiased text-slate-900 dark:text-slate-100">
-      {/* Premium Header - KICHIK */}
-      <header className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-4 py-3",
-        isScrolled ? "bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl shadow-xl border-b border-slate-200 dark:border-slate-800" : "bg-gradient-to-b from-white to-white/80 dark:from-gray-900 dark:to-gray-900/80"
-      )}>
-        <div className="max-w-7xl mx-auto flex justify-between items-center h-16 px-4">
-          {/* Chap tomon - Logo va kompaniya nomi */}
-          <div className="flex items-center gap-3">
-            <div 
-              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30 border-2 border-white/60 overflow-hidden bg-white"
+    <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-900">
+      {/* Header */}
+      <header
+        className={cn(
+          'fixed top-0 left-0 right-0 z-50 transition-all duration-200 bg-white border-b',
+          isScrolled ? 'border-slate-200 shadow-sm' : 'border-slate-100'
+        )}
+      >
+        <div className="max-w-7xl mx-auto flex justify-between items-center h-16 px-4 sm:px-6">
+          {/* Logo + kompaniya */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-600 shadow-sm overflow-hidden"
               style={{
                 backgroundImage: 'url("/logo.png")',
                 backgroundSize: 'contain',
                 backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'center'
+                backgroundPosition: 'center',
               }}
               title="LUX PET PLAST"
-            ></div>
-            <div className="flex flex-col">
-              <h1 className="text-lg sm:text-xl font-black tracking-tighter leading-tight">
-                <span className="text-emerald-600">LUX PET PLAST</span>
+            >
+              {/* logo.png bo'lmasa fallback harf */}
+              <span className="text-white font-bold text-sm">LP</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <h1 className="text-base sm:text-lg font-extrabold tracking-tight leading-tight text-slate-900 truncate">
+                LUX PET PLAST
               </h1>
-              <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 font-medium leading-tight">
-                BUXORO VILOYATI VOBKENT TUMANI
+              <p className="text-[10px] sm:text-xs text-slate-400 font-medium leading-tight truncate">
+                Buxoro viloyati, Vobkent tumani
               </p>
             </div>
           </div>
-          
-          {/* O'ng tomon - Kassir ma'lumotlari */}
-          <div className="flex items-center gap-2 sm:gap-3">
+
+          {/* Foydalanuvchi */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <div className="hidden sm:flex flex-col items-end">
-              <span className="text-sm font-bold">{user?.name}</span>
-              <span className="text-xs text-emerald-600 font-medium">Kassir</span>
+              <span className="text-sm font-semibold text-slate-800 leading-tight">{user?.name}</span>
+              <span className="text-xs text-indigo-600 font-medium leading-tight">Kassir</span>
             </div>
-            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center border-2 border-white dark:border-slate-700 shadow-md">
-              <User className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center">
+              <User className="w-5 h-5 text-slate-500" />
             </div>
             <button
               type="button"
               onClick={handleLogout}
-              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all duration-300"
+              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors duration-200"
               title="Chiqish"
+              aria-label="Chiqish"
             >
               <LogOut className="w-5 h-5" />
             </button>
@@ -85,64 +104,67 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
         </div>
       </header>
 
-      {/* Premium Bottom Navigation - More iOS like - KATTA */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50">
-        <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl border-t border-slate-200/50 dark:border-slate-800/50 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] px-2 sm:px-4 py-3 w-full">
-          <div className="flex justify-between items-center">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.path);
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
+      {/* Bottom navigation — bitta indigo accent, touch-friendly */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(15,23,42,0.06)]">
+        <div className="max-w-3xl mx-auto flex items-stretch justify-between px-1 sm:px-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.path);
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className="relative flex flex-col items-center justify-center flex-1 py-2 min-h-[60px] group"
+                aria-current={active ? 'page' : undefined}
+              >
+                {active && (
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full bg-indigo-600" />
+                )}
+                <div
                   className={cn(
-                    "relative flex flex-col items-center justify-center py-2 px-2 transition-all duration-500 group flex-1",
-                    active ? "scale-105" : "opacity-70 hover:opacity-100 hover:scale-105"
+                    'w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200',
+                    active
+                      ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                      : 'text-slate-400 group-hover:text-slate-600 group-hover:bg-slate-100'
                   )}
                 >
-                  <div className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500",
-                    active ? cn(item.color, "text-white shadow-lg") : "bg-gray-100 dark:bg-gray-800 text-slate-600 dark:text-slate-400"
-                  )}>
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <span className={cn(
-                    "text-xs font-bold uppercase tracking-wide mt-2",
-                    active ? "text-slate-900 dark:text-white" : "text-slate-500"
-                  )}>
-                    {item.label}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
+                  <Icon className="w-5 h-5" strokeWidth={active ? 2.4 : 2} />
+                </div>
+                <span
+                  className={cn(
+                    'text-[10px] font-semibold tracking-wide mt-1 transition-colors',
+                    active ? 'text-indigo-600' : 'text-slate-400'
+                  )}
+                >
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
         </div>
       </nav>
 
-      {/* Main Content - KICHIK */}
-      <main className="pt-20 pb-28 px-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
-        {/* Floating Action Button - Contextual based on current page */}
-        {isActive('/cashier/sales') === false && (
+      {/* Main content */}
+      <main className="pt-16 pb-24 w-full">
+        {/* Kontekstga mos suzuvchi tugma (FAB) */}
+        {!isActive('/cashier/sales') && (
           <button
             type="button"
-            onClick={() => isInventoryPage ? navigate('/cashier/add-product') : navigate('/cashier/sales')}
-            className={`fixed right-8 bottom-32 w-16 h-16 rounded-2xl shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300 z-40 group ${
-              isInventoryPage 
-                ? 'bg-blue-600 shadow-blue-500/40' 
-                : 'bg-emerald-600 shadow-emerald-500/40'
-            }`}
-            title={isInventoryPage ? "Yangi Mahsulot" : "Yangi Sotuv"}
+            onClick={() =>
+              isInventoryPage ? navigate('/cashier/add-product') : navigate('/cashier/sales')
+            }
+            className="fixed right-5 sm:right-8 bottom-24 w-14 h-14 rounded-2xl bg-indigo-600 shadow-lg shadow-indigo-500/40 flex items-center justify-center hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all duration-200 z-40 group"
+            title={isInventoryPage ? 'Yangi mahsulot' : 'Yangi sotuv'}
+            aria-label={isInventoryPage ? 'Yangi mahsulot' : 'Yangi sotuv'}
           >
-            <Plus className="w-8 h-8 text-white group-hover:rotate-90 transition-transform duration-500" />
+            <Plus className="w-7 h-7 text-white group-hover:rotate-90 transition-transform duration-300" />
           </button>
         )}
-        
+
         {children}
       </main>
     </div>
   );
 };
 
-export default CashierLayout; 
- 
+export default CashierLayout;

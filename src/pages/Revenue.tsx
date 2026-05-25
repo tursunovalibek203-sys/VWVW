@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react';
-import { 
-  DollarSign, TrendingUp, TrendingDown, Calculator, 
-  PieChart, BarChart3, Calendar, Download, Filter,
-  ArrowUpRight, ArrowDownRight, Target, Wallet, Receipt,
-  Search, Plus, MoreHorizontal, ChevronDown, Printer
+import { useState, useEffect, useCallback } from 'react';
+import {
+  TrendingUp, TrendingDown, Calculator,
+  BarChart3, Wallet, Target, RefreshCw, X, AlertCircle, DollarSign,
 } from 'lucide-react';
 import api from '../lib/professionalApi';
+import { formatCurrency } from '../lib/utils';
+import { latinToCyrillic } from '../lib/transliterator';
+import { useToast } from '../components/ui/Toast';
+import { CardSkeleton } from '../components/ui/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
 
 interface RevenueData {
   month: string;
@@ -22,48 +25,63 @@ interface ProductRevenue {
   growth: number;
 }
 
-// Revenue data will be loaded from API
-
 export default function Revenue() {
+  const t = latinToCyrillic;
+  const { addToast } = useToast();
+
   const [timeRange, setTimeRange] = useState('6months');
-  const [searchTerm, setSearchTerm] = useState('');
   const [showCalculator, setShowCalculator] = useState(false);
   const [calcValues, setCalcValues] = useState({ price: '', cost: '', quantity: '' });
   const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
   const [productRevenue, setProductRevenue] = useState<ProductRevenue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+
+  const loadRevenueData = useCallback(async () => {
+    setError(false);
+    try {
+      // NOTE: backend /api/revenue routes are not mounted yet — these calls
+      // will fail (404) until the endpoint exists. We surface this honestly
+      // instead of silently swallowing the error and showing a fake-empty page.
+      const [revenueRes, productRes] = await Promise.all([
+        api.get('/revenue/monthly'),
+        api.get('/revenue/by-product'),
+      ]);
+      setRevenueData(Array.isArray(revenueRes.data) ? revenueRes.data : []);
+      setProductRevenue(Array.isArray(productRes.data) ? productRes.data : []);
+    } catch (err) {
+      console.error('Error loading revenue data:', err);
+      setRevenueData([]);
+      setProductRevenue([]);
+      setError(true);
+      addToast({
+        type: 'error',
+        title: t('Hisobotni yuklab bolmadi'),
+        message: t('Daromad hisoboti hozircha mavjud emas'),
+      });
+    }
+  }, [addToast, t]);
 
   useEffect(() => {
-    const loadRevenueData = async () => {
-      try {
-        setLoading(true);
-        const [revenueRes, productRes] = await Promise.all([
-          api.get('/revenue/monthly').catch(() => ({ data: [] })),
-          api.get('/revenue/by-product').catch(() => ({ data: [] }))
-        ]);
-        setRevenueData(revenueRes.data || []);
-        setProductRevenue(productRes.data || []);
-      } catch (error) {
-        console.error('Error loading revenue data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadRevenueData();
-  }, [timeRange]);
+    setLoading(true);
+    loadRevenueData().finally(() => setLoading(false));
+  }, [timeRange, loadRevenueData]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadRevenueData();
+    if (!error) {
+      addToast({ type: 'success', title: t('Malumotlar yangilandi') });
+    }
+    setRefreshing(false);
+  };
 
   const totalRevenue = revenueData.reduce((sum, d) => sum + d.revenue, 0);
   const totalExpenses = revenueData.reduce((sum, d) => sum + d.expenses, 0);
   const totalProfit = totalRevenue - totalExpenses;
   const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('uz-UZ', { 
-      style: 'currency', 
-      currency: 'UZS',
-      maximumFractionDigits: 0 
-    }).format(amount);
-  };
+  const maxRevenue = revenueData.reduce((m, d) => Math.max(m, d.revenue), 0) || 1;
 
   const calculateProfit = () => {
     const price = parseFloat(calcValues.price) || 0;
@@ -72,247 +90,342 @@ export default function Revenue() {
     return (price - cost) * quantity;
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
-                <DollarSign className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Daromad kalkulyatori</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Moliyaviy tahlil va foyda hisoblash</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setShowCalculator(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-              >
-                <Calculator className="w-4 h-4" />
-                Kalkulyator
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                <Download className="w-4 h-4" />
-                Eksport
-              </button>
-            </div>
+  const periodLabel: Record<string, string> = {
+    '6months': t('Songgi 6 oy'),
+    '12months': t('Songgi 12 oy'),
+    'year': t('Bu yil'),
+  };
+
+  const hasData = revenueData.length > 0 || productRevenue.length > 0;
+
+  const kpiCards = [
+    {
+      title: t('Umumiy daromad'),
+      value: formatCurrency(totalRevenue),
+      icon: TrendingUp,
+      tint: 'bg-indigo-50 text-indigo-600',
+    },
+    {
+      title: t('Umumiy xarajat'),
+      value: formatCurrency(totalExpenses),
+      icon: TrendingDown,
+      tint: 'bg-amber-50 text-amber-600',
+    },
+    {
+      title: t('Sof foyda'),
+      value: formatCurrency(totalProfit),
+      icon: Wallet,
+      tint: 'bg-emerald-50 text-emerald-600',
+    },
+    {
+      title: t('Foyda marjasi'),
+      value: `${profitMargin.toFixed(1)}%`,
+      icon: Target,
+      tint: 'bg-sky-50 text-sky-600',
+    },
+  ];
+
+  // ── Loading: clean header + KPI skeletons matching premium standard ──────
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div>
+            <div className="h-7 w-48 bg-slate-200 rounded-lg animate-pulse" />
+            <div className="mt-2 h-4 w-64 bg-slate-100 rounded animate-pulse" />
           </div>
+          <div className="flex gap-2">
+            <div className="h-9 w-32 bg-slate-100 rounded-xl animate-pulse" />
+            <div className="h-9 w-32 bg-slate-100 rounded-xl animate-pulse" />
+          </div>
+        </div>
+        <CardSkeleton count={4} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
+            {t('Daromad tahlili')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {t('Daromad, xarajat va foyda korsatkichlari')} · {periodLabel[timeRange]}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 self-start">
+          <select
+            title={t('Vaqt oraligini tanlash')}
+            aria-label={t('Vaqt oraligini tanlash')}
+            className="px-3.5 py-2 bg-white hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/30 cursor-pointer"
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value)}
+          >
+            <option value="6months">{t('Songgi 6 oy')}</option>
+            <option value="12months">{t('Songgi 12 oy')}</option>
+            <option value="year">{t('Bu yil')}</option>
+          </select>
+          <button
+            onClick={() => setShowCalculator(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+          >
+            <Calculator className="w-4 h-4" />
+            {t('Kalkulyator')}
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {t('Yangilash')}
+          </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                <TrendingUp className="w-5 h-5 text-emerald-600" />
-              </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">Bu oy</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(totalRevenue)}</p>
-            <p className="text-sm text-emerald-600 mt-1">Umumiy daromad</p>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-rose-100 dark:bg-rose-900/30 rounded-lg">
-                <TrendingDown className="w-5 h-5 text-rose-600" />
-              </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">Bu oy</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(totalExpenses)}</p>
-            <p className="text-sm text-rose-600 mt-1">Umumiy xarajat</p>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <Wallet className="w-5 h-5 text-blue-600" />
-              </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">Bu oy</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(totalProfit)}</p>
-            <p className="text-sm text-blue-600 mt-1">Sof foyda</p>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-                <Target className="w-5 h-5 text-amber-600" />
-              </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">Bu oy</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{profitMargin.toFixed(1)}%</p>
-            <p className="text-sm text-amber-600 mt-1">Foyda marjasi</p>
-          </div>
-        </div>
-
-        {/* Charts & Tables */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Monthly Revenue Chart */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Oylik daromad</h3>
-              <select
-                title="Vaqt oralig'ini tanlash"
-                aria-label="Vaqt oralig'ini tanlash"
-                value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value)}
-                className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-800 dark:text-white"
+      {/* Honest error / no-data state (backend endpoint is missing) */}
+      {(error || !hasData) ? (
+        <div className="bg-white rounded-2xl border border-slate-200/70">
+          <EmptyState
+            icon={AlertCircle}
+            title={t('Bu hisobot hozircha mavjud emas')}
+            description={t(
+              'Daromad hisoboti uchun server xizmati hali ulanmagan. Iltimos keyinroq qayta urinib koring.'
+            )}
+            action={
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold disabled:opacity-60 transition-colors active:scale-[0.98]"
               >
-                <option value="6months">So'nggi 6 oy</option>
-                <option value="12months">So'nggi 12 oy</option>
-                <option value="year">Bu yil</option>
-              </select>
-            </div>
-            <div className="space-y-4">
-              {revenueData.map((data, index) => (
-                <div key={index} className="flex items-center gap-4">
-                  <span className="w-16 text-sm text-gray-600 dark:text-gray-400">{data.month}</span>
-                  <div className="flex-1 h-8 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg transition-all duration-500"
-                      style={{ width: `${(data.revenue / 70000000) * 100}%` }}
-                    />
-                  </div>
-                  <span className="w-24 text-sm font-medium text-gray-900 dark:text-white text-right">
-                    {(data.revenue / 1000000).toFixed(0)} mln
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Product Revenue */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Mahsulotlar bo'yicha daromad</h3>
-            <div className="space-y-4">
-              {productRevenue.map((product, index) => (
-                <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
-                  <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
-                    <BarChart3 className="w-6 h-6 text-emerald-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900 dark:text-white">{product.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-emerald-500 rounded-full"
-                          style={{ width: `${product.percentage}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">{product.percentage}%</span>
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                {t('Qayta urinish')}
+              </button>
+            }
+          />
+        </div>
+      ) : (
+        <>
+          {/* KPI cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {kpiCards.map((kpi, idx) => {
+              const Icon = kpi.icon;
+              return (
+                <div
+                  key={idx}
+                  className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">
+                      {kpi.title}
+                    </p>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${kpi.tint}`}>
+                      <Icon className="w-[18px] h-[18px]" />
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900 dark:text-white">{(product.revenue / 1000000).toFixed(0)} mln</p>
-                    <p className={`text-xs ${product.growth > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {product.growth > 0 ? '+' : ''}{product.growth}%
-                    </p>
-                  </div>
+                  <p className="mt-3 text-2xl font-bold text-slate-900 tracking-tight tabular-nums">{kpi.value}</p>
                 </div>
-              ))}
+              );
+            })}
+          </div>
+
+          {/* Charts grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Monthly revenue bars */}
+            <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <BarChart3 className="w-[18px] h-[18px]" />
+                </div>
+                <h2 className="font-semibold text-slate-900 tracking-tight">{t('Oylik daromad')}</h2>
+              </div>
+              {revenueData.length > 0 ? (
+                <div className="space-y-4">
+                  {revenueData.map((data, index) => (
+                    <div key={index} className="flex items-center gap-4">
+                      <span className="w-14 text-sm font-medium text-slate-500 tabular-nums">{data.month}</span>
+                      <div className="flex-1 h-8 bg-slate-100 rounded-lg overflow-hidden">
+                        <div
+                          className="h-full bg-indigo-500 rounded-lg transition-all duration-500"
+                          style={{ width: `${Math.min(100, (data.revenue / maxRevenue) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="w-24 text-sm font-semibold text-slate-900 text-right tabular-nums">
+                        {(data.revenue / 1_000_000).toFixed(1)} {t('mln')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={BarChart3}
+                  title={t('Malumot yoq')}
+                  description={t('Tanlangan davr uchun oylik daromad topilmadi')}
+                />
+              )}
+            </div>
+
+            {/* Product revenue */}
+            <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                  <DollarSign className="w-[18px] h-[18px]" />
+                </div>
+                <h2 className="font-semibold text-slate-900 tracking-tight">
+                  {t('Mahsulotlar boyicha daromad')}
+                </h2>
+              </div>
+              {productRevenue.length > 0 ? (
+                <div className="space-y-3">
+                  {productRevenue.map((product, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-4 p-3 sm:p-4 bg-slate-50 rounded-xl"
+                    >
+                      <div className="w-11 h-11 bg-indigo-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <BarChart3 className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-900 truncate">{product.name}</p>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-indigo-500 rounded-full"
+                              style={{ width: `${Math.min(100, product.percentage)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium text-slate-400 tabular-nums">
+                            {product.percentage}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="font-semibold text-slate-900 tabular-nums">
+                          {(product.revenue / 1_000_000).toFixed(1)} {t('mln')}
+                        </p>
+                        <p
+                          className={`text-xs font-medium tabular-nums ${
+                            product.growth > 0 ? 'text-emerald-600' : 'text-rose-600'
+                          }`}
+                        >
+                          {product.growth > 0 ? '+' : ''}
+                          {product.growth}%
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={DollarSign}
+                  title={t('Malumot yoq')}
+                  description={t('Mahsulotlar boyicha daromad topilmadi')}
+                />
+              )}
             </div>
           </div>
-        </div>
 
-        {/* Revenue Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Batafsil moliyaviy hisobot</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700/50">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Oy</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Daromad</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Xarajat</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Sof foyda</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Foyda %</th>
-                  <th className="px-6 py-4 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Buyurtmalar</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {revenueData.map((data, index) => (
-                  <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{data.month}</td>
-                    <td className="px-6 py-4 text-right text-emerald-600 font-medium">{formatCurrency(data.revenue)}</td>
-                    <td className="px-6 py-4 text-right text-rose-600 font-medium">{formatCurrency(data.expenses)}</td>
-                    <td className="px-6 py-4 text-right text-blue-600 font-medium">{formatCurrency(data.profit)}</td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm">
-                        {((data.profit / data.revenue) * 100).toFixed(1)}%
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-400">{data.orders}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+          {/* Detailed financial table */}
+          {revenueData.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
+              <div className="p-5 sm:p-6 border-b border-slate-100">
+                <h2 className="font-semibold text-slate-900 tracking-tight">
+                  {t('Batafsil moliyaviy hisobot')}
+                </h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('Oy')}</th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('Daromad')}</th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('Xarajat')}</th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('Sof foyda')}</th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('Foyda')} %</th>
+                      <th className="px-6 py-4 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('Buyurtmalar')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {revenueData.map((data, index) => (
+                      <tr key={index} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4 font-medium text-slate-900">{data.month}</td>
+                        <td className="px-6 py-4 text-right text-slate-900 font-medium tabular-nums">{formatCurrency(data.revenue)}</td>
+                        <td className="px-6 py-4 text-right text-amber-600 font-medium tabular-nums">{formatCurrency(data.expenses)}</td>
+                        <td className="px-6 py-4 text-right text-emerald-600 font-medium tabular-nums">{formatCurrency(data.profit)}</td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium tabular-nums">
+                            {data.revenue > 0 ? ((data.profit / data.revenue) * 100).toFixed(1) : '0.0'}%
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center text-slate-500 tabular-nums">{data.orders}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
-      {/* Calculator Modal */}
+      {/* Profit calculator modal */}
       {showCalculator && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-[0_20px_60px_rgba(15,23,42,0.18)] border border-slate-200/70">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-emerald-600" />
-                Foyda kalkulyatori
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
+                <span className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Calculator className="w-[18px] h-[18px]" />
+                </span>
+                {t('Foyda kalkulyatori')}
               </h2>
-              <button 
+              <button
                 onClick={() => setShowCalculator(false)}
-                title="Yopish"
-                aria-label="Yopish"
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg"
+                title={t('Yopish')}
+                aria-label={t('Yopish')}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <MoreHorizontal className="w-5 h-5 rotate-45" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sotish narxi (so'm)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">{t('Sotish narxi')} (so'm)</label>
                 <input
                   type="number"
                   value={calcValues.price}
-                  onChange={(e) => setCalcValues({...calcValues, price: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-800 dark:text-white"
+                  onChange={(e) => setCalcValues({ ...calcValues, price: e.target.value })}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
                   placeholder="0"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tannarx (so'm)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">{t('Tannarx')} (so'm)</label>
                 <input
                   type="number"
                   value={calcValues.cost}
-                  onChange={(e) => setCalcValues({...calcValues, cost: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-800 dark:text-white"
+                  onChange={(e) => setCalcValues({ ...calcValues, cost: e.target.value })}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
                   placeholder="0"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Miqdori (dona)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">{t('Miqdori')} (dona)</label>
                 <input
                   type="number"
                   value={calcValues.quantity}
-                  onChange={(e) => setCalcValues({...calcValues, quantity: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-800 dark:text-white"
+                  onChange={(e) => setCalcValues({ ...calcValues, quantity: e.target.value })}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
                   placeholder="0"
                 />
               </div>
-              <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
-                <p className="text-sm text-emerald-600 dark:text-emerald-400 mb-1">Sof foyda:</p>
-                <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-                  {formatCurrency(calculateProfit())}
-                </p>
+              <div className="p-4 bg-indigo-50 rounded-xl">
+                <p className="text-sm text-indigo-600 mb-1">{t('Sof foyda')}:</p>
+                <p className="text-2xl font-bold text-indigo-700 tabular-nums">{formatCurrency(calculateProfit())}</p>
               </div>
             </div>
           </div>

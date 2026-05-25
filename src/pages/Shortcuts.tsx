@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import { 
-  Keyboard, Search, Plus, Edit2, Trash2, Save, 
+import {
+  Keyboard, Search, Plus, Edit2, Save,
   Copy, Printer, Download, Upload, RefreshCw, Home,
   ShoppingCart, Package, Users, DollarSign, Settings,
-  ChevronRight, Command, MoreHorizontal, CheckCircle
+  Command, Lightbulb, SearchX
 } from 'lucide-react';
+import { latinToCyrillic } from '../lib/transliterator';
+import EmptyState from '../components/EmptyState';
+
+const t = latinToCyrillic;
 
 interface Shortcut {
   id: string;
@@ -34,6 +38,18 @@ const shortcuts: Shortcut[] = [
 
 const categories = ['Navigatsiya', 'Mahsulotlar', 'Sotuvlar', 'Mijozlar', 'Moliya', 'Umumiy', 'Ma\'lumotlar', 'Tizim'];
 
+// Per-category tint for the icon chip so groups read at a glance
+const categoryTint: Record<string, string> = {
+  'Navigatsiya': 'bg-blue-50 text-blue-600',
+  'Mahsulotlar': 'bg-indigo-50 text-indigo-600',
+  'Sotuvlar': 'bg-emerald-50 text-emerald-600',
+  'Mijozlar': 'bg-violet-50 text-violet-600',
+  'Moliya': 'bg-amber-50 text-amber-600',
+  'Umumiy': 'bg-sky-50 text-sky-600',
+  'Ma\'lumotlar': 'bg-rose-50 text-rose-600',
+  'Tizim': 'bg-slate-100 text-slate-600',
+};
+
 export default function Shortcuts() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,112 +68,144 @@ export default function Shortcuts() {
     return acc;
   }, {} as Record<string, Shortcut[]>);
 
+  const hasResults = filteredShortcuts.length > 0;
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Keyboard className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Klavisha yorliqlari</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Tezkor harakatlar uchun klavisha kombinatsiyalari</p>
-              </div>
+    <div className="min-h-screen bg-gray-50/60 pb-24">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+        {/* Hero header */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-6 sm:p-8 shadow-glass-lg">
+          <div className="absolute -top-8 -right-8 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+          <div className="absolute -bottom-10 -left-6 w-36 h-36 bg-white/5 rounded-full blur-2xl" />
+          <div className="relative flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-white/80">{t('Yordam')}</p>
+              <h1 className="mt-1 text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                {t('Klaviatura yorliqlari')}
+              </h1>
+              <p className="mt-2 max-w-xl text-sm text-white/75 leading-relaxed">
+                {t('Tezkor harakatlar uchun klaviatura kombinatsiyalari. Ishni jadallashtiring va kamroq sichqoncha bilan boshqaring.')}
+              </p>
+            </div>
+            <div className="w-14 h-14 bg-white/15 rounded-2xl flex items-center justify-center backdrop-blur-sm flex-shrink-0">
+              <Keyboard className="w-7 h-7 text-white" />
+            </div>
+          </div>
+          <div className="relative mt-6 flex items-center gap-6 text-white/90">
+            <div>
+              <p className="text-2xl font-bold">{shortcuts.length}</p>
+              <p className="text-xs text-white/70">{t('Jami yorliqlar')}</p>
+            </div>
+            <div className="w-px h-10 bg-white/20" />
+            <div>
+              <p className="text-2xl font-bold">{categories.length}</p>
+              <p className="text-xs text-white/70">{t('Bo\'limlar')}</p>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filters */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 mb-8">
-          <div className="p-4 flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Qidirish (yorliq, kategoriya)"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 dark:bg-gray-800 dark:text-white"
-              />
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
+        {/* Search + category filters */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-100 space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder={t('Qidirish (yorliq yoki bo\'lim)')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-medium text-sm text-gray-900 transition-all placeholder:text-gray-400"
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setSelectedCategory('all')}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 active:scale-95 ${
+                selectedCategory === 'all'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+                  : 'bg-gray-50 text-gray-600 border border-gray-100 hover:bg-gray-100'
+              }`}
+            >
+              {t('Barchasi')}
+            </button>
+            {categories.map((category) => (
               <button
-                onClick={() => setSelectedCategory('all')}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  selectedCategory === 'all'
-                    ? 'bg-orange-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 active:scale-95 ${
+                  selectedCategory === category
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+                    : 'bg-gray-50 text-gray-600 border border-gray-100 hover:bg-gray-100'
                 }`}
               >
-                Barchasi
+                {t(category)}
               </button>
-              {categories.filter(c => c !== 'all').map((category) => (
-                <button
-                  key={category}
-                  onClick={() => setSelectedCategory(category)}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    selectedCategory === category
-                      ? 'bg-orange-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Shortcuts Grid */}
-        {selectedCategory === 'all' ? (
-          <div className="space-y-8">
-            {Object.entries(groupedShortcuts).map(([category, categoryShortcuts]) => (
-              categoryShortcuts.length > 0 && (
-                <div key={category}>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <ChevronRight className="w-5 h-5 text-orange-600" />
-                    {category}
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {categoryShortcuts.map((shortcut) => (
-                      <ShortcutCard key={shortcut.id} shortcut={shortcut} />
-                    ))}
-                  </div>
-                </div>
-              )
-            ))}
+        {/* Shortcuts grouped by category */}
+        {!hasResults ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+            <EmptyState
+              icon={SearchX}
+              title={t('Hech narsa topilmadi')}
+              description={t('Qidiruv yoki bo\'lim bo\'yicha mos yorliq yo\'q. Boshqa kalit so\'z bilan urinib ko\'ring.')}
+              action={
+                <button
+                  onClick={() => { setSearchTerm(''); setSelectedCategory('all'); }}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  {t('Filterni tozalash')}
+                </button>
+              }
+            />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredShortcuts.map((shortcut) => (
-              <ShortcutCard key={shortcut.id} shortcut={shortcut} />
+          <div className="space-y-6">
+            {Object.entries(groupedShortcuts).map(([category, categoryShortcuts]) => (
+              categoryShortcuts.length > 0 && (
+                <section key={category} className="bg-white rounded-2xl p-6 sm:p-7 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${categoryTint[category] ?? 'bg-gray-100 text-gray-600'}`}>
+                      <Command className="w-4 h-4" />
+                    </div>
+                    <h2 className="text-lg font-bold text-gray-900 tracking-tight">{t(category)}</h2>
+                    <span className="ml-auto text-xs font-semibold text-gray-400">
+                      {categoryShortcuts.length}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {categoryShortcuts.map((shortcut) => (
+                      <ShortcutRow key={shortcut.id} shortcut={shortcut} />
+                    ))}
+                  </div>
+                </section>
+              )
             ))}
           </div>
         )}
 
         {/* Tips */}
-        <div className="mt-8 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 rounded-xl p-6 border border-orange-100 dark:border-orange-800">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-orange-600" />
-            Foydali maslahatlar
-          </h3>
-          <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-            <li className="flex items-start gap-2">
-              <span className="text-orange-600 mt-1">•</span>
-              <span>Ctrl + K bilan istalgan sahifani tez qidirishingiz mumkin</span>
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+              <Lightbulb className="w-4 h-4" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 tracking-tight">{t('Foydali maslahatlar')}</h3>
+          </div>
+          <ul className="space-y-2.5 text-sm text-gray-600">
+            <li className="flex items-start gap-2.5">
+              <span className="mt-2 w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+              <span>{t('Ctrl + K bilan istalgan sahifani tez qidirishingiz mumkin.')}</span>
             </li>
-            <li className="flex items-start gap-2">
-              <span className="text-orange-600 mt-1">•</span>
-              <span>Mac foydalanuvchilari uchun Cmd tugmasi ishlaydi</span>
+            <li className="flex items-start gap-2.5">
+              <span className="mt-2 w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+              <span>{t('Mac foydalanuvchilari uchun Cmd tugmasi ishlaydi.')}</span>
             </li>
-            <li className="flex items-start gap-2">
-              <span className="text-orange-600 mt-1">•</span>
-              <span>Custom yorliqlarni sozlamalar orqali o'zgartirishingiz mumkin</span>
+            <li className="flex items-start gap-2.5">
+              <span className="mt-2 w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+              <span>{t('Maxsus yorliqlarni sozlamalar orqali o\'zgartirishingiz mumkin.')}</span>
             </li>
           </ul>
         </div>
@@ -166,28 +214,32 @@ export default function Shortcuts() {
   );
 }
 
-function ShortcutCard({ shortcut }: { shortcut: Shortcut }) {
+function ShortcutRow({ shortcut }: { shortcut: Shortcut }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
-          {shortcut.icon}
-        </div>
-        <div>
-          <p className="font-medium text-gray-900 dark:text-white">{shortcut.description}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">{shortcut.category}</p>
-        </div>
+    <div className="group flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-3 hover:bg-white hover:border-gray-200 hover:shadow-sm transition-all duration-200">
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${categoryTint[shortcut.category] ?? 'bg-gray-100 text-gray-600'}`}>
+        {shortcut.icon}
       </div>
-      <div className="flex items-center gap-2">
+      <p className="font-semibold text-sm text-gray-800 truncate">{shortcut.description}</p>
+      <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
         {shortcut.keys.map((key, index) => (
-          <div key={index} className="flex items-center">
-            <kbd className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[40px] text-center">
-              {key}
-            </kbd>
-            {index < shortcut.keys.length - 1 && <span className="text-gray-400">+</span>}
-          </div>
+          <span key={index} className="flex items-center gap-1.5">
+            <Keycap>{key}</Keycap>
+            {index < shortcut.keys.length - 1 && (
+              <span className="text-gray-300 text-xs font-bold">+</span>
+            )}
+          </span>
         ))}
       </div>
     </div>
+  );
+}
+
+// Real-keycap styled key chip: raised, beveled, soft inner highlight
+function Keycap({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="inline-flex min-w-[34px] h-8 items-center justify-center rounded-lg border border-gray-300 border-b-2 border-b-gray-400 bg-gradient-to-b from-white to-gray-100 px-2 text-[13px] font-bold text-gray-700 shadow-sm leading-none">
+      {children}
+    </kbd>
   );
 }

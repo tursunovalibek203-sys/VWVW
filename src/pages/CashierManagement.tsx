@@ -1,28 +1,33 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Users, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Key, 
-  Eye, 
+import {
+  Users,
+  Plus,
+  Edit2,
+  Trash2,
+  Key,
+  Eye,
   EyeOff,
   Shield,
-  UserPlus,
-  Lock,
   Mail,
   Phone,
   Search,
-  Filter,
-  Download,
-  RefreshCw
+  RefreshCw,
+  X,
+  UserCheck,
+  UserX,
+  CheckCircle2,
+  Loader2,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/professionalApi';
 import { latinToCyrillic } from '../lib/transliterator';
 import { errorHandler } from '../lib/professionalErrorHandler';
 import { notify } from '../lib/professionalNotifications';
+import { TableSkeleton } from '../components/ui/LoadingSpinner';
+import { Badge } from '../components/ui/Badge';
+import EmptyState from '../components/EmptyState';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 interface Cashier {
   id: string;
@@ -49,6 +54,10 @@ export default function CashierManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  // UI-only: in-button spinners + delete confirmation target (replaces window.confirm)
+  const [submitting, setSubmitting] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [cashierToDelete, setCashierToDelete] = useState<Cashier | null>(null);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -83,13 +92,14 @@ export default function CashierManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
       notify.error(latinToCyrillic("Xatolik"), latinToCyrillic("Parollar mos kelmadi!"));
       return;
     }
 
     try {
+      setSubmitting(true);
       const userData = {
         username: formData.username,
         email: formData.email,
@@ -113,18 +123,23 @@ export default function CashierManagement() {
       loadCashiers();
     } catch (error) {
       errorHandler.handleError(error, { action: selectedCashier ? 'updateCashier' : 'createCashier' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleDelete = async (cashierId: string) => {
-    if (!confirm(latinToCyrillic("Kassirni o'chirishni tasdiqlaysizmi?"))) return;
-
+  // Kassirni o'chirish (ConfirmDialog tasdiqlagandan keyin)
+  const handleConfirmDelete = async () => {
+    if (!cashierToDelete) return;
+    const cashierId = cashierToDelete.id;
     try {
       await api.delete(`/users/${cashierId}`);
       notify.success(latinToCyrillic("Muvaffaqiyat"), latinToCyrillic("Kassir muvaffaqiyat o'chirildi!"));
       loadCashiers();
     } catch (error) {
       errorHandler.handleError(error, { action: 'deleteCashier' });
+    } finally {
+      setCashierToDelete(null);
     }
   };
 
@@ -145,6 +160,7 @@ export default function CashierManagement() {
     }
 
     try {
+      setSavingPassword(true);
       await api.put(`/users/${selectedCashier.id}`, { password: newPassword });
       notify.success(latinToCyrillic("Muvaffaqiyat"), latinToCyrillic("Parol muvaffaqiyat o'zgartirildi!"));
       setShowPasswordModal(false);
@@ -152,6 +168,8 @@ export default function CashierManagement() {
       setSelectedCashier(null);
     } catch (error) {
       errorHandler.handleError(error, { action: 'changeCashierPassword' });
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -168,8 +186,15 @@ export default function CashierManagement() {
     setSelectedCashier(null);
   };
 
+  const openAddModal = () => {
+    resetForm();
+    setShowPassword(false);
+    setShowAddModal(true);
+  };
+
   const openEditModal = (cashier: Cashier) => {
     setSelectedCashier(cashier);
+    setShowPassword(false);
     setFormData({
       username: cashier.username,
       email: cashier.email || '',
@@ -188,6 +213,12 @@ export default function CashierManagement() {
     setShowPasswordModal(true);
   };
 
+  const closeFormModal = () => {
+    setShowAddModal(false);
+    setShowEditModal(false);
+    resetForm();
+  };
+
   const filteredCashiers = cashiers.filter(cashier =>
     cashier.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     cashier.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -195,20 +226,54 @@ export default function CashierManagement() {
     (cashier.phone && cashier.phone.includes(searchTerm))
   );
 
+  // Lavozim Badge varianti: admin = info, kassir = neutral
+  const getRoleVariant = (role: string): 'success' | 'warning' | 'error' | 'info' | 'neutral' => {
+    switch (role) {
+      case 'admin': return 'info';
+      case 'cashier': return 'neutral';
+      default: return 'neutral';
+    }
+  };
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'admin': return latinToCyrillic('Admin');
+      case 'cashier': return latinToCyrillic('Kassir');
+      default: return role;
+    }
+  };
+
+  // Avatar: soft indigo for admin, soft slate for cashier (premium, not gradient)
+  const avatarTint = (role: string) =>
+    role === 'admin' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-600';
+
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+  };
+
+  const hasActiveFilters = !!searchTerm;
+  const activeCount = cashiers.filter(c => c.isActive).length;
+  const adminCount = cashiers.filter(c => c.role === 'admin').length;
+
   if (!hasPermission('admin')) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Shield className="w-16 h-16 mx-auto mb-4 text-red-500" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(15,23,42,0.06)] border border-slate-200/70 p-8 sm:p-10 text-center max-w-md w-full">
+          <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
+            <Shield className="w-7 h-7" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight mb-2">
             {latinToCyrillic("Ruxsat yo'q")}
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm text-slate-500">
             {latinToCyrillic("Bu sahifaga faqat adminlar kirishi mumkin")}
           </p>
           <button
             onClick={() => navigate('/dashboard')}
-            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
           >
             {latinToCyrillic("Orqaga")}
           </button>
@@ -217,356 +282,553 @@ export default function CashierManagement() {
     );
   }
 
+  const stats = [
+    {
+      label: latinToCyrillic('Jami xodimlar'),
+      value: cashiers.length.toLocaleString('en-US'),
+      icon: Users,
+      tint: 'bg-indigo-50 text-indigo-600',
+    },
+    {
+      label: latinToCyrillic('Aktiv'),
+      value: activeCount.toLocaleString('en-US'),
+      icon: UserCheck,
+      tint: 'bg-emerald-50 text-emerald-600',
+    },
+    {
+      label: latinToCyrillic('Adminlar'),
+      value: adminCount.toLocaleString('en-US'),
+      icon: Shield,
+      tint: 'bg-violet-50 text-violet-600',
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Users className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {latinToCyrillic("Kassirlar Boshqaruvi")}
-                </h1>
-                <p className="text-gray-600">
-                  {latinToCyrillic("Barcha kassirlarni boshqarish")}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Header: clean title + count + actions */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
+            {latinToCyrillic('Xodimlar boshqaruvi')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500 tabular-nums">
+            {loading
+              ? latinToCyrillic('Yuklanmoqda...')
+              : `${filteredCashiers.length.toLocaleString('en-US')} ${latinToCyrillic('ta xodim')}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          <button
+            onClick={loadCashiers}
+            disabled={loading}
+            className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-60 rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-600 transition-colors active:scale-[0.98]"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{latinToCyrillic('Yangilash')}</span>
+          </button>
+          <button
+            onClick={openAddModal}
+            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.98]"
+          >
+            <Plus className="w-4 h-4" />
+            {latinToCyrillic('Yangi xodim')}
+          </button>
+        </div>
+      </div>
+
+      {/* Stat cards: premium white */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+        {loading
+          ? Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[104px] animate-pulse" />
+            ))
+          : stats.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">
+                      {stat.label}
+                    </p>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${stat.tint}`}>
+                      <Icon className="w-[18px] h-[18px]" />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-2xl font-bold text-slate-900 tracking-tight tabular-nums">{stat.value}</p>
+                </div>
+              );
+            })}
+      </div>
+
+      {/* Search card */}
+      <div className="bg-white rounded-2xl border border-slate-200/70 p-4">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 pointer-events-none" />
+          <input
+            id="cashiers-search"
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder={latinToCyrillic('Ism, login, email yoki telefon...')}
+            className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
+          />
+        </div>
+      </div>
+
+      {/* Loading state */}
+      {loading && (
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-6">
+          <TableSkeleton rows={6} cols={5} />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && filteredCashiers.length === 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200/70">
+          <EmptyState
+            icon={Users}
+            title={
+              hasActiveFilters
+                ? latinToCyrillic('Xodimlar topilmadi')
+                : latinToCyrillic("Hali xodimlar yo'q")
+            }
+            description={
+              hasActiveFilters
+                ? latinToCyrillic("Qidiruv shartlarini o'zgartirib qayta urinib ko'ring")
+                : latinToCyrillic("Birinchi xodimni qo'shing va u shu yerda ko'rinadi")
+            }
+            action={
               <button
-                onClick={loadCashiers}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                aria-label={latinToCyrillic("Yangilash")}
-              >
-                <RefreshCw className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                onClick={openAddModal}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
               >
                 <Plus className="w-4 h-4" />
-                {latinToCyrillic("Yangi Kassir")}
+                {latinToCyrillic('Yangi xodim')}
               </button>
-            </div>
-          </div>
+            }
+          />
         </div>
+      )}
 
-        {/* Search */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-          <div className="flex items-center gap-3">
-            <Search className="w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder={latinToCyrillic("Kassirlarni qidirish...")}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        {/* Cashiers List */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          {loading ? (
-            <div className="p-8 text-center">
-              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-pulse mx-auto"></div>
-              <p className="mt-2 text-gray-600">
-                {latinToCyrillic("Yuklanmoqda...")}
-              </p>
-            </div>
-          ) : filteredCashiers.length === 0 ? (
-            <div className="p-8 text-center">
-              <Users className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {latinToCyrillic("Kassirlar topilmadi")}
-              </h3>
-              <p className="text-gray-600 mb-4">
-                {latinToCyrillic("Birinchi kassirni qo'shing")}
-              </p>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                {latinToCyrillic("Yangi Kassir Qo'shish")}
-              </button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {latinToCyrillic("Kassir")}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {latinToCyrillic("Aloqa")}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {latinToCyrillic("Lavozim")}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {latinToCyrillic("Holati")}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {latinToCyrillic("So'nggi kirish")}
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {latinToCyrillic("Amallar")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredCashiers.map((cashier) => (
-                    <tr key={cashier.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                            <Users className="w-4 h-4 text-blue-600" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {cashier.fullName}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              @{cashier.username}
-                            </div>
-                          </div>
+      {/* Cashiers table (desktop) */}
+      {!loading && filteredCashiers.length > 0 && (
+        <div className="hidden md:block bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200/70 bg-slate-50/60">
+                  <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Xodim')}</th>
+                  <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Aloqa')}</th>
+                  <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Lavozim')}</th>
+                  <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Holati')}</th>
+                  <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic("So'nggi kirish")}</th>
+                  <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Amallar')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredCashiers.map((cashier) => (
+                  <tr key={cashier.id} className="group hover:bg-slate-50/70 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarTint(cashier.role)}`}>
+                          {getInitials(cashier.fullName)}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {cashier.email && (
-                            <div className="flex items-center gap-1">
-                              <Mail className="w-3 h-3 text-gray-400" />
-                              {cashier.email}
-                            </div>
-                          )}
-                          {cashier.phone && (
-                            <div className="flex items-center gap-1">
-                              <Phone className="w-3 h-3 text-gray-400" />
-                              {cashier.phone}
-                            </div>
-                          )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 truncate">{cashier.fullName}</p>
+                          <p className="text-xs text-slate-400 truncate">@{cashier.username}</p>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                          {cashier.role === 'admin' ? latinToCyrillic("Admin") : latinToCyrillic("Kassir")}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="space-y-1">
+                        {cashier.email && (
+                          <p className="text-sm text-slate-600 flex items-center gap-1.5 truncate">
+                            <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                            <span className="truncate">{cashier.email}</span>
+                          </p>
+                        )}
+                        {cashier.phone && (
+                          <p className="text-xs text-slate-400 flex items-center gap-1.5 tabular-nums">
+                            <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                            {cashier.phone}
+                          </p>
+                        )}
+                        {!cashier.email && !cashier.phone && (
+                          <span className="text-sm text-slate-300">&mdash;</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <Badge variant={getRoleVariant(cashier.role)}>
+                        <span className="inline-flex items-center gap-1">
+                          {cashier.role === 'admin' && <Shield className="w-3 h-3" />}
+                          {getRoleLabel(cashier.role)}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      </Badge>
+                    </td>
+                    <td className="px-5 py-4">
+                      <button
+                        onClick={() => handleToggleActive(cashier.id, !cashier.isActive)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                          cashier.isActive
+                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                        title={cashier.isActive ? latinToCyrillic('Deaktivlashtirish') : latinToCyrillic('Aktivlashtirish')}
+                      >
+                        {cashier.isActive
+                          ? <><UserCheck className="w-3 h-3" />{latinToCyrillic('Aktiv')}</>
+                          : <><UserX className="w-3 h-3" />{latinToCyrillic('Noaktiv')}</>}
+                      </button>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-slate-500 tabular-nums">
+                      {cashier.lastLogin ? new Date(cashier.lastLogin).toLocaleDateString('uz-UZ') : <span className="text-slate-300">&mdash;</span>}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => handleToggleActive(cashier.id, !cashier.isActive)}
-                          className={`px-2 py-1 text-xs font-medium rounded-full ${
-                            cashier.isActive
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
+                          onClick={() => openPasswordModal(cashier)}
+                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title={latinToCyrillic("Parolni o'zgartirish")}
+                          aria-label={latinToCyrillic("Parolni o'zgartirish")}
                         >
-                          {cashier.isActive ? latinToCyrillic("Aktiv") : latinToCyrillic("Noaktiv")}
+                          <Key className="w-4 h-4" />
                         </button>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {cashier.lastLogin ? new Date(cashier.lastLogin).toLocaleDateString('uz-UZ') : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => openPasswordModal(cashier)}
-                            className="p-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"
-                            title={latinToCyrillic("Parolni o'zgartirish")}
-                            aria-label={latinToCyrillic("Parolni o'zgartirish")}
-                          >
-                            <Key className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => openEditModal(cashier)}
-                            className="p-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"
-                            title={latinToCyrillic("Tahrirlash")}
-                            aria-label={latinToCyrillic("Tahrirlash")}
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(cashier.id)}
-                            className="p-1 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
-                            title={latinToCyrillic("O'chirish")}
-                            aria-label={latinToCyrillic("O'chirish")}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                        <button
+                          onClick={() => openEditModal(cashier)}
+                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title={latinToCyrillic("Tahrirlash")}
+                          aria-label={latinToCyrillic("Tahrirlash")}
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setCashierToDelete(cashier)}
+                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title={latinToCyrillic("O'chirish")}
+                          aria-label={latinToCyrillic("O'chirish")}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+      )}
 
-        {/* Add/Edit Modal */}
-        {(showAddModal || showEditModal) && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
-                {selectedCashier ? latinToCyrillic("Kassirni Tahrirlash") : latinToCyrillic("Yangi Kassir Qo'shish")}
-              </h2>
-              <form onSubmit={handleSubmit}>
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="cashier-fullname" className="block text-sm font-medium text-gray-700 mb-1">
-                      {latinToCyrillic("To'liq ism")}
-                    </label>
-                    <input
-                      id="cashier-fullname"
-                      type="text"
-                      required
-                      value={formData.fullName}
-                      onChange={(e) => setFormData({...formData, fullName: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+      {/* Cashiers cards (mobile) */}
+      {!loading && filteredCashiers.length > 0 && (
+        <div className="md:hidden space-y-3">
+          {filteredCashiers.map((cashier) => (
+            <div
+              key={cashier.id}
+              className="bg-white rounded-2xl border border-slate-200/70 p-4 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${avatarTint(cashier.role)}`}>
+                    {getInitials(cashier.fullName)}
                   </div>
-                  <div>
-                    <label htmlFor="cashier-username" className="block text-sm font-medium text-gray-700 mb-1">
-                      {latinToCyrillic("Login")}
-                    </label>
-                    <input
-                      id="cashier-username"
-                      type="text"
-                      required
-                      value={formData.username}
-                      onChange={(e) => setFormData({...formData, username: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{cashier.fullName}</p>
+                    <p className="text-xs text-slate-400 truncate">@{cashier.username}</p>
                   </div>
+                </div>
+                <Badge variant={getRoleVariant(cashier.role)}>
+                  <span className="inline-flex items-center gap-1">
+                    {cashier.role === 'admin' && <Shield className="w-3 h-3" />}
+                    {getRoleLabel(cashier.role)}
+                  </span>
+                </Badge>
+              </div>
+
+              {(cashier.email || cashier.phone) && (
+                <div className="mt-3 space-y-1.5">
+                  {cashier.email && (
+                    <p className="text-sm text-slate-600 flex items-center gap-1.5 truncate">
+                      <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                      <span className="truncate">{cashier.email}</span>
+                    </p>
+                  )}
+                  {cashier.phone && (
+                    <p className="text-sm text-slate-600 flex items-center gap-1.5 tabular-nums">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                      {cashier.phone}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                <button
+                  onClick={() => handleToggleActive(cashier.id, !cashier.isActive)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    cashier.isActive
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  {cashier.isActive
+                    ? <><UserCheck className="w-3 h-3" />{latinToCyrillic('Aktiv')}</>
+                    : <><UserX className="w-3 h-3" />{latinToCyrillic('Noaktiv')}</>}
+                </button>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => openPasswordModal(cashier)}
+                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                    aria-label={latinToCyrillic("Parolni o'zgartirish")}
+                  >
+                    <Key className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => openEditModal(cashier)}
+                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                    aria-label={latinToCyrillic("Tahrirlash")}
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setCashierToDelete(cashier)}
+                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                    aria-label={latinToCyrillic("O'chirish")}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Delete confirmation (replaces window.confirm) */}
+      <ConfirmDialog
+        isOpen={cashierToDelete !== null}
+        onClose={() => setCashierToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        variant="danger"
+        title={latinToCyrillic("Xodimni o'chirish")}
+        message={
+          cashierToDelete
+            ? latinToCyrillic(`"${cashierToDelete.fullName}" xodimini rostdan ham o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi.`)
+            : ''
+        }
+        confirmText={latinToCyrillic("O'chirish")}
+        cancelText={latinToCyrillic('Bekor qilish')}
+      />
+
+      {/* Add/Edit Modal */}
+      {(showAddModal || showEditModal) && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-200/70">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                  {selectedCashier ? <Edit2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 tracking-tight">
+                  {selectedCashier ? latinToCyrillic("Xodimni tahrirlash") : latinToCyrillic("Yangi xodim qo'shish")}
+                </h3>
+              </div>
+              <button
+                onClick={closeFormModal}
+                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                title={latinToCyrillic('Yopish')}
+                aria-label={latinToCyrillic('Yopish')}
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="px-6 py-5">
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="cashier-fullname" className="block text-sm font-medium text-slate-700 mb-1.5">
+                    {latinToCyrillic("To'liq ism")}
+                  </label>
+                  <input
+                    id="cashier-fullname"
+                    type="text"
+                    required
+                    value={formData.fullName}
+                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="cashier-username" className="block text-sm font-medium text-slate-700 mb-1.5">
+                    {latinToCyrillic("Login")}
+                  </label>
+                  <input
+                    id="cashier-username"
+                    type="text"
+                    required
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="cashier-email" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="cashier-email" className="block text-sm font-medium text-slate-700 mb-1.5">
                       {latinToCyrillic("Email")}
                     </label>
                     <input
                       id="cashier-email"
                       type="email"
                       value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
                     />
                   </div>
                   <div>
-                    <label htmlFor="cashier-phone" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="cashier-phone" className="block text-sm font-medium text-slate-700 mb-1.5">
                       {latinToCyrillic("Telefon")}
                     </label>
                     <input
                       id="cashier-phone"
                       type="tel"
                       value={formData.phone}
-                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="cashier-role" className="block text-sm font-medium text-gray-700 mb-1">
-                      {latinToCyrillic("Lavozim")}
-                    </label>
-                    <select
-                      id="cashier-role"
-                      value={formData.role}
-                      onChange={(e) => setFormData({...formData, role: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="cashier">{latinToCyrillic("Kassir")}</option>
-                      <option value="admin">{latinToCyrillic("Admin")}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="cashier-password" className="block text-sm font-medium text-gray-700 mb-1">
-                      {latinToCyrillic("Parol")}
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="cashier-password"
-                        type={showPassword ? "text" : "password"}
-                        required={!selectedCashier}
-                        value={formData.password}
-                        onChange={(e) => setFormData({...formData, password: e.target.value})}
-                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
-                        aria-label={showPassword ? latinToCyrillic("Parolni yashirish") : latinToCyrillic("Parolni ko'rsatish")}
-                      >
-                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="cashier-confirm-password" className="block text-sm font-medium text-gray-700 mb-1">
-                      {latinToCyrillic("Parolni tasdiqlash")}
-                    </label>
-                    <input
-                      id="cashier-confirm-password"
-                      type="password"
-                      required={!selectedCashier}
-                      value={formData.confirmPassword}
-                      onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
                     />
                   </div>
                 </div>
-                <div className="flex gap-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddModal(false);
-                      setShowEditModal(false);
-                      resetForm();
-                    }}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                  >
-                    {latinToCyrillic("Bekor qilish")}
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    {selectedCashier ? latinToCyrillic("Yangilash") : latinToCyrillic("Qo'shish")}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Password Change Modal */}
-        {showPasswordModal && selectedCashier && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-sm">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
-                {latinToCyrillic("Parolni O'zgartirish")}
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">
-                {latinToCyrillic("Kassir")}: {selectedCashier.fullName}
-              </p>
-              <div className="space-y-4">
                 <div>
-                  <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 mb-1">
-                    {latinToCyrillic("Yangi parol")}
+                  <label htmlFor="cashier-role" className="block text-sm font-medium text-slate-700 mb-1.5">
+                    {latinToCyrillic("Lavozim")}
+                  </label>
+                  <select
+                    id="cashier-role"
+                    value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
+                  >
+                    <option value="cashier">{latinToCyrillic("Kassir")}</option>
+                    <option value="admin">{latinToCyrillic("Admin")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="cashier-password" className="block text-sm font-medium text-slate-700 mb-1.5">
+                    {latinToCyrillic("Parol")}
+                    {selectedCashier && (
+                      <span className="ml-1 text-xs font-normal text-slate-400">
+                        {latinToCyrillic("(o'zgartirmasangiz bo'sh qoldiring)")}
+                      </span>
+                    )}
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="cashier-password"
+                      type={showPassword ? "text" : "password"}
+                      required={!selectedCashier}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      className="w-full px-3.5 py-2.5 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                      aria-label={showPassword ? latinToCyrillic("Parolni yashirish") : latinToCyrillic("Parolni ko'rsatish")}
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="cashier-confirm-password" className="block text-sm font-medium text-slate-700 mb-1.5">
+                    {latinToCyrillic("Parolni tasdiqlash")}
                   </label>
                   <input
-                    id="new-password"
+                    id="cashier-confirm-password"
                     type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required={!selectedCashier}
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
                   />
                 </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={closeFormModal}
+                  disabled={submitting}
+                  className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-60 text-slate-700 rounded-xl text-sm font-semibold transition-colors"
+                >
+                  {latinToCyrillic("Bekor qilish")}
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+                >
+                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {selectedCashier ? latinToCyrillic("Yangilash") : latinToCyrillic("Qo'shish")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Password Change Modal */}
+      {showPasswordModal && selectedCashier && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-200/70">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                  <Key className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 tracking-tight">
+                  {latinToCyrillic("Parolni o'zgartirish")}
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setNewPassword('');
+                  setSelectedCashier(null);
+                }}
+                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                title={latinToCyrillic('Yopish')}
+                aria-label={latinToCyrillic('Yopish')}
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-4 p-3 bg-slate-50 rounded-xl">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarTint(selectedCashier.role)}`}>
+                  {getInitials(selectedCashier.fullName)}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 truncate">{selectedCashier.fullName}</p>
+                  <p className="text-xs text-slate-400 truncate">@{selectedCashier.username}</p>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="new-password" className="block text-sm font-medium text-slate-700 mb-1.5">
+                  {latinToCyrillic("Yangi parol")}
+                </label>
+                <input
+                  id="new-password"
+                  type="password"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
+                />
               </div>
               <div className="flex gap-3 mt-6">
                 <button
@@ -576,21 +838,24 @@ export default function CashierManagement() {
                     setNewPassword('');
                     setSelectedCashier(null);
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  disabled={savingPassword}
+                  className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-60 text-slate-700 rounded-xl text-sm font-semibold transition-colors"
                 >
                   {latinToCyrillic("Bekor qilish")}
                 </button>
                 <button
                   onClick={handleChangePassword}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  disabled={savingPassword}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
                 >
+                  {savingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                   {latinToCyrillic("O'zgartirish")}
                 </button>
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

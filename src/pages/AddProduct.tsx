@@ -1,20 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { Save, ArrowLeft, RefreshCw, X } from 'lucide-react';
+import { Save, ArrowLeft, RefreshCw, X, Loader2, DollarSign, Warehouse, Boxes, Plus } from 'lucide-react';
 import CustomDropdown from '../components/CustomDropdown';
 import { useVariants } from '../hooks/useVariants';
 import api from '../lib/professionalApi';
 import { latinToCyrillic } from '../lib/transliterator';
+import { PageLoading } from '../components/ui/LoadingSpinner';
+import { useToast, toast } from '../components/ui/Toast';
 
 export default function AddProduct() {
   const navigate = useNavigate();
   const isCashier = window.location.pathname.startsWith('/cashier');
   const [searchParams] = useSearchParams();
-  const { t } = useTranslation();
+  const { addToast } = useToast();
   const editId = searchParams.get('edit');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [loadingProduct, setLoadingProduct] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [manualSuffix, setManualSuffix] = useState('');
   const [isNameManuallyEdited, setIsNameManuallyEdited] = useState(false);
@@ -134,6 +135,7 @@ export default function AddProduct() {
 
   // Mahsulot ma'lumotlarini yuklash
   const loadProductData = async (productId: string) => {
+    setLoadingProduct(true);
     try {
       const response = await api.get(`/products/${productId}`);
       const product = response.data;
@@ -164,8 +166,13 @@ export default function AddProduct() {
       
     } catch (error) {
       console.error('Mahsulot ma\'lumotlarini yuklashda xatolik:', error);
-      alert('Mahsulot ma\'lumotlarini yuklashda xatolik yuz berdi!');
+      addToast(toast.error(
+        latinToCyrillic("Xatolik"),
+        latinToCyrillic("Mahsulot ma'lumotlarini yuklashda xatolik yuz berdi!")
+      ));
       navigate(isCashier ? '/cashier/products' : '/products');
+    } finally {
+      setLoadingProduct(false);
     }
   };
 
@@ -191,8 +198,10 @@ export default function AddProduct() {
       // Allow manual editing but keep the warning if format is unusual
       const pattern = /^(\d+)(G|g|GR|gr|KG|kg|Kg)\s+.+$/;
       if (value && !pattern.test(value)) {
-        setMessage('âš ï¸ ' + latinToCyrillic("Mahsulot nomi '15G QORA' formatida bo'lishi tavsiya etiladi"));
-        setTimeout(() => setMessage(''), 3000);
+        addToast(toast.warning(
+          latinToCyrillic("Format tavsiyasi"),
+          latinToCyrillic("Mahsulot nomi '15G QORA' formatida bo'lishi tavsiya etiladi")
+        ));
       }
     }
 
@@ -214,14 +223,16 @@ export default function AddProduct() {
     e.preventDefault();
     console.log('ðŸš€ Form submit bosildi!');
     setLoading(true);
-    setMessage('');
 
     try {
       // Validatsiya - faqat kerakli maydonlar
       console.log('Form ma\'lumotlari:', formData);
       if (!formData.name || !formData.bagType || !formData.color || !formData.unitsPerBag || !formData.pricePerBag) {
         console.log('Validatsiya xatosi:', { name: !!formData.name, bagType: !!formData.bagType, color: !!formData.color, unitsPerBag: !!formData.unitsPerBag, pricePerBag: !!formData.pricePerBag });
-        setMessage('âŒ Iltimos, barcha majburiy maydonlarni to\'ldiring!');
+        addToast(toast.warning(
+          latinToCyrillic("Majburiy maydonlar"),
+          latinToCyrillic("Iltimos, barcha majburiy maydonlarni to'ldiring!")
+        ));
         setLoading(false);
         return;
       }
@@ -263,11 +274,17 @@ export default function AddProduct() {
       let response;
       if (isEditing) {
         response = await api.put(`/products/${editId}`, productData);
-        setMessage(`âœ… "${response.data.name}" mahsuloti muvaffaqiyatli yangilandi!`);
-        setTimeout(() => navigate(isCashier ? '/cashier/products' : '/products'), 2000);
+        addToast(toast.success(
+          latinToCyrillic("Saqlandi"),
+          `"${response.data.name}" ` + latinToCyrillic("mahsuloti muvaffaqiyatli yangilandi!")
+        ));
+        setTimeout(() => navigate(isCashier ? '/cashier/products' : '/products'), 1200);
       } else {
         response = await api.post('/products', productData);
-        setMessage(`âœ… "${response.data.name}" mahsuloti muvaffaqiyatli yaratildi!`);
+        addToast(toast.success(
+          latinToCyrillic("Saqlandi"),
+          `"${response.data.name}" ` + latinToCyrillic("mahsuloti muvaffaqiyatli yaratildi!")
+        ));
         setIsNameManuallyEdited(false);
         setManualSuffix('');
         
@@ -299,339 +316,393 @@ export default function AddProduct() {
       console.error('âŒ Mahsulot yaratish xatoligi:', error);
       const errorMsg = error.response?.data?.error || error.message;
       const details = error.response?.data?.details || '';
-      setMessage(`âŒ Xatolik: ${errorMsg} ${details ? '(' + details + ')' : ''}`);
+      addToast(toast.error(
+        latinToCyrillic("Xatolik"),
+        `${errorMsg}${details ? ' (' + details + ')' : ''}`
+      ));
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="space-y-12 pb-20 animate-in fade-in duration-1000">
-      {/* Premium Header Section */}
-      <div className="relative overflow-hidden bg-white dark:bg-gray-900 rounded-[3rem] p-10 sm:p-16 shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-white dark:border-gray-800">
-        <div className="absolute top-0 -left-10 w-64 h-64 bg-blue-100 dark:bg-blue-900/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob pointer-events-none"></div>
-        <div className="absolute -bottom-10 -right-10 w-64 h-64 bg-emerald-100 dark:bg-emerald-900/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000 pointer-events-none"></div>
 
-        <div className="relative z-10">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-10">
-            <div className="space-y-4">
-              <button 
-                onClick={() => window.history.back()}
-                className="inline-flex items-center gap-2 px-4 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-full border border-gray-100 dark:border-gray-700 text-[10px] font-semibold uppercase tracking-wide text-gray-500 hover:text-blue-600 transition-colors"
-              >
-                <ArrowLeft className="w-3 h-3" />
-                {t("Orqaga qaytish")}
-              </button>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white tracking-tight leading-[0.9]">
-                {isEditing ? t("Mahsulotni") : t("Yangi")}<br />
-                <span className="text-blue-600">{isEditing ? t("Tahrirlash") : t("Mahsulot")}</span>
-              </h1>
-              <p className="text-gray-500 dark:text-gray-400 font-bold max-w-md text-sm sm:text-base">
-                {isEditing ? t("Mavjud mahsulot ma'lumotlarini yangilash va sozlash") : t("Yangi mahsulotni tizimga qo'shish va omborga joylashtirish")}
-              </p>
+  // Edit rejimida mahsulot yuklanayotganda to'liq sahifa loader
+  if (loadingProduct) {
+    return <PageLoading text={latinToCyrillic("Mahsulot yuklanmoqda...")} />;
+  }
+
+  const inputBase =
+    "w-full h-12 px-3.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm text-slate-900 placeholder:text-slate-400 transition-all outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 tabular-nums";
+
+  // CustomDropdown ichidagi inputni premium uslubga moslash (className keyin qo'shilib, asosiy stilni qoplaydi)
+  const dropdownClass =
+    "h-12 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm text-slate-900 focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 tabular-nums";
+
+  const labelClass = "block text-sm font-semibold text-slate-700";
+
+  const warehouseOptions = [
+    { id: 'preform', label: latinToCyrillic('PREFORM'), color: 'blue' },
+    { id: 'krishka', label: latinToCyrillic('QOPQOQ'), color: 'orange' },
+    { id: 'ruchka', label: latinToCyrillic('RUCHKA'), color: 'emerald' },
+    ...customTypes,
+  ];
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Header: back + title + subtitle */}
+      <div className="flex items-start gap-3">
+        <button
+          type="button"
+          onClick={() => navigate(isCashier ? '/cashier/products' : '/products')}
+          aria-label={latinToCyrillic('Orqaga')}
+          className="w-10 h-10 flex-shrink-0 bg-white hover:bg-slate-50 text-slate-600 rounded-xl flex items-center justify-center border border-slate-200 transition-colors active:scale-95"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div>
+          <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
+            {isEditing ? latinToCyrillic('Mahsulotni tahrirlash') : latinToCyrillic('Yangi mahsulot')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {isEditing
+              ? latinToCyrillic("Mavjud mahsulot ma'lumotlarini yangilang")
+              : latinToCyrillic("Yangi mahsulotni tizimga qo'shing")}
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Card: Ombor bo'limi */}
+        <div className="rounded-2xl bg-white border border-slate-200/70 p-6">
+          <div className="flex items-start gap-3.5 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+              <Warehouse className="w-[18px] h-[18px]" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-900 tracking-tight">{latinToCyrillic("Ombor bo'limi")}</h3>
+              <p className="text-sm text-slate-400 mt-0.5">{latinToCyrillic("Mahsulot qaysi omborga tegishli")}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {warehouseOptions.map((type) => {
+              const isActive = formData.warehouse === type.id;
+              return (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, warehouse: type.id }))}
+                  className={`p-4 rounded-xl border transition-all duration-200 text-center active:scale-[0.98] ${
+                    isActive
+                      ? 'border-indigo-500 bg-indigo-50 shadow-sm'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <p className={`text-sm font-semibold tracking-wide ${isActive ? 'text-indigo-600' : 'text-slate-500'}`}>
+                    {type.label}
+                  </p>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setShowAddTypeModal(true)}
+              className="p-4 rounded-xl border border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/50 transition-all duration-200 text-center active:scale-[0.98] flex items-center justify-center gap-1.5 text-slate-400 hover:text-indigo-600"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="text-sm font-semibold tracking-wide">{latinToCyrillic("Yangi tur")}</span>
+            </button>
+          </div>
+
+          {formData.warehouse === 'preform' && (
+            <div className="mt-5 bg-slate-50 p-5 rounded-xl border border-slate-200/70">
+              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                {latinToCyrillic("Aksessuar o'lchami")}
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  { id: '28', label: '28 MM', desc: '15g - 30g' },
+                  { id: '38', label: '38 MM', desc: '52g - 70g' },
+                  { id: '48', label: '48 MM', desc: '75g+' },
+                ].map((size) => {
+                  const isActive = formData.subType === size.id;
+                  return (
+                    <button
+                      key={size.id}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, subType: size.id }))}
+                      className={`p-4 rounded-xl border transition-all duration-200 active:scale-[0.98] ${
+                        isActive
+                          ? 'border-indigo-500 bg-white shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <p className={`font-bold text-lg tabular-nums ${isActive ? 'text-slate-900' : 'text-slate-500'}`}>{size.label}</p>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-tight">{size.desc}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Card: Asosiy ma'lumotlar */}
+        <div className="rounded-2xl bg-white border border-slate-200/70 p-6">
+          <div className="flex items-start gap-3.5 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+              <Boxes className="w-[18px] h-[18px]" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-900 tracking-tight">{latinToCyrillic("Asosiy ma'lumotlar")}</h3>
+              <p className="text-sm text-slate-400 mt-0.5">{latinToCyrillic("Nom, qop turi va rang")}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+            <div className="space-y-1.5">
+              <label htmlFor="name" className={labelClass}>
+                {latinToCyrillic("Mahsulot nomi")} <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  id="name"
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  className={`${inputBase} pr-12`}
+                  placeholder={latinToCyrillic("15G QORA...")}
+                />
+                {(isNameManuallyEdited || manualSuffix) && !isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsNameManuallyEdited(false);
+                      setManualSuffix('');
+                    }}
+                    aria-label={latinToCyrillic("Nomni tiklash")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white border border-slate-200 rounded-lg shadow-sm flex items-center justify-center text-indigo-600 hover:bg-indigo-50 transition-all active:scale-95"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className={labelClass}>
+                {latinToCyrillic("Qop turi")} <span className="text-rose-500">*</span>
+              </label>
+              <CustomDropdown
+                value={formData.bagType}
+                onChange={(value) => setFormData(prev => ({ ...prev, bagType: value }))}
+                placeholder="15G, 21G, 5KG..."
+                variants={getVariants('bagTypeVariants')}
+                variantKey="bagType"
+                onDeleteVariant={(variant) => deleteVariant('bagTypeVariants', variant)}
+                onAddVariant={(variant) => addVariant('bagTypeVariants', variant)}
+                className={dropdownClass}
+              />
+            </div>
+
+            <div className="space-y-1.5 md:col-span-2">
+              <label className={labelClass}>
+                {latinToCyrillic("Rangi")} <span className="text-rose-500">*</span>
+              </label>
+              <CustomDropdown
+                value={formData.color}
+                onChange={(value) => setFormData(prev => ({ ...prev, color: value }))}
+                placeholder={latinToCyrillic("Rangni tanlang yoki yozing...")}
+                variants={getVariants('colorVariants')}
+                variantKey="color"
+                onDeleteVariant={(variant) => deleteVariant('colorVariants', variant)}
+                onAddVariant={(variant) => addVariant('colorVariants', variant)}
+                className={dropdownClass}
+              />
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-5xl mx-auto px-4">
-        <div className="bg-white dark:bg-gray-900 rounded-[4rem] border border-gray-100 dark:border-gray-800 shadow-2xl overflow-hidden">
-          {message && (
-            <div className={`p-6 text-center font-semibold text-xs tracking-widest uppercase animate-in slide-in-from-top duration-500 ${
-              message.includes('âœ…') ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
-            }`}>
-              {message}
+        {/* Card: Narxlar va miqdor */}
+        <div className="rounded-2xl bg-white border border-slate-200/70 p-6">
+          <div className="flex items-start gap-3.5 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+              <DollarSign className="w-[18px] h-[18px]" />
             </div>
-          )}
+            <div>
+              <h3 className="font-semibold text-slate-900 tracking-tight">{latinToCyrillic("Narxlar va miqdor")}</h3>
+              <p className="text-sm text-slate-400 mt-0.5">{latinToCyrillic("Qopdagi dona, zaxira va narx")}</p>
+            </div>
+          </div>
 
-          <form onSubmit={handleSubmit} className="p-10 sm:p-16 space-y-16">
-            {/* 0. Ombor Turi */}
-            <div className="space-y-8">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center font-bold shadow-lg shadow-blue-500/30">0</div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">{t("Ombor bo'limi")}</h3>
-              </div>
-              
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  { id: 'preform', label: 'PREFORM', color: 'blue' },
-                  { id: 'krishka', label: 'QOPQOQ', color: 'orange' },
-                  { id: 'ruchka', label: 'RUCHKA', color: 'emerald' },
-                  ...customTypes
-                ].map((type) => (
-                  <button
-                    key={type.id}
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, warehouse: type.id }))}
-                    className={`group p-6 rounded-2xl border-2 transition-all duration-300 text-center ${
-                      formData.warehouse === type.id
-                        ? `border-${type.color}-500 bg-${type.color}-50 dark:bg-${type.color}-900/20 shadow-lg shadow-${type.color}-500/10`
-                        : 'border-gray-100 dark:border-gray-800 hover:border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <p className={`text-sm font-bold tracking-wide ${formData.warehouse === type.id ? `text-${type.color}-600` : 'text-gray-500'}`}>
-                      {type.label}
-                    </p>
-                  </button>
-                ))}
-                {/* Yangi tur qo'shish tugmasi */}
-                <button
-                  type="button"
-                  onClick={() => setShowAddTypeModal(true)}
-                  className="group p-6 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all duration-300 text-center"
-                >
-                  <p className="text-sm font-bold tracking-wide text-gray-400 group-hover:text-purple-600">
-                    + {latinToCyrillic("YANGI TUR")}
-                  </p>
-                </button>
-              </div>
-
-              {formData.warehouse === 'preform' && (
-                <div className="bg-gray-50 dark:bg-gray-800/50 p-8 rounded-[3rem] border border-gray-100 dark:border-gray-800 animate-in zoom-in-95 duration-500">
-                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6 text-center">{t("Aksessuar O'lchami")}</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {[
-                      { id: '28', label: '28 MM', desc: '15g - 30g' },
-                      { id: '38', label: '38 MM', desc: '52g - 70g' },
-                      { id: '48', label: '48 MM', desc: '75g+' }
-                    ].map((size) => (
-                      <button
-                        key={size.id}
-                        type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, subType: size.id }))}
-                        className={`p-6 rounded-2xl border-2 transition-all ${
-                          formData.subType === size.id
-                            ? 'border-blue-500 bg-white dark:bg-gray-900 shadow-lg'
-                            : 'border-white dark:border-gray-800 text-gray-400'
-                        }`}
-                      >
-                        <p className="font-bold text-lg text-gray-900 dark:text-white">{size.label}</p>
-                        <p className="text-[10px] font-bold opacity-50 uppercase tracking-tighter">{size.desc}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
+            <div className="space-y-1.5">
+              <label className={labelClass}>
+                {latinToCyrillic("Qopdagi dona")} <span className="text-rose-500">*</span>
+              </label>
+              <CustomDropdown
+                value={formData.unitsPerBag}
+                onChange={(value) => setFormData(prev => ({ ...prev, unitsPerBag: value }))}
+                placeholder="1000"
+                variants={getVariants('unitsPerBagVariants')}
+                variantKey="unitsPerBag"
+                type="number"
+                min="1"
+                onDeleteVariant={(variant) => deleteVariant('unitsPerBagVariants', variant)}
+                onAddVariant={(variant) => addVariant('unitsPerBagVariants', variant)}
+                className={dropdownClass}
+              />
             </div>
 
-            {/* 1. Asosiy Ma'lumotlar */}
-            <div className="space-y-8">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center font-bold shadow-lg shadow-emerald-500/30">1</div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">{latinToCyrillic(t("Asosiy ma'lumotlar"))}</h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                <div className="space-y-3">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-widest ml-1">{latinToCyrillic(t("Mahsulot Nomi"))}</label>
-                  <div className="relative group">
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      className="w-full h-16 px-6 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-blue-500 rounded-2xl font-bold text-sm transition-all outline-none"
-                      placeholder={latinToCyrillic("15G QORA...")}
-                    />
-                    {(isNameManuallyEdited || manualSuffix) && !isEditing && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsNameManuallyEdited(false);
-                          setManualSuffix('');
-                        }}
-                        aria-label="Reset name"
-                        className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-white dark:bg-gray-900 rounded-lg shadow-sm flex items-center justify-center text-blue-600 hover:scale-110 transition-all"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-widest ml-1">{latinToCyrillic(t("Qop Turi"))}</label>
-                  <CustomDropdown
-                    value={formData.bagType}
-                    onChange={(value) => setFormData(prev => ({ ...prev, bagType: value }))}
-                    placeholder="15G, 21G, 5KG..."
-                    variants={getVariants('bagTypeVariants')}
-                    variantKey="bagType"
-                    onDeleteVariant={(variant) => deleteVariant('bagTypeVariants', variant)}
-                    onAddVariant={(variant) => addVariant('bagTypeVariants', variant)}
-                    className="h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 border-none font-bold text-sm"
-                  />
-                </div>
-
-                <div className="space-y-3 md:col-span-2">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-widest ml-1">{latinToCyrillic(t("Rangi"))}</label>
-                  <CustomDropdown
-                    value={formData.color}
-                    onChange={(value) => setFormData(prev => ({ ...prev, color: value }))}
-                    placeholder={latinToCyrillic(t("Rangni tanlang yoki yozing..."))}
-                    variants={getVariants('colorVariants')}
-                    variantKey="color"
-                    onDeleteVariant={(variant) => deleteVariant('colorVariants', variant)}
-                    onAddVariant={(variant) => addVariant('colorVariants', variant)}
-                    className="h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 border-none font-bold text-sm"
-                  />
-                </div>
-              </div>
+            <div className="space-y-1.5">
+              <label className={labelClass}>
+                {latinToCyrillic("Joriy zaxira")}
+              </label>
+              <CustomDropdown
+                value={formData.currentStock}
+                onChange={(value) => setFormData(prev => ({ ...prev, currentStock: value }))}
+                placeholder="0"
+                variants={getVariants('stockVariants')}
+                variantKey="stock"
+                type="number"
+                min="0"
+                onDeleteVariant={(variant) => deleteVariant('stockVariants', variant)}
+                onAddVariant={(variant) => addVariant('stockVariants', variant)}
+                className={dropdownClass}
+              />
             </div>
 
-            {/* 2. Miqdor va Narx */}
-            <div className="space-y-8">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-amber-600 text-white rounded-2xl flex items-center justify-center font-bold shadow-lg shadow-amber-500/30">2</div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">{latinToCyrillic(t("Miqdor va narx"))}</h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-                <div className="space-y-3">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-widest ml-1">{latinToCyrillic(t("Qopdagi Dona"))}</label>
-                  <CustomDropdown
-                    value={formData.unitsPerBag}
-                    onChange={(value) => setFormData(prev => ({ ...prev, unitsPerBag: value }))}
-                    placeholder="1000"
-                    variants={getVariants('unitsPerBagVariants')}
-                    variantKey="unitsPerBag"
-                    type="number"
-                    min="1"
-                    onDeleteVariant={(variant) => deleteVariant('unitsPerBagVariants', variant)}
-                    onAddVariant={(variant) => addVariant('unitsPerBagVariants', variant)}
-                    className="h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 border-none font-bold text-lg"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-widest ml-1">{latinToCyrillic(t("Joriy Zaxira"))}</label>
-                  <CustomDropdown
-                    value={formData.currentStock}
-                    onChange={(value) => setFormData(prev => ({ ...prev, currentStock: value }))}
-                    placeholder="0"
-                    variants={getVariants('stockVariants')}
-                    variantKey="stock"
-                    type="number"
-                    min="0"
-                    onDeleteVariant={(variant) => deleteVariant('stockVariants', variant)}
-                    onAddVariant={(variant) => addVariant('stockVariants', variant)}
-                    className="h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 border-none font-bold text-lg"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-widest ml-1">{latinToCyrillic(t("Narxi (USD)"))}</label>
-                  <CustomDropdown
-                    value={formData.pricePerBag}
-                    onChange={(value) => setFormData(prev => ({ ...prev, pricePerBag: value }))}
-                    placeholder="25.00"
-                    variants={getVariants('priceVariants')}
-                    variantKey="price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    onDeleteVariant={(variant) => deleteVariant('priceVariants', variant)}
-                    onAddVariant={(variant) => addVariant('priceVariants', variant)}
-                    className="h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border-none font-bold text-lg text-emerald-600"
-                  />
-                </div>
-              </div>
+            <div className="space-y-1.5">
+              <label className={labelClass}>
+                {latinToCyrillic("Narxi (USD)")} <span className="text-rose-500">*</span>
+              </label>
+              <CustomDropdown
+                value={formData.pricePerBag}
+                onChange={(value) => setFormData(prev => ({ ...prev, pricePerBag: value }))}
+                placeholder="25.00"
+                variants={getVariants('priceVariants')}
+                variantKey="price"
+                type="number"
+                step="0.01"
+                min="0"
+                onDeleteVariant={(variant) => deleteVariant('priceVariants', variant)}
+                onAddVariant={(variant) => addVariant('priceVariants', variant)}
+                className="h-12 bg-emerald-50 border border-emerald-200 rounded-xl font-semibold text-sm text-emerald-700 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 tabular-nums"
+              />
             </div>
-
-            {/* 3. Limitlar */}
-            <div className="space-y-8">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-rose-600 text-white rounded-2xl flex items-center justify-center font-bold shadow-lg shadow-rose-500/30">3</div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">{latinToCyrillic(t("Limitlar va nazorat"))}</h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-                <div className="space-y-3">
-                  <label htmlFor="minStockLimit" className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">{latinToCyrillic(t("Minimal Limit"))}</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    id="minStockLimit"
-                    name="minStockLimit"
-                    value={formData.minStockLimit}
-                    onChange={handleInputChange}
-                    className="w-full h-14 px-6 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-rose-500 rounded-xl font-semibold transition-all outline-none"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <label htmlFor="optimalStock" className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">{latinToCyrillic(t("Optimal Limit"))}</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    id="optimalStock"
-                    name="optimalStock"
-                    value={formData.optimalStock}
-                    onChange={handleInputChange}
-                    className="w-full h-14 px-6 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-blue-500 rounded-xl font-semibold transition-all outline-none"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <label htmlFor="maxCapacity" className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">{latinToCyrillic(t("Maksimal Sig'im"))}</label>
-                  <input
-                    id="maxCapacity"
-                    type="text"
-                    inputMode="decimal"
-                    name="maxCapacity"
-                    value={formData.maxCapacity}
-                    onChange={handleInputChange}
-                    className="w-full h-14 px-6 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-indigo-500 rounded-xl font-semibold transition-all outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl w-fit">
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="active"
-                    checked={formData.active}
-                    onChange={handleInputChange}
-                    className="sr-only peer"
-                  />
-                  <div className="w-14 h-7 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                  <span className="ml-4 text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-widest">{t("Mahsulot Faol")}</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 pt-10 border-t border-gray-50 dark:border-gray-800">
-              <button
-                type="button"
-                onClick={() => window.history.back()}
-                className="flex-1 h-14 rounded-xl border-2 border-gray-100 dark:border-gray-800 font-semibold text-sm text-gray-400 hover:bg-gray-50 transition-all active:scale-95"
-              >
-                {t("Bekor qilish")}
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-[2] h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-lg shadow-blue-500/30 transition-all active:scale-95 flex items-center justify-center gap-2"
-              >
-                {loading ? <RefreshCw className="w-5 h-5 animate-pulse" /> : <Save className="w-5 h-5" />}
-                {loading 
-                  ? (isEditing ? t("Yangilanmoqda...") : t("Saqlanmoqda..."))
-                  : (isEditing ? t("Mahsulotni yangilash") : t("Mahsulotni saqlash"))
-                }
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
-      </div>
+
+        {/* Card: Stok limitlari */}
+        <div className="rounded-2xl bg-white border border-slate-200/70 p-6">
+          <div className="flex items-start gap-3.5 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center flex-shrink-0">
+              <Warehouse className="w-[18px] h-[18px]" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-900 tracking-tight">{latinToCyrillic("Stok limitlari")}</h3>
+              <p className="text-sm text-slate-400 mt-0.5">{latinToCyrillic("Minimal, optimal va maksimal nazorat")}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5">
+            <div className="space-y-1.5">
+              <label htmlFor="minStockLimit" className={labelClass}>
+                {latinToCyrillic("Minimal limit")}
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                id="minStockLimit"
+                name="minStockLimit"
+                value={formData.minStockLimit}
+                onChange={handleInputChange}
+                className={inputBase}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="optimalStock" className={labelClass}>
+                {latinToCyrillic("Optimal limit")}
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                id="optimalStock"
+                name="optimalStock"
+                value={formData.optimalStock}
+                onChange={handleInputChange}
+                className={inputBase}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="maxCapacity" className={labelClass}>
+                {latinToCyrillic("Maksimal sig'im")}
+              </label>
+              <input
+                id="maxCapacity"
+                type="text"
+                inputMode="decimal"
+                name="maxCapacity"
+                value={formData.maxCapacity}
+                onChange={handleInputChange}
+                className={inputBase}
+              />
+            </div>
+          </div>
+
+          <label className="mt-5 flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/70 w-full sm:w-fit cursor-pointer">
+            <span className="relative inline-flex items-center">
+              <input
+                type="checkbox"
+                name="active"
+                checked={formData.active}
+                onChange={handleInputChange}
+                className="sr-only peer"
+              />
+              <span className="w-14 h-7 bg-slate-200 rounded-full peer peer-checked:bg-indigo-600 peer-focus:ring-4 peer-focus:ring-indigo-500/20 after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:border after:border-slate-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full peer-checked:after:border-white" />
+            </span>
+            <span className="text-sm font-semibold text-slate-900">{latinToCyrillic("Mahsulot faol")}</span>
+          </label>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => navigate(isCashier ? '/cashier/products' : '/products')}
+            className="sm:flex-1 rounded-xl border border-slate-200 bg-white py-3 text-base font-semibold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors active:scale-[0.98]"
+          >
+            {latinToCyrillic("Bekor qilish")}
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="sm:flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-3 text-base font-semibold transition-colors active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2.5"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                {isEditing ? latinToCyrillic("Yangilanmoqda...") : latinToCyrillic("Saqlanmoqda...")}
+              </>
+            ) : (
+              <>
+                <Save className="w-5 h-5" />
+                {isEditing ? latinToCyrillic("Mahsulotni yangilash") : latinToCyrillic("Mahsulotni saqlash")}
+              </>
+            )}
+          </button>
+        </div>
+      </form>
 
       {/* Yangi tur qo'shish modal */}
       {showAddTypeModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-bold text-slate-900 tracking-tight">
                 {latinToCyrillic("Yangi mahsulot turi")}
               </h3>
               <button
@@ -640,16 +711,16 @@ export default function AddProduct() {
                   setShowAddTypeModal(false);
                   setNewTypeName('');
                 }}
-                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors active:scale-95"
                 aria-label={latinToCyrillic("Yopish")}
               >
-                <X className="w-5 h-5 text-gray-600" />
+                <X className="w-5 h-5 text-slate-600" />
               </button>
             </div>
-            
+
             <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-widest ml-1 mb-2 block">
+              <div className="space-y-1.5">
+                <label className={labelClass}>
                   {latinToCyrillic("Tur nomi")}
                 </label>
                 <input
@@ -657,18 +728,19 @@ export default function AddProduct() {
                   value={newTypeName}
                   onChange={(e) => setNewTypeName(e.target.value)}
                   placeholder={latinToCyrillic("Masalan: ETIKETKA")}
-                  className="w-full h-14 px-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-purple-500 rounded-xl font-bold text-sm transition-all outline-none"
+                  className={inputBase}
+                  autoFocus
                 />
               </div>
-              
-              <div className="flex gap-3 pt-4">
+
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setShowAddTypeModal(false);
                     setNewTypeName('');
                   }}
-                  className="flex-1 h-12 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition-all"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 hover:border-slate-300 transition-colors active:scale-[0.98]"
                 >
                   {latinToCyrillic("Bekor qilish")}
                 </button>
@@ -679,10 +751,10 @@ export default function AddProduct() {
                       const newId = 'custom-' + Date.now();
                       const colors = ['purple', 'pink', 'indigo', 'cyan', 'teal', 'lime', 'amber', 'rose'];
                       const randomColor = colors[customTypes.length % colors.length];
-                      setCustomTypes(prev => [...prev, { 
-                        id: newId, 
-                        label: newTypeName.trim().toUpperCase(), 
-                        color: randomColor 
+                      setCustomTypes(prev => [...prev, {
+                        id: newId,
+                        label: newTypeName.trim().toUpperCase(),
+                        color: randomColor
                       }]);
                       setFormData(prev => ({ ...prev, warehouse: newId }));
                       setNewTypeName('');
@@ -690,7 +762,7 @@ export default function AddProduct() {
                     }
                   }}
                   disabled={!newTypeName.trim()}
-                  className="flex-1 h-12 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 text-white rounded-xl font-semibold transition-all"
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-colors active:scale-[0.98]"
                 >
                   {latinToCyrillic("Qo'shish")}
                 </button>

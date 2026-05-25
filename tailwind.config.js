@@ -1,6 +1,10 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  darkMode: 'media',
+  // 'class' (not 'media'): dark: variants only apply when a `.dark` class is
+  // present on <html>. App.tsx always removes it -> app stays light-only.
+  // ('media' made every dark: class follow the OS theme, blacking out the
+  // layout chrome on dark-mode machines.)
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {

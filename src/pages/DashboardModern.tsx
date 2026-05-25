@@ -1,189 +1,251 @@
 import { useEffect, useState } from 'react';
-import { 
-  TrendingUp, 
-  DollarSign, 
-  Users, 
-  Package, 
-  Target,
-  Activity,
-  ShoppingCart
+import { useNavigate } from 'react-router-dom';
+import {
+  ShoppingCart,
+  Package,
+  Users,
+  Wallet,
+  TrendingUp,
+  Calendar,
+  RefreshCw,
+  Clock,
+  Plus,
+  UserPlus,
+  ClipboardList,
+  Receipt,
 } from 'lucide-react';
-// Note: Charts removed until real data API is available
-import api from '../lib/professionalApi';
 import { latinToCyrillic } from '../lib/transliterator';
-import ModernLayout from '../components/ModernLayout';
+import DashboardCard from '../components/cards/DashboardCard';
+import MainLayout from '../components/layout/MainLayout';
+import { CardSkeleton } from '../components/ui/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import api from '../lib/professionalApi';
 
 interface DashboardStats {
-  totalRevenue: number;
-  monthlyRevenue: number;
-  totalOrders: number;
-  monthlyOrders: number;
-  totalCustomers: number;
+  todaySales: number;
+  todayRevenue: number;
   totalProducts: number;
-  netProfit: number;
-  growth: number;
+  lowStockProducts: number;
+  totalCustomers: number;
+  newCustomers: number;
+  cashboxBalance: number;
+  pendingOrders: number;
 }
 
+const USD_TO_UZS = 12500;
+
 export default function DashboardModern() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const navigate = useNavigate();
+  const [stats, setStats] = useState<DashboardStats>({
+    todaySales: 0,
+    todayRevenue: 0,
+    totalProducts: 0,
+    lowStockProducts: 0,
+    totalCustomers: 0,
+    newCustomers: 0,
+    cashboxBalance: 0,
+    pendingOrders: 0,
+  });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    const loadDashboardData = async () => {
-      try {
-        setLoading(true);
-        
-        // Real API call
-        const response = await api.get('/dashboard/stats');
-        const data = response.data;
-        
-        if (data) {
-          setStats({
-            totalRevenue: data.totalRevenue || 0,
-            monthlyRevenue: data.monthlyRevenue || 0,
-            totalOrders: data.totalOrders || 0,
-            monthlyOrders: data.monthlyOrders || 0,
-            totalCustomers: data.totalCustomers || 0,
-            totalProducts: data.totalProducts || 0,
-            netProfit: data.netProfit || 0,
-            growth: data.growth || 0
-          });
-        }
-      } catch (error) {
-        console.error('Error loading dashboard data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadDashboardData();
+    loadDashboardStats();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="modern-bg page-container">
-        <div className="content-wrapper">
-          <div className="glass-card p-12">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16">
-                <div className="animate-pulse rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
-              </div>
-              <p className="mt-6 text-lg font-semibold text-primary">{latinToCyrillic("Yuklanmoqda...")}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const loadDashboardStats = async () => {
+    setRefreshing(true);
+    try {
+      // Haqiqiy backend ma'lumotlari
+      const { data } = await api.get('/dashboard/stats');
+      setStats({
+        todaySales: data.todaySales ?? 0,
+        todayRevenue: data.dailyRevenue ?? 0,
+        totalProducts: data.totalProducts ?? 0,
+        lowStockProducts: Array.isArray(data.lowStock) ? data.lowStock.length : 0,
+        totalCustomers: data.totalCustomers ?? 0,
+        newCustomers: data.newCustomers ?? 0,
+        cashboxBalance: data.cashBalance ?? 0,
+        pendingOrders: data.pendingDeliveries ?? 0,
+      });
+    } catch (error) {
+      console.error('Dashboard stats loading error:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
-  if (!stats) {
-    return (
-      <div className="modern-bg page-container">
-        <div className="content-wrapper">
-          <div className="glass-card p-12">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Target className="w-8 h-8 text-red-500" />
-              </div>
-              <p className="text-lg text-primary mb-4">{latinToCyrillic("Xatolik yuz berdi")}</p>
-              <button 
-                onClick={() => window.location.reload()} 
-                className="btn-gradient-primary px-6 py-3"
-              >
-                {latinToCyrillic("Qayta urinish")}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const currentDate = new Date().toLocaleDateString('uz-UZ', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 
-  // Note: Chart data should be fetched from API endpoint
-  // For now, charts are hidden until real data is available
+  const quickActions = [
+    { id: 'sotuv', icon: Plus, label: 'Yangi savdo', gradient: 'from-emerald-500 to-emerald-600', path: '/cashier/sales/add' },
+    { id: 'mijoz', icon: UserPlus, label: 'Mijozlar', gradient: 'from-blue-500 to-blue-600', path: '/cashier/customers' },
+    { id: 'buyurtma', icon: ClipboardList, label: 'Buyurtmalar', gradient: 'from-amber-500 to-amber-600', path: '/cashier/orders' },
+    { id: 'xarajat', icon: Receipt, label: 'Xarajatlar', gradient: 'from-rose-500 to-rose-600', path: '/cashier/expenses' },
+  ];
 
   return (
-    <ModernLayout 
-      title={latinToCyrillic("Ð‘Ð¾ÑˆÒ›Ð°Ñ€ÑƒÐ² ÐŸÐ°Ð½ÐµÐ»Ð¸")}
-      subtitle={new Date().toLocaleDateString('uz-UZ', { weekday: 'long', day: 'numeric', month: 'long' })}
-    >
-      <div className="space-y-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="glass-card-light p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("Ð–Ð°Ð¼Ð¸ Ð”Ð°Ñ€Ð¾Ð¼Ð°Ð´")}</p>
-                <p className="text-2xl font-bold text-primary">
-                  {stats.totalRevenue.toLocaleString()} UZS
-                </p>
-                <div className="flex items-center gap-1 mt-2">
-                  <TrendingUp className="w-4 h-4 text-green-500" />
-                  <span className="text-sm text-green-500">+{stats.growth}%</span>
-                </div>
+    <MainLayout>
+      <div className="min-h-screen bg-gray-50/60 pb-24">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+          {/* Page header: title + date + refresh */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+                {latinToCyrillic('Boshqaruv paneli')}
+              </h1>
+              <div className="mt-1 flex items-center gap-2 text-gray-500">
+                <Calendar className="w-4 h-4" />
+                <span className="text-sm font-medium">{currentDate}</span>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-white" />
+            </div>
+            <button
+              onClick={loadDashboardStats}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-gray-700 shadow-sm border border-gray-100 transition-all duration-200 active:scale-95 self-start"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {latinToCyrillic('Yangilash')}
+            </button>
+          </div>
+
+          {/* Hero metric: today's revenue (most important) */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-6 sm:p-8 shadow-glass-lg">
+            <div className="absolute -top-8 -right-8 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+            <div className="relative flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-white/80">{latinToCyrillic('Bugungi daromad')}</p>
+                {loading ? (
+                  <div className="mt-2 h-10 w-48 bg-white/20 rounded-lg animate-pulse" />
+                ) : (
+                  <p className="mt-1 text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
+                    ${stats.todayRevenue.toLocaleString()}
+                  </p>
+                )}
+                <p className="mt-2 text-sm text-white/70">
+                  ≈ {(stats.todayRevenue * USD_TO_UZS).toLocaleString()} {latinToCyrillic("so'm")}
+                </p>
+              </div>
+              <div className="w-14 h-14 bg-white/15 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                <TrendingUp className="w-7 h-7 text-white" />
+              </div>
+            </div>
+            <div className="relative mt-6 flex items-center gap-6 text-white/90">
+              <div>
+                <p className="text-2xl font-bold">{loading ? '—' : stats.todaySales}</p>
+                <p className="text-xs text-white/70">{latinToCyrillic('Bugungi savdolar')}</p>
+              </div>
+              <div className="w-px h-10 bg-white/20" />
+              <div>
+                <p className="text-2xl font-bold">{loading ? '—' : stats.pendingOrders}</p>
+                <p className="text-xs text-white/70">{latinToCyrillic('Kutilayotgan buyurtma')}</p>
               </div>
             </div>
           </div>
 
-          <div className="glass-card-light p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("ÐžÐ¹Ð»Ð¸Ðº Ð”Ð°Ñ€Ð¾Ð¼Ð°Ð´")}</p>
-                <p className="text-2xl font-bold text-primary">
-                  {stats.monthlyRevenue.toLocaleString()} UZS
-                </p>
-                <div className="flex items-center gap-1 mt-2">
-                  <Activity className="w-4 h-4 text-blue-500" />
-                  <span className="text-sm text-blue-500">+8.2%</span>
-                </div>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center">
-                <Target className="w-6 h-6 text-white" />
-              </div>
-            </div>
+          {/* Quick actions */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.id}
+                  onClick={() => navigate(action.path)}
+                  className={`group bg-gradient-to-br ${action.gradient} text-white rounded-2xl p-4 sm:p-5 shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5 active:scale-95 text-left`}
+                >
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-200">
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <span className="text-sm font-semibold block">{latinToCyrillic(action.label)}</span>
+                </button>
+              );
+            })}
           </div>
 
-          <div className="glass-card-light p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("Ð–Ð°Ð¼Ð¸ Ð‘ÑƒÑŽÑ€Ñ‚Ð¼Ð°Ð»Ð°Ñ€")}</p>
-                <p className="text-2xl font-bold text-primary">
-                  {stats.totalOrders.toLocaleString()}
-                </p>
-                <div className="flex items-center gap-1 mt-2">
-                  <ShoppingCart className="w-4 h-4 text-purple-500" />
-                  <span className="text-sm text-purple-500">+{stats.monthlyOrders}</span>
-                </div>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center">
-                <Package className="w-6 h-6 text-white" />
-              </div>
+          {/* Stats grid */}
+          {loading ? (
+            <CardSkeleton count={6} />
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              <DashboardCard
+                icon={ShoppingCart}
+                title={latinToCyrillic('Bugungi savdolar')}
+                mainValue={stats.todaySales}
+                subValue={`$${stats.todayRevenue.toLocaleString()}`}
+                variant="info"
+              />
+              <DashboardCard
+                icon={Wallet}
+                title={latinToCyrillic('Kassa balansi')}
+                mainValue={`$${stats.cashboxBalance.toLocaleString()}`}
+                subValue={`${(stats.cashboxBalance * USD_TO_UZS).toLocaleString()} ${latinToCyrillic("so'm")}`}
+                variant="neutral"
+              />
+              <DashboardCard
+                icon={Package}
+                title={latinToCyrillic('Mahsulotlar')}
+                mainValue={stats.totalProducts}
+                subValue={
+                  stats.lowStockProducts > 0
+                    ? `${stats.lowStockProducts} ${latinToCyrillic('ta kam qoldi')}`
+                    : latinToCyrillic('Hammasi yaxshi')
+                }
+                variant={stats.lowStockProducts > 0 ? 'warning' : 'success'}
+              />
+              <DashboardCard
+                icon={Users}
+                title={latinToCyrillic('Mijozlar')}
+                mainValue={stats.totalCustomers}
+                subValue={
+                  stats.newCustomers > 0
+                    ? `+${stats.newCustomers} ${latinToCyrillic('yangi')}`
+                    : latinToCyrillic('Jami')
+                }
+                variant="info"
+              />
+              <DashboardCard
+                icon={ClipboardList}
+                title={latinToCyrillic('Kutilayotgan buyurtmalar')}
+                mainValue={stats.pendingOrders}
+                subValue={latinToCyrillic('ta buyurtma')}
+                variant={stats.pendingOrders > 0 ? 'warning' : 'neutral'}
+              />
+              <DashboardCard
+                icon={TrendingUp}
+                title={latinToCyrillic('Bugungi daromad')}
+                mainValue={`$${stats.todayRevenue.toLocaleString()}`}
+                subValue={latinToCyrillic('USD')}
+                variant="success"
+              />
             </div>
-          </div>
+          )}
 
-          <div className="glass-card-light p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-secondary">{latinToCyrillic("ÐœÐ¸Ð¶Ð¾Ð·Ð»Ð°Ñ€")}</p>
-                <p className="text-2xl font-bold text-primary">
-                  {stats.totalCustomers.toLocaleString()}
-                </p>
-                <div className="flex items-center gap-1 mt-2">
-                  <Users className="w-4 h-4 text-orange-500" />
-                  <span className="text-sm text-orange-500">+12</span>
-                </div>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center">
-                <Users className="w-6 h-6 text-white" />
-              </div>
-            </div>
+          {/* Recent activity (honest empty state until a feed is wired) */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6">
+            <h3 className="font-bold text-gray-900 mb-1">{latinToCyrillic("So'nggi faoliyat")}</h3>
+            <p className="text-sm text-gray-500 mb-4">{latinToCyrillic('Eng oxirgi savdo va amallar shu yerda chiqadi')}</p>
+            <EmptyState
+              icon={Clock}
+              title={latinToCyrillic("Hozircha faoliyat yo'q")}
+              description={latinToCyrillic("Yangi savdo qilganingizda bu yerda ko'rinadi")}
+              action={
+                <button
+                  onClick={() => navigate('/cashier/sales/add')}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
+                >
+                  <Plus className="w-4 h-4" />
+                  {latinToCyrillic('Yangi savdo')}
+                </button>
+              }
+            />
           </div>
         </div>
-
       </div>
-    </ModernLayout>
+    </MainLayout>
   );
 }

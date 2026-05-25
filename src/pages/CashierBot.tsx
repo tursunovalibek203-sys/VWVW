@@ -1,22 +1,23 @@
-import { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
-import Button from '../components/Button';
-import { 
-  Bot, 
-  Send, 
-  MessageCircle, 
-  Users, 
-  Package, 
-  DollarSign,
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Send,
+  MessageCircle,
+  Users,
+  Package,
   CheckCircle,
   AlertCircle,
   Clock,
-  Settings,
-  RefreshCw
+  RefreshCw,
+  Loader2,
+  WifiOff,
+  X,
+  ChevronRight,
 } from 'lucide-react';
 import api from '../lib/professionalApi';
 import { latinToCyrillic } from '../lib/transliterator';
-import { errorHandler } from '../lib/professionalErrorHandler';
+import { useToast } from '../components/ui/Toast';
+import { CardSkeleton } from '../components/ui/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
 
 interface CustomerMessage {
   id: string;
@@ -34,86 +35,121 @@ interface BotStats {
   pendingOrders: number;
 }
 
+const EMPTY_STATS: BotStats = {
+  totalCustomers: 0,
+  activeChats: 0,
+  todayMessages: 0,
+  pendingOrders: 0,
+};
+
+// MUHIM (honesty): backend'da /api/bot/messages, /api/bot/stats, /api/bot/reply
+// route'lari MAVJUD EMAS. Server faqat /api/bots/* (status, list, broadcast, ...)
+// ni mount qiladi. Shu sababli bu so'rovlar deyarli har doim xatoga tushadi.
+// Biz soxta bo'sh ma'lumot KO'RSATMAYMIZ — o'rniga halol xato holati + Toast.
+const BOT_UNAVAILABLE_TITLE = latinToCyrillic('Bot xizmati hozircha mavjud emas');
+const BOT_UNAVAILABLE_DESC = latinToCyrillic(
+  "Kassir boti serveri hali ulanmagan. Xizmat ulanganidan so'ng mijoz xabarlari bu yerda ko'rinadi."
+);
+
 export default function CashierBot() {
+  const { addToast } = useToast();
   const [messages, setMessages] = useState<CustomerMessage[]>([]);
-  const [stats, setStats] = useState<BotStats>({
-    totalCustomers: 0,
-    activeChats: 0,
-    todayMessages: 0,
-    pendingOrders: 0
-  });
+  const [stats, setStats] = useState<BotStats>(EMPTY_STATS);
   const [selectedMessage, setSelectedMessage] = useState<CustomerMessage | null>(null);
   const [replyText, setReplyText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [sending, setSending] = useState(false);
+  // Halol xato holati: backend yo'qligini yashirmaymiz.
+  const [hasError, setHasError] = useState(false);
+
+  const loadBotData = useCallback(
+    async (mode: 'initial' | 'refresh' | 'silent' = 'initial') => {
+      if (mode === 'initial') setLoading(true);
+      if (mode === 'refresh') setRefreshing(true);
+
+      try {
+        // Haqiqiy backend so'rovlari. .catch(() => bo'sh) MASKALASH OLIB TASHLANDI:
+        // agar so'rov xato bersa — bu yerda halol catch'ga tushadi.
+        const [messagesRes, statsRes] = await Promise.all([
+          api.get('/bot/messages'),
+          api.get('/bot/stats'),
+        ]);
+
+        const apiMessages: any[] = Array.isArray(messagesRes.data)
+          ? messagesRes.data
+          : messagesRes.data?.messages ?? [];
+
+        const mapped: CustomerMessage[] = apiMessages.map((msg: any) => ({
+          id: String(msg.id ?? crypto.randomUUID()),
+          customerName: msg.customer?.name || msg.customerName || latinToCyrillic("Noma'lum"),
+          message: msg.message || msg.content || '',
+          telegramChatId: msg.telegramChatId || msg.chatId || '',
+          timestamp: msg.timestamp || msg.createdAt || new Date().toISOString(),
+          status: (msg.status as CustomerMessage['status']) || 'new',
+        }));
+
+        setMessages(mapped);
+        setStats(statsRes.data ?? EMPTY_STATS);
+        setHasError(false);
+      } catch (error) {
+        console.error('Bot data loading error:', error);
+        // Soxta bo'sh muvaffaqiyat EMAS — halol xato holati.
+        setHasError(true);
+        setMessages([]);
+        setStats(EMPTY_STATS);
+        setSelectedMessage(null);
+        // Faqat foydalanuvchi o'zi yangilaganda Toast — silent poll'da spam qilmaymiz.
+        if (mode !== 'silent') {
+          addToast({
+            type: 'error',
+            title: BOT_UNAVAILABLE_TITLE,
+            message: latinToCyrillic(
+              "Server bilan bog'lanib bo'lmadi. Keyinroq qayta urinib ko'ring."
+            ),
+          });
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [addToast]
+  );
 
   useEffect(() => {
-    loadBotData();
-    const interval = setInterval(loadBotData, 30000); // Har 30 sekundda yangilash
+    loadBotData('initial');
+    const interval = setInterval(() => loadBotData('silent'), 30000);
     return () => clearInterval(interval);
-  }, []);
-
-  const loadBotData = async () => {
-    try {
-      setLoading(true);
-      // Real API call
-      const [messagesRes, statsRes] = await Promise.all([
-        api.get('/bot/messages').catch(() => ({ data: [] })),
-        api.get('/bot/stats').catch(() => ({ 
-          data: { totalCustomers: 0, activeChats: 0, todayMessages: 0, pendingOrders: 0 }
-        }))
-      ]);
-      
-      const apiMessages = messagesRes.data || [];
-      const mappedMessages: CustomerMessage[] = apiMessages.map((msg: any) => ({
-        id: msg.id,
-        customerName: msg.customer?.name || msg.customerName || 'Noma\'lum',
-        message: msg.message || msg.content || '',
-        telegramChatId: msg.telegramChatId || msg.chatId || '',
-        timestamp: msg.timestamp || msg.createdAt || new Date().toISOString(),
-        status: msg.status || 'new'
-      }));
-      
-      setMessages(mappedMessages);
-      setStats(statsRes.data || { totalCustomers: 0, activeChats: 0, todayMessages: 0, pendingOrders: 0 });
-    } catch (error) {
-      console.error('Bot data yuklashda xatolik:', error);
-      setMessages([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadBotData]);
 
   const sendReply = async () => {
-    console.log('sendReply called, selectedMessage:', selectedMessage, 'replyText:', replyText);
-    if (!selectedMessage || !replyText.trim()) {
-      console.log('sendReply early return - missing data');
-      return;
-    }
+    if (!selectedMessage || !replyText.trim() || sending) return;
 
     setSending(true);
     try {
-      // Real API call
       await api.post('/bot/reply', {
         chatId: selectedMessage.telegramChatId,
         message: replyText,
-        originalMessageId: selectedMessage.id
+        originalMessageId: selectedMessage.id,
       });
 
-      // Update message status
-      setMessages(prev => prev.map(msg => 
-        msg.id === selectedMessage.id 
-          ? { ...msg, status: 'answered' as const }
-          : msg
-      ));
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === selectedMessage.id ? { ...msg, status: 'answered' as const } : msg
+        )
+      );
 
       setReplyText('');
       setSelectedMessage(null);
-      
-      alert(latinToCyrillic('Javob yuborildi!'));
+      addToast({ type: 'success', title: latinToCyrillic('Javob yuborildi') });
     } catch (error) {
-      console.error('Javob yuborishda xatolik:', error);
-      alert(latinToCyrillic('Xatolik yuz berdi!'));
+      console.error('Reply send error:', error);
+      addToast({
+        type: 'error',
+        title: latinToCyrillic('Javob yuborilmadi'),
+        message: latinToCyrillic("Bot xizmati ulanmagan. Keyinroq qayta urinib ko'ring."),
+      });
     } finally {
       setSending(false);
     }
@@ -124,242 +160,299 @@ export default function CashierBot() {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const minutes = Math.floor(diff / 60000);
-    
+
     if (minutes < 1) return latinToCyrillic('hozir');
     if (minutes < 60) return `${minutes} ${latinToCyrillic('daqiqa oldin')}`;
     if (minutes < 1440) return `${Math.floor(minutes / 60)} ${latinToCyrillic('soat oldin')}`;
     return date.toLocaleDateString('uz-UZ');
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'new': return 'bg-red-100 text-red-800 border-red-200';
-      case 'answered': return 'bg-green-100 text-green-800 border-green-200';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
+  const statusMeta: Record<
+    CustomerMessage['status'],
+    { label: string; chip: string; icon: typeof AlertCircle }
+  > = {
+    new: {
+      label: latinToCyrillic('Yangi'),
+      chip: 'bg-rose-50 text-rose-700 border-rose-200/70',
+      icon: AlertCircle,
+    },
+    answered: {
+      label: latinToCyrillic('Javob berildi'),
+      chip: 'bg-emerald-50 text-emerald-700 border-emerald-200/70',
+      icon: CheckCircle,
+    },
+    pending: {
+      label: latinToCyrillic('Kutilmoqda'),
+      chip: 'bg-amber-50 text-amber-700 border-amber-200/70',
+      icon: Clock,
+    },
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'new': return <AlertCircle className="w-4 h-4" />;
-      case 'answered': return <CheckCircle className="w-4 h-4" />;
-      case 'pending': return <Clock className="w-4 h-4" />;
-      default: return <MessageCircle className="w-4 h-4" />;
-    }
-  };
+  const nf = (n: number) => n.toLocaleString('en-US');
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <Bot className="w-16 h-16 text-blue-600 animate-pulse mx-auto mb-4" />
-          <p className="text-lg">{latinToCyrillic('Bot yuklanmoqda...')}</p>
-        </div>
-      </div>
-    );
-  }
+  const statCards = [
+    { label: 'Jami mijozlar', value: stats.totalCustomers, icon: Users, tint: 'bg-sky-50 text-sky-600' },
+    { label: 'Faol suhbatlar', value: stats.activeChats, icon: MessageCircle, tint: 'bg-emerald-50 text-emerald-600' },
+    { label: 'Bugungi xabarlar', value: stats.todayMessages, icon: Send, tint: 'bg-indigo-50 text-indigo-600' },
+    { label: 'Kutilayotgan buyurtma', value: stats.pendingOrders, icon: Package, tint: 'bg-amber-50 text-amber-600' },
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white mb-8 shadow-2xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Bot className="w-12 h-12 animate-pulse" />
-              <div>
-                <h1 className="text-4xl font-bold">{latinToCyrillic('Кассир Боти')}</h1>
-                <p className="text-blue-100 mt-2">{latinToCyrillic('Mijozlar bilan Telegram orqali muloqot')}</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => {
-                console.log('Yangilash button clicked');
-                loadBotData();
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white border-2 border-white/30 rounded-xl font-medium text-sm transition-all"
-            >
-              <RefreshCw className="w-5 h-5" />
-              {latinToCyrillic('Yangilash')}
-            </button>
-          </div>
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
+            {latinToCyrillic('Kassir boti')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {latinToCyrillic('Mijozlar bilan Telegram orqali muloqot')}
+          </p>
         </div>
+        <button
+          onClick={() => loadBotData('refresh')}
+          disabled={refreshing}
+          className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98] self-start"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {latinToCyrillic('Yangilash')}
+        </button>
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-xl">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-sm font-medium">{latinToCyrillic('Jami mijozlar')}</p>
-                  <p className="text-3xl font-bold mt-2">{stats.totalCustomers}</p>
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+        {loading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[110px] animate-pulse"
+              />
+            ))
+          : statCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div
+                  key={card.label}
+                  className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">
+                      {latinToCyrillic(card.label)}
+                    </p>
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${card.tint}`}
+                    >
+                      <Icon className="w-[18px] h-[18px]" />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
+                    {nf(card.value)}
+                  </p>
                 </div>
-                <Users className="w-12 h-12 text-blue-200" />
-              </div>
-            </CardContent>
-          </Card>
+              );
+            })}
+      </div>
 
-          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-xl">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100 text-sm font-medium">{latinToCyrillic('Faol suhbatlar')}</p>
-                  <p className="text-3xl font-bold mt-2">{stats.activeChats}</p>
-                </div>
-                <MessageCircle className="w-12 h-12 text-green-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-xl">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-100 text-sm font-medium">{latinToCyrillic("Bugungi xabarlar")}</p>
-                  <p className="text-3xl font-bold mt-2">{stats.todayMessages}</p>
-                </div>
-                <Send className="w-12 h-12 text-purple-200" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0 shadow-xl">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-orange-100 text-sm font-medium">{latinToCyrillic('Kutilayotgan buyurtmalar')}</p>
-                  <p className="text-3xl font-bold mt-2">{stats.pendingOrders}</p>
-                </div>
-                <Package className="w-12 h-12 text-orange-200" />
-              </div>
-            </CardContent>
-          </Card>
+      {/* Body */}
+      {loading ? (
+        <CardSkeleton count={4} />
+      ) : hasError ? (
+        <div className="bg-white rounded-2xl border border-slate-200/70">
+          <EmptyState
+            icon={WifiOff}
+            title={BOT_UNAVAILABLE_TITLE}
+            description={BOT_UNAVAILABLE_DESC}
+            action={
+              <button
+                onClick={() => loadBotData('refresh')}
+                disabled={refreshing}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors active:scale-[0.98] disabled:opacity-60"
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                {latinToCyrillic('Qayta urinish')}
+              </button>
+            }
+          />
         </div>
-
-        {/* Messages and Reply */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Messages List */}
-          <Card className="shadow-2xl border-0 bg-white dark:bg-gray-800">
-            <CardHeader className="border-b-2 border-gray-200 dark:border-gray-700">
-              <CardTitle className="text-xl font-bold flex items-center gap-2">
-                <MessageCircle className="w-6 h-6 text-blue-600" />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Messages list */}
+          <div className="bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
+            <div className="flex items-center gap-2 px-5 sm:px-6 py-4 border-b border-slate-200/70">
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <MessageCircle className="w-[18px] h-[18px]" />
+              </div>
+              <h2 className="text-sm font-semibold text-slate-900">
                 {latinToCyrillic('Mijoz xabarlari')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all hover:shadow-lg ${
-                      selectedMessage?.id === message.id
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
-                    }`}
-                    onClick={() => {
-                      console.log('Message clicked:', message);
-                      setSelectedMessage(message);
-                    }}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
-                          <Users className="w-4 h-4 text-white" />
+              </h2>
+              {messages.length > 0 && (
+                <span className="ml-auto inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 tabular-nums">
+                  {messages.length}
+                </span>
+              )}
+            </div>
+
+            {messages.length === 0 ? (
+              <EmptyState
+                icon={MessageCircle}
+                title={latinToCyrillic("Xabarlar yo'q")}
+                description={latinToCyrillic(
+                  'Hozircha mijozlardan yangi xabar kelmagan. Yangi xabarlar bu yerda avtomatik chiqadi.'
+                )}
+              />
+            ) : (
+              <div className="p-4 sm:p-5 space-y-3 max-h-[28rem] overflow-y-auto">
+                {messages.map((message) => {
+                  const meta = statusMeta[message.status];
+                  const StatusIcon = meta.icon;
+                  const active = selectedMessage?.id === message.id;
+                  return (
+                    <button
+                      key={message.id}
+                      type="button"
+                      onClick={() => setSelectedMessage(message)}
+                      className={`group w-full text-left p-4 rounded-2xl border transition-all duration-200 active:scale-[0.99] ${
+                        active
+                          ? 'border-indigo-300 bg-indigo-50/50 ring-1 ring-indigo-200'
+                          : 'border-slate-200/70 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0">
+                            <Users className="w-[18px] h-[18px]" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-slate-900 text-sm truncate">
+                              {message.customerName}
+                            </p>
+                            <p className="text-[11px] text-slate-400">
+                              {formatTime(message.timestamp)}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-bold">{message.customerName}</p>
-                          <p className="text-xs text-gray-500">{formatTime(message.timestamp)}</p>
-                        </div>
-                      </div>
-                      <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(message.status)}`}>
-                        {getStatusIcon(message.status)}
-                        <span>
-                          {message.status === 'new' && latinToCyrillic('Yangi')}
-                          {message.status === 'answered' && latinToCyrillic('Javob berildi')}
-                          {message.status === 'pending' && latinToCyrillic('Kutilmoqda')}
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border flex-shrink-0 ${meta.chip}`}
+                        >
+                          <StatusIcon className="w-3.5 h-3.5" />
+                          {meta.label}
                         </span>
                       </div>
-                    </div>
-                    <p className="text-gray-700 dark:text-gray-300">{message.message}</p>
-                  </div>
-                ))}
+                      <p className="text-sm text-slate-600 leading-relaxed line-clamp-3 pl-12">
+                        {message.message}
+                      </p>
+                      <div className="flex items-center justify-end mt-2 text-xs font-semibold text-indigo-600">
+                        {latinToCyrillic('Javob berish')}
+                        <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </div>
 
-          {/* Reply Panel */}
-          <Card className="shadow-2xl border-0 bg-white dark:bg-gray-800">
-            <CardHeader className="border-b-2 border-gray-200 dark:border-gray-700">
-              <CardTitle className="text-xl font-bold flex items-center gap-2">
-                <Send className="w-6 h-6 text-green-600" />
+          {/* Reply panel */}
+          <div className="bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
+            <div className="flex items-center gap-2 px-5 sm:px-6 py-4 border-b border-slate-200/70">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Send className="w-[18px] h-[18px]" />
+              </div>
+              <h2 className="text-sm font-semibold text-slate-900">
                 {latinToCyrillic('Javob yozish')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
+              </h2>
+            </div>
+
+            <div className="p-5 sm:p-6">
               {selectedMessage ? (
                 <div className="space-y-4">
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
-                        <Users className="w-4 h-4 text-white" />
+                  {/* Original message preview */}
+                  <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0">
+                          <Users className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 text-sm truncate">
+                            {selectedMessage.customerName}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {formatTime(selectedMessage.timestamp)}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold">{selectedMessage.customerName}</p>
-                        <p className="text-xs text-gray-500">{formatTime(selectedMessage.timestamp)}</p>
-                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedMessage(null);
+                          setReplyText('');
+                        }}
+                        title={latinToCyrillic('Yopish')}
+                        aria-label={latinToCyrillic('Tanlovni bekor qilish')}
+                        className="flex-shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                    <p className="text-gray-700 dark:text-gray-300">{selectedMessage.message}</p>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      {selectedMessage.message}
+                    </p>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {latinToCyrillic('Javob matni:')}
+                  {/* Reply textarea */}
+                  <div className="space-y-1.5">
+                    <label htmlFor="reply-text" className="block text-sm font-semibold text-slate-700">
+                      {latinToCyrillic('Javob matni')}
                     </label>
                     <textarea
+                      id="reply-text"
                       value={replyText}
                       onChange={(e) => setReplyText(e.target.value)}
-                      className="w-full h-32 p-4 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:bg-gray-700 dark:text-white resize-none"
-                      placeholder={latinToCyrillic('Javobingizni shu yerga yozing...')}
+                      rows={5}
+                      placeholder={latinToCyrillic('Javobingizni shu yerga yozing…')}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 resize-none transition-all focus:outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 focus:bg-white hover:border-slate-300"
                     />
                   </div>
 
+                  {/* Actions */}
                   <div className="flex gap-3">
-                    <button 
-                      onClick={() => {
-                        console.log('Javob yuborish button clicked');
-                        sendReply();
-                      }}
+                    <button
+                      onClick={sendReply}
                       disabled={!replyText.trim() || sending}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-all"
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Send className="w-5 h-5" />
-                      {sending ? latinToCyrillic('Yuborilmoqda...') : latinToCyrillic('Javob yuborish')}
+                      {sending ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Send className="w-5 h-5" />
+                      )}
+                      {sending ? latinToCyrillic('Yuborilmoqda…') : latinToCyrillic('Javob yuborish')}
                     </button>
-                    <button 
+                    <button
                       onClick={() => {
-                        console.log('Bekor qilish button clicked');
                         setSelectedMessage(null);
                         setReplyText('');
                       }}
-                      className="px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-semibold text-sm transition-all"
+                      disabled={sending}
+                      className="px-4 py-3 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-colors active:scale-[0.98] disabled:opacity-50"
                     >
                       {latinToCyrillic('Bekor qilish')}
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <MessageCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 dark:text-gray-400">
-                    {latinToCyrillic('Javob berish uchun xabarni tanlang')}
-                  </p>
-                </div>
+                <EmptyState
+                  icon={MessageCircle}
+                  title={latinToCyrillic('Xabar tanlanmagan')}
+                  description={latinToCyrillic(
+                    "Javob berish uchun chap tomondagi ro'yxatdan mijoz xabarini tanlang."
+                  )}
+                />
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

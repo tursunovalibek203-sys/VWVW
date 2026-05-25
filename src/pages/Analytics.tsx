@@ -1,33 +1,38 @@
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
-import Button from '../components/Button';
 import api from '../lib/professionalApi';
 import { formatCurrency } from '../lib/utils';
+import { latinToCyrillic } from '../lib/transliterator';
+import { useToast } from '../components/ui/Toast';
+import { CardSkeleton } from '../components/ui/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
 import BusinessMetricsCard from '../components/BusinessMetricsCard';
 import MetricsCharts from '../components/MetricsCharts';
-import { 
-  Brain, 
-  TrendingUp, 
+import {
+  Brain,
+  TrendingUp,
   TrendingDown,
   DollarSign,
   Users,
   Package,
-  Zap,
+  RefreshCw,
   CheckCircle,
   AlertCircle,
   XCircle,
   BarChart3,
-  PieChart
+  PieChart,
+  LineChart as LineChartIcon,
+  Lightbulb,
+  Crown,
 } from 'lucide-react';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
-  Legend
+  Legend,
 } from 'recharts';
 import AdvancedMetricsCard from '../components/AdvancedMetricsCard';
 import CustomerSegmentsChart from '../components/CustomerSegmentsChart';
@@ -35,18 +40,22 @@ import StrategicRecommendations from '../components/StrategicRecommendations';
 import RiskAssessment from '../components/RiskAssessment';
 import AnomaliesDetection from '../components/AnomaliesDetection';
 import ProfessionalCEOAnalytics from '../components/ProfessionalCEOAnalytics';
-import { Crown } from 'lucide-react';
 
 export default function Analytics() {
+  const t = latinToCyrillic;
+  const { addToast } = useToast();
+
   const [analytics, setAnalytics] = useState<any>(null);
   const [businessMetrics, setBusinessMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [timeRange, setTimeRange] = useState('30');
   const [activeView, setActiveView] = useState<'ai' | 'business' | 'charts' | 'ceo'>('ceo');
 
   useEffect(() => {
     loadAnalytics();
     loadBusinessMetrics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRange]);
 
   const loadAnalytics = async () => {
@@ -56,6 +65,7 @@ export default function Analytics() {
       setAnalytics(data);
     } catch (error) {
       console.error('Analytics yuklashda xatolik');
+      addToast({ type: 'error', title: t('Tahlilni yuklashda xatolik') });
     } finally {
       setLoading(false);
     }
@@ -70,357 +80,392 @@ export default function Analytics() {
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([loadAnalytics(), loadBusinessMetrics()]);
+      addToast({ type: 'success', title: t('Malumotlar yangilandi') });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const periodLabel: Record<string, string> = {
+    '7': t('Oxirgi 7 kun'),
+    '30': t('Oxirgi 30 kun'),
+    '90': t('Oxirgi 90 kun'),
+    '365': t('Oxirgi 1 yil'),
+  };
+
+  const tabs = [
+    { id: 'ceo' as const, name: t('CEO Tahlil'), icon: Crown },
+    { id: 'ai' as const, name: t('AI Tahlil'), icon: Brain },
+    { id: 'business' as const, name: t('Biznes Metrikalar'), icon: BarChart3 },
+    { id: 'charts' as const, name: t('Chartlar'), icon: PieChart },
+  ];
+
+  // ── Header: clean title + period selector + refresh (reused in all states) ──
+  const Header = () => (
+    <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+      <div>
+        <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
+          {t('Suniy intellekt tahlili')}
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          {t('Professional biznes tahlili va aqlli tavsiyalar')} · {periodLabel[timeRange]}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 self-start">
+        <select
+          title={t('Vaqt oraligini tanlash')}
+          aria-label={t('Vaqt oraligini tanlash')}
+          className="px-3.5 py-2 bg-white hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900/10 cursor-pointer"
+          value={timeRange}
+          onChange={(e) => setTimeRange(e.target.value)}
+        >
+          <option value="7">{t('Oxirgi 7 kun')}</option>
+          <option value="30">{t('Oxirgi 30 kun')}</option>
+          <option value="90">{t('Oxirgi 90 kun')}</option>
+          <option value="365">{t('Oxirgi 1 yil')}</option>
+        </select>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {t('Yangilash')}
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── Loading: clean header + KPI skeletons matching house style ──────────────
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Brain className="w-16 h-16 text-primary mx-auto mb-4 animate-pulse" />
-          <p className="text-lg font-semibold">AI Tahlil qilinmoqda...</p>
+      <div className="max-w-7xl mx-auto space-y-8">
+        <Header />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="rounded-2xl bg-slate-900 p-6 h-[140px] animate-pulse" />
+          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-5">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[140px] animate-pulse" />
+            ))}
+          </div>
         </div>
+        <CardSkeleton count={4} />
       </div>
     );
   }
 
+  // ── Error / no data ─────────────────────────────────────────────────────
   if (!analytics) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <p className="text-lg font-semibold">Ma'lumotlarni yuklashda xatolik</p>
-          <Button onClick={loadAnalytics} className="mt-4">
-            Qayta urinish
-          </Button>
+      <div className="max-w-7xl mx-auto space-y-8">
+        <Header />
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+          <EmptyState
+            icon={XCircle}
+            title={t('Malumotlarni yuklashda xatolik')}
+            description={t('Tahlil malumotlarini olishda muammo yuz berdi. Iltimos qaytadan urinib koring.')}
+            action={
+              <button
+                onClick={loadAnalytics}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+              >
+                <RefreshCw className="w-4 h-4" />
+                {t('Qayta urinish')}
+              </button>
+            }
+          />
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-6 p-4">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Brain className="w-8 h-8 text-primary" />
-            AI Tahlil va Biznes Metrikalar
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Sun'iy intellekt va professional biznes tahlili
-          </p>
-        </div>
-        
-        <div className="flex gap-2">
-          <select
-            title="Vaqt oralig'ini tanlash"
-            aria-label="Vaqt oralig'ini tanlash"
-            className="px-4 py-2 bg-background border border-border rounded-lg"
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value)}
-          >
-            <option value="7">Oxirgi 7 kun</option>
-            <option value="30">Oxirgi 30 kun</option>
-            <option value="90">Oxirgi 90 kun</option>
-            <option value="365">Oxirgi 1 yil</option>
-          </select>
-          <Button onClick={() => { loadAnalytics(); loadBusinessMetrics(); }}>
-            <Zap className="w-4 h-4 mr-2" />
-            Yangilash
-          </Button>
-        </div>
-      </div>
+  const m = analytics.metrics || {};
+  const revenueUp = (m.revenueGrowth || 0) >= 0;
+  const profitUp = (m.profitGrowth || 0) >= 0;
 
-      {/* View Tabs */}
-      <div className="flex gap-2 border-b border-border overflow-x-auto">
-        <button
-          onClick={() => setActiveView('ai')}
-          className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeView === 'ai'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Brain className="w-4 h-4" />
-          AI Tahlil
-        </button>
-        <button
-          onClick={() => setActiveView('business')}
-          className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeView === 'business'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <BarChart3 className="w-4 h-4" />
-          Biznes Metrikalar
-        </button>
-        <button
-          onClick={() => setActiveView('charts')}
-          className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeView === 'charts'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <PieChart className="w-4 h-4" />
-          Chartlar
-        </button>
-        <button
-          onClick={() => setActiveView('ceo')}
-          className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors whitespace-nowrap ${
-            activeView === 'ceo'
-              ? 'border-amber-500 text-amber-600'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Crown className="w-4 h-4" />
-          CEO Analytics
-        </button>
+  const insightStyle = (type: string) => {
+    switch (type) {
+      case 'success':
+        return { wrap: 'bg-emerald-50 border-emerald-500', icon: <CheckCircle className="w-5 h-5 text-emerald-600" /> };
+      case 'warning':
+        return { wrap: 'bg-amber-50 border-amber-500', icon: <AlertCircle className="w-5 h-5 text-amber-600" /> };
+      case 'danger':
+        return { wrap: 'bg-rose-50 border-rose-500', icon: <XCircle className="w-5 h-5 text-rose-600" /> };
+      default:
+        return { wrap: 'bg-indigo-50 border-indigo-500', icon: <Brain className="w-5 h-5 text-indigo-600" /> };
+    }
+  };
+
+  // Secondary KPI cards (white tiles with soft tinted icon tiles)
+  const kpiCards = [
+    {
+      title: t('Sof Foyda'),
+      value: formatCurrency(m.netProfit || 0, 'USD'),
+      icon: TrendingUp,
+      tint: 'bg-indigo-50 text-indigo-600',
+      delta: m.profitGrowth,
+      deltaUp: profitUp,
+    },
+    {
+      title: t('Sotuvlar'),
+      value: (m.totalQuantity || 0).toLocaleString('en-US'),
+      icon: Package,
+      tint: 'bg-sky-50 text-sky-600',
+      sub: `${(m.totalSales || 0).toLocaleString('en-US')} ${t('ta savdo')}`,
+    },
+    {
+      title: t('Mijozlar'),
+      value: (m.totalCustomers || 0).toLocaleString('en-US'),
+      icon: Users,
+      tint: 'bg-amber-50 text-amber-600',
+      sub: `${(m.activeCustomers || 0).toLocaleString('en-US')} ${t('faol')}`,
+    },
+  ];
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-8">
+      <Header />
+
+      {/* View tabs — pill tabs */}
+      <div className="bg-white rounded-2xl p-1.5 border border-slate-200/70 flex gap-1 overflow-x-auto">
+        {tabs.map((tab) => {
+          const active = activeView === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveView(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+                active
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.name}
+            </button>
+          );
+        })}
       </div>
 
       {/* AI Tahlil View */}
       {activeView === 'ai' && (
-        <div className="space-y-6">{/* AI Xulosalar */}
-      <Card className="border-2 border-primary bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Brain className="w-6 h-6 text-primary" />
-            AI Xulosalari va Tavsiyalar
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {analytics.insights?.map((insight: any, index: number) => (
-              <div 
-                key={index}
-                className={`p-4 rounded-lg border-l-4 ${
-                  insight.type === 'success' 
-                    ? 'bg-green-50 dark:bg-green-950 border-green-500'
-                    : insight.type === 'warning'
-                    ? 'bg-yellow-50 dark:bg-yellow-950 border-yellow-500'
-                    : insight.type === 'danger'
-                    ? 'bg-red-50 dark:bg-red-950 border-red-500'
-                    : 'bg-blue-50 dark:bg-blue-950 border-blue-500'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  {insight.type === 'success' ? (
-                    <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  ) : insight.type === 'warning' ? (
-                    <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
-                  ) : insight.type === 'danger' ? (
-                    <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
-                  ) : (
-                    <Brain className="w-5 h-5 text-blue-600 mt-0.5" />
-                  )}
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-lg">{insight.title}</h4>
-                    <p className="text-sm text-muted-foreground mt-1">{insight.description}</p>
-                    {insight.action && (
-                      <p className="text-sm font-medium mt-2 text-primary">
-                        💡 {insight.action}
-                      </p>
-                    )}
+        <div className="space-y-8 animate-in fade-in duration-500">
+          {/* KPI metric grid: dark revenue hero + secondary white cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Premium dark KPI: total revenue */}
+            <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-6 text-white">
+              <div className="absolute -top-16 -right-16 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl" />
+              <div className="relative">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t('Jami Daromad')}</p>
+                  <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
+                    <DollarSign className="w-[18px] h-[18px] text-indigo-300" />
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Asosiy Metrikalar */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <DollarSign className="w-6 h-6 text-green-500" />
-                <div className={`flex items-center gap-1 text-sm ${
-                  analytics.metrics?.revenueGrowth >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {analytics.metrics?.revenueGrowth >= 0 ? (
-                    <TrendingUp className="w-4 h-4" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4" />
-                  )}
-                  {Math.abs(analytics.metrics?.revenueGrowth || 0).toFixed(1)}%
+                <p className="mt-3 text-4xl font-bold tracking-tight tabular-nums">
+                  {formatCurrency(m.totalRevenue || 0, 'USD')}
+                </p>
+                <div
+                  className={`mt-3 inline-flex items-center gap-1 text-sm font-semibold px-2.5 py-1 rounded-lg ${
+                    revenueUp ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                  }`}
+                >
+                  {revenueUp ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                  <span className="tabular-nums">{Math.abs(m.revenueGrowth || 0).toFixed(1)}%</span>
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground">Jami Daromad</p>
-              <p className="text-2xl font-bold">
-                {formatCurrency(analytics.metrics?.totalRevenue || 0, 'USD')}
-              </p>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <TrendingUp className="w-6 h-6 text-purple-500" />
-                <div className={`flex items-center gap-1 text-sm ${
-                  analytics.metrics?.profitGrowth >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {analytics.metrics?.profitGrowth >= 0 ? (
-                    <TrendingUp className="w-4 h-4" />
+            {/* Secondary KPI cards */}
+            <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-5">
+              {kpiCards.map((kpi, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">
+                      {kpi.title}
+                    </p>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${kpi.tint}`}>
+                      <kpi.icon className="w-[18px] h-[18px]" />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-2xl font-bold text-slate-900 tracking-tight tabular-nums">{kpi.value}</p>
+                  {typeof kpi.delta === 'number' ? (
+                    <p
+                      className={`mt-1 text-xs flex items-center gap-1 font-medium ${
+                        kpi.deltaUp ? 'text-emerald-600' : 'text-rose-600'
+                      }`}
+                    >
+                      {kpi.deltaUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                      <span className="tabular-nums">{Math.abs(kpi.delta).toFixed(1)}%</span>
+                    </p>
                   ) : (
-                    <TrendingDown className="w-4 h-4" />
+                    kpi.sub && <p className="mt-1 text-xs text-slate-400 tabular-nums">{kpi.sub}</p>
                   )}
-                  {Math.abs(analytics.metrics?.profitGrowth || 0).toFixed(1)}%
                 </div>
-              </div>
-              <p className="text-sm text-muted-foreground">Sof Foyda</p>
-              <p className="text-2xl font-bold">
-                {formatCurrency(analytics.metrics?.netProfit || 0, 'USD')}
-              </p>
+              ))}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <Package className="w-6 h-6 text-blue-500" />
-                <span className="text-sm text-blue-600">
-                  {analytics.metrics?.totalSales || 0}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground">Sotuvlar</p>
-              <p className="text-2xl font-bold">
-                {analytics.metrics?.totalQuantity || 0}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <Users className="w-6 h-6 text-orange-500" />
-                <span className="text-sm text-orange-600">
-                  {analytics.metrics?.activeCustomers || 0}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground">Mijozlar</p>
-              <p className="text-2xl font-bold">
-                {analytics.metrics?.totalCustomers || 0}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Kengaytirilgan Metrikalar */}
-      {analytics.advancedMetrics && (
-        <div>
-          <h2 className="text-xl font-bold mb-4">Kengaytirilgan Metrikalar</h2>
-          <AdvancedMetricsCard metrics={analytics.advancedMetrics} />
-        </div>
-      )}
-
-      {/* Daromad Trendi */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Daromad Trendi</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="p-4">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={analytics.trends?.daily || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="revenue" 
-                  stroke="#3b82f6" 
-                  strokeWidth={2}
-                  name="Daromad"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="profit" 
-                  stroke="#10b981" 
-                  strokeWidth={2}
-                  name="Foyda"
-                />
-              </LineChart>
-            </ResponsiveContainer>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Mijoz Segmentlari */}
-      {analytics.customerSegments && analytics.customerSegments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Mijoz Segmentlari</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="p-4">
+          {/* AI Insights card */}
+          <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Brain className="w-[18px] h-[18px]" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-slate-900 tracking-tight">{t('AI Xulosalari va Tavsiyalar')}</h2>
+                <p className="text-sm text-slate-500">{t('Malumotlar asosida aqlli tahlil')}</p>
+              </div>
+            </div>
+
+            {analytics.insights && analytics.insights.length > 0 ? (
+              <div className="space-y-3">
+                {analytics.insights.map((insight: any, index: number) => {
+                  const s = insightStyle(insight.type);
+                  return (
+                    <div key={index} className={`p-4 rounded-xl border-l-4 ${s.wrap}`}>
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex-shrink-0">{s.icon}</div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-slate-900">{insight.title}</h4>
+                          <p className="text-sm text-slate-600 mt-1">{insight.description}</p>
+                          {insight.action && (
+                            <p className="inline-flex items-center gap-1.5 text-sm font-medium mt-2 text-indigo-600">
+                              <Lightbulb className="w-4 h-4" />
+                              {insight.action}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState
+                icon={Brain}
+                title={t('Hozircha xulosa yoq')}
+                description={t('Tanlangan davr uchun AI tavsiyalari topilmadi')}
+              />
+            )}
+          </div>
+
+          {/* Advanced metrics */}
+          {analytics.advancedMetrics && (
+            <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+              <h2 className="font-semibold text-slate-900 tracking-tight mb-4">{t('Kengaytirilgan Metrikalar')}</h2>
+              <AdvancedMetricsCard metrics={analytics.advancedMetrics} />
+            </div>
+          )}
+
+          {/* Revenue trend chart */}
+          <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                <LineChartIcon className="w-[18px] h-[18px]" />
+              </div>
+              <h2 className="font-semibold text-slate-900 tracking-tight">{t('Daromad Trendi')}</h2>
+            </div>
+            {analytics.trends?.daily && analytics.trends.daily.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={analytics.trends.daily}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
+                  <YAxis stroke="#94a3b8" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                    }}
+                  />
+                  <Legend />
+                  <Line type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2.5} dot={false} name={t('Daromad')} />
+                  <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={2.5} dot={false} name={t('Foyda')} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState
+                icon={LineChartIcon}
+                title={t('Malumot yoq')}
+                description={t('Tanlangan davr uchun daromad trendi topilmadi')}
+              />
+            )}
+          </div>
+
+          {/* Customer segments */}
+          {analytics.customerSegments && analytics.customerSegments.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Users className="w-[18px] h-[18px]" />
+                </div>
+                <h2 className="font-semibold text-slate-900 tracking-tight">{t('Mijoz Segmentlari')}</h2>
+              </div>
               <CustomerSegmentsChart segments={analytics.customerSegments} />
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
 
-      {/* Anomaliyalar */}
-      {analytics.anomalies && (
-        <AnomaliesDetection anomalies={analytics.anomalies} />
-      )}
+          {/* Anomalies */}
+          {analytics.anomalies && <AnomaliesDetection anomalies={analytics.anomalies} />}
 
-      {/* Strategik Tavsiyalar */}
-      {analytics.strategicRecommendations && analytics.strategicRecommendations.length > 0 && (
-        <StrategicRecommendations recommendations={analytics.strategicRecommendations} />
-      )}
+          {/* Strategic recommendations */}
+          {analytics.strategicRecommendations && analytics.strategicRecommendations.length > 0 && (
+            <StrategicRecommendations recommendations={analytics.strategicRecommendations} />
+          )}
 
-      {/* Xavf Baholash */}
-      {analytics.riskAssessment && (
-        <RiskAssessment assessment={analytics.riskAssessment} />
-      )}
+          {/* Risk assessment */}
+          {analytics.riskAssessment && <RiskAssessment assessment={analytics.riskAssessment} />}
         </div>
       )}
 
       {/* Biznes Metrikalar View */}
       {activeView === 'business' && (
-        <div className="space-y-6">
+        <div className="space-y-8 animate-in fade-in duration-500">
           {businessMetrics ? (
             <BusinessMetricsCard metrics={businessMetrics} />
           ) : (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4 animate-pulse" />
-                <p className="text-lg font-semibold">Biznes metrikalari yuklanmoqda...</p>
-              </CardContent>
-            </Card>
+            <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+              <EmptyState
+                icon={BarChart3}
+                title={t('Biznes metrikalari yuklanmoqda')}
+                description={t('Iltimos kuting, malumotlar tayyorlanmoqda')}
+              />
+            </div>
           )}
         </div>
       )}
 
       {/* Chartlar View */}
       {activeView === 'charts' && (
-        <div className="space-y-6">
+        <div className="space-y-8 animate-in fade-in duration-500">
           {businessMetrics ? (
             <MetricsCharts metrics={businessMetrics} />
           ) : (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <PieChart className="w-16 h-16 text-muted-foreground mx-auto mb-4 animate-pulse" />
-                <p className="text-lg font-semibold">Chartlar yuklanmoqda...</p>
-              </CardContent>
-            </Card>
+            <div className="bg-white rounded-2xl border border-slate-200/70 p-5 sm:p-6">
+              <EmptyState
+                icon={PieChart}
+                title={t('Chartlar yuklanmoqda')}
+                description={t('Iltimos kuting, malumotlar tayyorlanmoqda')}
+              />
+            </div>
           )}
         </div>
       )}
 
       {/* CEO Analytics View */}
       {activeView === 'ceo' && (
-        <ProfessionalCEOAnalytics />
+        <div className="animate-in fade-in duration-500">
+          <ProfessionalCEOAnalytics />
+        </div>
       )}
     </div>
   );

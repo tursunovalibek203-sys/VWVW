@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Phone, 
+import {
+  ArrowLeft,
+  Phone,
   Calendar,
   ShoppingCart,
   AlertTriangle,
@@ -13,10 +13,19 @@ import {
   TrendingUp,
   Wallet,
   Trash2,
-  Coins
+  Coins,
+  Banknote,
+  Crown,
+  ShieldAlert,
+  User,
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import Button from '../components/Button';
+import { Badge } from '../components/ui/Badge';
+import { TableSkeleton, PageLoading } from '../components/ui/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useToast, toast } from '../components/ui/Toast';
 import api from '../lib/professionalApi';
 import { formatCurrency, formatDate } from '../lib/utils';
 import { exportToExcel } from '../lib/excelUtils';
@@ -27,11 +36,13 @@ export default function CustomerProfile() {
   const navigate = useNavigate();
   const location = useLocation();
   const isCashier = location.pathname.startsWith('/cashier');
+  const { addToast } = useToast();
   const [customer, setCustomer] = useState<any>(null);
   const [sales, setSales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
@@ -52,8 +63,8 @@ export default function CustomerProfile() {
         api.get(`/sales?customerId=${id}`)
       ]);
       setCustomer(customerRes.data);
-      
-      // âœ… API dan kelgan ma'lumotni to'g'ri parse qilish
+
+      // API dan kelgan ma'lumotni to'g'ri parse qilish
       const salesData = salesRes.data?.sales || salesRes.data || [];
       setSales(Array.isArray(salesData) ? salesData : []);
     } catch (error) {
@@ -72,17 +83,18 @@ export default function CustomerProfile() {
   const handleDeleteCustomer = async () => {
     try {
       if (!id) return;
-      console.log('Mijoz o\'chirilmoqda:', id);
+      setIsDeleting(true);
       await api.delete(`/customers/${id}`);
-      console.log('Mijoz muvaffaqiyatli o\'chirildi');
       setShowDeleteModal(false);
-      alert('âœ… Mijoz muvaffaqiyatli o\'chirildi!');
+      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic('Mijoz muvaffaqiyatli o\'chirildi!')));
       navigate(isCashier ? '/cashier/customers' : '/customers');
     } catch (error: any) {
       console.error('Delete customer error:', error);
-      const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Mijozni o\'chirishda xatolik yuz berdi';
-      alert('âŒ Xatolik: ' + errorMsg);
+      const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || latinToCyrillic('Mijozni o\'chirishda xatolik yuz berdi');
+      addToast(toast.error(latinToCyrillic('Xatolik'), errorMsg));
       setShowDeleteModal(false);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -92,7 +104,7 @@ export default function CustomerProfile() {
 
     const amount = parseFloat(paymentForm.amount);
     if (!amount || amount <= 0) {
-      alert('âŒ Iltimos, to\'lov summasini kiriting');
+      addToast(toast.warning(latinToCyrillic('Diqqat'), latinToCyrillic('Iltimos, to\'lov summasini kiriting')));
       return;
     }
 
@@ -105,50 +117,47 @@ export default function CustomerProfile() {
         notes: paymentForm.notes
       });
 
-      alert('âœ… To\'lov muvaffaqiyatli amalga oshirildi! Kassaga qo\'shildi.');
+      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic('Тўлов амалга оширилди ва кассага қўшилди!')));
       setShowPaymentModal(false);
       setPaymentForm({ amount: '', currency: 'USD', type: 'CASH', notes: '' });
       loadCustomerData(); // Refresh customer data
     } catch (error: any) {
       console.error('To\'lov xatolik:', error);
-      alert('âŒ To\'lov amalga oshirishda xatolik: ' + (error.response?.data?.error || error.message));
+      addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || error.message || latinToCyrillic('To\'lov amalga oshirishda xatolik')));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <div className="animate-pulse rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 text-lg">{latinToCyrillic('Yuklanmoqda...')}</p>
-        </div>
-      </div>
-    );
+    return <PageLoading text={latinToCyrillic('Yuklanmoqda...')} />;
   }
 
   if (!customer) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">{latinToCyrillic("Mijoz topilmadi")}</h2>
-          <button
-            onClick={() => navigate('/cashier/customers')}
-            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-          >
-            {latinToCyrillic("Mijozlar ro'yxatiga qaytish")}
-          </button>
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <EmptyState
+            icon={AlertTriangle}
+            title={latinToCyrillic('Mijoz topilmadi')}
+            description={latinToCyrillic('Бу мижоз мавжуд эмас ёки ўчирилган. Мижозлар рўйхатига қайтиб қайта уриниб кўринг.')}
+            action={
+              <button
+                onClick={() => navigate(isCashier ? '/cashier/customers' : '/customers')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                {latinToCyrillic('Mijozlar ro\'yxati')}
+              </button>
+            }
+          />
         </div>
       </div>
     );
   }
 
   const totalPurchases = sales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0);
-  // totalPaid va totalDebt hisoblash (kelajakda statistika uchun)
-  // const totalPaid = sales.reduce((sum, sale) => sum + (sale.paidAmount || 0), 0);
-  // const totalDebt = sales.reduce((sum, sale) => sum + ((sale.debtAmount || 0)), 0);
+  const averagePurchase = sales.length > 0 ? totalPurchases / sales.length : 0;
 
   const handleExportExcel = () => {
     const historyData = sales.map(sale => ({
@@ -165,14 +174,14 @@ export default function CustomerProfile() {
   // Faqat naqd (cash) savdolarni eksport qilish
   const handleExportCashSales = () => {
     // Faqat CASH to'lov turidagi savdolarni filtrlash
-    const cashSales = sales.filter(sale => 
-      sale.paymentMethod === 'CASH' || 
+    const cashSales = sales.filter(sale =>
+      sale.paymentMethod === 'CASH' ||
       sale.paymentType === 'CASH' ||
       (sale.notes && sale.notes.toLowerCase().includes('naqd'))
     );
 
     if (cashSales.length === 0) {
-      alert(latinToCyrillic('Naqd pul savdolari topilmadi!'));
+      addToast(toast.warning(latinToCyrillic('Diqqat'), latinToCyrillic('Naqd pul savdolari topilmadi!')));
       return;
     }
 
@@ -186,307 +195,407 @@ export default function CustomerProfile() {
       [latinToCyrillic('To\'lov turi')]: latinToCyrillic('Naqd pul'),
     }));
 
-    exportToExcel(cashSalesData, { 
-      fileName: `Mijoz_${customer.name}_Naqd_Savdolari` 
+    exportToExcel(cashSalesData, {
+      fileName: `Mijoz_${customer.name}_Naqd_Savdolari`
     });
   };
 
+  // Avatar uchun bosh harflar
+  const getInitials = (name: string) => {
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+  };
+
+  // Kategoriya Badge varianti
+  const getCategoryVariant = (category: string): 'success' | 'warning' | 'error' | 'info' | 'neutral' => {
+    switch (category) {
+      case 'VIP': return 'info';
+      case 'WHOLESALE': return 'success';
+      case 'PROBLEMATIC':
+      case 'RISK': return 'error';
+      default: return 'neutral';
+    }
+  };
+
+  const getCategoryLabel = (category: string) => {
+    switch (category) {
+      case 'VIP': return 'VIP';
+      case 'WHOLESALE': return latinToCyrillic('Optom');
+      case 'NORMAL': return latinToCyrillic('Oddiy');
+      case 'PROBLEMATIC':
+      case 'RISK': return latinToCyrillic('Xavfli');
+      case 'NEW': return latinToCyrillic('Yangi');
+      default: return category;
+    }
+  };
+
+  const debtUSD = customer.debtUSD || 0;
+  const debtUZS = customer.debtUZS || 0;
+  const hasDebt = debtUSD > 0 || debtUZS > 0;
+
   return (
-    <div className="w-full max-w-7xl mx-auto p-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            aria-label="Orqaga"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{customer.name}</h1>
-            <p className="text-sm text-gray-500">{latinToCyrillic("Mijoz kodi")}: {customer.code || 'N/A'}</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleRefresh}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-pulse' : ''}`} />
-            {latinToCyrillic("Yangilash")}
-          </button>
-          <button
-            onClick={handleExportExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-sm"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Excel
-          </button>
-          <button
-            onClick={handleExportCashSales}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg text-sm"
-            title={latinToCyrillic("Faqat naqd pul savdolari")}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            {latinToCyrillic("Naqd savdolar")}
-          </button>
-          <button
-            onClick={() => setShowPaymentModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm"
-          >
-            <Coins className="w-4 h-4" />
-            {latinToCyrillic("To'lov qilish")}
-          </button>
-          <button
-            type="button"
-            onClick={() => { console.log('O\'chirish tugmasi bosildi'); setShowDeleteModal(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-sm transition-all"
-            title={latinToCyrillic("Mijozni o'chirish")}
-          >
-            <Trash2 className="w-4 h-4" />
-            {latinToCyrillic("O'chirish")}
-          </button>
-        </div>
-      </div>
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+      {/* Hero header: avatar + name + category + key figures + actions */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-6 sm:p-8 shadow-glass-lg">
+        <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/10 rounded-full blur-2xl" />
+        <div className="absolute -bottom-16 -left-12 w-56 h-56 bg-white/5 rounded-full blur-3xl" />
 
-      {/* Contact Info */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Phone className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">{latinToCyrillic("Telefon")}</p>
-              <p className="font-medium text-gray-900">{customer.phone || '-'}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">{latinToCyrillic("Manzil")}</p>
-              <p className="font-medium text-gray-900">{customer.address || '-'}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">{latinToCyrillic("Ro'yxatdan o'tgan")}</p>
-              <p className="font-medium text-gray-900">{formatDate(customer.createdAt)}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+        <div className="relative">
+          {/* Top row: back + actions */}
+          <div className="flex items-center justify-between gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-white/15 hover:bg-white/25 rounded-xl text-sm font-semibold text-white backdrop-blur-sm transition-all duration-200 active:scale-95"
+              aria-label={latinToCyrillic('Орқага')}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">{latinToCyrillic('Орқага')}</span>
+            </button>
 
-      {/* Financial Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-              <Wallet className="w-5 h-5 text-emerald-600" />
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="inline-flex items-center gap-2 px-3 py-2 bg-white/15 hover:bg-white/25 disabled:opacity-60 rounded-xl text-sm font-semibold text-white backdrop-blur-sm transition-all duration-200 active:scale-95"
+                title={latinToCyrillic('Yangilash')}
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                <span className="hidden lg:inline">{latinToCyrillic('Yangilash')}</span>
+              </button>
+              <button
+                onClick={handleExportExcel}
+                className="inline-flex items-center gap-2 px-3 py-2 bg-white/15 hover:bg-white/25 rounded-xl text-sm font-semibold text-white backdrop-blur-sm transition-all duration-200 active:scale-95"
+                title="Excel"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span className="hidden lg:inline">Excel</span>
+              </button>
+              <button
+                onClick={handleExportCashSales}
+                className="inline-flex items-center gap-2 px-3 py-2 bg-white/15 hover:bg-white/25 rounded-xl text-sm font-semibold text-white backdrop-blur-sm transition-all duration-200 active:scale-95"
+                title={latinToCyrillic('Naqd savdolar')}
+              >
+                <Banknote className="w-4 h-4" />
+                <span className="hidden lg:inline">{latinToCyrillic('Naqd savdolar')}</span>
+              </button>
+              <button
+                onClick={() => setShowPaymentModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white text-indigo-700 rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
+              >
+                <Coins className="w-4 h-4" />
+                {latinToCyrillic('To\'lov qilish')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(true)}
+                className="inline-flex items-center gap-2 px-3 py-2 bg-rose-500/90 hover:bg-rose-500 rounded-xl text-sm font-semibold text-white shadow-lg transition-all duration-200 active:scale-95"
+                title={latinToCyrillic('Mijozni o\'chirish')}
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden lg:inline">{latinToCyrillic('O\'chirish')}</span>
+              </button>
             </div>
-            <p className="text-sm text-gray-500">{latinToCyrillic("Balans")}</p>
           </div>
-          <p className="text-xl font-bold text-gray-900">${(customer.balanceUSD || 0).toFixed(2)}</p>
-          <p className="text-xs text-gray-500">{(customer.balanceUZS || 0).toLocaleString()} sum</p>
-        </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-rose-100 rounded-lg flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-rose-600" />
-            </div>
-            <p className="text-sm text-gray-500">{latinToCyrillic("Qarz")}</p>
-          </div>
-          <p className="text-xl font-bold text-rose-600">${(customer.debtUSD || 0).toFixed(2)}</p>
-          <p className="text-xs text-gray-500">{(customer.debtUZS || 0).toLocaleString()} sum</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <ShoppingCart className="w-5 h-5 text-blue-600" />
-            </div>
-            <p className="text-sm text-gray-500">{latinToCyrillic("Xaridlar")}</p>
-          </div>
-          <p className="text-xl font-bold text-gray-900">{sales.length} {latinToCyrillic("ta")}</p>
-          <p className="text-xs text-gray-500">${totalPurchases.toFixed(2)}</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-amber-600" />
-            </div>
-            <p className="text-sm text-gray-500">{latinToCyrillic("O'rtacha")}</p>
-          </div>
-          <p className="text-xl font-bold text-gray-900">
-            ${sales.length > 0 ? (totalPurchases / sales.length).toFixed(2) : '0.00'}
-          </p>
-          <p className="text-xs text-gray-500">{latinToCyrillic("Har bir sotuv")}</p>
-        </div>
-      </div>
-
-      {/* Sales History */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Package className="w-5 h-5 text-gray-600" />
-            {latinToCyrillic("Sotuvlar tarixi")}
-          </h2>
-          <span className="text-sm text-gray-500">{sales.length} {latinToCyrillic("ta sotuv")}</span>
-        </div>
-        
-        {sales.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-            <p>{latinToCyrillic("Sotuvlar mavjud emas")}</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{latinToCyrillic("Sana")}</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{latinToCyrillic("Mahsulotlar")}</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{latinToCyrillic("Jami")}</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{latinToCyrillic("To'langan")}</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">{latinToCyrillic("Qarz")}</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">{latinToCyrillic("Holat")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {sales.map((sale) => (
-                  <tr key={sale.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      {formatDate(sale.createdAt)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      <div className="space-y-1">
-                        {sale.items?.map((i: any, idx: number) => (
-                          <div key={idx} className="flex items-center gap-2">
-                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                            <span className="font-medium">{i.product?.name || i.productName || 'N/A'}</span>
-                            <span className="text-gray-400">Ã—</span>
-                            <span className="bg-gray-100 px-2 py-0.5 rounded text-xs font-semibold">{i.quantity}</span>
-                          </div>
-                        )) || (sale.product?.name ? (
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                            <span className="font-medium">{sale.product.name}</span>
-                            <span className="text-gray-400">Ã—</span>
-                            <span className="bg-gray-100 px-2 py-0.5 rounded text-xs font-semibold">{sale.quantity}</span>
-                          </div>
-                        ) : '-')}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
-                      {formatCurrency(sale.totalAmount, sale.currency)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-emerald-600 text-right">
-                      {formatCurrency(sale.paidAmount, sale.currency)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right">
-                      {(sale.debtAmount || 0) > 0 ? (
-                        <span className="text-rose-600 font-medium">{formatCurrency(sale.debtAmount, sale.currency)}</span>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {(sale.debtAmount || 0) > 0 ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-800">
-                          {latinToCyrillic("Qarz")}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                          {latinToCyrillic("To'langan")}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Mijozni O'chirish Modal */}
-      {showDeleteModal && customer && (
-        <Modal
-          isOpen={showDeleteModal}
-          onClose={() => setShowDeleteModal(false)}
-          title={latinToCyrillic("Mijozni O'chirish")}
-          size="sm"
-        >
-          <div className="space-y-4">
-            <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-200 dark:border-red-800">
-              <div className="flex items-center gap-3">
-                <Trash2 className="w-6 h-6 text-red-600" />
-                <div>
-                  <h3 className="font-semibold text-red-800 dark:text-red-200">
-                    {latinToCyrillic("Mijozni o'chirishni tasdiqlang")}
-                  </h3>
-                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                    {customer.name}
-                  </p>
+          {/* Identity + key figures */}
+          <div className="mt-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-white text-xl sm:text-2xl font-extrabold flex-shrink-0 shadow-inner">
+                {getInitials(customer.name)}
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight truncate">
+                  {customer.name}
+                </h1>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {customer.category && (
+                    <Badge variant={getCategoryVariant(customer.category)}>
+                      <span className="inline-flex items-center gap-1">
+                        {customer.category === 'VIP' && <Crown className="w-3 h-3" />}
+                        {(customer.category === 'RISK' || customer.category === 'PROBLEMATIC') && <ShieldAlert className="w-3 h-3" />}
+                        {getCategoryLabel(customer.category)}
+                      </span>
+                    </Badge>
+                  )}
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-white/80 bg-white/10 rounded-full px-2.5 py-0.5">
+                    <User className="w-3 h-3" />
+                    {latinToCyrillic('Mijoz kodi')}: {customer.code || 'N/A'}
+                  </span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
-              <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                <strong>{latinToCyrillic("Diqqat:")}</strong> {latinToCyrillic("Mijozni o'chirgandan so'ng, barcha ma'lumotlari (sotuvlar, to'lovlar, qarzlar) ham o'chiriladi. Bu amalni qaytarib bo'lmaydi!")}
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowDeleteModal(false)}
-                className="flex-1"
-              >
-                {latinToCyrillic("Bekor qilish")}
-              </Button>
-              <Button
-                type="button"
-                onClick={handleDeleteCustomer}
-                className="flex-1 bg-red-600 hover:bg-red-700"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                {latinToCyrillic("O'chirish")}
-              </Button>
+            {/* Key figures: balance + debt */}
+            <div className="grid grid-cols-2 gap-3 w-full lg:w-auto">
+              <div className="rounded-2xl bg-white/15 backdrop-blur-sm px-4 py-3 min-w-[9rem]">
+                <p className="text-xs font-medium text-white/70">{latinToCyrillic('Balans')}</p>
+                <p className="mt-0.5 text-lg sm:text-xl font-bold text-white tracking-tight">
+                  ${(customer.balanceUSD || 0).toFixed(2)}
+                </p>
+                <p className="text-xs text-white/60">{(customer.balanceUZS || 0).toLocaleString()} UZS</p>
+              </div>
+              <div className={`rounded-2xl backdrop-blur-sm px-4 py-3 min-w-[9rem] ${hasDebt ? 'bg-rose-500/30' : 'bg-white/15'}`}>
+                <p className="text-xs font-medium text-white/70">{latinToCyrillic('Qarz')}</p>
+                <p className={`mt-0.5 text-lg sm:text-xl font-bold tracking-tight ${hasDebt ? 'text-rose-100' : 'text-white'}`}>
+                  ${debtUSD.toFixed(2)}
+                </p>
+                <p className="text-xs text-white/60">{debtUZS.toLocaleString()} UZS</p>
+              </div>
             </div>
           </div>
-        </Modal>
-      )}
+        </div>
+      </div>
 
-      {/* To'lov Qilish Modal */}
+      {/* Info cards: contact */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 flex items-center gap-3 transition-all duration-200 hover:shadow-md">
+          <div className="w-11 h-11 bg-blue-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <Phone className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-gray-500">{latinToCyrillic('Telefon')}</p>
+            <p className="mt-0.5 text-sm font-bold text-gray-900 truncate">{customer.phone || '—'}</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 flex items-center gap-3 transition-all duration-200 hover:shadow-md">
+          <div className="w-11 h-11 bg-purple-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <MapPin className="w-5 h-5 text-purple-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-gray-500">{latinToCyrillic('Manzil')}</p>
+            <p className="mt-0.5 text-sm font-bold text-gray-900 truncate">{customer.address || '—'}</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 flex items-center gap-3 transition-all duration-200 hover:shadow-md">
+          <div className="w-11 h-11 bg-emerald-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+            <Calendar className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-gray-500">{latinToCyrillic('Ro\'yxatdan o\'tgan')}</p>
+            <p className="mt-0.5 text-sm font-bold text-gray-900 truncate">{formatDate(customer.createdAt)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Financial summary cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 transition-all duration-200 hover:shadow-md">
+          <div className="w-11 h-11 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-sm mb-3">
+            <Wallet className="w-5 h-5 text-white" />
+          </div>
+          <p className="text-xs font-medium text-gray-500">{latinToCyrillic('Balans')}</p>
+          <p className="mt-1 text-lg sm:text-xl font-bold text-gray-900 tracking-tight">${(customer.balanceUSD || 0).toFixed(2)}</p>
+          <p className="text-xs text-gray-400">{(customer.balanceUZS || 0).toLocaleString()} UZS</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 transition-all duration-200 hover:shadow-md">
+          <div className="w-11 h-11 bg-gradient-to-br from-rose-500 to-red-600 rounded-2xl flex items-center justify-center shadow-sm mb-3">
+            <AlertTriangle className="w-5 h-5 text-white" />
+          </div>
+          <p className="text-xs font-medium text-gray-500">{latinToCyrillic('Qarz')}</p>
+          <p className={`mt-1 text-lg sm:text-xl font-bold tracking-tight ${hasDebt ? 'text-rose-600' : 'text-gray-900'}`}>${debtUSD.toFixed(2)}</p>
+          <p className="text-xs text-gray-400">{debtUZS.toLocaleString()} UZS</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 transition-all duration-200 hover:shadow-md">
+          <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-sm mb-3">
+            <ShoppingCart className="w-5 h-5 text-white" />
+          </div>
+          <p className="text-xs font-medium text-gray-500">{latinToCyrillic('Xaridlar')}</p>
+          <p className="mt-1 text-lg sm:text-xl font-bold text-gray-900 tracking-tight">{sales.length} {latinToCyrillic('ta')}</p>
+          <p className="text-xs text-gray-400">${totalPurchases.toFixed(2)}</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 transition-all duration-200 hover:shadow-md">
+          <div className="w-11 h-11 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-sm mb-3">
+            <TrendingUp className="w-5 h-5 text-white" />
+          </div>
+          <p className="text-xs font-medium text-gray-500">{latinToCyrillic('O\'rtacha')}</p>
+          <p className="mt-1 text-lg sm:text-xl font-bold text-gray-900 tracking-tight">${averagePurchase.toFixed(2)}</p>
+          <p className="text-xs text-gray-400">{latinToCyrillic('Har bir sotuv')}</p>
+        </div>
+      </div>
+
+      {/* Sales history */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+          <h2 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
+            <Package className="w-5 h-5 text-gray-500" />
+            {latinToCyrillic('Sotuvlar tarixi')}
+          </h2>
+          <span className="text-xs font-medium text-gray-500 bg-gray-100 rounded-full px-2.5 py-1">
+            {sales.length} {latinToCyrillic('ta sotuv')}
+          </span>
+        </div>
+
+        {refreshing ? (
+          <div className="p-4 sm:p-6">
+            <TableSkeleton rows={5} cols={6} />
+          </div>
+        ) : sales.length === 0 ? (
+          <EmptyState
+            icon={Package}
+            title={latinToCyrillic('Sotuvlar mavjud emas')}
+            description={latinToCyrillic('Бу мижоз учун ҳали ҳеч қандай сотув қайд этилмаган.')}
+          />
+        ) : (
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/60">
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Sana')}</th>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Mahsulotlar')}</th>
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Jami')}</th>
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('To\'langan')}</th>
+                    <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Qarz')}</th>
+                    <th className="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Holat')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {sales.map((sale) => (
+                    <tr key={sale.id} className="hover:bg-blue-50/40 transition-colors">
+                      <td className="px-5 py-4 text-sm text-gray-900 whitespace-nowrap">
+                        {formatDate(sale.createdAt)}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-gray-600">
+                        <div className="space-y-1">
+                          {sale.items?.map((i: any, idx: number) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
+                              <span className="font-medium text-gray-900">{i.product?.name || i.productName || 'N/A'}</span>
+                              <span className="text-gray-300">×</span>
+                              <span className="bg-gray-100 px-2 py-0.5 rounded-md text-xs font-semibold text-gray-700">{i.quantity}</span>
+                            </div>
+                          )) || (sale.product?.name ? (
+                            <div className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
+                              <span className="font-medium text-gray-900">{sale.product.name}</span>
+                              <span className="text-gray-300">×</span>
+                              <span className="bg-gray-100 px-2 py-0.5 rounded-md text-xs font-semibold text-gray-700">{sale.quantity}</span>
+                            </div>
+                          ) : <span className="text-gray-300">—</span>)}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-gray-900 text-right font-semibold whitespace-nowrap">
+                        {formatCurrency(sale.totalAmount, sale.currency)}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-emerald-600 text-right whitespace-nowrap">
+                        {formatCurrency(sale.paidAmount, sale.currency)}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-right whitespace-nowrap">
+                        {(sale.debtAmount || 0) > 0 ? (
+                          <span className="text-rose-600 font-semibold">{formatCurrency(sale.debtAmount, sale.currency)}</span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 text-center">
+                        {(sale.debtAmount || 0) > 0 ? (
+                          <Badge variant="error">{latinToCyrillic('Qarz')}</Badge>
+                        ) : (
+                          <Badge variant="success">{latinToCyrillic('To\'langan')}</Badge>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="md:hidden divide-y divide-gray-50">
+              {sales.map((sale) => (
+                <div key={sale.id} className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-medium text-gray-500 inline-flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                      {formatDate(sale.createdAt)}
+                    </span>
+                    {(sale.debtAmount || 0) > 0 ? (
+                      <Badge variant="error">{latinToCyrillic('Qarz')}</Badge>
+                    ) : (
+                      <Badge variant="success">{latinToCyrillic('To\'langan')}</Badge>
+                    )}
+                  </div>
+
+                  <div className="mt-3 space-y-1">
+                    {sale.items?.map((i: any, idx: number) => (
+                      <div key={idx} className="flex items-center gap-2 text-sm">
+                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
+                        <span className="font-medium text-gray-900">{i.product?.name || i.productName || 'N/A'}</span>
+                        <span className="text-gray-300">×</span>
+                        <span className="bg-gray-100 px-2 py-0.5 rounded-md text-xs font-semibold text-gray-700">{i.quantity}</span>
+                      </div>
+                    )) || (sale.product?.name ? (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
+                        <span className="font-medium text-gray-900">{sale.product.name}</span>
+                        <span className="text-gray-300">×</span>
+                        <span className="bg-gray-100 px-2 py-0.5 rounded-md text-xs font-semibold text-gray-700">{sale.quantity}</span>
+                      </div>
+                    ) : <span className="text-sm text-gray-300">—</span>)}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    <div className="bg-gray-50 rounded-xl p-2.5">
+                      <p className="text-[11px] text-gray-500">{latinToCyrillic('Jami')}</p>
+                      <p className="mt-0.5 text-sm font-bold text-gray-900">{formatCurrency(sale.totalAmount, sale.currency)}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-2.5">
+                      <p className="text-[11px] text-gray-500">{latinToCyrillic('To\'langan')}</p>
+                      <p className="mt-0.5 text-sm font-bold text-emerald-600">{formatCurrency(sale.paidAmount, sale.currency)}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-2.5">
+                      <p className="text-[11px] text-gray-500">{latinToCyrillic('Qarz')}</p>
+                      <p className={`mt-0.5 text-sm font-bold ${(sale.debtAmount || 0) > 0 ? 'text-rose-600' : 'text-gray-400'}`}>
+                        {(sale.debtAmount || 0) > 0 ? formatCurrency(sale.debtAmount, sale.currency) : '—'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Mijozni o'chirish tasdiqlash */}
+      <ConfirmDialog
+        isOpen={showDeleteModal}
+        onClose={() => { if (!isDeleting) setShowDeleteModal(false); }}
+        onConfirm={handleDeleteCustomer}
+        variant="danger"
+        title={latinToCyrillic('Mijozni o\'chirish')}
+        message={latinToCyrillic(`"${customer.name}" mijozini rostdan ham o'chirmoqchimisiz? Barcha sotuvlar, to'lovlar va qarzlar ham o'chiriladi. Bu amalni qaytarib bo'lmaydi.`)}
+        confirmText={isDeleting ? latinToCyrillic('O\'chirilmoqda...') : latinToCyrillic('O\'chirish')}
+        cancelText={latinToCyrillic('Bekor qilish')}
+      />
+
+      {/* To'lov qilish modal */}
       {showPaymentModal && customer && (
         <Modal
           isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          title={latinToCyrillic("Mijozdan To'lov Qilish")}
+          onClose={() => { if (!isSubmitting) setShowPaymentModal(false); }}
+          title={latinToCyrillic('Mijozdan to\'lov qilish')}
           size="md"
         >
-          <form onSubmit={handlePaymentSubmit} className="space-y-4">
+          <form onSubmit={handlePaymentSubmit} className="space-y-5">
             {/* Mijoz ma'lumoti */}
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+            <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-4">
               <div className="flex items-center gap-3">
-                <Wallet className="w-6 h-6 text-blue-600" />
-                <div>
-                  <h3 className="font-semibold text-blue-800 dark:text-blue-200">{customer.name}</h3>
-                  <p className="text-sm text-blue-600 dark:text-blue-400">
-                    {latinToCyrillic("Qarz")}: ${customer.debtUSD?.toFixed(2) || '0.00'} | {latinToCyrillic("Balans")}: ${customer.balanceUSD?.toFixed(2) || '0.00'}
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                  {getInitials(customer.name)}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-gray-900 truncate">{customer.name}</h3>
+                  <p className="text-sm text-gray-600">
+                    {latinToCyrillic('Qarz')}: <span className="font-semibold text-rose-600">${debtUSD.toFixed(2)}</span>
+                    <span className="text-gray-300 mx-1.5">|</span>
+                    {latinToCyrillic('Balans')}: <span className="font-semibold text-emerald-600">${(customer.balanceUSD || 0).toFixed(2)}</span>
                   </p>
                 </div>
               </div>
@@ -494,80 +603,86 @@ export default function CustomerProfile() {
 
             {/* Summa */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {latinToCyrillic("To'lov summasi")} *
+              <label htmlFor="payment-amount" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                {latinToCyrillic('To\'lov summasi')} *
               </label>
               <input
+                id="payment-amount"
                 type="number"
                 min="0.01"
                 step="0.01"
                 value={paymentForm.amount}
                 onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                className="w-full h-12 px-3 text-lg font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                className="w-full h-12 px-4 text-lg font-bold bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all"
                 placeholder="0.00"
                 required
+                autoFocus
               />
             </div>
 
-            {/* Valyuta */}
-            <div>
-              <label htmlFor="payment-currency" className="block text-sm font-medium text-gray-700 mb-1">
-                {latinToCyrillic("Valyuta")}
-              </label>
-              <select
-                id="payment-currency"
-                value={paymentForm.currency}
-                onChange={(e) => setPaymentForm({ ...paymentForm, currency: e.target.value })}
-                className="w-full h-12 px-3 border-2 border-gray-300 rounded-lg focus:border-blue-500"
-                aria-label={latinToCyrillic("Valyuta tanlash")}
-              >
-                <option value="USD">USD ($)</option>
-                <option value="UZS">UZS (so'm)</option>
-              </select>
-            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Valyuta */}
+              <div>
+                <label htmlFor="payment-currency" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  {latinToCyrillic('Valyuta')}
+                </label>
+                <select
+                  id="payment-currency"
+                  value={paymentForm.currency}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, currency: e.target.value })}
+                  className="w-full h-12 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                  aria-label={latinToCyrillic('Valyuta tanlash')}
+                >
+                  <option value="USD">USD ($)</option>
+                  <option value="UZS">UZS (so'm)</option>
+                </select>
+              </div>
 
-            {/* To'lov turi */}
-            <div>
-              <label htmlFor="payment-type" className="block text-sm font-medium text-gray-700 mb-1">
-                {latinToCyrillic("To'lov turi")}
-              </label>
-              <select
-                id="payment-type"
-                value={paymentForm.type}
-                onChange={(e) => setPaymentForm({ ...paymentForm, type: e.target.value })}
-                className="w-full h-12 px-3 border-2 border-gray-300 rounded-lg focus:border-blue-500"
-                aria-label={latinToCyrillic("To'lov turini tanlash")}
-              >
-                <option value="CASH">{latinToCyrillic("Naqd pul")}</option>
-                <option value="CARD">{latinToCyrillic("Karta")}</option>
-                <option value="CLICK">Click</option>
-                <option value="TRANSFER">{latinToCyrillic("Bank o'tkazmasi")}</option>
-              </select>
+              {/* To'lov turi */}
+              <div>
+                <label htmlFor="payment-type" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  {latinToCyrillic('To\'lov turi')}
+                </label>
+                <select
+                  id="payment-type"
+                  value={paymentForm.type}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, type: e.target.value })}
+                  className="w-full h-12 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                  aria-label={latinToCyrillic('To\'lov turini tanlash')}
+                >
+                  <option value="CASH">{latinToCyrillic('Naqd pul')}</option>
+                  <option value="CARD">{latinToCyrillic('Karta')}</option>
+                  <option value="CLICK">Click</option>
+                  <option value="TRANSFER">{latinToCyrillic('Bank o\'tkazmasi')}</option>
+                </select>
+              </div>
             </div>
 
             {/* Izoh */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {latinToCyrillic("Izoh")} ({latinToCyrillic("ixtiyoriy")})
+              <label htmlFor="payment-notes" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                {latinToCyrillic('Izoh')} ({latinToCyrillic('ixtiyoriy')})
               </label>
               <textarea
+                id="payment-notes"
                 value={paymentForm.notes}
                 onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all resize-none"
                 rows={2}
-                placeholder={latinToCyrillic("Qo'shimcha ma'lumot...")}
+                placeholder={latinToCyrillic('Qo\'shimcha ma\'lumot...')}
               />
             </div>
 
             {/* Ogohlantirish */}
-            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200">
-              <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                <strong>{latinToCyrillic("Diqqat:")}</strong> {latinToCyrillic("Bu to'lov avtomatik ravishda kassaga qo'shiladi va mijoz balansi yangilanadi.")}
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 flex gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800">
+                {latinToCyrillic('Бу тўлов автоматик равишда кассага қўшилади ва мижоз баланси янгиланади.')}
               </p>
             </div>
 
             {/* Tugmalar */}
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-3 pt-1">
               <Button
                 type="button"
                 variant="outline"
@@ -575,22 +690,22 @@ export default function CustomerProfile() {
                 className="flex-1"
                 disabled={isSubmitting}
               >
-                {latinToCyrillic("Bekor qilish")}
+                {latinToCyrillic('Bekor qilish')}
               </Button>
               <Button
                 type="submit"
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1 bg-gradient-to-br from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
-                    <div className="animate-pulse rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                    {latinToCyrillic("Saqlanmoqda...")}
+                    <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                    {latinToCyrillic('Saqlanmoqda...')}
                   </>
                 ) : (
                   <>
                     <Coins className="w-4 h-4 mr-2" />
-                    {latinToCyrillic("To'lovni qabul qilish")}
+                    {latinToCyrillic('To\'lovni qabul qilish')}
                   </>
                 )}
               </Button>

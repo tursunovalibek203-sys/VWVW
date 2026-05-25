@@ -56,25 +56,50 @@ export const PaymentSection = ({
     onReset();
   };
 
+  const isDisabled = isSubmitting || form.items.length === 0;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-4">
-        <label htmlFor="paymentType" className="block text-lg font-semibold text-gray-700">
+        <label htmlFor="paymentType" className="block text-sm font-semibold text-slate-900">
           {latinToCyrillic("To'lov")}
         </label>
 
-        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
-          {/* Payment Type */}
+        <div className="space-y-4">
+          {/* Payment Type — segmented buttons */}
           <div>
-            <label htmlFor="paymentType" className="block text-base font-medium text-gray-600 mb-1">
+            <span className="block text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5">
               {latinToCyrillic("To'lov turi")}
-            </label>
+            </span>
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl">
+              {([
+                { value: 'cash', label: latinToCyrillic('Naqd') },
+                { value: 'debt', label: latinToCyrillic('Qarz') },
+                { value: 'partial', label: latinToCyrillic('Qisman') },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => onUpdateForm({ paymentType: opt.value as SaleFormData['paymentType'] })}
+                  className={`min-h-[44px] rounded-lg text-sm font-semibold transition-all active:scale-[0.97] ${
+                    form.paymentType === opt.value
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {/* Keep accessible select in sync (visually hidden) */}
             <select
               id="paymentType"
               title={latinToCyrillic("To'lov turini tanlash")}
               value={form.paymentType}
               onChange={(e) => onUpdateForm({ paymentType: e.target.value as SaleFormData['paymentType'] })}
-              className="w-full h-12 px-3 text-base font-medium border rounded-lg bg-white"
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden="true"
             >
               <option value="cash">{latinToCyrillic('Naqd')}</option>
               <option value="debt">{latinToCyrillic('Qarz')}</option>
@@ -83,9 +108,9 @@ export const PaymentSection = ({
           </div>
 
           {/* Payment Inputs */}
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label htmlFor="paidUZS" className="block text-base text-gray-600 font-medium">UZS</label>
+              <label htmlFor="paidUZS" className="block text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5">UZS</label>
               <input
                 id="paidUZS"
                 type="text"
@@ -96,11 +121,11 @@ export const PaymentSection = ({
                   const val = e.target.value.replace(/[^0-9]/g, '');
                   onUpdateForm({ paidUZS: val, paidCLICK: '' });
                 }}
-                className="w-full h-12 px-3 text-base font-medium border rounded-lg"
+                className="w-full h-11 px-3 text-sm font-medium text-slate-900 tabular-nums rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
               />
             </div>
             <div>
-              <label htmlFor="paidUSD" className="block text-base text-gray-600 font-medium">USD</label>
+              <label htmlFor="paidUSD" className="block text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5">USD</label>
               <input
                 id="paidUSD"
                 type="text"
@@ -111,11 +136,11 @@ export const PaymentSection = ({
                   const val = e.target.value.replace(/[^0-9.]/g, '').replace(/\.(?=.*\.)/g, '');
                   onUpdateForm({ paidUSD: val });
                 }}
-                className="w-full h-12 px-3 text-base font-medium border rounded-lg"
+                className="w-full h-11 px-3 text-sm font-medium text-slate-900 tabular-nums rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
               />
             </div>
             <div>
-              <label htmlFor="paidCLICK" className="block text-base text-gray-600 font-medium">CLICK</label>
+              <label htmlFor="paidCLICK" className="block text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5">CLICK</label>
               <input
                 id="paidCLICK"
                 type="text"
@@ -126,44 +151,40 @@ export const PaymentSection = ({
                   const val = e.target.value.replace(/[^0-9.]/g, '').replace(/\.(?=.*\.)/g, '');
                   onUpdateForm({ paidCLICK: val, paidUZS: '' });
                 }}
-                className="w-full h-12 px-3 text-base font-medium border rounded-lg"
+                className="w-full h-11 px-3 text-sm font-medium text-slate-900 tabular-nums rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
               />
             </div>
           </div>
 
           {/* Summary */}
-          <div className="bg-white p-3 rounded-lg border">
+          <div className="rounded-xl border border-slate-200/70 bg-slate-50 p-3.5 space-y-2">
             {debtAmount > 0 ? (
-              <div className="flex justify-between text-base mb-2">
-                <span className="text-gray-500">{latinToCyrillic('Qarz')}:</span>
-                <span className="font-bold text-red-600">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">{latinToCyrillic('Qarz')}:</span>
+                <span className="font-semibold text-rose-600 tabular-nums">
                   {getCurrencySymbol(currency)}
                   {debtAmount.toFixed(currency === 'UZS' ? 0 : 2)}
                 </span>
               </div>
             ) : debtAmount < 0 ? (
-              <div className="flex justify-between text-base mb-2">
-                <span className="text-gray-500">{latinToCyrillic('Ortiqcha to\'lov (Balans)')}:</span>
-                <span className="font-bold text-green-600">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">{latinToCyrillic('Ortiqcha to\'lov (Balans)')}:</span>
+                <span className="font-semibold text-emerald-600 tabular-nums">
                   {getCurrencySymbol(currency)}
                   {Math.abs(debtAmount).toFixed(currency === 'UZS' ? 0 : 2)}
                 </span>
               </div>
             ) : null}
-            <div className="flex justify-between text-base">
-              <span className="text-gray-500">{latinToCyrillic("To'langan")}:</span>
-              <span className="font-bold text-green-600">
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">{latinToCyrillic("To'langan")}:</span>
+              <span className="font-semibold text-emerald-600 tabular-nums">
                 {getCurrencySymbol(currency)}
                 {paidAmount.toFixed(currency === 'UZS' ? 0 : 2)}
               </span>
             </div>
-          </div>
-
-          {/* Total */}
-          <div className="bg-blue-600 text-white p-4 rounded-xl">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">{latinToCyrillic('JAMI')}:</span>
-              <span className="text-2xl font-bold">
+            <div className="flex justify-between items-center pt-2 border-t border-slate-200/70">
+              <span className="text-sm font-medium text-slate-600">{latinToCyrillic('JAMI')}:</span>
+              <span className="text-xl font-bold text-slate-900 tabular-nums">
                 {getCurrencySymbol(currency)}
                 {getDisplayAmount(totalAmount, currency)}
               </span>
@@ -172,8 +193,8 @@ export const PaymentSection = ({
         </div>
 
         {/* Exchange Rate */}
-        <div className="flex items-center gap-2 bg-amber-50 p-3 rounded border border-amber-200">
-          <label htmlFor="exchangeRate" className="text-base font-medium text-amber-700">{latinToCyrillic('Kurs')}:</label>
+        <div className="flex items-center gap-2.5">
+          <label htmlFor="exchangeRate" className="text-sm font-medium text-slate-500 flex-shrink-0">{latinToCyrillic('Kurs')}:</label>
           <input
             id="exchangeRate"
             type="text"
@@ -181,14 +202,14 @@ export const PaymentSection = ({
             placeholder="12500"
             value={exchangeRate}
             onChange={(e) => onExchangeRateChange(e.target.value.replace(/[^0-9.]/g, '').replace(/\.(?=.*\.)/g, ''))}
-            className="flex-1 h-12 px-3 border rounded-lg text-base"
+            className="flex-1 h-11 px-3 text-sm font-medium text-slate-900 tabular-nums rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
           />
-          <span className="text-amber-700 font-medium">UZS/$</span>
+          <span className="text-sm font-medium text-slate-400 flex-shrink-0">UZS/$</span>
         </div>
 
         {/* Savat bo'sh bo'lganda ogohlantirish */}
         {form.items.length === 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg text-yellow-700 text-sm text-center">
+          <div className="rounded-xl bg-amber-50 border border-amber-200/70 p-3 text-amber-700 text-sm text-center font-medium">
             {latinToCyrillic('Sotuvni rasmiylashtirish uchun kamida bitta mahsulot qoshish kerak')}
           </div>
         )}
@@ -196,41 +217,41 @@ export const PaymentSection = ({
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={isSubmitting || form.items.length === 0}
-          className={`w-full h-16 text-lg font-bold flex items-center justify-center gap-3 rounded-xl transition-all ${
-            isSubmitting || form.items.length === 0
-              ? 'bg-gray-400 text-white cursor-not-allowed'
-              : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl'
+          disabled={isDisabled}
+          className={`w-full rounded-xl py-3.5 text-base font-semibold flex items-center justify-center gap-2.5 transition-colors active:scale-[0.99] ${
+            isDisabled
+              ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+              : 'bg-indigo-600 hover:bg-indigo-700 text-white'
           }`}
         >
           {isSubmitting ? (
             <>
-              <div className="animate-pulse rounded-full h-6 w-6 border-b-2 border-white"></div>
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
               {latinToCyrillic('Saqlanmoqda...')}
             </>
           ) : (
             <>
-              <ShoppingCart className="w-6 h-6" />
+              <ShoppingCart className="w-5 h-5" />
               {isEditMode ? latinToCyrillic('Sotuvni saqlash') : latinToCyrillic("Sotuvni rasmiylashtirish")}
             </>
           )}
         </button>
 
-        {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* Action Buttons — secondary / ghost */}
+        <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
             onClick={handleCancel}
-            className="h-14 text-base font-bold flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 shadow-md transition-all"
+            className="min-h-[44px] text-sm font-semibold flex items-center justify-center gap-2 rounded-xl bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 transition-colors active:scale-[0.98]"
           >
-            <X className="w-5 h-5" /> {latinToCyrillic('Bekor')}
+            <X className="w-4 h-4" /> {latinToCyrillic('Bekor')}
           </button>
           <button
             type="button"
             onClick={handleReset}
-            className="h-14 text-base font-bold flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-gray-500 to-gray-600 text-white hover:from-gray-600 hover:to-gray-700 shadow-md transition-all"
+            className="min-h-[44px] text-sm font-semibold flex items-center justify-center gap-2 rounded-xl bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 transition-colors active:scale-[0.98]"
           >
-            <RotateCcw className="w-5 h-5" /> {latinToCyrillic('Tozalash')}
+            <RotateCcw className="w-4 h-4" /> {latinToCyrillic('Tozalash')}
           </button>
         </div>
       </div>

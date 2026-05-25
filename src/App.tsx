@@ -63,39 +63,6 @@ const Settings = lazy(() => import('./pages/Settings'));
 const ProfessionalLayout = lazy(() => import('./components/ProfessionalLayout'));
 const CashierLayout = lazy(() => import('./layouts/CashierLayout'));
 
-// Modern Loading component with enhanced design
-const LoadingSpinner = () => (
-  <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 bg-dots-pattern">
-    <div className="glass-card p-10 rounded-3xl shadow-glass-lg animate-scale-in">
-      <div className="relative">
-        {/* Outer ring with pulse effect */}
-        <div className="animate-pulse rounded-full h-20 w-20 bg-blue-500 shadow-glow"></div>
-        
-        {/* Middle ring - delayed pulse */}
-        <div className="absolute top-1 left-1 animate-pulse rounded-full h-18 w-18 bg-indigo-500" style={{ animationDelay: '0.2s' }}></div>
-        
-        {/* Inner animated gradient */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="h-10 w-10 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full animate-pulse shadow-glow"></div>
-        </div>
-        
-        {/* Orbital dots */}
-        <div className="absolute inset-0 animate-pulse" style={{ animationDelay: '0.5s' }}>
-          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-blue-400 rounded-full shadow-glow"></div>
-        </div>
-        <div className="absolute inset-0 animate-pulse" style={{ animationDelay: '0.7s' }}>
-          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-indigo-400 rounded-full shadow-glow"></div>
-        </div>
-      </div>
-      
-      {/* Loading text with pulse effect */}
-      <div className="mt-8 text-center">
-        <p className="text-lg font-semibold text-gradient-blue animate-pulse">Yuklanmoqda...</p>
-        <p className="text-sm text-gray-500 mt-2">Iltimos, kuting</p>
-      </div>
-    </div>
-  </div>
-);
 
 function App() {
   const { token, user } = useAuthStore();
@@ -112,7 +79,7 @@ function App() {
       <ToastProvider>
         <LanguageProvider>
           <BrowserRouter>
-            <Suspense fallback={<LoadingSpinner />}>
+            <Suspense fallback={null}>
               <AppRoutes token={token} user={user} />
             </Suspense>
           </BrowserRouter>

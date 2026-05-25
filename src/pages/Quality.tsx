@@ -1,11 +1,34 @@
 import { useState, useEffect } from 'react';
-import { 
-  CheckCircle, XCircle, AlertTriangle, FileText, 
-  Search, Filter, Plus, Download, ChevronDown, MoreHorizontal,
-  Shield, Award, TrendingUp, BarChart3, Calendar, Clock,
-  User, Package, Settings, Eye, Edit2, Trash2, Printer
+import {
+  Shield,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Gauge,
+  Plus,
+  Search,
+  Package,
+  User,
+  Calendar,
+  Eye,
+  Edit2,
+  Trash2,
+  RefreshCw,
+  Loader2,
+  X,
+  Hash,
+  AlertTriangle,
 } from 'lucide-react';
 import api from '../lib/professionalApi';
+import { Badge } from '../components/ui/Badge';
+import { TableSkeleton } from '../components/ui/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useToast, toast as toastFactory } from '../components/ui/Toast';
+import { latinToCyrillic } from '../lib/transliterator';
+import { formatDate } from '../lib/utils';
+
+const L = latinToCyrillic;
 
 interface QualityCheck {
   id: string;
@@ -19,336 +42,645 @@ interface QualityCheck {
   category: string;
 }
 
-interface QualityMetric {
-  label: string;
-  value: number;
-  total: number;
-  color: string;
-  icon: React.ReactNode;
-}
+type StatusKey = 'passed' | 'failed' | 'pending';
 
-// Quality checks will be loaded from API
+const statusConfig: Record<
+  StatusKey,
+  { label: string; variant: 'success' | 'error' | 'warning'; icon: typeof CheckCircle }
+> = {
+  passed: { label: L('Muvaffaqiyatli'), variant: 'success', icon: CheckCircle },
+  failed: { label: L('Brak'), variant: 'error', icon: XCircle },
+  pending: { label: L('Kutilmoqda'), variant: 'warning', icon: Clock },
+};
+
+const getStatusMeta = (status: string) =>
+  statusConfig[status as StatusKey] || {
+    label: status,
+    variant: 'warning' as const,
+    icon: Clock,
+  };
 
 export default function Quality() {
+  const { addToast } = useToast();
+
   const [checks, setChecks] = useState<QualityCheck[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCheck, setSelectedCheck] = useState<QualityCheck | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Confirm dialog (replaces window.confirm)
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    target: QualityCheck | null;
+  }>({ open: false, target: null });
 
   // Load quality checks from API
-  useEffect(() => {
-    const loadQualityChecks = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get('/quality-checks');
-        const data = response.data || [];
-        // Map API data to QualityCheck interface
-        const mappedChecks: QualityCheck[] = data.map((item: any) => ({
-          id: item.id,
-          productName: item.product?.name || item.productName || 'Noma\'lum',
-          batchNumber: item.batchNumber || item.productionOrder?.batchNumber || '-',
-          inspector: item.inspector?.name || item.inspectorName || '-',
-          checkDate: item.checkDate || item.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
-          status: item.status?.toLowerCase() || 'pending',
-          defects: item.defects || item.defectCount || 0,
-          notes: item.notes || item.comments || '-',
-          category: item.category || item.product?.category || 'Umumiy'
-        }));
-        setChecks(mappedChecks);
-      } catch (error) {
-        console.error('Error loading quality checks:', error);
-        setChecks([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadQualityChecks = async () => {
+    try {
+      const response = await api.get('/quality-checks');
+      const data = response.data || [];
+      // Map API data to QualityCheck interface
+      const mappedChecks: QualityCheck[] = data.map((item: any) => ({
+        id: item.id,
+        productName: item.product?.name || item.productName || 'Noma\'lum',
+        batchNumber: item.batchNumber || item.productionOrder?.batchNumber || '-',
+        inspector: item.inspector?.name || item.inspectorName || '-',
+        checkDate:
+          item.checkDate ||
+          item.createdAt?.split('T')[0] ||
+          new Date().toISOString().split('T')[0],
+        status: item.status?.toLowerCase() || 'pending',
+        defects: item.defects || item.defectCount || 0,
+        notes: item.notes || item.comments || '-',
+        category: item.category || item.product?.category || 'Umumiy',
+      }));
+      setChecks(mappedChecks);
+    } catch (error) {
+      console.error('Error loading quality checks:', error);
+      setChecks([]);
+      addToast(
+        toastFactory.error(L('Xatolik'), L("Tekshiruvlarni yuklashda xatolik yuz berdi"))
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
+  useEffect(() => {
     loadQualityChecks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const metrics: QualityMetric[] = [
-    { label: 'Muvaffaqiyatli', value: 156, total: 180, color: 'text-emerald-600', icon: <CheckCircle className="w-5 h-5" /> },
-    { label: 'Brak', value: 12, total: 180, color: 'text-rose-600', icon: <XCircle className="w-5 h-5" /> },
-    { label: 'Kutilmoqda', value: 8, total: 180, color: 'text-amber-600', icon: <Clock className="w-5 h-5" /> },
-    { label: 'Sifat ko\'rsatkichi', value: 94, total: 100, color: 'text-blue-600', icon: <Award className="w-5 h-5" /> },
-  ];
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadQualityChecks();
+  };
 
-  const filteredChecks = checks.filter(check => {
-    const matchesSearch = check.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         check.batchNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         check.inspector.toLowerCase().includes(searchTerm.toLowerCase());
+  // "Yangi tekshiruv" — backendda hali POST endpoint yo'q.
+  // Soxta create oqimini ko'rsatmaymiz; halol ravishda xabar beramiz.
+  const handleCreate = () => {
+    addToast(
+      toastFactory.info(
+        L('Tez orada'),
+        L("Yangi tekshiruv qo'shish funksiyasi tayyorlanmoqda")
+      )
+    );
+  };
+
+  // "Tahrirlash" — hali implement qilinmagan (stub). Halol surface.
+  const handleEdit = () => {
+    addToast(
+      toastFactory.info(
+        L('Tez orada'),
+        L("Tahrirlash funksiyasi tayyorlanmoqda")
+      )
+    );
+  };
+
+  const requestDelete = (check: QualityCheck) =>
+    setConfirmState({ open: true, target: check });
+
+  const handleConfirmDelete = async () => {
+    const target = confirmState.target;
+    if (!target) return;
+    setDeletingId(target.id);
+    try {
+      await api.delete(`/quality-checks/${target.id}`);
+      setChecks((prev) => prev.filter((c) => c.id !== target.id));
+      addToast(toastFactory.success(L('Tekshiruv ochirildi')));
+      if (selectedCheck?.id === target.id) setSelectedCheck(null);
+    } catch (error) {
+      console.error('Error deleting:', error);
+      addToast(toastFactory.error(L('Xatolik'), L("Ochirishda xatolik yuz berdi")));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const filteredChecks = checks.filter((check) => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch =
+      check.productName.toLowerCase().includes(term) ||
+      check.batchNumber.toLowerCase().includes(term) ||
+      check.inspector.toLowerCase().includes(term);
     const matchesStatus = filterStatus === 'all' || check.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'passed': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-      case 'failed': return 'bg-rose-100 text-rose-700 border-rose-200';
-      case 'pending': return 'bg-amber-100 text-amber-700 border-amber-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
-  };
+  // Live stats derived from real data
+  const passedCount = checks.filter((c) => c.status === 'passed').length;
+  const failedCount = checks.filter((c) => c.status === 'failed').length;
+  const pendingCount = checks.filter((c) => c.status === 'pending').length;
+  const qualityRate = checks.length > 0 ? Math.round((passedCount / checks.length) * 100) : 0;
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'passed': return 'Muvaffaqiyatli';
-      case 'failed': return 'Brak';
-      case 'pending': return 'Kutilmoqda';
-      default: return status;
-    }
-  };
+  const stats = [
+    {
+      label: L('Muvaffaqiyatli'),
+      value: passedCount.toLocaleString('en-US'),
+      icon: CheckCircle,
+      tint: 'bg-emerald-50 text-emerald-600',
+    },
+    {
+      label: L('Brak'),
+      value: failedCount.toLocaleString('en-US'),
+      icon: XCircle,
+      tint: 'bg-rose-50 text-rose-600',
+    },
+    {
+      label: L('Kutilmoqda'),
+      value: pendingCount.toLocaleString('en-US'),
+      icon: Clock,
+      tint: 'bg-amber-50 text-amber-600',
+    },
+    {
+      label: L('Sifat korsatkichi'),
+      value: `${qualityRate}%`,
+      icon: Gauge,
+      tint: 'bg-indigo-50 text-indigo-600',
+    },
+  ];
+
+  const filterOptions = [
+    { value: 'all', label: L('Barcha statuslar') },
+    { value: 'passed', label: L('Muvaffaqiyatli') },
+    { value: 'failed', label: L('Brak') },
+    { value: 'pending', label: L('Kutilmoqda') },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Shield className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Sifat nazorati</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Mahsulot sifati va standartlarni nazorat qilish</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Yangi tekshiruv
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                <Download className="w-4 h-4" />
-                Eksport
-              </button>
-            </div>
+    <>
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div>
+            <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
+              {L('Sifat nazorati')}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              {loading
+                ? L('Yuklanmoqda...')
+                : `${checks.length} ${L('ta tekshiruv')}`}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 self-start">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing || loading}
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{L('Yangilash')}</span>
+            </button>
+            <button
+              onClick={handleCreate}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+            >
+              <Plus className="w-4 h-4" />
+              {L('Yangi tekshiruv')}
+            </button>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {metrics.map((metric, index) => (
-            <div key={index} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-lg ${metric.color} bg-opacity-10`}>
-                  {metric.icon}
-                </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400">Bu oy</span>
-              </div>
-              <div className="flex items-end gap-2">
-                <span className="text-3xl font-bold text-gray-900 dark:text-white">{metric.value}</span>
-                {metric.total > 100 ? (
-                  <span className="text-sm text-gray-500 dark:text-gray-400 mb-1">/ {metric.total}</span>
-                ) : (
-                  <span className="text-sm text-gray-500 dark:text-gray-400 mb-1">%</span>
-                )}
-              </div>
-              <p className={`text-sm ${metric.color} mt-2`}>{metric.label}</p>
-              <div className="mt-3 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full rounded-full ${metric.color.replace('text-', 'bg-')}`}
-                  style={{ width: `${(metric.value / metric.total) * 100}%` }}
+        {/* Stats cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          {loading
+            ? Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[116px] animate-pulse"
                 />
-              </div>
-            </div>
-          ))}
+              ))
+            : stats.map((stat) => {
+                const Icon = stat.icon;
+                return (
+                  <div
+                    key={stat.label}
+                    className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">
+                        {stat.label}
+                      </p>
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${stat.tint}`}
+                      >
+                        <Icon className="w-[18px] h-[18px]" />
+                      </div>
+                    </div>
+                    <p className="mt-3 text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
+                      {stat.value}
+                    </p>
+                  </div>
+                );
+              })}
         </div>
 
         {/* Filters */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
-          <div className="p-4 flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Qidirish (mahsulot, partiya, inspektor)"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <select
-                title="Status filter"
-                aria-label="Status bo'yicha filter"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-4 flex flex-col lg:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder={L('Qidirish (mahsulot, partiya, inspektor)')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white transition-all"
+            />
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto lg:overflow-visible -mx-1 px-1 lg:mx-0 lg:px-0">
+            {filterOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setFilterStatus(opt.value)}
+                className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors active:scale-[0.98] ${
+                  filterStatus === opt.value
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                }`}
               >
-                <option value="all">Barcha statuslar</option>
-                <option value="passed">Muvaffaqiyatli</option>
-                <option value="failed">Brak</option>
-                <option value="pending">Kutilmoqda</option>
-              </select>
-            </div>
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700/50">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Partiya</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Mahsulot</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Kategoriya</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Inspektor</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Sana</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nuqsonlar</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amallar</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {filteredChecks.map((check) => (
-                  <tr key={check.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <span className="font-mono text-sm text-gray-900 dark:text-white">{check.batchNumber}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                          <Package className="w-4 h-4 text-blue-600" />
-                        </div>
-                        <span className="font-medium text-gray-900 dark:text-white">{check.productName}</span>
+        {/* Loading state */}
+        {loading && (
+          <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-6">
+            <TableSkeleton rows={6} cols={6} />
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loading && filteredChecks.length === 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200/70">
+            <EmptyState
+              icon={Shield}
+              title={
+                checks.length === 0
+                  ? L("Hali sifat tekshiruvlari yo'q")
+                  : L("Mos tekshiruv topilmadi")
+              }
+              description={
+                checks.length === 0
+                  ? L("Sifat tekshiruvlari shu yerda korinadi")
+                  : L("Qidiruv yoki filterni ozgartirib koring")
+              }
+              action={
+                checks.length === 0 ? (
+                  <button
+                    onClick={handleCreate}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {L('Yangi tekshiruv')}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFilterStatus('all');
+                    }}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-200 transition-colors active:scale-[0.98]"
+                  >
+                    <X className="w-4 h-4" />
+                    {L('Filterni tozalash')}
+                  </button>
+                )
+              }
+            />
+          </div>
+        )}
+
+        {/* Table (desktop) */}
+        {!loading && filteredChecks.length > 0 && (
+          <div className="hidden md:block bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200/70 bg-slate-50/60">
+                    <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">
+                      {L('Partiya')}
+                    </th>
+                    <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">
+                      {L('Mahsulot')}
+                    </th>
+                    <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">
+                      {L('Inspektor')}
+                    </th>
+                    <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">
+                      {L('Sana')}
+                    </th>
+                    <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">
+                      {L('Status')}
+                    </th>
+                    <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">
+                      {L('Nuqsonlar')}
+                    </th>
+                    <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">
+                      {L('Amallar')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredChecks.map((check) => {
+                    const meta = getStatusMeta(check.status);
+                    const busy = deletingId === check.id;
+                    return (
+                      <tr key={check.id} className="group hover:bg-slate-50/70 transition-colors">
+                        <td className="px-5 py-4">
+                          <span className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-slate-900 tabular-nums">
+                            <Hash className="w-3.5 h-3.5 text-slate-400" />
+                            {check.batchNumber}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0">
+                              <Package className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-900 truncate">
+                                {check.productName}
+                              </p>
+                              <p className="text-xs text-slate-400 truncate">{check.category}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="inline-flex items-center gap-1.5 text-sm text-slate-600">
+                            <User className="w-4 h-4 text-slate-400" />
+                            {check.inspector}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="inline-flex items-center gap-1.5 text-sm text-slate-600 tabular-nums">
+                            <Calendar className="w-4 h-4 text-slate-400" />
+                            {check.checkDate ? formatDate(check.checkDate) : '-'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <Badge variant={meta.variant}>{meta.label}</Badge>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span
+                            className={`inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-lg text-sm font-bold tabular-nums ${
+                              check.defects > 0
+                                ? 'bg-rose-50 text-rose-600'
+                                : 'bg-emerald-50 text-emerald-600'
+                            }`}
+                          >
+                            {check.defects}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCheck(check)}
+                              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                              title={L('Korish')}
+                              aria-label={L('Korish')}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleEdit}
+                              className="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                              title={L('Tahrirlash (tez orada)')}
+                              aria-label={L('Tahrirlash (tez orada)')}
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => requestDelete(check)}
+                              disabled={busy}
+                              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-50 rounded-lg transition-colors"
+                              title={L('Ochirish')}
+                              aria-label={L('Ochirish')}
+                            >
+                              {busy ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Cards (mobile) */}
+        {!loading && filteredChecks.length > 0 && (
+          <div className="md:hidden space-y-3">
+            {filteredChecks.map((check) => {
+              const meta = getStatusMeta(check.status);
+              const busy = deletingId === check.id;
+              return (
+                <div
+                  key={check.id}
+                  className="bg-white rounded-2xl border border-slate-200/70 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0">
+                        <Package className="w-5 h-5" />
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">{check.category}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-600 dark:text-gray-400">{check.inspector}</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 truncate">
+                          {check.productName}
+                        </p>
+                        <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 font-mono tabular-nums">
+                          <Hash className="w-3 h-3" />
+                          {check.batchNumber}
+                        </p>
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-600 dark:text-gray-400">{check.checkDate}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(check.status)}`}>
-                        {getStatusText(check.status)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`text-sm font-medium ${check.defects > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                    </div>
+                    <Badge variant={meta.variant}>{meta.label}</Badge>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <span className="inline-flex items-center gap-1.5 text-slate-500">
+                      <User className="w-3.5 h-3.5 text-slate-400" />
+                      {check.inspector}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-slate-500 tabular-nums">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                      {check.checkDate ? formatDate(check.checkDate) : '-'}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs text-slate-500 inline-flex items-center gap-1.5">
+                      {L('Nuqsonlar')}:
+                      <span
+                        className={`px-2 py-0.5 rounded-lg font-bold tabular-nums ${
+                          check.defects > 0
+                            ? 'bg-rose-50 text-rose-600'
+                            : 'bg-emerald-50 text-emerald-600'
+                        }`}
+                      >
                         {check.defects}
                       </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => setSelectedCheck(check)}
-                          title="Ko'rish"
-                          aria-label="Ko'rish"
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => alert(`Tahrirlash: ${check.id}\nBu funksiya tez orada qo'shiladi!`)}
-                          title="Tahrirlash"
-                          aria-label="Tahrirlash"
-                          className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={async () => {
-                            if (!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
-                            try {
-                              await api.delete(`/quality-checks/${check.id}`);
-                              setChecks(checks.filter(c => c.id !== check.id));
-                              alert('Muvaffaqiyatli o\'chirildi!');
-                            } catch (error) {
-                              console.error('Error deleting:', error);
-                              alert('O\'chirishda xatolik!');
-                            }
-                          }}
-                          title="O'chirish"
-                          aria-label="O'chirish"
-                          className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                        >
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCheck(check)}
+                        className="p-2 bg-indigo-50 text-indigo-600 rounded-lg active:scale-95 transition-all"
+                        aria-label={L('Korish')}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleEdit}
+                        className="p-2 bg-slate-100 text-slate-500 rounded-lg active:scale-95 transition-all"
+                        aria-label={L('Tahrirlash (tez orada)')}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => requestDelete(check)}
+                        disabled={busy}
+                        className="p-2 bg-rose-50 text-rose-600 disabled:opacity-50 rounded-lg active:scale-95 transition-all"
+                        aria-label={L('Ochirish')}
+                      >
+                        {busy ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
                           <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        )}
       </div>
 
       {/* Detail Modal */}
       {selectedCheck && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Tekshiruv tafsilotlari</h2>
-              <button 
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200/70 flex items-center justify-between shrink-0">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-3">
+                <span className="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                  <Shield className="w-5 h-5" />
+                </span>
+                {L('Tekshiruv tafsilotlari')}
+              </h3>
+              <button
+                type="button"
                 onClick={() => setSelectedCheck(null)}
-                title="Yopish"
-                aria-label="Yopish"
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg"
+                aria-label={L('Yopish')}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <MoreHorizontal className="w-5 h-5 rotate-45" />
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-4">
-              <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                  <Package className="w-6 h-6 text-blue-600" />
+
+            <div className="p-6 space-y-4 overflow-y-auto">
+              <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200/70">
+                <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 flex-shrink-0">
+                  <Package className="w-6 h-6" />
                 </div>
-                <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">{selectedCheck.productName}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{selectedCheck.batchNumber}</p>
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-900 truncate">
+                    {selectedCheck.productName}
+                  </p>
+                  <p className="text-sm text-slate-500 font-mono truncate tabular-nums">
+                    {selectedCheck.batchNumber}
+                  </p>
+                </div>
+                <div className="ml-auto">
+                  <Badge variant={getStatusMeta(selectedCheck.status).variant}>
+                    {getStatusMeta(selectedCheck.status).label}
+                  </Badge>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Inspektor</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{selectedCheck.inspector}</p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/70">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5 inline-flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5" />
+                    {L('Inspektor')}
+                  </p>
+                  <p className="font-semibold text-slate-900">{selectedCheck.inspector}</p>
                 </div>
-                <div className="p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Sana</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{selectedCheck.checkDate}</p>
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/70">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5 inline-flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {L('Sana')}
+                  </p>
+                  <p className="font-semibold text-slate-900 tabular-nums">
+                    {selectedCheck.checkDate ? formatDate(selectedCheck.checkDate) : '-'}
+                  </p>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/70">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5">{L('Kategoriya')}</p>
+                  <p className="font-semibold text-slate-900">{selectedCheck.category}</p>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/70">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5 inline-flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    {L('Nuqsonlar')}
+                  </p>
+                  <p
+                    className={`text-lg font-bold tabular-nums ${
+                      selectedCheck.defects > 0 ? 'text-rose-600' : 'text-emerald-600'
+                    }`}
+                  >
+                    {selectedCheck.defects} {L('dona')}
+                  </p>
                 </div>
               </div>
-              <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Status</p>
-                <span className={`px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(selectedCheck.status)}`}>
-                  {getStatusText(selectedCheck.status)}
-                </span>
+
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/70">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5">{L('Izohlar')}</p>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedCheck.notes}</p>
               </div>
-              <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Nuqsonlar soni</p>
-                <p className={`text-lg font-bold ${selectedCheck.defects > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                  {selectedCheck.defects} dona
-                </p>
-              </div>
-              <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Izohlar</p>
-                <p className="text-sm text-gray-700 dark:text-gray-300">{selectedCheck.notes}</p>
-              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-200/70 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedCheck(null)}
+                className="w-full h-11 rounded-xl border border-slate-200 font-semibold text-sm text-slate-600 hover:bg-slate-50 transition-colors active:scale-[0.98]"
+              >
+                {L('Yopish')}
+              </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+
+      {/* Confirm delete dialog */}
+      <ConfirmDialog
+        isOpen={confirmState.open}
+        onClose={() => setConfirmState({ open: false, target: null })}
+        onConfirm={handleConfirmDelete}
+        title={L('Tekshiruvni ochirish')}
+        message={L("Bu tekshiruvni ochirmoqchimisiz? Bu amalni qaytarib bolmaydi.")}
+        confirmText={L('Ochirish')}
+        cancelText={L('Bekor qilish')}
+        variant="danger"
+      />
+    </>
   );
 }

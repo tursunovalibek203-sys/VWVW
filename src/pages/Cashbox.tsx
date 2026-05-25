@@ -3,7 +3,13 @@ import CashboxHistory from '../components/CashboxHistory';
 import api from '../lib/professionalApi';
 import { formatCurrency } from '../lib/utils';
 import { latinToCyrillic } from '../lib/transliterator';
-import { 
+import { useToast } from '../components/ui/Toast';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
+import { TableSkeleton } from '../components/ui/LoadingSpinner';
+import EmptyState from '../components/EmptyState';
+import ConfirmDialog from '../components/ConfirmDialog';
+import {
   Wallet,
   TrendingUp,
   TrendingDown,
@@ -30,7 +36,11 @@ import {
   Wrench,
   Building2,
   ShoppingCart,
-  MoreHorizontal
+  MoreHorizontal,
+  RefreshCw,
+  Plus,
+  Loader2,
+  X
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -54,12 +64,18 @@ const COLORS = ['#10b981', '#3b82f6', '#f59e0b'];
 export default function Cashbox() {
   // Translation function
   const t = latinToCyrillic;
-  
+  const { addToast } = useToast();
+
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'expenses' | 'budget' | 'loans'>('overview');
   const [cashbox, setCashbox] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  // Per-action in-button spinner flag
+  const [submitting, setSubmitting] = useState(false);
+  // Destructive category delete confirmation
+  const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
   const [showAddMoney, setShowAddMoney] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -146,24 +162,30 @@ export default function Cashbox() {
     ...defaultCategories.map(c => ({ ...c, icon: iconMap[c.icon] || MoreHorizontal })),
     ...customCategories.map(c => ({ ...c, icon: iconMap[c.icon] || MoreHorizontal }))
   ];
+  // Open confirmation dialog for category deletion (destructive)
   const handleDeleteCategory = (categoryId: string) => {
-    if (!confirm('Bu kategoriyani o\'chirmoqchimisiz?')) return;
-
     // Faqat custom kategoriyalarni o'chirish mumkin
     if (defaultCategories.find(c => c.id === categoryId)) {
-      alert('Standart kategoriyalarni o\'chirib bo\'lmaydi!');
+      addToast({ type: 'warning', title: t('Standart kategoriyalarni ochirib bolmaydi!') });
       return;
     }
+    setDeleteCategoryId(categoryId);
+  };
 
-    const updated = customCategories.filter(c => c.id !== categoryId);
+  // Confirmed category deletion
+  const confirmDeleteCategory = () => {
+    if (!deleteCategoryId) return;
+    const updated = customCategories.filter(c => c.id !== deleteCategoryId);
     setCustomCategories(updated);
     // Save to localStorage
     localStorage.setItem('cashboxCustomCategories', JSON.stringify(updated));
+    addToast({ type: 'success', title: t('Kategoriya ochirildi') });
+    setDeleteCategoryId(null);
   };
 
   const handleAddCategory = () => {
     if (!newCategoryName.trim()) {
-      alert('Kategoriya nomini kiriting!');
+      addToast({ type: 'warning', title: t('Kategoriya nomini kiriting!') });
       return;
     }
 
@@ -180,6 +202,7 @@ export default function Cashbox() {
     localStorage.setItem('cashboxCustomCategories', JSON.stringify(updated));
     setNewCategoryName('');
     setShowCategoryModal(false);
+    addToast({ type: 'success', title: t('Kategoriya qoshildi') });
   };
 
   // Byudjet state
@@ -252,8 +275,9 @@ export default function Cashbox() {
     setShowExchangeRateModal(false);
   };
 
-  const loadCashbox = async () => {
-    setLoading(true);
+  const loadCashbox = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     try {
       const params = new URLSearchParams();
       if (filters.startDate) params.append('startDate', filters.startDate);
@@ -283,8 +307,10 @@ export default function Cashbox() {
       setExpenses(expensesData);
     } catch (error) {
       console.error('Kassa ma\'lumotlarini yuklashda xatolik', error);
+      addToast({ type: 'error', title: t('Malumotlarni yuklashda xatolik') });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -321,6 +347,7 @@ export default function Cashbox() {
 
   const handleAddMoney = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
       await api.post('/cashbox/add', {
         amount: parseFloat(form.amount),
@@ -331,14 +358,17 @@ export default function Cashbox() {
       setShowAddMoney(false);
       setForm({ amount: '', currency: 'USD', description: '', type: 'CASH' });
       loadCashbox();
-      alert('ÐšÐ°ÑÑÐ° Ð¼ÑƒÐ²Ð°Ñ„Ñ„Ð°Ò›Ð¸ÑÑ‚Ð»Ð¸ Ñ‚ÑžÐ»Ð´Ð¸Ñ€Ð¸Ð»Ð´Ð¸!');
+      addToast({ type: 'success', title: t('Kassa muvaffaqiyatli toldirildi!') });
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Ð¥Ð°Ñ‚Ð¾Ð»Ð¸Ðº ÑŽÐ· Ð±ÐµÑ€Ð´Ð¸');
+      addToast({ type: 'error', title: t('Xatolik'), message: error.response?.data?.error || t('Xatolik yuz berdi') });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
       await api.post('/cashbox/withdraw', {
         amount: parseFloat(form.amount),
@@ -349,21 +379,23 @@ export default function Cashbox() {
       setShowWithdraw(false);
       setForm({ amount: '', currency: 'USD', description: '', type: 'CASH' });
       loadCashbox();
-      alert('Ð§Ð¸Ò›Ð¸Ð¼ Ð¼ÑƒÐ²Ð°Ñ„Ñ„Ð°Ò›Ð¸ÑÑ‚Ð»Ð¸ Ð°Ð¼Ð°Ð»Ð³Ð° Ð¾ÑˆÐ¸Ñ€Ð¸Ð»Ð´Ð¸!');
+      addToast({ type: 'success', title: t('Chiqim muvaffaqiyatli amalga oshirildi!') });
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Ð¥Ð°Ñ‚Ð¾Ð»Ð¸Ðº ÑŽÐ· Ð±ÐµÑ€Ð´Ð¸');
+      addToast({ type: 'error', title: t('Xatolik'), message: error.response?.data?.error || t('Xatolik yuz berdi') });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleExchange = async (e: React.FormEvent) => {
     e.preventDefault();
+    const amount = parseFloat(exchangeForm.amount);
+    if (isNaN(amount) || amount <= 0) {
+      addToast({ type: 'warning', title: t('Iltimos, togri summa kiriting!') });
+      return;
+    }
+    setSubmitting(true);
     try {
-      const amount = parseFloat(exchangeForm.amount);
-      if (isNaN(amount) || amount <= 0) {
-        alert('Iltimos, togri summa kiriting!');
-        return;
-      }
-
       await api.post('/cashbox/exchange', {
         fromCurrency: exchangeForm.fromCurrency,
         toCurrency: exchangeForm.toCurrency,
@@ -384,27 +416,29 @@ export default function Cashbox() {
         description: 'Valyuta ayirboshlash'
       });
       loadCashbox();
-      alert('Valyuta ayirboshlash muvaffaqiyatli amalga oshirildi!');
+      addToast({ type: 'success', title: t('Valyuta ayirboshlash muvaffaqiyatli amalga oshirildi!') });
     } catch (error: any) {
       console.error('Valyuta ayirboshlashda xatolik:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Valyuta ayirboshlashda xatolik yuz berdi';
-      alert(`âŒ Xatolik: ${errorMessage}`);
+      addToast({ type: 'error', title: t('Xatolik'), message: errorMessage });
+    } finally {
+      setSubmitting(false);
     }
   };
   // Xarajat qo'shish - avtomatik kassadan kamayadi
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
+    const amount = parseFloat(expenseForm.amount);
+    if (isNaN(amount) || amount <= 0) {
+      addToast({ type: 'warning', title: t('Iltimos, togri summa kiriting!') });
+      return;
+    }
+    if (!expenseForm.category) {
+      addToast({ type: 'warning', title: t('Iltimos, kategoriya tanlang!') });
+      return;
+    }
+    setSubmitting(true);
     try {
-      const amount = parseFloat(expenseForm.amount);
-      if (isNaN(amount) || amount <= 0) {
-        alert('Iltimos, to\'g\'ri summa kiriting!');
-        return;
-      }
-      if (!expenseForm.category) {
-        alert('Iltimos, kategoriya tanlang!');
-        return;
-      }
-
       // Xarajatni saqlash - kassadan avtomatik kamayadi
       await api.post('/expenses', {
         amount: amount,
@@ -428,16 +462,19 @@ export default function Cashbox() {
         date: new Date().toISOString().split('T')[0]
       });
       loadCashbox();
-      alert('Xarajat muvaffaqiyatli qo\'shildi va kassadan kamaytirildi!');
+      addToast({ type: 'success', title: t('Xarajat muvaffaqiyatli qoshildi va kassadan kamaytirildi!') });
     } catch (error: any) {
       console.error('Xarajat qo\'shishda xatolik:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Xarajat qo\'shishda xatolik yuz berdi';
-      alert(`âŒ Xatolik: ${errorMessage}`);
+      addToast({ type: 'error', title: t('Xatolik'), message: errorMessage });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
       await api.post('/cashbox/transfer', {
         from: transferForm.from,
@@ -449,11 +486,13 @@ export default function Cashbox() {
       setShowTransfer(false);
       setTransferForm({ from: 'CASH', to: 'CARD', amount: '', description: '' });
       loadCashbox();
-      alert('Kassa o\'tkazmasi muvaffaqiyatli amalga oshirildi!');
+      addToast({ type: 'success', title: t('Kassa otkazmasi muvaffaqiyatli amalga oshirildi!') });
     } catch (error: any) {
       console.error('Kassa o\'tkazmasida xatolik:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Kassa o\'tkazmasida xatolik yuz berdi';
-      alert(`âŒ Xatolik: ${errorMessage}`);
+      addToast({ type: 'error', title: t('Xatolik'), message: errorMessage });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -468,7 +507,7 @@ export default function Cashbox() {
       link.click();
       link.remove();
     } catch (error) {
-      alert('PDF ÑÐºÑÐ¿Ð¾Ñ€Ñ‚ Ò›Ð¸Ð»Ð¸ÑˆÐ´Ð° Ñ…Ð°Ñ‚Ð¾Ð»Ð¸Ðº');
+      addToast({ type: 'error', title: t('PDF eksport qilishda xatolik') });
     }
   };
 
@@ -519,6 +558,7 @@ export default function Cashbox() {
   // Byudjet yaratish
   const handleCreateBudget = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
       await api.post('/budgets', {
         category: budgetForm.category,
@@ -538,15 +578,18 @@ export default function Cashbox() {
         alertThreshold: '80'
       });
       loadBudgets();
-      alert('Byudjet muvaffaqiyatli yaratildi!');
+      addToast({ type: 'success', title: t('Byudjet muvaffaqiyatli yaratildi!') });
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Byudjet yaratishda xatolik');
+      addToast({ type: 'error', title: t('Xatolik'), message: error.response?.data?.error || t('Byudjet yaratishda xatolik') });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   // Qarz yaratish
   const handleCreateLoan = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
       await api.post('/cashbox/loans', {
         employeeName: loanForm.employeeName,
@@ -574,26 +617,43 @@ export default function Cashbox() {
         notes: ''
       });
       loadLoans();
-      alert('Qarz muvaffaqiyatli yaratildi!');
+      addToast({ type: 'success', title: t('Qarz muvaffaqiyatli yaratildi!') });
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Qarz yaratishda xatolik');
+      addToast({ type: 'error', title: t('Xatolik'), message: error.response?.data?.error || t('Qarz yaratishda xatolik') });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen ultra-bg-gradient">
-        <div className="text-center">
-          <div className="relative mb-6">
-            <div className="animate-pulse rounded-full h-20 w-20 border-4 border-blue-200 border-t-blue-600 shadow-lg"></div>
-            <Wallet className="w-8 h-8 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div>
+            <div className="h-7 w-32 bg-slate-200 rounded-lg animate-pulse" />
+            <div className="mt-2 h-4 w-48 bg-slate-100 rounded animate-pulse" />
           </div>
-          <p className="text-lg font-semibold text-gray-700">Ð®ÐºÐ»Ð°Ð½Ð¼Ð¾Ò›Ð´Ð°...</p>
-          <div className="flex justify-center gap-1 mt-3">
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          <div className="h-9 w-28 bg-slate-100 rounded-xl animate-pulse" />
+        </div>
+        {/* Dark hero + KPI grid skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="rounded-2xl bg-slate-900 p-6 h-[200px] animate-pulse" />
+          <div className="lg:col-span-2 grid grid-cols-2 gap-5">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[120px] animate-pulse" />
+            ))}
           </div>
+        </div>
+        {/* Action buttons skeleton */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-12 bg-white border border-slate-200/70 rounded-xl animate-pulse" />
+          ))}
+        </div>
+        {/* Table skeleton */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/70">
+          <TableSkeleton rows={6} cols={5} />
         </div>
       </div>
     );
@@ -610,120 +670,150 @@ export default function Cashbox() {
   const cardWarning = limits.alertEnabled && (cashbox?.byCurrency?.cashUSD || 0) > limits.cardLimit;
   const clickWarning = limits.alertEnabled && (cashbox?.byCurrency?.clickUZS || 0) > limits.clickLimit;
 
+  // Active filter count for the period/filter badge
+  const activeFilterCount =
+    (filters.startDate ? 1 : 0) +
+    (filters.endDate ? 1 : 0) +
+    (filters.type !== 'ALL' ? 1 : 0) +
+    (filters.paymentMethod !== 'ALL' ? 1 : 0);
+
+  const kpiCards = [
+    { title: t("Naqd Som"), value: formatCurrency(cashbox?.byCurrency?.cashUZS || 0, 'UZS'), icon: Banknote, tint: 'bg-emerald-50 text-emerald-600' },
+    { title: t("Naqd Dollar"), value: formatCurrency(cashbox?.byCurrency?.cashUSD || 0, 'USD'), icon: DollarSign, tint: 'bg-blue-50 text-blue-600' },
+    { title: t("Click / Karta"), value: formatCurrency(cashbox?.byCurrency?.clickUZS || 0, 'UZS'), icon: Smartphone, tint: 'bg-purple-50 text-purple-600' },
+    { title: t("Jami (USD eq)"), value: formatCurrency((cashbox?.totalUSD || 0), 'USD'), icon: Wallet, tint: 'bg-amber-50 text-amber-600' },
+  ];
+
+  // Period label: from active date filter or "Bugungi holat"
+  const periodLabel = filters.startDate || filters.endDate
+    ? `${filters.startDate || '...'} — ${filters.endDate || '...'}`
+    : t('Bugungi holat');
+
   return (
-    <div className="min-h-screen ultra-bg-gradient pb-12">
-      {/* Ultra-Modern Header */}
-      <div className="ultra-glass border-b border-glass-border shadow-3xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 ultra-glass rounded-3xl flex items-center justify-center shadow-glow-primary animate-glow">
-                <Wallet className="w-8 h-8 text-accent-600" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-black text-gray-900">
-                  {t("Kassa")}
-                </h1>
-                <p className="text-sm font-semibold text-neutral-600 mt-1">
-                  {t("Moliyaviy boshqaruv")}
-                </p>
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">{t("Kassa")}</h1>
+          <p className="mt-1 text-sm text-slate-500">{periodLabel}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 self-start">
+          <button
+            onClick={() => setShowFilters(true)}
+            className="relative inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+          >
+            <Filter className="w-4 h-4" />
+            {t("Davr")}
+            {activeFilterCount > 0 && (
+              <span className="ml-0.5 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold bg-indigo-600 text-white rounded-full">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => loadCashbox(true)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {t("Yangilash")}
+          </button>
+        </div>
+      </div>
+
+      {/* Top: dark balance hero + KPI grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Premium dark hero: cash balance (primary metric) */}
+        <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-6 text-white">
+          <div className="absolute -top-16 -right-16 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl" />
+          <div className="relative">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("Kassa balansi")}</p>
+              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
+                <Wallet className="w-[18px] h-[18px] text-indigo-300" />
               </div>
             </div>
-            
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setShowExchange(true)} 
-                className="ultra-button secondary"
-              >
-                <ArrowLeftRight className="w-5 h-5" />
-                {t("Ayirboshlash")}
-              </button>
-              
-              <button 
-                onClick={() => setShowAddMoney(true)} 
-                className="ultra-button success"
-              >
-                <ArrowDownRight className="w-5 h-5" />
-                {t("Kirim")}
-              </button>
-
-              <button 
-                onClick={() => setShowWithdraw(true)} 
-                className="ultra-button error"
-              >
-                <ArrowUpRight className="w-5 h-5" />
-                {t("Chiqim")}
-              </button>
+            <p className="mt-3 text-4xl font-bold tracking-tight tabular-nums">
+              {formatCurrency(cashbox?.totalBalance || 0, 'USD')}
+            </p>
+            <p className="mt-1.5 text-sm text-slate-400 tabular-nums">{t("Jami (USD ekvivalent)")}</p>
+            <div className="mt-6 pt-5 border-t border-white/10 flex items-center gap-8">
+              <div>
+                <p className="text-xl font-bold tabular-nums text-emerald-400">
+                  +{formatCurrency(cashbox?.todayIncome || 0, 'USD')}
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">{t("Bugungi kirim")}</p>
+              </div>
+              <div>
+                <p className="text-xl font-bold tabular-nums text-rose-400">
+                  -{formatCurrency(cashbox?.todayExpense || 0, 'USD')}
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">{t("Bugungi chiqim")}</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Ultra-Modern Stats Cards */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[ 
-            { 
-              title: t("Naqd So'm"), 
-              value: formatCurrency(cashbox?.byCurrency?.cashUZS || 0, 'UZS'),
-              icon: Banknote,
-              gradient: 'gradient-success'
-            },
-            { 
-              title: t("Naqd Dollar"), 
-              value: formatCurrency(cashbox?.byCurrency?.cashUSD || 0, 'USD'),
-              icon: DollarSign,
-              gradient: 'gradient-primary'
-            },
-            { 
-              title: t("Click / Karta"), 
-              value: formatCurrency(cashbox?.byCurrency?.clickUZS || 0, 'UZS'),
-              icon: Smartphone,
-              gradient: 'gradient-premium'
-            },
-            { 
-              title: t("Jami (USD eq)"), 
-              value: formatCurrency((cashbox?.totalUSD || 0), 'USD'),
-              icon: Wallet,
-              gradient: 'gradient-warning'
-            }
-          ].map((kpi, idx) => (
-            <div 
-              key={idx}
-              className="ultra-stat-card hover-lift"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-14 h-14 ultra-glass rounded-2xl flex items-center justify-center shadow-glow-primary">
-                  <kpi.icon className="w-7 h-7 text-accent-600" />
+        {/* KPI cards */}
+        <div className="lg:col-span-2 grid grid-cols-2 gap-5">
+          {kpiCards.map((kpi, idx) => {
+            const Icon = kpi.icon;
+            return (
+              <div
+                key={idx}
+                className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">{kpi.title}</p>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${kpi.tint}`}>
+                    <Icon className="w-[18px] h-[18px]" />
+                  </div>
                 </div>
-                <span className="ultra-badge primary text-xs">{kpi.title}</span>
+                <p className="mt-3 text-2xl font-bold text-slate-900 tracking-tight tabular-nums">{kpi.value}</p>
               </div>
-              <p className="text-3xl font-black text-gray-900">{kpi.value}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
-      {/* Ultra-Modern Tabs */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="ultra-nav flex-row p-2 ultra-glass rounded-3xl shadow-2xl">
-          {[
-            { id: 'overview', name: t('Umumiy'), icon: PieChartIcon },
-            { id: 'history', name: t('Tarix'), icon: History },
-            { id: 'expenses', name: t('Xarajatlar'), icon: Receipt },
-            { id: 'budget', name: t('Byudjet'), icon: Wallet },
-            { id: 'loans', name: t('Qarzlar'), icon: Users }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`ultra-nav-item ${activeTab === tab.id ? 'active' : ''}`}
-            >
-              <tab.icon className="w-5 h-5" />
-              {tab.name}
-            </button>
-          ))}
-        </div>
+      {/* Action buttons: Kirim / Chiqim / Transfer / Ayirboshlash */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Button variant="success" size="lg" fullWidth leftIcon={<ArrowDownRight className="w-5 h-5" />} onClick={() => setShowAddMoney(true)}>
+          {t("Kirim")}
+        </Button>
+        <Button variant="danger" size="lg" fullWidth leftIcon={<ArrowUpRight className="w-5 h-5" />} onClick={() => setShowWithdraw(true)}>
+          {t("Chiqim")}
+        </Button>
+        <Button variant="primary" size="lg" fullWidth leftIcon={<ArrowLeftRight className="w-5 h-5" />} onClick={() => setShowTransfer(true)}>
+          {t("Transfer")}
+        </Button>
+        <Button variant="secondary" size="lg" fullWidth leftIcon={<ArrowLeftRight className="w-5 h-5" />} onClick={() => setShowExchange(true)}>
+          {t("Ayirboshlash")}
+        </Button>
+      </div>
+
+      {/* Tabs */}
+      <div className="bg-white rounded-2xl p-1.5 shadow-sm border border-slate-200/70 flex gap-1 overflow-x-auto">
+        {[
+          { id: 'overview', name: t('Umumiy'), icon: PieChartIcon },
+          { id: 'history', name: t('Tarix'), icon: History },
+          { id: 'expenses', name: t('Xarajatlar'), icon: Receipt },
+          { id: 'budget', name: t('Byudjet'), icon: Wallet },
+          { id: 'loans', name: t('Qarzlar'), icon: Users }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+              activeTab === tab.id
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+            }`}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.name}
+          </button>
+        ))}
       </div>
 
       {/* Content */}
@@ -815,7 +905,7 @@ export default function Cashbox() {
                     <th className="text-left py-5 px-8 text-xs font-semibold text-gray-400 uppercase tracking-widest">{t("Kategoriya")}</th>
                     <th className="text-left py-5 px-8 text-xs font-semibold text-gray-400 uppercase tracking-widest">{t("To'lov Usuli")}</th>
                     <th className="text-left py-5 px-8 text-xs font-semibold text-gray-400 uppercase tracking-widest">{t("Tavsif")}</th>
-                    <th className="text-left py-5 px-8 text-xs font-semibold text-gray-400 uppercase tracking-widest">{t("Chek â„–")}</th>
+                    <th className="text-left py-5 px-8 text-xs font-semibold text-gray-400 uppercase tracking-widest">{t("Chek raqami")}</th>
                     <th className="text-right py-5 px-8 text-xs font-semibold text-gray-400 uppercase tracking-widest">{t("Summa")}</th>
                   </tr>
                 </thead>
@@ -871,14 +961,21 @@ export default function Cashbox() {
                   })}
                   {expenses.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-24">
-                        <div className="flex flex-col items-center justify-center bg-slate-50/50 rounded-3xl mx-8 py-12">
-                          <div className="w-24 h-24 bg-gradient-to-br from-slate-100 via-slate-200 to-slate-300 rounded-3xl flex items-center justify-center mb-6 shadow-inner">
-                            <Receipt className="w-12 h-12 text-slate-400" />
-                          </div>
-                          <p className="text-lg font-bold text-slate-400 uppercase tracking-widest">{t("Xarajatlar yo'q")}</p>
-                          <p className="text-sm text-slate-400 mt-2">{t("Yangi xarajat qo'shish uchun tugmani bosing")}</p>
-                        </div>
+                      <td colSpan={6}>
+                        <EmptyState
+                          icon={Receipt}
+                          title={t("Xarajatlar yoq")}
+                          description={t("Hozircha xarajatlar mavjud emas. Yangi xarajat qoshish uchun tugmani bosing.")}
+                          action={
+                            <button
+                              onClick={() => setShowExpenseModal(true)}
+                              className="inline-flex items-center gap-2 px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-semibold shadow-sm transition-all active:scale-95"
+                            >
+                              <Plus className="w-4 h-4" />
+                              {t("Yangi xarajat")}
+                            </button>
+                          }
+                        />
                       </td>
                     </tr>
                   )}
@@ -958,74 +1055,59 @@ export default function Cashbox() {
           </div>
         </div>
       ) : (
-        <div className="space-y-12 animate-in slide-in-from-bottom-10 duration-700">
-          {/* Main Balance Card */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 to-blue-700 rounded-[3.5rem] p-12 text-white shadow-2xl shadow-emerald-500/20">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl animate-pulse"></div>
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-black/10 rounded-full -ml-20 -mb-20 blur-2xl"></div>
-            
-            <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-10 text-center md:text-left">
-              <div className="space-y-4">
-                <p className="text-emerald-100 font-bold uppercase tracking-wide text-xs">{t("Jami Kassa Balansi")}</p>
-                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-none">
-                  {formatCurrency(cashbox?.totalBalance || 0, 'USD')}
-                </h2>
-                <div className="flex flex-wrap justify-center md:justify-start gap-4">
-                  <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10">
-                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                    <span className="text-xs font-bold uppercase tracking-widest">
-                      {t("Bugun")}: <span className="text-emerald-300">+{formatCurrency(cashbox?.todayIncome || 0, 'USD')}</span>
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10">
-                    <div className="w-2 h-2 bg-rose-400 rounded-full animate-pulse"></div>
-                    <span className="text-xs font-bold uppercase tracking-widest">
-                      {t("Bugun")}: <span className="text-rose-300">-{formatCurrency(cashbox?.todayExpense || 0, 'USD')}</span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="w-32 h-32 bg-white/10 backdrop-blur-xl rounded-[2.5rem] flex items-center justify-center border border-white/20 animate-bounce duration-[3000ms]">
-                <TrendingUp className="w-16 h-16 text-emerald-300" />
-              </div>
-            </div>
+        <div className="space-y-8 animate-in fade-in duration-500">
+          {/* Quick utility row: exchange rate + limits */}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              onClick={() => setShowExchangeRateModal(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+            >
+              <Settings className="w-4 h-4" />
+              {t("Kurs")}: 1$ = <span className="tabular-nums">{exchangeRate.toLocaleString()}</span>
+            </button>
+            <button
+              onClick={() => setShowLimits(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
+            >
+              <AlertTriangle className="w-4 h-4" />
+              {t("Limitlar")}
+            </button>
           </div>
 
           {/* Limit Alerts */}
           {(cashWarning || cardWarning || clickWarning) && (
-            <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800/50 p-8 rounded-[2.5rem] animate-pulse">
-              <div className="flex items-start gap-6">
-                <div className="w-14 h-14 bg-amber-500 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-amber-500/30">
-                  <AlertTriangle className="w-8 h-8" />
+            <div className="bg-amber-50 border border-amber-200 p-5 sm:p-6 rounded-2xl">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600 flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div className="flex-1">
-                  <h4 className="text-lg font-bold text-amber-900 dark:text-amber-100 uppercase tracking-tight mb-2">{t("Kassa limiti oshdi!")}</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <h4 className="text-sm font-bold text-amber-900 mb-3">{t("Kassa limiti oshdi!")}</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {cashWarning && (
-                      <div className="bg-white/50 dark:bg-black/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-800">
-                        <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">{t("Naqd UZS")}</p>
-                        <p className="text-lg font-bold text-amber-900 dark:text-amber-100">{(cashbox?.byCurrency?.cashUZS || 0).toLocaleString()} so'm</p>
+                      <div className="bg-white/70 p-3.5 rounded-xl border border-amber-100">
+                        <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide mb-1">{t("Naqd UZS")}</p>
+                        <p className="text-base font-bold text-amber-900 tabular-nums">{(cashbox?.byCurrency?.cashUZS || 0).toLocaleString()} so'm</p>
                       </div>
                     )}
                     {cardWarning && (
-                      <div className="bg-white/50 dark:bg-black/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-800">
-                        <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">{t("Naqd USD")}</p>
-                        <p className="text-lg font-bold text-amber-900 dark:text-amber-100">${(cashbox?.byCurrency?.cashUSD || 0).toFixed(2)}</p>
+                      <div className="bg-white/70 p-3.5 rounded-xl border border-amber-100">
+                        <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide mb-1">{t("Naqd USD")}</p>
+                        <p className="text-base font-bold text-amber-900 tabular-nums">${(cashbox?.byCurrency?.cashUSD || 0).toFixed(2)}</p>
                       </div>
                     )}
                     {clickWarning && (
-                      <div className="bg-white/50 dark:bg-black/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-800">
-                        <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">{t("Click UZS")}</p>
-                        <p className="text-lg font-bold text-amber-900 dark:text-amber-100">{(cashbox?.byCurrency?.clickUZS || 0).toLocaleString()} so'm</p>
+                      <div className="bg-white/70 p-3.5 rounded-xl border border-amber-100">
+                        <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide mb-1">{t("Click UZS")}</p>
+                        <p className="text-base font-bold text-amber-900 tabular-nums">{(cashbox?.byCurrency?.clickUZS || 0).toLocaleString()} so'm</p>
                       </div>
                     )}
                   </div>
-                  <button 
-                    onClick={() => setShowLimits(true)} 
-                    className="mt-6 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-sm transition-all active:scale-95 shadow-lg shadow-amber-500/20"
+                  <button
+                    onClick={() => setShowLimits(true)}
+                    className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold text-sm transition-colors active:scale-[0.98]"
                   >
-                    {t("LIMITLARNI SOZLASH")}
+                    {t("Limitlarni sozlash")}
                   </button>
                 </div>
               </div>
@@ -1033,15 +1115,13 @@ export default function Cashbox() {
           )}
 
           {/* Charts Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white dark:bg-gray-900 rounded-[3rem] p-10 border border-gray-100 dark:border-gray-800 shadow-sm">
-              <div className="flex items-center justify-between mb-10">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-50 dark:bg-purple-900/30 rounded-xl flex items-center justify-center text-purple-600">
-                    <PieChartIcon className="w-5 h-5" />
-                  </div>
-                  {t("Taqsimot")}
-                </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/70 shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-9 h-9 bg-violet-50 rounded-xl flex items-center justify-center text-violet-600">
+                  <PieChartIcon className="w-[18px] h-[18px]" />
+                </div>
+                <h3 className="font-semibold text-slate-900">{t("Taqsimot")}</h3>
               </div>
               <div className="h-[350px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -1072,24 +1152,22 @@ export default function Cashbox() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex justify-center gap-6 mt-6">
+              <div className="flex justify-center flex-wrap gap-x-6 gap-y-2 mt-6">
                 {paymentMethodsData.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{item.name}</span>
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
+                    <span className="text-xs font-medium text-slate-400">{item.name}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-900 rounded-[3rem] p-10 border border-gray-100 dark:border-gray-800 shadow-sm">
-              <div className="flex items-center justify-between mb-10">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center text-emerald-600">
-                    <Calendar className="w-5 h-5" />
-                  </div>
-                  {t("Haftalik Oqim")}
-                </h3>
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/70 shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
+                  <Calendar className="w-[18px] h-[18px]" />
+                </div>
+                <h3 className="font-semibold text-slate-900">{t("Haftalik oqim")}</h3>
               </div>
               <div className="h-[350px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -1124,95 +1202,149 @@ export default function Cashbox() {
           </div>
 
           {/* Mini Stats Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
             {[
-              { label: t("Bugungi Kirim"), value: cashbox?.todayIncome, color: 'text-emerald-600', icon: TrendingUp, bg: 'bg-emerald-50' },
-              { label: t("Bugungi Chiqim"), value: cashbox?.todayExpense, color: 'text-rose-600', icon: TrendingDown, bg: 'bg-rose-50' },
-              { label: t("Oylik Kirim"), value: cashbox?.monthlyIncome, color: 'text-emerald-600', icon: Zap, bg: 'bg-emerald-50' },
-              { label: t("Oylik Chiqim"), value: cashbox?.monthlyExpense, color: 'text-rose-600', icon: ShoppingCart, bg: 'bg-rose-50' }
-            ].map((stat, i) => (
-              <div key={i} className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm transition-all hover:shadow-lg">
-                <div className={`w-12 h-12 ${stat.bg} dark:bg-opacity-10 rounded-2xl flex items-center justify-center ${stat.color} mb-6`}>
-                  <stat.icon className="w-6 h-6" />
+              { label: t("Bugungi kirim"), value: cashbox?.todayIncome, color: 'text-emerald-600', icon: TrendingUp, tint: 'bg-emerald-50 text-emerald-600' },
+              { label: t("Bugungi chiqim"), value: cashbox?.todayExpense, color: 'text-rose-600', icon: TrendingDown, tint: 'bg-rose-50 text-rose-600' },
+              { label: t("Oylik kirim"), value: cashbox?.monthlyIncome, color: 'text-emerald-600', icon: Zap, tint: 'bg-emerald-50 text-emerald-600' },
+              { label: t("Oylik chiqim"), value: cashbox?.monthlyExpense, color: 'text-rose-600', icon: ShoppingCart, tint: 'bg-rose-50 text-rose-600' }
+            ].map((stat, i) => {
+              const Icon = stat.icon;
+              return (
+                <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">{stat.label}</p>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${stat.tint}`}>
+                      <Icon className="w-[18px] h-[18px]" />
+                    </div>
+                  </div>
+                  <p className={`mt-3 text-2xl font-bold tracking-tight tabular-nums ${stat.color}`}>
+                    {formatCurrency(stat.value || 0, 'USD')}
+                  </p>
                 </div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-[0.2em] mb-2">{stat.label}</p>
-                <p className={`text-xl font-bold tracking-tight ${stat.color}`}>
-                  {formatCurrency(stat.value || 0, 'USD')}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {/* Transactions Table */}
-          <div className="bg-white dark:bg-gray-900 rounded-[3rem] border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-            <div className="p-8 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center bg-gray-50/30 dark:bg-gray-800/30">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">{t("Oxirgi Tranzaksiyalar")}</h3>
-              <div className="flex gap-3">
-                <button onClick={handleExportPDF} className="p-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-500 hover:text-emerald-600 transition-colors shadow-sm" aria-label="PDF export">
-                  <FileText className="w-5 h-5" />
+          {/* Transactions */}
+          <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm overflow-hidden">
+            <div className="px-5 sm:px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="font-semibold text-slate-900">{t("Oxirgi tranzaksiyalar")}</h3>
+              <div className="flex gap-2">
+                <button onClick={handleExportPDF} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition-colors" aria-label="PDF export" title="PDF">
+                  <FileText className="w-4 h-4" />
                 </button>
-                <button onClick={handleExportExcel} className="p-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl text-gray-500 hover:text-emerald-600 transition-colors shadow-sm" aria-label="Excel export">
-                  <FileSpreadsheet className="w-5 h-5" />
+                <button onClick={handleExportExcel} className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-emerald-600 hover:border-emerald-200 transition-colors" aria-label="Excel export" title="Excel">
+                  <FileSpreadsheet className="w-4 h-4" />
                 </button>
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50/50 dark:bg-gray-800/50">
-                    <th className="text-left py-6 px-8 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{t("Sana")}</th>
-                    <th className="text-left py-6 px-8 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{t("Turi")}</th>
-                    <th className="text-left py-6 px-8 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{t("Usul")}</th>
-                    <th className="text-left py-6 px-8 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{t("Tavsif")}</th>
-                    <th className="text-right py-6 px-8 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{t("Summa")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+
+            {transactions.length === 0 ? (
+              <EmptyState
+                icon={Receipt}
+                title={t("Tranzaksiyalar yoq")}
+                description={t("Hozircha kassa tranzaksiyalari mavjud emas. Kirim yoki chiqim qoshganingizdan keyin shu yerda korinadi.")}
+                action={
+                  <button
+                    onClick={() => setShowAddMoney(true)}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {t("Kirim qoshish")}
+                  </button>
+                }
+              />
+            ) : (
+              <>
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-slate-50/70 border-b border-slate-100">
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t("Sana")}</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t("Turi")}</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t("Usul")}</th>
+                        <th className="text-left py-4 px-6 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t("Tavsif")}</th>
+                        <th className="text-right py-4 px-6 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t("Summa")}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {transactions.map((tx) => (
+                        <tr key={tx.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-4 px-6">
+                            <div className="text-sm font-semibold text-slate-900 tabular-nums">
+                              {new Date(tx.createdAt).toLocaleString('uz-UZ')}
+                            </div>
+                          </td>
+                          <td className="py-4 px-6">
+                            <Badge variant={tx.type === 'INCOME' ? 'success' : 'error'}>
+                              {tx.type === 'INCOME' ? t('Kirim') : t('Chiqim')}
+                            </Badge>
+                          </td>
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500">
+                                {tx.paymentMethod === 'CASH' && <Banknote className="w-4 h-4" />}
+                                {tx.paymentMethod === 'CARD' && <CreditCard className="w-4 h-4" />}
+                                {tx.paymentMethod === 'CLICK' && <Smartphone className="w-4 h-4" />}
+                              </div>
+                              <span className="text-xs font-medium text-slate-600">
+                                {tx.paymentMethod === 'CASH' ? t('Naqd') :
+                                 tx.paymentMethod === 'CARD' ? t('Karta') : t('Click')}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-4 px-6">
+                            <div className="text-sm text-slate-600 max-w-[300px] truncate">
+                              {tx.description}
+                            </div>
+                          </td>
+                          <td className={`py-4 px-6 text-right font-bold text-base tracking-tight tabular-nums ${
+                            tx.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'
+                          }`}>
+                            {tx.type === 'INCOME' ? '+' : '-'}
+                            {formatCurrency(tx.amount, tx.currency)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile card list */}
+                <div className="md:hidden divide-y divide-slate-50">
                   {transactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors group">
-                      <td className="py-6 px-8">
-                        <div className="text-sm font-bold text-gray-900 dark:text-white">
-                          {new Date(tx.createdAt).toLocaleString('uz-UZ')}
-                        </div>
-                      </td>
-                      <td className="py-6 px-8">
-                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-semibold uppercase tracking-widest shadow-sm ${
-                          tx.type === 'INCOME' 
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-400'
-                            : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-400'
-                        }`}>
-                          {tx.type === 'INCOME' ? t('Kirim') : t('Chiqim')}
-                        </span>
-                      </td>
-                      <td className="py-6 px-8">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center text-gray-500">
-                            {tx.paymentMethod === 'CASH' && <Banknote className="w-4 h-4" />}
-                            {tx.paymentMethod === 'CARD' && <CreditCard className="w-4 h-4" />}
-                            {tx.paymentMethod === 'CLICK' && <Smartphone className="w-4 h-4" />}
-                          </div>
-                          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                            {tx.paymentMethod === 'CASH' ? t('Naqd') : 
+                    <div key={tx.id} className="p-4 flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        tx.type === 'INCOME' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                      }`}>
+                        {tx.type === 'INCOME' ? <ArrowDownRight className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Badge variant={tx.type === 'INCOME' ? 'success' : 'error'}>
+                            {tx.type === 'INCOME' ? t('Kirim') : t('Chiqim')}
+                          </Badge>
+                          <span className="text-[11px] font-medium text-slate-500">
+                            {tx.paymentMethod === 'CASH' ? t('Naqd') :
                              tx.paymentMethod === 'CARD' ? t('Karta') : t('Click')}
                           </span>
                         </div>
-                      </td>
-                      <td className="py-6 px-8">
-                        <div className="text-xs font-bold text-gray-500 dark:text-gray-400 max-w-[300px] truncate">
-                          {tx.description}
-                        </div>
-                      </td>
-                      <td className={`py-6 px-8 text-right font-bold text-lg tracking-tight ${
+                        <p className="mt-1 text-xs text-slate-500 truncate">{tx.description || '-'}</p>
+                        <p className="text-[11px] text-slate-400 tabular-nums">{new Date(tx.createdAt).toLocaleString('uz-UZ')}</p>
+                      </div>
+                      <div className={`text-right font-bold text-sm shrink-0 tabular-nums ${
                         tx.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'
                       }`}>
                         {tx.type === 'INCOME' ? '+' : '-'}
                         {formatCurrency(tx.amount, tx.currency)}
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1229,7 +1361,7 @@ export default function Cashbox() {
                 {t("Kirim")}
               </h3>
               <button onClick={() => setShowAddMoney(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 hover:text-rose-500 transition-colors" aria-label="Yopish">
-                <MoreHorizontal className="w-5 h-5 rotate-45" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleAddMoney} className="p-10 space-y-8">
@@ -1298,8 +1430,10 @@ export default function Cashbox() {
 
               <button
                 type="submit"
-                className="w-full h-16 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-emerald-500/30 transition-all active:scale-95"
+                disabled={submitting}
+                className="w-full h-16 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-emerald-500/30 transition-all active:scale-95"
               >
+                {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
                 {t("TASDIQLASH")}
               </button>
             </form>
@@ -1319,7 +1453,7 @@ export default function Cashbox() {
                 {t("Chiqim")}
               </h3>
               <button onClick={() => setShowWithdraw(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 hover:text-rose-500 transition-colors" aria-label="Yopish">
-                <MoreHorizontal className="w-5 h-5 rotate-45" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleWithdraw} className="p-10 space-y-8">
@@ -1388,8 +1522,10 @@ export default function Cashbox() {
 
               <button
                 type="submit"
-                className="w-full h-16 bg-rose-600 hover:bg-rose-700 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-rose-500/30 transition-all active:scale-95"
+                disabled={submitting}
+                className="w-full h-16 flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-rose-500/30 transition-all active:scale-95"
               >
+                {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
                 {t("TASDIQLASH")}
               </button>
             </form>
@@ -1409,7 +1545,7 @@ export default function Cashbox() {
                 {t("Transfer")}
               </h3>
               <button onClick={() => setShowTransfer(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 hover:text-rose-500 transition-colors" aria-label="Yopish">
-                <MoreHorizontal className="w-5 h-5 rotate-45" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleTransfer} className="p-10 space-y-8">
@@ -1471,8 +1607,10 @@ export default function Cashbox() {
 
               <button
                 type="submit"
-                className="w-full h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-blue-500/30 transition-all active:scale-95"
+                disabled={submitting}
+                className="w-full h-16 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-blue-500/30 transition-all active:scale-95"
               >
+                {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
                 {t("TRANSFER QILISH")}
               </button>
             </form>
@@ -1490,7 +1628,7 @@ export default function Cashbox() {
                 {t("FILTRLAR")}
               </h3>
               <button onClick={() => setShowFilters(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400" aria-label="Yopish">
-                <MoreHorizontal className="w-4 h-4 rotate-45" />
+                <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-8 space-y-6">
@@ -1579,14 +1717,14 @@ export default function Cashbox() {
                 {t("VALYUTA")} <span className="text-purple-600">{t("AYIRBOSHLASH")}</span>
               </h3>
               <button onClick={() => setShowExchange(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400" aria-label="Yopish">
-                <MoreHorizontal className="w-5 h-5 rotate-45" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleExchange} className="p-10 space-y-8">
               {/* Kurs inputi */}
               <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-[2rem] border border-amber-100 dark:border-amber-800">
                 <label className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-widest block text-center mb-3">
-                  ðŸ’± {t("AYIRBOSHLASH KURSI")}: 1 USD =
+                  {t("AYIRBOSHLASH KURSI")}: 1 USD =
                 </label>
                 <div className="flex items-center justify-center gap-2">
                   <input
@@ -1634,9 +1772,9 @@ export default function Cashbox() {
                     onChange={(e) => setExchangeForm({...exchangeForm, fromType: e.target.value})}
                     className="w-full h-12 rounded-xl border-2 border-gray-100 dark:bg-gray-800 dark:border-gray-800 px-4 font-bold text-xs appearance-none"
                   >
-                    <option value="CASH">ðŸ’µ {t("Naqd")}</option>
-                    <option value="CARD">ðŸ’³ {t("Karta")}</option>
-                    <option value="CLICK">ðŸ“± {t("Click")}</option>
+                    <option value="CASH">{t("Naqd")}</option>
+                    <option value="CARD">{t("Karta")}</option>
+                    <option value="CLICK">{t("Click")}</option>
                   </select>
                 </div>
 
@@ -1664,9 +1802,9 @@ export default function Cashbox() {
                     onChange={(e) => setExchangeForm({...exchangeForm, toType: e.target.value})}
                     className="w-full h-12 rounded-xl border-2 border-gray-100 dark:bg-gray-800 dark:border-gray-800 px-4 font-bold text-xs appearance-none"
                   >
-                    <option value="CASH">ðŸ’µ {t("Naqd")}</option>
-                    <option value="CARD">ðŸ’³ {t("Karta")}</option>
-                    <option value="CLICK">ðŸ“± {t("Click")}</option>
+                    <option value="CASH">{t("Naqd")}</option>
+                    <option value="CARD">{t("Karta")}</option>
+                    <option value="CLICK">{t("Click")}</option>
                   </select>
                 </div>
               </div>
@@ -1706,9 +1844,11 @@ export default function Cashbox() {
 
               <button
                 type="submit"
-                className="w-full h-16 bg-purple-600 hover:bg-purple-700 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-purple-500/30 transition-all active:scale-95"
+                disabled={submitting}
+                className="w-full h-16 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-purple-500/30 transition-all active:scale-95"
               >
-                ðŸ’± {t("ALMASHISHNI TASDIQLASH")}
+                {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowLeftRight className="w-5 h-5" />}
+                {t("ALMASHISHNI TASDIQLASH")}
               </button>
             </form>
           </div>
@@ -1727,7 +1867,7 @@ export default function Cashbox() {
             </div>
             <div className="p-8 space-y-6">
               <div className="space-y-3">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-widest ml-1">ðŸ’µ 1 USD = ? UZS</label>
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-widest ml-1">1 USD = ? UZS</label>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -1855,7 +1995,7 @@ export default function Cashbox() {
                 {t("YANGI")} <span className="text-rose-600">{t("XARAJAT")}</span>
               </h3>
               <button onClick={() => setShowExpenseModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400" aria-label="Yopish">
-                <MoreHorizontal className="w-5 h-5 rotate-45" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleAddExpense} className="p-10 space-y-8 overflow-y-auto">
@@ -1925,9 +2065,9 @@ export default function Cashbox() {
                     onChange={(e) => setExpenseForm({ ...expenseForm, paymentMethod: e.target.value })}
                     className="w-full h-16 rounded-2xl border-2 border-gray-100 dark:bg-gray-800 dark:border-gray-800 px-6 font-bold text-sm focus:border-rose-500 outline-none transition-all appearance-none"
                   >
-                    <option value="CASH">ðŸ’µ {t("Naqd")}</option>
-                    <option value="CARD">ðŸ’³ {t("Karta")}</option>
-                    <option value="CLICK">ðŸ“± {t("Click")}</option>
+                    <option value="CASH">{t("Naqd")}</option>
+                    <option value="CARD">{t("Karta")}</option>
+                    <option value="CLICK">{t("Click")}</option>
                   </select>
                 </div>
                 <div className="space-y-3">
@@ -1962,9 +2102,10 @@ export default function Cashbox() {
 
               <button
                 type="submit"
-                className="w-full h-16 bg-rose-600 hover:bg-rose-700 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-rose-500/30 transition-all active:scale-95"
-                disabled={!expenseForm.category || !expenseForm.amount}
+                className="w-full h-16 flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-rose-500/30 transition-all active:scale-95 disabled:opacity-60"
+                disabled={!expenseForm.category || !expenseForm.amount || submitting}
               >
+                {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
                 {t("XARAJATNI TASDIQLASH")}
               </button>
             </form>
@@ -1984,7 +2125,7 @@ export default function Cashbox() {
                 {t("KATEGORIYALAR")}
               </h3>
               <button onClick={() => setShowCategoryModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400" aria-label="Yopish">
-                <MoreHorizontal className="w-5 h-5 rotate-45" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             
@@ -2050,7 +2191,7 @@ export default function Cashbox() {
                             aria-label="O'chirish"
                             className="w-10 h-10 flex items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-900/30 text-rose-600 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-600 hover:text-white"
                           >
-                            <TrendingDown className="w-5 h-5 rotate-45" />
+                            <X className="w-5 h-5" />
                           </button>
                         )}
                       </div>
@@ -2074,7 +2215,7 @@ export default function Cashbox() {
                 {t("YANGI")} <span className="text-blue-600">{t("BYUDJET")}</span>
               </h3>
               <button onClick={() => setShowBudgetModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400" aria-label="Yopish">
-                <MoreHorizontal className="w-5 h-5 rotate-45" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleCreateBudget} className="p-10 space-y-8">
@@ -2167,9 +2308,10 @@ export default function Cashbox() {
 
               <button
                 type="submit"
-                className="w-full h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-blue-500/30 transition-all active:scale-95"
-                disabled={!budgetForm.category || !budgetForm.amount}
+                className="w-full h-16 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-blue-500/30 transition-all active:scale-95 disabled:opacity-60"
+                disabled={!budgetForm.category || !budgetForm.amount || submitting}
               >
+                {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
                 {t("BYUDJETNI SAQLASH")}
               </button>
             </form>
@@ -2189,7 +2331,7 @@ export default function Cashbox() {
                 {t("YANGI")} <span className="text-purple-600">{t("QARZ")}</span>
               </h3>
               <button onClick={() => setShowLoanModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400" aria-label="Yopish">
-                <MoreHorizontal className="w-5 h-5 rotate-45" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleCreateLoan} className="p-10 space-y-6 overflow-y-auto">
@@ -2315,15 +2457,28 @@ export default function Cashbox() {
 
               <button
                 type="submit"
-                className="w-full h-16 bg-purple-600 hover:bg-purple-700 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-purple-500/30 transition-all active:scale-95"
-                disabled={!loanForm.employeeName || !loanForm.amount}
+                className="w-full h-16 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white rounded-3xl font-bold text-sm tracking-[0.2em] shadow-2xl shadow-purple-500/30 transition-all active:scale-95 disabled:opacity-60"
+                disabled={!loanForm.employeeName || !loanForm.amount || submitting}
               >
+                {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
                 {t("QARZNI SAQLASH")}
               </button>
             </form>
           </div>
         </div>
       )}
+
+      {/* Kategoriya o'chirish tasdig'i */}
+      <ConfirmDialog
+        isOpen={deleteCategoryId !== null}
+        onClose={() => setDeleteCategoryId(null)}
+        onConfirm={confirmDeleteCategory}
+        title={t("Kategoriyani ochirish")}
+        message={t("Bu kategoriyani ochirmoqchimisiz? Bu amalni qaytarib bolmaydi.")}
+        confirmText={t("Ochirish")}
+        cancelText={t("Bekor qilish")}
+        variant="danger"
+      />
     </div>
   );
 }

@@ -1,8 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import api from '../lib/professionalApi';
-import { Truck, Phone, Star, MessageSquare, Plus, RefreshCw, FileText, Search, User, MapPin, Send, Sparkles } from 'lucide-react';
+import {
+  Truck,
+  Phone,
+  Star,
+  MessageSquare,
+  Plus,
+  RefreshCw,
+  FileSpreadsheet,
+  Search,
+  User,
+  MapPin,
+  Send,
+  X,
+  CreditCard,
+  Package,
+  Trash2,
+  Loader2,
+  Users,
+  CheckCircle2,
+  Clock,
+} from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
 import { exportToExcel } from '../lib/excelUtils';
+import { useToast, toast } from '../components/ui/Toast';
+import { TableSkeleton } from '../components/ui/LoadingSpinner';
+import { Badge } from '../components/ui/Badge';
+import EmptyState from '../components/EmptyState';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 interface Driver {
   id: string;
@@ -43,6 +68,7 @@ interface Assignment {
 }
 
 export function Drivers() {
+  const { addToast } = useToast();
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,6 +81,11 @@ export function Drivers() {
   const [orders, setOrders] = useState<any[]>([]);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  // UI-only states
+  const [addLoading, setAddLoading] = useState(false);
+  const [sendLoading, setSendLoading] = useState(false);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+  const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
 
   const [newDriver, setNewDriver] = useState({
     name: '',
@@ -77,6 +108,7 @@ export function Drivers() {
       setDrivers(response.data);
     } catch (error) {
       console.error('Error fetching drivers:', error);
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Haydovchilarni yuklashda xatolik yuz berdi')));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -90,6 +122,10 @@ export function Drivers() {
   };
 
   const handleExport = () => {
+    if (drivers.length === 0) {
+      addToast(toast.warning(latinToCyrillic('Diqqat'), latinToCyrillic("Haydovchilar ro'yxati bo'sh!")));
+      return;
+    }
     const dataToExport = drivers.map(d => ({
       'Ism': d.name,
       'Telefon': d.phone,
@@ -100,6 +136,7 @@ export function Drivers() {
       'Jami yetkazish': d.totalDeliveries
     }));
     exportToExcel(dataToExport, { fileName: 'Haydovchilar', sheetName: 'Haydovchilar' });
+    addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic(`${drivers.length} ta haydovchi eksport qilindi!`)));
   };
 
   const fetchOrders = async () => {
@@ -131,6 +168,7 @@ export function Drivers() {
 
   const handleAddDriver = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAddLoading(true);
     try {
       await api.post('/drivers', newDriver);
       setShowAddModal(false);
@@ -144,20 +182,26 @@ export function Drivers() {
         telegramBotToken: ''
       });
       fetchDrivers();
-    } catch (error) {
+      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic("Haydovchi muvaffaqiyatli qo'shildi!")));
+    } catch (error: any) {
       console.error('Error adding driver:', error);
+      addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || latinToCyrillic("Haydovchi qo'shishda xatolik yuz berdi")));
+    } finally {
+      setAddLoading(false);
     }
   };
 
   const handleAssignOrder = async (orderId: string) => {
     if (!selectedDriver) return;
-    
+
     try {
       await api.post(`/drivers/${selectedDriver.id}/assign-order`, { orderId });
       setShowAssignModal(false);
       fetchAssignments(selectedDriver.id);
+      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic('Buyurtma tayinlandi!')));
     } catch (error) {
       console.error('Error assigning order:', error);
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Buyurtma tayinlashda xatolik yuz berdi')));
     }
   };
 
@@ -165,30 +209,53 @@ export function Drivers() {
     e.preventDefault();
     if (!selectedDriver || !newMessage.trim()) return;
 
+    setSendLoading(true);
     try {
       await api.post(`/drivers/${selectedDriver.id}/chat`, { message: newMessage });
       setNewMessage('');
       fetchChatMessages(selectedDriver.id);
     } catch (error) {
       console.error('Error sending message:', error);
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Xabar yuborishda xatolik yuz berdi')));
+    } finally {
+      setSendLoading(false);
     }
   };
 
   const updateDriverStatus = async (driverId: string, status: string) => {
+    setStatusUpdatingId(driverId);
     try {
       await api.put(`/drivers/${driverId}/status`, { status });
       fetchDrivers();
     } catch (error) {
       console.error('Error updating status:', error);
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Statusni yangilashda xatolik yuz berdi')));
+    } finally {
+      setStatusUpdatingId(null);
     }
   };
 
-  const getStatusStyle = (status: string) => {
+  const handleConfirmDelete = async () => {
+    if (!driverToDelete) return;
+    const id = driverToDelete.id;
+    try {
+      await api.delete(`/drivers/${id}`);
+      setDrivers(prev => prev.filter(d => d.id !== id));
+      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic("Haydovchi o'chirildi!")));
+    } catch (error) {
+      console.error('Error deleting driver:', error);
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic("Haydovchini o'chirishda xatolik yuz berdi")));
+    } finally {
+      setDriverToDelete(null);
+    }
+  };
+
+  const getStatusVariant = (status: string): 'success' | 'warning' | 'error' | 'info' | 'neutral' => {
     switch (status) {
-      case 'AVAILABLE': return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400';
-      case 'BUSY': return 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400';
-      case 'OFFLINE': return 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400';
-      default: return 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400';
+      case 'AVAILABLE': return 'success';
+      case 'BUSY': return 'warning';
+      case 'OFFLINE': return 'neutral';
+      default: return 'neutral';
     }
   };
 
@@ -201,243 +268,506 @@ export function Drivers() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <div className="relative">
-          <div className="animate-pulse rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
-          <Sparkles className="w-6 h-6 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-        </div>
-      </div>
-    );
-  }
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+  };
 
-  const filteredDrivers = drivers.filter(d => 
+  // Avatar: soft slate tint (premium, not rainbow). Mirrors CustomersModern standard.
+  const avatarTint = (_status: string) => 'bg-slate-100 text-slate-600';
+
+  const filteredDrivers = drivers.filter(d =>
     d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     d.phone.includes(searchTerm) ||
     d.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  return (
-    <div className="space-y-12 pb-20 animate-in fade-in duration-700">
-      {/* Clean Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Truck className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900">{latinToCyrillic("Haydovchilar")}</h1>
-              <p className="text-sm text-gray-500">{filteredDrivers.length} {latinToCyrillic("ta haydovchi")}</p>
-            </div>
-          </div>
+  const hasActiveFilters = !!searchTerm;
+  const availableCount = drivers.filter(d => d.status === 'AVAILABLE').length;
+  const busyCount = drivers.filter(d => d.status === 'BUSY').length;
 
-          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-            <div className="relative flex-1 sm:flex-none sm:w-56">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input 
-                type="text"
-                placeholder={latinToCyrillic("Qidirish...")}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-gray-100 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-              />
-            </div>
-            <button 
-              onClick={handleRefresh}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-all"
-              aria-label="Yangilash"
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-pulse' : ''}`} />
-            </button>
-            <button 
-              onClick={handleExport}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg text-sm font-medium transition-all"
-            >
-              <FileText className="w-4 h-4" />
-              Excel
-            </button>
-            <button 
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              {latinToCyrillic("Qo'shish")}
-            </button>
-          </div>
+  const stats = [
+    {
+      label: latinToCyrillic('Jami haydovchilar'),
+      value: drivers.length.toLocaleString('en-US'),
+      icon: Users,
+      tint: 'bg-sky-50 text-sky-600',
+    },
+    {
+      label: latinToCyrillic('Mavjud'),
+      value: availableCount.toLocaleString('en-US'),
+      icon: CheckCircle2,
+      tint: 'bg-emerald-50 text-emerald-600',
+    },
+    {
+      label: latinToCyrillic('Band'),
+      value: busyCount.toLocaleString('en-US'),
+      icon: Clock,
+      tint: 'bg-amber-50 text-amber-600',
+    },
+  ];
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Header: clean title + count + actions */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
+            {latinToCyrillic('Haydovchilar')}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500 tabular-nums">
+            {loading
+              ? latinToCyrillic('Yuklanmoqda...')
+              : `${filteredDrivers.length.toLocaleString('en-US')} ${latinToCyrillic('ta haydovchi')}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          <button
+            onClick={handleExport}
+            className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-600 transition-colors active:scale-[0.98]"
+            title={latinToCyrillic('Barcha haydovchilarni eksport qilish')}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span className="hidden sm:inline">{latinToCyrillic('Excel')}</span>
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-60 rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-600 transition-colors active:scale-[0.98]"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{latinToCyrillic('Yangilash')}</span>
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.98]"
+          >
+            <Plus className="w-4 h-4" />
+            {latinToCyrillic("Yangi haydovchi")}
+          </button>
         </div>
       </div>
 
-      {/* Drivers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {filteredDrivers.map((driver) => (
-          <div key={driver.id} className="group relative bg-white dark:bg-gray-900 rounded-[2.5rem] p-8 shadow-[0_10px_40px_rgba(0,0,0,0.03)] border border-gray-100 dark:border-gray-800 hover:scale-[1.03] transition-all duration-500">
-            {/* Header */}
-            <div className="flex items-start justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-[1.5rem] bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 shadow-inner group-hover:rotate-6 transition-all duration-500">
-                  <User className="w-8 h-8" />
+      {/* Stat cards: premium white */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+        {loading
+          ? Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[104px] animate-pulse" />
+            ))
+          : stats.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">
+                      {stat.label}
+                    </p>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${stat.tint}`}>
+                      <Icon className="w-[18px] h-[18px]" />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-2xl font-bold tracking-tight tabular-nums text-slate-900">
+                    {stat.value}
+                  </p>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">{driver.name}</h3>
-                  <div className={`mt-1 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wider ${getStatusStyle(driver.status)}`}>
-                    <div className={`w-1 h-1 rounded-full bg-current animate-pulse`} />
-                    {getStatusText(driver.status)}
+              );
+            })}
+      </div>
+
+      {/* Search card */}
+      <div className="bg-white rounded-2xl border border-slate-200/70 p-4">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 pointer-events-none" />
+          <input
+            id="drivers-search"
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder={latinToCyrillic('Ism, telefon yoki mashina raqami...')}
+            className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
+          />
+        </div>
+      </div>
+
+      {/* Loading state */}
+      {loading && (
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-6">
+          <TableSkeleton rows={8} cols={6} />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && filteredDrivers.length === 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200/70">
+          <EmptyState
+            icon={Truck}
+            title={
+              hasActiveFilters
+                ? latinToCyrillic('Haydovchilar topilmadi')
+                : latinToCyrillic("Hali haydovchilar yo'q")
+            }
+            description={
+              hasActiveFilters
+                ? latinToCyrillic("Qidiruv shartlarini o'zgartirib qayta urinib ko'ring")
+                : latinToCyrillic("Birinchi haydovchini qo'shing va u shu yerda ko'rinadi")
+            }
+            action={
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+              >
+                <Plus className="w-4 h-4" />
+                {latinToCyrillic("Yangi haydovchi")}
+              </button>
+            }
+          />
+        </div>
+      )}
+
+      {/* Drivers table (desktop) */}
+      {!loading && filteredDrivers.length > 0 && (
+        <div className="hidden md:block bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200/70 bg-slate-50/60">
+                  <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Haydovchi')}</th>
+                  <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Aloqa')}</th>
+                  <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Guvohnoma / Mashina')}</th>
+                  <th className="text-center text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Reyting')}</th>
+                  <th className="text-center text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Status')}</th>
+                  <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Amallar')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredDrivers.map((driver) => (
+                  <tr key={driver.id} className="group hover:bg-slate-50/70 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarTint(driver.status)}`}>
+                          {getInitials(driver.name)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 truncate">{driver.name}</p>
+                          <p className="text-xs text-slate-400 mt-0.5 tabular-nums">
+                            {driver.totalDeliveries} {latinToCyrillic('ta yetkazish')}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="space-y-1">
+                        <p className="text-sm text-slate-600 flex items-center gap-1.5 tabular-nums">
+                          <Phone className="w-3.5 h-3.5 text-slate-400" />
+                          {driver.phone}
+                        </p>
+                        {driver.currentLocation && (
+                          <p className="text-xs text-slate-400 flex items-center gap-1.5 truncate">
+                            <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="truncate">{driver.currentLocation}</span>
+                          </p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="space-y-1">
+                        <p className="text-sm text-slate-600 flex items-center gap-1.5">
+                          <CreditCard className="w-3.5 h-3.5 text-slate-400" />
+                          {driver.licenseNumber || <span className="text-slate-300">&mdash;</span>}
+                        </p>
+                        <p className="text-xs text-slate-400 flex items-center gap-1.5">
+                          <Truck className="w-3.5 h-3.5 flex-shrink-0" />
+                          {driver.vehicleNumber || <span className="text-slate-300">&mdash;</span>}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-center gap-1 text-amber-500">
+                        <Star className="w-4 h-4 fill-current" />
+                        <span className="text-sm font-bold text-slate-900 tabular-nums">{driver.rating ?? 0}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      <Badge variant={getStatusVariant(driver.status)}>
+                        {getStatusText(driver.status)}
+                      </Badge>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDriver(driver);
+                            fetchAssignments(driver.id);
+                            setShowAssignModal(true);
+                          }}
+                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          aria-label={latinToCyrillic('Buyurtma tayinlash')}
+                          title={latinToCyrillic('Buyurtma tayinlash')}
+                        >
+                          <Package className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedDriver(driver);
+                            fetchChatMessages(driver.id);
+                            setShowChatModal(true);
+                          }}
+                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          aria-label="Chat"
+                          title="Chat"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateDriverStatus(driver.id, driver.status === 'AVAILABLE' ? 'OFFLINE' : 'AVAILABLE')}
+                          disabled={statusUpdatingId === driver.id}
+                          className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
+                            driver.status === 'AVAILABLE'
+                              ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+                              : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'
+                          }`}
+                          aria-label={driver.status === 'AVAILABLE' ? latinToCyrillic('Offline qilish') : latinToCyrillic('Online qilish')}
+                          title={driver.status === 'AVAILABLE' ? latinToCyrillic('Offline qilish') : latinToCyrillic('Online qilish')}
+                        >
+                          {statusUpdatingId === driver.id
+                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                            : <RefreshCw className="w-4 h-4" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDriverToDelete(driver)}
+                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          aria-label={latinToCyrillic("Haydovchini o'chirish")}
+                          title={latinToCyrillic("O'chirish")}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Drivers cards (mobile) */}
+      {!loading && filteredDrivers.length > 0 && (
+        <div className="md:hidden space-y-3">
+          {filteredDrivers.map((driver) => (
+            <div
+              key={driver.id}
+              className="bg-white rounded-2xl border border-slate-200/70 p-4 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${avatarTint(driver.status)}`}>
+                    {getInitials(driver.name)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{driver.name}</p>
+                    <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 tabular-nums">
+                      <Phone className="w-3 h-3" />
+                      {driver.phone}
+                    </p>
                   </div>
                 </div>
+                <Badge variant={getStatusVariant(driver.status)}>
+                  {getStatusText(driver.status)}
+                </Badge>
               </div>
-              <div className="flex flex-col items-end">
-                <div className="flex items-center gap-1 text-amber-500">
-                  <Star className="w-4 h-4 fill-current" />
-                  <span className="text-sm font-bold">{driver.rating}</span>
+
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 rounded-xl p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400 flex items-center gap-1">
+                    <Star className="w-3 h-3 text-amber-500 fill-current" />
+                    {latinToCyrillic('Reyting')}
+                  </p>
+                  <p className="mt-0.5 text-sm font-bold text-slate-900 tabular-nums">{driver.rating ?? 0}</p>
                 </div>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{driver.totalDeliveries} {latinToCyrillic("TA")}</p>
-              </div>
-            </div>
-
-            {/* Info */}
-            <div className="space-y-4 mb-8">
-              <div className="flex items-center gap-3 p-4 bg-gray-50/50 dark:bg-gray-800/50 rounded-2xl">
-                <Phone className="w-4 h-4 text-emerald-500" />
-                <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{driver.phone}</span>
-              </div>
-              <div className="flex items-center gap-3 p-4 bg-gray-50/50 dark:bg-gray-800/50 rounded-2xl">
-                <Truck className="w-4 h-4 text-blue-500" />
-                <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{driver.vehicleNumber}</span>
-              </div>
-              {driver.currentLocation && (
-                <div className="flex items-center gap-3 p-4 bg-gray-50/50 dark:bg-gray-800/50 rounded-2xl">
-                  <MapPin className="w-4 h-4 text-rose-500" />
-                  <span className="text-xs font-bold text-gray-500 dark:text-gray-400 truncate">{driver.currentLocation}</span>
+                <div className="bg-slate-50 rounded-xl p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic('Yetkazishlar')}</p>
+                  <p className="mt-0.5 text-sm font-bold text-slate-900 tabular-nums">{driver.totalDeliveries}</p>
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* Actions */}
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => {
-                  setSelectedDriver(driver);
-                  fetchAssignments(driver.id);
-                  setShowAssignModal(true);
-                }}
-                className="flex items-center justify-center gap-2 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-blue-500/20"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                {latinToCyrillic("BUYURTMA")}
-              </button>
-              
-              <button
-                onClick={() => {
-                  setSelectedDriver(driver);
-                  fetchChatMessages(driver.id);
-                  setShowChatModal(true);
-                }}
-                className="flex items-center justify-center gap-2 py-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-2xl font-bold text-[10px] uppercase tracking-wider transition-all active:scale-95"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
-                CHAT
-              </button>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-500">
+                <span className="inline-flex items-center gap-1.5 min-w-0">
+                  <CreditCard className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+                  <span className="truncate">{driver.licenseNumber || '—'}</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 min-w-0">
+                  <Truck className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+                  <span className="truncate">{driver.vehicleNumber || '—'}</span>
+                </span>
+              </div>
 
-              <button
-                onClick={() => updateDriverStatus(driver.id, driver.status === 'AVAILABLE' ? 'OFFLINE' : 'AVAILABLE')}
-                className={`col-span-2 py-4 rounded-2xl font-bold text-[10px] uppercase tracking-wider transition-all active:scale-95 border ${
-                  driver.status === 'AVAILABLE' 
-                    ? 'border-rose-100 text-rose-600 hover:bg-rose-50 dark:border-rose-900/30' 
-                    : 'border-emerald-100 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-900/30'
-                }`}
-              >
-                {driver.status === 'AVAILABLE' ? latinToCyrillic('OFFLINE QILISH') : latinToCyrillic('ONLINE QILISH')}
-              </button>
+              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-end gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDriver(driver);
+                    fetchAssignments(driver.id);
+                    setShowAssignModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                >
+                  <Package className="w-4 h-4" />
+                  {latinToCyrillic('Buyurtma')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDriver(driver);
+                    fetchChatMessages(driver.id);
+                    setShowChatModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Chat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateDriverStatus(driver.id, driver.status === 'AVAILABLE' ? 'OFFLINE' : 'AVAILABLE')}
+                  disabled={statusUpdatingId === driver.id}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+                  aria-label={driver.status === 'AVAILABLE' ? latinToCyrillic('Offline qilish') : latinToCyrillic('Online qilish')}
+                >
+                  {statusUpdatingId === driver.id
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <RefreshCw className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDriverToDelete(driver)}
+                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                  aria-label={latinToCyrillic("Haydovchini o'chirish")}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {/* Delete confirmation (replaces window.confirm) */}
+      <ConfirmDialog
+        isOpen={driverToDelete !== null}
+        onClose={() => setDriverToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        variant="danger"
+        title={latinToCyrillic("Haydovchini o'chirish")}
+        message={
+          driverToDelete
+            ? latinToCyrillic(`"${driverToDelete.name}" haydovchisini rostdan ham o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi.`)
+            : ''
+        }
+        confirmText={latinToCyrillic("O'chirish")}
+        cancelText={latinToCyrillic('Bekor qilish')}
+      />
 
       {/* Add Driver Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xl flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-[3rem] overflow-hidden shadow-2xl border border-white/20 animate-in zoom-in-95 duration-300">
-            <div className="p-10 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center bg-blue-50/30 dark:bg-blue-900/10">
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center text-blue-600">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-slate-200/70 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
+                <span className="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
                   <User className="w-5 h-5" />
-                </div>
-                {latinToCyrillic("Yangi haydovchi")}
+                </span>
+                {latinToCyrillic('Yangi haydovchi')}
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 hover:text-rose-500 transition-colors" aria-label="Yopish">
-                <Plus className="w-6 h-6 rotate-45" />
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                aria-label={latinToCyrillic('Yopish')}
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddDriver} className="p-10 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label htmlFor="driver-name" className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">{latinToCyrillic("Ism")}</label>
+            <form onSubmit={handleAddDriver} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="driver-name" className="block text-xs font-semibold text-slate-600">{latinToCyrillic('Ism')} <span className="text-rose-500">*</span></label>
                   <input
                     id="driver-name"
                     required
-                    className="w-full px-6 py-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm transition-all"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
                     value={newDriver.name}
                     onChange={(e) => setNewDriver({ ...newDriver, name: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label htmlFor="driver-phone" className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">{latinToCyrillic("Telefon")}</label>
+                <div className="space-y-1.5">
+                  <label htmlFor="driver-phone" className="block text-xs font-semibold text-slate-600">{latinToCyrillic('Telefon')} <span className="text-rose-500">*</span></label>
                   <input
                     id="driver-phone"
                     required
-                    className="w-full px-6 py-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm transition-all"
+                    placeholder="+998901234567"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
                     value={newDriver.phone}
                     onChange={(e) => setNewDriver({ ...newDriver, phone: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label htmlFor="driver-license" className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">{latinToCyrillic("Guvohnoma raqami")}</label>
+                <div className="space-y-1.5">
+                  <label htmlFor="driver-license" className="block text-xs font-semibold text-slate-600">{latinToCyrillic('Guvohnoma raqami')} <span className="text-rose-500">*</span></label>
                   <input
                     id="driver-license"
                     required
-                    className="w-full px-6 py-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm transition-all"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
                     value={newDriver.licenseNumber}
                     onChange={(e) => setNewDriver({ ...newDriver, licenseNumber: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label htmlFor="driver-vehicle" className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">{latinToCyrillic("Mashina raqami")}</label>
+                <div className="space-y-1.5">
+                  <label htmlFor="driver-vehicle" className="block text-xs font-semibold text-slate-600">{latinToCyrillic('Mashina raqami')} <span className="text-rose-500">*</span></label>
                   <input
                     id="driver-vehicle"
                     required
-                    className="w-full px-6 py-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm transition-all"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
                     value={newDriver.vehicleNumber}
                     onChange={(e) => setNewDriver({ ...newDriver, vehicleNumber: e.target.value })}
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest ml-1">Email (ixtiyoriy)</label>
+              <div className="space-y-1.5">
+                <label htmlFor="driver-email" className="block text-xs font-semibold text-slate-600">Email ({latinToCyrillic('ixtiyoriy')})</label>
                 <input
+                  id="driver-email"
                   type="email"
                   placeholder="email@example.com"
-                  className="w-full px-6 py-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm transition-all"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
                   value={newDriver.email}
                   onChange={(e) => setNewDriver({ ...newDriver, email: e.target.value })}
                 />
               </div>
 
-              <div className="flex gap-4 pt-4">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl font-semibold text-sm transition-all active:scale-95 text-gray-900 dark:text-white"
+                  className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
                 >
-                  {latinToCyrillic("Bekor qilish")}
+                  {latinToCyrillic('Bekor qilish')}
                 </button>
                 <button
                   type="submit"
-                  className="flex-[2] px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-semibold text-sm transition-all active:scale-95 text-white shadow-lg shadow-blue-500/30"
+                  disabled={addLoading}
+                  className="flex-[2] inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
                 >
+                  {addLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                   {latinToCyrillic("Qo'shish")}
                 </button>
               </div>
@@ -448,60 +778,66 @@ export function Drivers() {
 
       {/* Assign Order Modal */}
       {showAssignModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xl flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-[3rem] overflow-hidden shadow-2xl border border-white/20 animate-in zoom-in-95 duration-300">
-            <div className="p-10 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center bg-blue-50/30 dark:bg-blue-900/10">
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center text-blue-600">
-                  <Plus className="w-5 h-5" />
-                </div>
-                {latinToCyrillic("Buyurtma tayinlash")}
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-200/70 flex items-center justify-between flex-shrink-0">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
+                <span className="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                  <Package className="w-5 h-5" />
+                </span>
+                {latinToCyrillic('Buyurtma tayinlash')}
               </h3>
-              <button onClick={() => setShowAssignModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 hover:text-rose-500 transition-colors" aria-label="Yopish">
-                <Plus className="w-6 h-6 rotate-45" />
+              <button
+                onClick={() => setShowAssignModal(false)}
+                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+                aria-label={latinToCyrillic('Yopish')}
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-10 space-y-8 max-h-[70vh] overflow-y-auto scrollbar-hide">
+            <div className="p-6 space-y-6 overflow-y-auto">
               <div>
-                <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.2em] mb-4 ml-1">{latinToCyrillic("Tayyor buyurtmalar")}</h4>
-                <div className="space-y-3">
+                <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-3">{latinToCyrillic('Tayyor buyurtmalar')}</h4>
+                <div className="space-y-2">
                   {orders.map((order) => (
-                    <div key={order.id} className="p-6 bg-gray-50/50 dark:bg-gray-800/50 rounded-3xl flex justify-between items-center group hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all border border-transparent hover:border-blue-100 dark:hover:border-blue-800">
-                      <div>
-                        <p className="font-bold text-gray-900 dark:text-white">#{order.orderNumber}</p>
-                        <p className="text-xs font-bold text-gray-500">{order.customer.name}</p>
+                    <div key={order.id} className="p-4 bg-slate-50 rounded-xl flex justify-between items-center gap-3 hover:bg-indigo-50/60 transition-colors border border-transparent hover:border-indigo-100">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 truncate tabular-nums">#{order.orderNumber}</p>
+                        <p className="text-xs text-slate-500 truncate">{order.customer?.name}</p>
                       </div>
                       <button
                         onClick={() => handleAssignOrder(order.id)}
-                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-[10px] uppercase tracking-wider transition-all active:scale-95"
+                        className="flex-shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-colors active:scale-[0.98]"
                       >
-                        {latinToCyrillic("TAYINLASH")}
+                        {latinToCyrillic('Tayinlash')}
                       </button>
                     </div>
                   ))}
                   {orders.length === 0 && (
-                    <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-[2rem] border-2 border-dashed border-gray-100 dark:border-gray-800">
-                      <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">{latinToCyrillic("Buyurtmalar yo'q")}</p>
+                    <div className="text-center py-8 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+                      <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm font-medium text-slate-400">{latinToCyrillic("Tayyor buyurtmalar yo'q")}</p>
                     </div>
                   )}
                 </div>
               </div>
 
               <div>
-                <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-[0.2em] mb-4 ml-1">{latinToCyrillic("Joriy buyurtmalar")}</h4>
-                <div className="space-y-3">
+                <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-3">{latinToCyrillic('Joriy buyurtmalar')}</h4>
+                <div className="space-y-2">
                   {assignments.map((assignment) => (
-                    <div key={assignment.id} className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 flex justify-between items-center">
-                      <div>
-                        <p className="text-xs font-bold text-gray-900 dark:text-white">#{assignment.order.orderNumber}</p>
-                        <p className="text-[10px] font-bold text-gray-500">{assignment.order.customer.name}</p>
+                    <div key={assignment.id} className="p-4 bg-white rounded-xl border border-slate-200/70 flex justify-between items-center gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 truncate tabular-nums">#{assignment.order.orderNumber}</p>
+                        <p className="text-xs text-slate-500 truncate">{assignment.order.customer?.name}</p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wider ${getStatusStyle(assignment.status)}`}>
-                        {assignment.status}
-                      </span>
+                      <Badge variant={getStatusVariant(assignment.status)}>{assignment.status}</Badge>
                     </div>
                   ))}
+                  {assignments.length === 0 && (
+                    <p className="text-sm text-slate-400 text-center py-4">{latinToCyrillic("Joriy buyurtmalar yo'q")}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -511,66 +847,71 @@ export function Drivers() {
 
       {/* Chat Modal */}
       {showChatModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xl flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-gray-900 w-full max-w-2xl h-[80vh] rounded-[3rem] overflow-hidden shadow-2xl border border-white/20 flex flex-col animate-in zoom-in-95 duration-300">
-            <div className="p-8 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center bg-blue-50/30 dark:bg-blue-900/10">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/30">
-                  <User className="w-6 h-6" />
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg h-[80vh] rounded-2xl shadow-xl overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-200/70 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${avatarTint(selectedDriver?.status || '')}`}>
+                  {selectedDriver ? getInitials(selectedDriver.name) : '?'}
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">{selectedDriver?.name}</h3>
-                  <p className="text-[10px] font-semibold text-emerald-500 uppercase tracking-widest flex items-center gap-1">
-                    <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                    Online Chat
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-slate-900 truncate">{selectedDriver?.name}</h3>
+                  <p className="text-xs text-emerald-600 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    {latinToCyrillic('Onlayn chat')}
                   </p>
                 </div>
               </div>
-              <button onClick={() => setShowChatModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 hover:text-rose-500 transition-colors" aria-label="Yopish">
-                <Plus className="w-6 h-6 rotate-45" />
+              <button
+                onClick={() => setShowChatModal(false)}
+                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600 flex-shrink-0"
+                aria-label={latinToCyrillic('Yopish')}
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-hide">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/50">
               {chatMessages.map((message) => (
                 <div
                   key={message.id}
                   className={`flex ${message.senderType === 'ADMIN' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`max-w-[80%] p-6 rounded-[2rem] shadow-sm ${
+                  <div className={`max-w-[80%] px-4 py-3 rounded-2xl shadow-sm ${
                     message.senderType === 'ADMIN'
-                      ? 'bg-blue-600 text-white rounded-tr-none'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-tl-none'
+                      ? 'bg-indigo-600 text-white rounded-tr-sm'
+                      : 'bg-white text-slate-900 border border-slate-200/70 rounded-tl-sm'
                   }`}>
-                    <p className="text-sm font-bold leading-relaxed">{message.message}</p>
-                    <p className={`text-[9px] font-semibold uppercase tracking-tighter mt-2 opacity-50`}>
+                    <p className="text-sm leading-relaxed">{message.message}</p>
+                    <p className={`text-[10px] mt-1 tabular-nums ${message.senderType === 'ADMIN' ? 'text-white/60' : 'text-slate-400'}`}>
                       {new Date(message.createdAt).toLocaleTimeString()}
                     </p>
                   </div>
                 </div>
               ))}
               {chatMessages.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-30">
-                  <MessageSquare className="w-16 h-16" />
-                  <p className="text-sm font-semibold uppercase tracking-[0.3em]">{latinToCyrillic("Xabarlar yo'q")}</p>
+                <div className="h-full flex flex-col items-center justify-center text-center gap-3 text-slate-300">
+                  <MessageSquare className="w-12 h-12" />
+                  <p className="text-sm font-medium text-slate-400">{latinToCyrillic("Hali xabarlar yo'q")}</p>
                 </div>
               )}
             </div>
 
-            <form onSubmit={handleSendMessage} className="p-8 bg-gray-50/50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800">
-              <div className="flex gap-4">
+            <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-200/70 flex-shrink-0">
+              <div className="flex gap-2">
                 <input
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder={latinToCyrillic("Xabar yozing...")}
-                  className="flex-1 px-8 py-5 bg-white dark:bg-gray-900 border-none rounded-[2rem] focus:ring-2 focus:ring-blue-500 outline-none font-bold text-sm shadow-inner"
+                  placeholder={latinToCyrillic('Xabar yozing...')}
+                  className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
                 />
                 <button
                   type="submit"
-                  className="w-16 h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-[1.5rem] flex items-center justify-center transition-all active:scale-90 shadow-xl shadow-blue-500/30 group"
-                  aria-label={latinToCyrillic("Xabar yuborish")}
+                  disabled={sendLoading || !newMessage.trim()}
+                  className="w-11 h-11 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl flex items-center justify-center transition-colors active:scale-[0.98] flex-shrink-0"
+                  aria-label={latinToCyrillic('Xabar yuborish')}
                 >
-                  <Send className="w-6 h-6 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                  {sendLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                 </button>
               </div>
             </form>
