@@ -6,7 +6,7 @@ import {
   DollarSign, LogOut, FileText,
   Settings as SettingsIcon,
   Factory, Package2, Truck, CheckSquare,
-  Wallet, Brain, Menu, X, Bot,
+  Wallet, Brain, Menu, Bot,
   BarChart3, Activity, Zap, Cloud, Shield,
   PanelLeftClose, PanelLeft, User as UserIcon,
 } from 'lucide-react';
@@ -20,6 +20,7 @@ interface NavigationItem {
   href: string;
   icon: any;
   adminOnly?: boolean;
+  allowedRoles?: string[]; // if set, only these roles (+ ADMIN) can see this item
 }
 
 interface NavSection {
@@ -28,49 +29,55 @@ interface NavSection {
   items: NavigationItem[];
 }
 
+const SELLER_ROLES = ['ADMIN', 'SELLER', 'CASHIER'];
+const FINANCE_ROLES = ['ADMIN', 'ACCOUNTANT'];
+const WAREHOUSE_ROLES = ['ADMIN', 'WAREHOUSE_MANAGER'];
+const MGMT_ROLES = ['ADMIN', 'SELLER', 'WAREHOUSE_MANAGER', 'ACCOUNTANT'];
+
 const getSections = (t: (key: string) => string): NavSection[] => [
   {
     key: 'main',
     label: 'Asosiy',
     items: [
       { name: t('navigation.dashboard'), href: '/dashboard', icon: LayoutDashboard },
-      { name: t('navigation.sales'), href: '/sales', icon: ShoppingCart },
-      { name: t('navigation.orders'), href: '/orders', icon: Package },
+      { name: 'Kassir paneli', href: '/cashier/sales', icon: ShoppingCart, allowedRoles: SELLER_ROLES },
+      { name: t('navigation.sales'), href: '/sales', icon: ShoppingCart, allowedRoles: [...SELLER_ROLES, 'ACCOUNTANT'] },
+      { name: t('navigation.orders'), href: '/orders', icon: Package, allowedRoles: MGMT_ROLES },
       { name: t('navigation.products'), href: '/products', icon: Package2 },
-      { name: t('navigation.customers'), href: '/customers', icon: Users },
-      { name: t('navigation.cashbox'), href: '/cashbox', icon: Wallet },
+      { name: t('navigation.customers'), href: '/customers', icon: Users, allowedRoles: [...SELLER_ROLES, 'ACCOUNTANT'] },
+      { name: t('navigation.cashbox'), href: '/cashbox', icon: Wallet, allowedRoles: FINANCE_ROLES },
       { name: t('navigation.cashierManagement'), href: '/cashiers', icon: Shield, adminOnly: true },
-      { name: t('navigation.reports'), href: '/reports', icon: FileText },
-      { name: t('navigation.settings'), href: '/settings', icon: SettingsIcon },
+      { name: t('navigation.reports'), href: '/reports', icon: FileText, allowedRoles: FINANCE_ROLES },
+      { name: t('navigation.settings'), href: '/settings', icon: SettingsIcon, adminOnly: true },
     ],
   },
   {
     key: 'analytics',
     label: 'Analitika',
     items: [
-      { name: t('navigation.analytics'), href: '/analytics', icon: BarChart3 },
-      { name: t('navigation.revenueCalculator'), href: '/revenue', icon: DollarSign },
-      { name: t('navigation.activityMonitor'), href: '/activity', icon: Activity },
+      { name: t('navigation.analytics'), href: '/analytics', icon: BarChart3, allowedRoles: FINANCE_ROLES },
+      { name: t('navigation.revenueCalculator'), href: '/revenue', icon: DollarSign, allowedRoles: FINANCE_ROLES },
+      { name: t('navigation.activityMonitor'), href: '/activity', icon: Activity, allowedRoles: FINANCE_ROLES },
     ],
   },
   {
     key: 'management',
     label: 'Boshqaruv',
     items: [
-      { name: t('navigation.inventory'), href: '/inventory', icon: Package2 },
-      { name: t('navigation.suppliers'), href: '/suppliers', icon: Truck },
-      { name: t('navigation.production'), href: '/production', icon: Factory },
-      { name: t('navigation.qualityControl'), href: '/quality', icon: CheckSquare },
-      { name: t('navigation.logistics'), href: '/logistics', icon: Truck },
+      { name: t('navigation.inventory'), href: '/inventory', icon: Package2, allowedRoles: WAREHOUSE_ROLES },
+      { name: t('navigation.suppliers'), href: '/suppliers', icon: Truck, allowedRoles: WAREHOUSE_ROLES },
+      { name: t('navigation.production'), href: '/production', icon: Factory, allowedRoles: WAREHOUSE_ROLES },
+      { name: t('navigation.qualityControl'), href: '/quality', icon: CheckSquare, allowedRoles: WAREHOUSE_ROLES },
+      { name: t('navigation.logistics'), href: '/logistics', icon: Truck, allowedRoles: [...WAREHOUSE_ROLES, 'DRIVER'] },
     ],
   },
   {
     key: 'tools',
     label: 'Vositalar',
     items: [
-      { name: t('navigation.aiAssistant'), href: '/ai-assistant', icon: Brain },
-      { name: t('navigation.bots'), href: '/bots', icon: Bot },
-      { name: t('navigation.cloudBackup'), href: '/cloud-backup', icon: Cloud },
+      { name: t('navigation.aiAssistant'), href: '/ai-assistant', icon: Brain, allowedRoles: FINANCE_ROLES },
+      { name: t('navigation.bots'), href: '/bots', icon: Bot, adminOnly: true },
+      { name: t('navigation.cloudBackup'), href: '/cloud-backup', icon: Cloud, adminOnly: true },
       { name: t('navigation.shortcuts'), href: '/shortcuts', icon: Zap },
     ],
   },
@@ -98,7 +105,7 @@ export default function ProfessionalLayout({ children }: { children: ReactNode }
     setMobileOpen(false); // route o'zgarsa mobil menyuni yopish
   }, [location.pathname]);
 
-  const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
+  const isUserAdmin = user?.role?.toUpperCase() === 'ADMIN';
   const sections = getSections(t);
 
   const isItemActive = (href: string) =>
@@ -108,7 +115,11 @@ export default function ProfessionalLayout({ children }: { children: ReactNode }
   const iconOnly = collapsed && !isMobile;
 
   const renderItem = (item: NavigationItem) => {
-    if (item.adminOnly && !isAdmin) return null;
+    if (item.adminOnly && !isUserAdmin) return null;
+    if (item.allowedRoles && !isUserAdmin) {
+      const userRole = user?.role?.toUpperCase() || '';
+      if (!item.allowedRoles.includes(userRole)) return null;
+    }
     const active = isItemActive(item.href);
     return (
       <Link
@@ -176,7 +187,7 @@ export default function ProfessionalLayout({ children }: { children: ReactNode }
           </button>
         )}
         {sections.map((section) => {
-          const visible = section.items.filter((i) => !(i.adminOnly && !isAdmin));
+          const visible = section.items.filter((i) => !(i.adminOnly && !isUserAdmin));
           if (visible.length === 0) return null;
           return (
             <div key={section.key} className="space-y-1">

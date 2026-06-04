@@ -144,7 +144,7 @@ export default function AddProduct() {
       setFormData({
         name: product.name || '',
         bagType: product.bagType || '',
-        color: product.color || '',
+        color: (product as any).color || '',
         warehouse: product.warehouse || 'preform',
         unitsPerBag: product.unitsPerBag?.toString() || '1000',
         pricePerBag: product.pricePerBag?.toString() || '',

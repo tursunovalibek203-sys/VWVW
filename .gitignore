@@ -102,7 +102,7 @@ capacitor.config.ts
 .vercel
 
 # Secret-bearing deploy manifests / env files (NEVER commit - set in platform dashboard)
-render.yaml
+# render.yaml — intentionally tracked for Blueprint deploy
 render.env
 render-deploy.env
 railway.yaml

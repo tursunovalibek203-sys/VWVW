@@ -205,8 +205,8 @@ h6 {
 .professional-card {
   @apply bg-white rounded-3xl border border-neutral-200 shadow-xl;
   background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -345,6 +345,7 @@ h6 {
 .professional-input {
   @apply w-full px-5 py-4 rounded-2xl border text-sm font-semibold;
   background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(15px);
   backdrop-filter: blur(15px);
   border-color: var(--neutral-200);
   color: var(--neutral-800);
@@ -375,6 +376,7 @@ h6 {
 .professional-table {
   @apply w-full rounded-3xl overflow-hidden;
   background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border: 2px solid var(--glass-border);
   box-shadow: var(--shadow-xl);
@@ -540,6 +542,7 @@ h6 {
 .professional-header {
   @apply bg-white border-b border-neutral-200;
   background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border-bottom: 2px solid var(--glass-border);
   box-shadow: var(--shadow-lg);
@@ -562,6 +565,7 @@ h6 {
 .professional-sidebar {
   @apply bg-white border-r border-neutral-200;
   background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border-right: 2px solid var(--glass-border);
   box-shadow: var(--shadow-xl);
@@ -736,6 +740,11 @@ h6 {
 
 .animate-glow {
   animation: glow 2s ease-in-out infinite;
+}
+
+/* Animation Delay Variants */
+.animate-float-delay-2s {
+  animation-delay: 2s;
 }
 
 /* Enhanced Hover Effects & Micro-interactions */
@@ -989,6 +998,7 @@ h6 {
   background: var(--gradient-neutral);
   color: white;
   border: 2px solid var(--neutral-700);
+  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   animation: fadeInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 40px;
@@ -1009,6 +1019,7 @@ h6 {
 .professional-modal {
   @apply fixed inset-0 z-50 flex items-center justify-center p-6;
   background: rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   animation: fadeIn 0.3s ease;
 }
@@ -1016,6 +1027,7 @@ h6 {
 .professional-modal-content {
   @apply max-w-2xl w-full rounded-3xl shadow-2xl;
   background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border: 2px solid var(--glass-border);
   animation: scaleIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1027,6 +1039,7 @@ h6 {
 .professional-dropdown {
   @apply absolute z-50 w-full rounded-2xl shadow-2xl border-2 overflow-hidden;
   background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border-color: var(--glass-border);
   animation: fadeInDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1054,6 +1067,7 @@ h6 {
 .professional-chart-container {
   @apply p-8 rounded-3xl;
   background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border: 2px solid var(--glass-border);
   box-shadow: var(--shadow-xl);
@@ -1076,6 +1090,7 @@ h6 {
 .ultra-stat-card {
   @apply p-6 rounded-2xl;
   background: linear-gradient(135deg, var(--glass-bg), rgba(255, 255, 255, 0.95));
+  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   position: relative;
@@ -1094,6 +1109,7 @@ h6 {
 .ultra-nav {
   @apply flex gap-1 p-2;
   background: linear-gradient(135deg, var(--glass-bg), rgba(255, 255, 255, 0.95));
+  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: 1.5rem;
@@ -1124,6 +1140,7 @@ h6 {
 /* Ultra Glass Effect */
 .ultra-glass {
   background: linear-gradient(135deg, var(--glass-bg), rgba(255, 255, 255, 0.95));
+  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
 }
@@ -1184,6 +1201,7 @@ h6 {
 .professional-stat-card {
   @apply p-8 rounded-3xl;
   background: linear-gradient(135deg, var(--glass-bg), rgba(255, 255, 255, 0.95));
+  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   position: relative;
@@ -1217,6 +1235,7 @@ h6 {
 /* Enhanced Alerts */
 .professional-alert {
   @apply p-6 rounded-2xl border-2 font-semibold;
+  -webkit-backdrop-filter: blur(15px);
   backdrop-filter: blur(15px);
   min-height: 80px;
   transition: all 0.3s ease;
@@ -1312,8 +1331,8 @@ h6 {
 /* Enhanced Glass Effect */
 .professional-glass {
   background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   border: 2px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   position: relative;

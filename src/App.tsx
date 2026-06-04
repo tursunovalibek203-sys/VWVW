@@ -1,11 +1,13 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useAuthStore } from './store/authStore';
+     import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useThemeStore } from './store/themeStore';
 import { useEffect, Suspense, lazy } from 'react';
 import './i18n';
 import { LanguageProvider } from './contexts/LanguageContext';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import { ToastProvider } from './components/ui/Toast';
+import { AuthGuard } from './components/guards/AuthGuard';
+import { RoleGuard } from './components/guards/RoleGuard';
+import { ROLES, PERMISSIONS } from './lib/permissions';
 
 // ========== LAZY LOADED PAGES ==========
 // Auth pages
@@ -14,7 +16,7 @@ const CashierLogin = lazy(() => import('./pages/CashierLogin'));
 
 // Dashboard & Main
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-const DashboardModern = lazy(() => import('./pages/DashboardModern'));
+
 
 // Inventory
 const SimplifiedInventory = lazy(() => import('./pages/SimplifiedInventory'));
@@ -56,7 +58,7 @@ const Bots = lazy(() => import('./pages/Bots'));
 const CloudBackup = lazy(() => import('./pages/CloudBackup'));
 const Shortcuts = lazy(() => import('./pages/Shortcuts'));
 const ModernChat = lazy(() => import('./pages/ModernChat'));
-const CashierBot = lazy(() => import('./pages/CashierBot'));
+
 const Settings = lazy(() => import('./pages/Settings'));
 
 // Layouts
@@ -65,7 +67,6 @@ const CashierLayout = lazy(() => import('./layouts/CashierLayout'));
 
 
 function App() {
-  const { token, user } = useAuthStore();
   const { theme } = useThemeStore();
   
   useEffect(() => {
@@ -80,7 +81,7 @@ function App() {
         <LanguageProvider>
           <BrowserRouter>
             <Suspense fallback={null}>
-              <AppRoutes token={token} user={user} />
+              <AppRoutes />
             </Suspense>
           </BrowserRouter>
         </LanguageProvider>
@@ -90,17 +91,7 @@ function App() {
 }
 
 // Separate component for routes to use hooks inside Router context
-function AppRoutes({ token, user }: { token: string | null; user: any }) {
-  const location = useLocation();
-  const isCashier = user?.role?.toUpperCase() === 'CASHIER' || user?.role?.toUpperCase() === 'SELLER';
-  
-  const isCashierRoute = location.pathname.startsWith('/cashier');
-  
-  // Redirect cashier to /cashier if trying to access professional routes
-  if (token && isCashier && !isCashierRoute) {
-    return <Navigate to="/cashier/sales" replace />;
-  }
-
+function AppRoutes() {
   return (
     <Routes>
       {/* ========== PUBLIC ROUTES ========== */}
@@ -110,86 +101,93 @@ function AppRoutes({ token, user }: { token: string | null; user: any }) {
       
       {/* ========== CASHIER ROUTES (Protected) ========== */}
       <Route path="/cashier/*" element={
-        token ? (
-          <CashierLayout>
-            <Routes>
-              <Route path="sales" element={<Sales />} />
-              <Route path="sales/add" element={<AddSale />} />
-              <Route path="products" element={<SimplifiedInventory />} />
-              <Route path="products/:id" element={<ProductDetail />} />
-              <Route path="add-product" element={<AddProduct />} />
-              <Route path="inventory" element={<SimplifiedInventory />} />
-              <Route path="orders" element={<Orders />} />
-              <Route path="customers" element={<Customers />} />
-              <Route path="customers/:id" element={<CustomerProfileModern />} />
-              <Route path="cashbox" element={<Cashbox />} />
-              <Route path="bot" element={<CashierBot />} />
-              <Route path="chat" element={<ModernChat />} />
-              <Route path="expenses" element={<Expenses />} />
-              <Route path="*" element={<Navigate to="/cashier/sales" />} />
-            </Routes>
-          </CashierLayout>
-        ) : (
-          <Navigate to="/cashier/login" replace />
-        )
+        <AuthGuard>
+          <RoleGuard requiredPermission={PERMISSIONS.ACCESS_CASHIER_PANEL} fallback="/dashboard">
+            <CashierLayout>
+              <Routes>
+                <Route path="sales" element={<Sales />} />
+                <Route path="sales/add" element={<AddSale />} />
+                <Route path="products" element={<SimplifiedInventory />} />
+                <Route path="products/:id" element={<ProductDetail />} />
+                <Route path="add-product" element={<AddProduct />} />
+                <Route path="inventory" element={<SimplifiedInventory />} />
+                <Route path="orders" element={<Orders />} />
+                <Route path="customers" element={<Customers />} />
+                <Route path="customers/:id" element={<CustomerProfileModern />} />
+                <Route path="cashbox" element={<Cashbox />} />
+                <Route path="chat" element={<ModernChat />} />
+                <Route path="expenses" element={<Expenses />} />
+                <Route path="*" element={<Navigate to="/cashier/sales" />} />
+              </Routes>
+            </CashierLayout>
+          </RoleGuard>
+        </AuthGuard>
       } />
       
       {/* ========== PROFESSIONAL ROUTES (Protected) ========== */}
       <Route path="*" element={
-        token ? (
-          <ProfessionalLayout>
-            <Routes>
-              {/* Dashboard */}
-              <Route path="dashboard" element={<Dashboard />} />
-              
-              {/* Inventory */}
-              <Route path="products" element={<SimplifiedInventory />} />
-              <Route path="products/:id" element={<ProductDetail />} />
-              <Route path="add-product" element={<AddProduct />} />
-              <Route path="inventory" element={<SimplifiedInventory />} />
-              
-              {/* Sales */}
-              <Route path="sales" element={<Sales />} />
-              <Route path="sales/add" element={<AddSale />} />
-              
-              {/* Customers */}
-              <Route path="customers" element={<Customers />} />
-              <Route path="customers/:id" element={<CustomerProfile />} />
-              
-              {/* Orders & Cashbox */}
-              <Route path="orders" element={<Orders />} />
-              <Route path="cashbox" element={<Cashbox />} />
-              
-              {/* Finance */}
-              <Route path="expenses" element={<Expenses />} />
-              <Route path="revenue" element={<Revenue />} />
-              
-              {/* Reports */}
-              <Route path="reports" element={<Reports />} />
-              <Route path="analytics" element={<Analytics />} />
-              <Route path="activity" element={<Activity />} />
-              
-              {/* Management */}
-              <Route path="cashiers" element={<CashierManagement />} />
-              <Route path="suppliers" element={<Suppliers />} />
-              <Route path="production" element={<Production />} />
-              <Route path="quality" element={<Quality />} />
-              <Route path="logistics" element={<Logistics />} />
-              
-              {/* Tools */}
-              <Route path="ai-assistant" element={<AIAssistant />} />
-              <Route path="bots" element={<Bots />} />
-              <Route path="cloud-backup" element={<CloudBackup />} />
-              <Route path="shortcuts" element={<Shortcuts />} />
-              <Route path="settings" element={<Settings />} />
-              
-              {/* Default redirect */}
-              <Route path="*" element={<Navigate to="/dashboard" />} />
-            </Routes>
-          </ProfessionalLayout>
-        ) : (
-          <Navigate to="/login" replace />
-        )
+        <AuthGuard>
+          <RoleGuard requiredPermission={PERMISSIONS.VIEW_DASHBOARD} fallback="/cashier/sales">
+            <ProfessionalLayout>
+              <Routes>
+                {/* Dashboard */}
+                <Route path="dashboard" element={<Dashboard />} />
+                
+                {/* Inventory */}
+                <Route path="products" element={<SimplifiedInventory />} />
+                <Route path="products/:id" element={<ProductDetail />} />
+                <Route path="add-product" element={<AddProduct />} />
+                <Route path="inventory" element={<SimplifiedInventory />} />
+                
+                {/* Sales */}
+                <Route path="sales" element={<Sales />} />
+                <Route path="sales/add" element={<AddSale />} />
+                
+                {/* Customers */}
+                <Route path="customers" element={<Customers />} />
+                <Route path="customers/:id" element={<CustomerProfile />} />
+                
+                {/* Orders & Cashbox */}
+                <Route path="orders" element={<Orders />} />
+                <Route path="cashbox" element={<Cashbox />} />
+                
+                {/* Finance */}
+                <Route path="expenses" element={<Expenses />} />
+                <Route path="revenue" element={<Revenue />} />
+                
+                {/* Reports */}
+                <Route path="reports" element={<Reports />} />
+                <Route path="analytics" element={<Analytics />} />
+                <Route path="activity" element={<Activity />} />
+                
+                {/* Management */}
+                <Route path="cashiers" element={
+                  <RoleGuard allowedRoles={[ROLES.ADMIN]}>
+                    <CashierManagement />
+                  </RoleGuard>
+                } />
+                <Route path="suppliers" element={<Suppliers />} />
+                <Route path="production" element={<Production />} />
+                <Route path="quality" element={<Quality />} />
+                <Route path="logistics" element={<Logistics />} />
+                
+                {/* Tools */}
+                <Route path="ai-assistant" element={<AIAssistant />} />
+                <Route path="bots" element={<Bots />} />
+                <Route path="cloud-backup" element={<CloudBackup />} />
+                <Route path="shortcuts" element={<Shortcuts />} />
+                <Route path="settings" element={
+                  <RoleGuard requiredPermission={PERMISSIONS.MANAGE_SETTINGS}>
+                    <Settings />
+                  </RoleGuard>
+                } />
+                
+                {/* Default redirect */}
+                <Route path="*" element={<Navigate to="/dashboard" />} />
+              </Routes>
+            </ProfessionalLayout>
+          </RoleGuard>
+        </AuthGuard>
       } />
     </Routes>
   );

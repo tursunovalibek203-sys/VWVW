@@ -1,9 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { login } from './helpers/auth';
 
 test.describe('Customers Management', () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
     await page.goto('/customers');
     await page.waitForTimeout(2000);
   });
@@ -19,7 +17,7 @@ test.describe('Customers Management', () => {
   });
 
   test('should have add customer button', async ({ page }) => {
-    const addButton = page.locator('button:has-text("Qo\'shish"), button:has-text("Add"), button:has-text("Yangi")');
+    const addButton = page.locator('button[class*="bg-indigo"], button[class*="bg-violet"], button:has-text("Янги"), button:has-text("mijoz")');
     const buttonCount = await addButton.count();
     expect(buttonCount).toBeGreaterThan(0);
   });

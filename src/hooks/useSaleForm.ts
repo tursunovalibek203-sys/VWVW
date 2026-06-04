@@ -201,19 +201,6 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     // Narxni hisoblash - basePrice dan (sozlamalardan olingan)
     const displayPrice = basePrice;
 
-    // Determine if preform for sale type - kuchaytirilgan tekshiruv
-    const name = product.name?.toLowerCase() || '';
-    const warehouse = product.warehouse?.toLowerCase() || '';
-    const hasGram = /\d+\s*(gr|g|гр|г)\b/i.test(name);
-    const isKrishka = name.includes('krishka') || name.includes('qopqoq') || name.includes('cap') || warehouse === 'krishka';
-    const isRuchka = name.includes('ruchka') || name.includes('handle') || warehouse === 'ruchka';
-    const isKapsula = name.includes('kapsula') || name.includes('capsule') || name.includes('капсула');
-    // Agar warehouse preform bo'lsa yoki gram bor va krishka/ruchka bo'lmasa - komplekt
-    const isPreform = warehouse === 'preform' ||
-                       name.includes('preform') ||
-                       isKapsula ||
-                       (hasGram && !isKrishka && !isRuchka);
-
     setNewItem({
       productId: updatedProduct.id,
       productName: updatedProduct.name,
@@ -221,7 +208,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
       pricePerBag: displayPrice.toString(),
       priceDisplayValue: displayPrice.toString(),
       unitsPerBag: unitsPerBag.toString(),
-      saleType: isPreform ? 'komplekt' : 'bag',
+      saleType: 'bag',
       // Stock ma'lumotlarini saqlash
       maxQuantity: updatedProduct.currentStock || 0,
       product: updatedProduct, // To'liq mahsulot ma'lumotlari
@@ -249,145 +236,44 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
       return;
     }
 
-    // Mahsulot preform ekanligini tekshirish
-    const name = product.name?.toLowerCase() || '';
-    const warehouse = product.warehouse?.toLowerCase() || '';
-    const hasGram = /\d+\s*(gr|g|гр|г)\b/i.test(name);
-    const isKrishka = name.includes('krishka') || name.includes('qopqoq') || name.includes('cap') || warehouse === 'krishka';
-    const isRuchka = name.includes('ruchka') || name.includes('handle') || warehouse === 'ruchka';
-    const isPreform = warehouse === 'preform' || name.includes('preform') || (hasGram && !isKrishka && !isRuchka);
+    const existingIndex = form.items.findIndex((item) => item.productId === newItem.productId);
 
-    // Komplektni tekshirish - faqat preformlar uchun
-    let komplektConfigs: Array<{size: number; type: 'krishka' | 'ruchka'; quantity: number}> = [];
-    
-    // Cache bo'lmasa va preform bo'lsa - local dan generatsiya (tez)
-    if (isPreform) {
-      const gramMatch = product.name?.toLowerCase().match(/(\d+)\s*(gr|g|гр|г)/);
-      const gramSize = gramMatch ? parseInt(gramMatch[1]) : 0;
-      
-      // Komplekt qoidalari asosida konfiguratsiya
-      if (gramSize >= 15 && gramSize <= 35) {
-        // 15-35gr preformlar -> 28 krishka
-        komplektConfigs = [{ size: 28, type: 'krishka', quantity: 1 }];
-      } else if (gramSize === 36) {
-        // 36gr preform -> 28 krishka + 28 ruchka
-        komplektConfigs = [
-          { size: 28, type: 'krishka', quantity: 1 },
-          { size: 28, type: 'ruchka', quantity: 1 }
-        ];
-      } else if (gramSize >= 52 && gramSize <= 70) {
-        // 52-70gr preform -> 38 krishka + 38 ruchka
-        komplektConfigs = [
-          { size: 38, type: 'krishka', quantity: 1 },
-          { size: 38, type: 'ruchka', quantity: 1 }
-        ];
-      } else if (gramSize >= 75) {
-        // 75gr+ preform -> 48 krishka + 48 ruchka
-        komplektConfigs = [
-          { size: 48, type: 'krishka', quantity: 1 },
-          { size: 48, type: 'ruchka', quantity: 1 }
-        ];
-      }
-    }
+    const pricePerBag = parseFloat(newItem.pricePerBag || '0') || product.pricePerBag || 0;
+    const unitsPerBag = parseFloat(newItem.unitsPerBag || '0') || product.unitsPerBag || 2000;
+    const pricePerPiece = pricePerBag / unitsPerBag;
+    const isPieceSale = newItem.saleType === 'piece';
+    const subtotal = isPieceSale ? quantity * pricePerPiece : quantity * pricePerBag;
 
-    // Agar komplekt bo'lsa, komplekt mahsulotlarini ham qo'shish
-    if (komplektConfigs.length > 0) {
-      const pricePerBag = parseFloat(newItem.pricePerBag || '0') || product.pricePerBag || 0;
-      const unitsPerBag = parseFloat(newItem.unitsPerBag || '0') || product.unitsPerBag || 2000;
-      const pricePerPiece = pricePerBag / unitsPerBag;
-      const subtotal = quantity * pricePerBag;
+    if (existingIndex >= 0) {
+      const existingItem = form.items[existingIndex];
+      const newQuantity = (typeof existingItem.quantity === 'number' ? existingItem.quantity : parseFloat(existingItem.quantity || '0')) + quantity;
 
-      const itemsToAdd: SaleItemForm[] = [{
-        productId: newItem.productId,
-        productName: product.name,
-        quantity: quantity.toString(),
-        bagDisplayValue: quantity.toString(),
+      const updatedItems = [...form.items];
+      updatedItems[existingIndex] = {
+        ...existingItem,
+        quantity: newQuantity.toString(),
+        bagDisplayValue: newQuantity.toString(),
         pricePerBag,
         pricePerPiece,
-        unitsPerBag,
-        subtotal,
-        warehouse: (product.warehouse as 'preform' | 'krishka' | 'ruchka' | 'other') || 'other',
-        saleType: 'bag' as const,
-      }];
-
-      // Komplekt mahsulotlarini qo'shish - mahsulotlarni nom/warehouse bo'yicha qidirish
-      for (const config of komplektConfigs) {
-        // Mos keluvchi mahsulotni topish (masalan: 28 krishka)
-        const komplektProduct = products.find((p) => {
-          const pName = p.name?.toLowerCase() || '';
-          const pWarehouse = p.warehouse?.toLowerCase() || '';
-          const sizeMatch = pName.match(new RegExp(`\\b${config.size}\\s*(mm|мм)?\\b`));
-          const isType = config.type === 'krishka' 
-            ? (pName.includes('krishka') || pName.includes('qopqoq') || pName.includes('крышка') || pWarehouse === 'krishka')
-            : (pName.includes('ruchka') || pName.includes('ручка') || pName.includes('handle') || pWarehouse === 'ruchka');
-          return sizeMatch && isType;
-        });
-        
-        if (komplektProduct) {
-          const komplektQuantity = quantity * config.quantity;
-          const komplektUnits = komplektProduct.unitsPerBag || 2000;
-          const komplektPricePerBag = parseFloat(komplektProduct.pricePerBag?.toString() || '0') || 0;
-          const komplektPricePerPiece = komplektPricePerBag / komplektUnits;
-          const komplektSubtotal = komplektQuantity * komplektPricePerBag;
-
-          itemsToAdd.push({
-            productId: komplektProduct.id,
-            productName: komplektProduct.name,
-            quantity: komplektQuantity.toString(),
-            bagDisplayValue: komplektQuantity.toString(),
-            pricePerBag: komplektPricePerBag,
-            pricePerPiece: komplektPricePerPiece,
-            unitsPerBag: komplektUnits,
-            subtotal: komplektSubtotal,
-            warehouse: (komplektProduct.warehouse as 'preform' | 'krishka' | 'ruchka' | 'other') || 'other',
-            saleType: 'bag' as const,
-          });
-        }
-      }
-
-      setForm((prev) => ({ ...prev, items: [...prev.items, ...itemsToAdd] }));
+        subtotal: newQuantity * pricePerBag,
+      };
+      setForm((prev) => ({ ...prev, items: updatedItems }));
     } else {
-      // Regular mode - komplektsiz
-      
-      const existingIndex = form.items.findIndex((item) => item.productId === newItem.productId);
-
-      const pricePerBag = parseFloat(newItem.pricePerBag || '0') || product.pricePerBag || 0;
-      const unitsPerBag = parseFloat(newItem.unitsPerBag || '0') || product.unitsPerBag || 2000;
-      const pricePerPiece = pricePerBag / unitsPerBag;
-      const isPieceSale = newItem.saleType === 'piece';
-      const subtotal = isPieceSale ? quantity * pricePerPiece : quantity * pricePerBag;
-
-      if (existingIndex >= 0) {
-        const existingItem = form.items[existingIndex];
-        const newQuantity = (typeof existingItem.quantity === 'number' ? existingItem.quantity : parseFloat(existingItem.quantity || '0')) + quantity;
-
-        const updatedItems = [...form.items];
-        updatedItems[existingIndex] = {
-          ...existingItem,
-          quantity: newQuantity.toString(),
-          bagDisplayValue: newQuantity.toString(),
+      setForm((prev) => ({
+        ...prev,
+        items: [...prev.items, {
+          productId: newItem.productId,
+          productName: product.name,
+          quantity: newItem.quantity,
+          bagDisplayValue: newItem.quantity,
           pricePerBag,
           pricePerPiece,
-          subtotal: newQuantity * pricePerBag,
-        };
-        setForm((prev) => ({ ...prev, items: updatedItems }));
-      } else {
-        setForm((prev) => ({
-          ...prev,
-          items: [...prev.items, {
-            productId: newItem.productId,
-            productName: product.name,
-            quantity: newItem.quantity,
-            bagDisplayValue: newItem.quantity,
-            pricePerBag,
-            pricePerPiece,
-            unitsPerBag,
-            subtotal,
-            warehouse: product.warehouse || 'other',
-            saleType: newItem.saleType,
-          }],
-        }));
-      }
+          unitsPerBag,
+          subtotal,
+          warehouse: product.warehouse || 'other',
+          saleType: newItem.saleType,
+        }],
+      }));
     }
 
     // Reset new item

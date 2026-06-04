@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../utils/prisma';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -39,7 +39,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // Create budget
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, authorize('ADMIN', 'ACCOUNTANT'), async (req: AuthRequest, res) => {
   try {
     const { category, year, month, amount, currency, description, alertThreshold } = req.body;
     
@@ -76,7 +76,7 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // Update budget
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, authorize('ADMIN', 'ACCOUNTANT'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { amount, description, alertThreshold } = req.body;
@@ -98,7 +98,7 @@ router.put('/:id', authenticate, async (req, res) => {
 });
 
 // Delete budget
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, authorize('ADMIN', 'ACCOUNTANT'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Printer, X, Package, User, Calendar, Barcode, Monitor, FileText } from 'lucide-react';
+import { useToast } from '@/lib/toast';
 import { 
   BagLabelData, 
   prepareBagLabels,
@@ -35,6 +36,7 @@ export default function BagLabelPrinter({
   const [isPrinting, setIsPrinting] = useState(false);
   const [previewData, setPreviewData] = useState<BagLabelData[] | null>(null);
   const [printerType, setPrinterType] = useState<'a4' | '80mm'>('80mm');
+  const [error, setError] = useState<string | null>(null);
 
   // Mahsulot nomini tozalash (15gr-Preform-QORA -> 15gr)
   const getProductName = () => {
@@ -50,9 +52,10 @@ export default function BagLabelPrinter({
 
   const handlePreview = () => {
     if (!workerId.trim()) {
-      alert('Iltimos, ishchi raqamini kiriting!');
+      setError('Iltimos, ishchi raqamini kiriting!');
       return;
     }
+    setError(null);
 
     const labels = prepareBagLabels(
       getProductName(),
@@ -75,6 +78,7 @@ export default function BagLabelPrinter({
     }
 
     setIsPrinting(true);
+    setError(null);
     
     // Printer turiga qarab chop etish
     if (printerType === '80mm') {
@@ -86,7 +90,7 @@ export default function BagLabelPrinter({
       if (result.success && !result.error) {
         console.log('Yorliqlar muvaffaqiyatli chop etildi va saqlandi');
       } else if (result.error) {
-        alert(result.error);
+        setError(result.error);
       }
     }
     

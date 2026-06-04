@@ -107,7 +107,7 @@ router.get('/', async (req, res) => {
 router.post('/', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'CASHIER'), async (req: AuthRequest, res) => {
   try {
     console.log('Creating product with data:', req.body);
-    const { productTypeId, categoryId, sizeId, ...productData } = req.body;
+    const { productTypeId, categoryId, sizeId, color, ...productData } = req.body;
     
     // 1. Ism takrorlanmasligini tekshirish
     const existingProduct = await prisma.product.findUnique({
@@ -121,18 +121,23 @@ router.post('/', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'CASHIER'), async (req:
       });
     }
 
-    // 2. Mahsulotni Prisma orqali yaratish (Raw SQL o'rniga)
+    // 2. Mahsulotni Prisma orqali yaratish
+    const unitsPerBag = parseFloat(productData.unitsPerBag) || 1000;
+    const currentStock = parseFloat(productData.currentStock) || 0;
+    const currentUnits = currentStock * unitsPerBag;
+
     const product = await prisma.product.create({
       data: {
         name: productData.name,
         bagType: productData.bagType,
+        color: color || null,
         warehouse: productData.warehouse || 'preform',
-        unitsPerBag: parseFloat(productData.unitsPerBag) || 1000,
+        unitsPerBag: unitsPerBag,
         minStockLimit: parseFloat(productData.minStockLimit) || 0,
         optimalStock: parseFloat(productData.optimalStock) || 0,
         maxCapacity: parseFloat(productData.maxCapacity) || 0,
-        currentStock: parseFloat(productData.currentStock) || 0,
-        currentUnits: (parseFloat(productData.currentStock) || 0) * (parseFloat(productData.unitsPerBag) || 0),
+        currentStock: currentStock,
+        currentUnits: currentUnits,
         pricePerBag: parseFloat(productData.pricePerBag) || 0,
         pricePerPiece: parseFloat(productData.pricePerPiece) || 0,
         productionCost: parseFloat(productData.productionCost) || 0,
@@ -144,6 +149,30 @@ router.post('/', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'CASHIER'), async (req:
         active: productData.active !== false,
       }
     });
+
+    // 3. Agar initial stock > 0 bo'lsa, stockMovement yaratish
+    if (currentStock > 0) {
+      try {
+        await prisma.stockMovement.create({
+          data: {
+            productId: product.id,
+            type: 'ADD',
+            quantity: currentStock,
+            units: currentUnits,
+            reason: 'Yangi mahsulot uchun boshlang\'ich zaxira',
+            userId: req.user!.id,
+            userName: (req.user as any).name || req.user!.email,
+            previousStock: 0,
+            previousUnits: 0,
+            newStock: currentStock,
+            newUnits: currentUnits,
+            notes: 'Mahsulot yaratilganda qo\'shildi',
+          }
+        });
+      } catch (stockError) {
+        console.error('Error creating initial stock movement:', stockError);
+      }
+    }
 
     // 3. Mahsulot turiga qarab avtomatik kartga qo'shish
     if (productTypeId) {
@@ -188,6 +217,10 @@ router.post('/', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'CASHIER'), async (req:
         productName: product.name,
         details: {
           type: 'ADD',
+          quantityBags: currentStock,
+          quantityUnits: currentUnits,
+          newStock: currentStock,
+          newUnits: currentUnits,
           notes: 'Yangi mahsulot yaratildi',
         },
         ipAddress: req.ip,
@@ -195,7 +228,6 @@ router.post('/', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'CASHIER'), async (req:
       });
     } catch (auditError) {
       console.error('Audit log error:', auditError);
-      // Audit log xatoligi mahsulot yaratishiga to'sqin bo'lmasin
     }
 
     // Real-time event emit
@@ -372,7 +404,13 @@ router.post('/:id/stock', authorize('ADMIN', 'WAREHOUSE_MANAGER'), async (req: A
     } else if (type === 'REMOVE') {
       newStock = previousStock - quantity;
       newUnits = previousUnits - (quantity * product.unitsPerBag);
+      if (newStock < 0 || newUnits < 0) {
+        return res.status(400).json({ error: `Omborda yetarli mahsulot yo'q (mavjud: ${previousStock} qop)` });
+      }
     } else if (type === 'ADJUST') {
+      if (quantity < 0) {
+        return res.status(400).json({ error: 'ADJUST miqdori manfiy bo\'lishi mumkin emas' });
+      }
       newStock = quantity;
       newUnits = quantity * product.unitsPerBag;
     }
@@ -1136,7 +1174,7 @@ router.get('/:id/expense', async (req: AuthRequest, res) => {
 });
 
 // DELETE /products/:id - Mahsulotni o'chirish
-router.delete('/:id', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'MANAGER', 'USER', 'CASHIER'), async (req: AuthRequest, res) => {
+router.delete('/:id', authorize('ADMIN', 'WAREHOUSE_MANAGER'), async (req: AuthRequest, res) => {
   try {
     console.log('Delete product request:', {
       productId: req.params.id,

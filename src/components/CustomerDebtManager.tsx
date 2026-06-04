@@ -28,7 +28,7 @@ const CustomerDebtManager: React.FC<CustomerDebtManagerProps> = ({
   const handlePayment = async () => {
     const validAmount = validatePositiveNumber(amount, 'amount', 0);
     if (validAmount <= 0) {
-      alert('Iltimos, to\'g\'ri summa kiriting!');
+      console.log('Iltimos, to\'g\'ri summa kiriting!');
       return;
     }
 
@@ -42,16 +42,16 @@ const CustomerDebtManager: React.FC<CustomerDebtManagerProps> = ({
       });
 
       if (response.data.success) {
-        alert('To\'lov muvaffaqiyatli amalga oshirildi!');
+        console.log('To\'lov muvaffaqiyatli amalga oshirildi!');
         setAmount('');
         setDescription('');
         onUpdate();
       } else {
-        alert(response.data.error || 'Xatolik yuz berdi!');
+        console.log(response.data.error || 'Xatolik yuz berdi!');
       }
     } catch (error) {
       console.error('To\'lov xatoligi:', error);
-      alert('Server xatoligi!');
+      console.log('Server xatoligi!');
     } finally {
       setLoading(false);
     }
@@ -60,7 +60,7 @@ const CustomerDebtManager: React.FC<CustomerDebtManagerProps> = ({
   const handleDebt = async () => {
     const validAmount = validatePositiveNumber(amount, 'amount', 0);
     if (validAmount <= 0) {
-      alert('Iltimos, qarz summasini kiriting!');
+      console.log('Iltimos, qarz summasini kiriting!');
       return;
     }
 
@@ -74,16 +74,16 @@ const CustomerDebtManager: React.FC<CustomerDebtManagerProps> = ({
       });
 
       if (response.data.success) {
-        alert('Qarz muvaffaqiyatli qo\'shildi!');
+        console.log('Qarz muvaffaqiyatli qo\'shildi!');
         setAmount('');
         setDescription('');
         onUpdate();
       } else {
-        alert(response.data.error || 'Xatolik yuz berdi!');
+        console.log(response.data.error || 'Xatolik yuz berdi!');
       }
     } catch (error) {
       console.error('Qarz xatoligi:', error);
-      alert('Server xatoligi!');
+      console.log('Server xatoligi!');
     } finally {
       setLoading(false);
     }

@@ -104,7 +104,7 @@ export default function CloudBackupComponent({ className = '' }: CloudBackupComp
 
   const handleBackup = async () => {
     if (!backupService) {
-      alert('Backup service not configured');
+      console.log('Backup service not configured');
       return;
     }
 
@@ -134,12 +134,12 @@ export default function CloudBackupComponent({ className = '' }: CloudBackupComp
       if (result.success) {
         saveBackupHistory(result);
         updateSystemStatus(result);
-        alert('Backup completed successfully!');
+        console.log('Backup completed successfully!');
       } else {
-        alert(`Backup failed: ${result.error}`);
+        console.log(`Backup failed: ${result.error}`);
       }
     } catch (error) {
-      alert(`Backup error: ${error}`);
+      console.log(`Backup error: ${error}`);
     } finally {
       setIsUploading(false);
       setTimeout(() => setUploadProgress(0), 2000);

@@ -155,7 +155,7 @@ export default function SimplifiedProductSelector({
 
     // Zaxirani tekshirish
     if (qty > selectedProduct.currentStock) {
-      alert(latinToCyrillic(
+      console.log(latinToCyrillic(
         `Zaxirada yetarli mahsulot yo'q!\nOmborda: ${selectedProduct.currentStock} qop\nSotmoqchisiz: ${qty} qop`
       ));
       return;

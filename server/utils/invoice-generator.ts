@@ -149,9 +149,9 @@ ${debt > 0 ? `⚠️ **QARZ:** ${debt.toFixed(2)} USD` : '✅ **TO\'LIQ TO\'LANG
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🏢 **KOMPANIYA:**
-AzizTrades ERP
+Lux Pet Plast
 Tel: +998 XX XXX XX XX
-Telegram: @aziztrades
+Telegram: @luxpetplast
 
 Xaridingiz uchun rahmat! 🙏
   `;

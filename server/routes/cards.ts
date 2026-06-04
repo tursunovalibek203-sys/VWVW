@@ -77,7 +77,7 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // Kartni yangilash
-router.put('/:id', authenticate, async (req, res) => {
+router.put('/:id', authenticate, authorize('ADMIN', 'WAREHOUSE_MANAGER'), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, price, active } = req.body;
@@ -124,7 +124,7 @@ router.put('/:id', authenticate, async (req, res) => {
 });
 
 // Kartni o'chirish (deactivate)
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, authorize('ADMIN', 'WAREHOUSE_MANAGER'), async (req, res) => {
   try {
     const { id } = req.params;
 

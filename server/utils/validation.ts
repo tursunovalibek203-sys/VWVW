@@ -13,7 +13,9 @@ export const parseMoney = (value: unknown): number => {
 export const SaleItemSchema = z.object({
   productId: z.string().min(1, 'Mahsulot ID kiritilishi shart'),
   productName: z.string().optional(),
-  quantity: z.union([z.string(), z.number()]).transform((v) => parseFloat(String(v))),
+  quantity: z.union([z.string(), z.number()])
+    .transform((v) => parseFloat(String(v)))
+    .refine((v) => Number.isFinite(v) && v > 0, { message: 'Miqdor musbat son bo\'lishi kerak' }),
   pricePerBag: z.union([z.string(), z.number()]).transform(parseMoney),
   pricePerPiece: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
   variantId: z.string().optional(),

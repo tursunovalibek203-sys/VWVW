@@ -306,6 +306,11 @@ router.put('/:id',
       return res.status(404).json({ error: 'Sotuv topilmadi' });
     }
 
+    // Ownership check: SELLER can only edit their own sales
+    if (req.user?.role?.toUpperCase() === 'SELLER' && oldSale.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Siz faqat o\'z sotuvlaringizni tahrirlay olasiz' });
+    }
+
     // 1. Eski mahsulotlarni omborda qaytarish (saleType ni hisobga olish)
     for (const oldItem of oldSale.items) {
       if (!oldItem.productId) continue;

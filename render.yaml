@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: luxpetplast-api
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci && npx prisma generate && npx prisma db push --accept-data-loss
+    startCommand: npx tsx server/index.ts
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: luxpetplast-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://luxpetplast.vercel.app
+      - key: USD_TO_UZS_RATE
+        value: "12500"
+      - key: VITE_DEVICE_ID
+        value: server_1
+      - key: VITE_DEVICE_NAME
+        value: "Server"
+
+databases:
+  - name: luxpetplast-db
+    databaseName: luxpetplast
+    plan: free
+    region: oregon

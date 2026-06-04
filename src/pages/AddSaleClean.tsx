@@ -587,7 +587,7 @@ export default function AddSaleClean() {
 
   return (
     <div className="min-h-screen bg-slate-50/60 pb-24">
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+      <div className="space-y-6">
         {/* Offline Warning Banner */}
         {!isOnline && (
           <div className="bg-amber-50 border border-amber-200/70 rounded-2xl p-4 flex items-center gap-3">
@@ -701,8 +701,66 @@ export default function AddSaleClean() {
             onQuickAdd={handleQuickAdd}
           />
 
+          {/* Cart + Customer (right column, sticky) */}
+          <div className="flex flex-col gap-4 lg:sticky lg:top-6">
+
+          {/* ─── Compact Customer Quick-Select (always visible) ─── */}
+          <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <User className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{latinToCyrillic('Mijoz')}</p>
+            </div>
+            {saleForm.form.isKocha ? (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-slate-700">{latinToCyrillic("Ko'cha savdosi")}</span>
+                <button type="button" onClick={() => { saleForm.updateFormField('isKocha', false); saleForm.updateFormField('customerId', ''); }} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">{latinToCyrillic("O'zgartirish")}</button>
+              </div>
+            ) : saleForm.form.customerId ? (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-slate-900">
+                  {saleForm.customers.find(c => c.id === saleForm.form.customerId)?.name || latinToCyrillic('Noma\'lum')}
+                </span>
+                <button type="button" onClick={() => saleForm.updateFormField('customerId', '')} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">{latinToCyrillic("O'zgartirish")}</button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={saleForm.customerSearch}
+                  onChange={e => saleForm.setCustomerSearch(e.target.value)}
+                  placeholder={latinToCyrillic('Mijozni qidiring...')}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none"
+                />
+                {saleForm.customerSearch && (
+                  <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
+                    {saleForm.customers
+                      .filter(c => c.name.toLowerCase().includes(saleForm.customerSearch.toLowerCase()))
+                      .slice(0, 6)
+                      .map(c => (
+                        <button key={c.id} type="button"
+                          onClick={() => { saleForm.updateFormField('customerId', c.id); saleForm.updateFormField('isKocha', false); saleForm.setCustomerSearch(''); }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors"
+                        >
+                          <span className="font-medium text-slate-900">{c.name}</span>
+                          {c.phone && <span className="text-slate-400 ml-2 text-xs">{c.phone}</span>}
+                        </button>
+                      ))}
+                    {saleForm.customers.filter(c => c.name.toLowerCase().includes(saleForm.customerSearch.toLowerCase())).length === 0 && (
+                      <p className="px-3 py-2 text-sm text-slate-400">{latinToCyrillic('Topilmadi')}</p>
+                    )}
+                  </div>
+                )}
+                <button type="button" onClick={() => { saleForm.updateFormField('isKocha', true); saleForm.updateFormField('customerId', ''); saleForm.setCustomerSearch(''); }}
+                  className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 border border-dashed border-slate-200 rounded-xl hover:border-slate-300 transition-colors"
+                >
+                  {latinToCyrillic("Ko'cha savdosi")}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Cart */}
-          <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden lg:sticky lg:top-6">
+          <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden">
             {/* Cart header */}
             <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-slate-200/70">
               <div className="flex items-center gap-3">
@@ -753,9 +811,10 @@ export default function AddSaleClean() {
               />
             )}
           </div>
+          </div>{/* end sticky right column wrapper */}
         </div>
 
-        {/* Zone 2: Customer & Payment (checkout) */}
+        {/* Zone 2: Customer (detailed) & Payment (checkout) */}
         <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden">
           <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-slate-200/70">
             <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">

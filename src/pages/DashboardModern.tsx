@@ -32,8 +32,6 @@ interface DashboardStats {
   pendingOrders: number;
 }
 
-const USD_TO_UZS = 12500;
-
 export default function DashboardModern() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
@@ -48,10 +46,23 @@ export default function DashboardModern() {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState(12500); // Default fallback
 
   useEffect(() => {
     loadDashboardStats();
+    loadExchangeRate();
   }, []);
+
+  const loadExchangeRate = async () => {
+    try {
+      const { data } = await api.get('/exchange-rates/pair?from=USD&to=UZS');
+      if (data?.data?.rate) {
+        setExchangeRate(data.data.rate);
+      }
+    } catch (error) {
+      console.error('Failed to load exchange rate:', error);
+    }
+  };
 
   const loadDashboardStats = async () => {
     setRefreshing(true);
@@ -128,7 +139,7 @@ export default function DashboardModern() {
                   </p>
                 )}
                 <p className="mt-2 text-sm text-white/70">
-                  ≈ {(stats.todayRevenue * USD_TO_UZS).toLocaleString()} {latinToCyrillic("so'm")}
+                  ≈ {(stats.todayRevenue * exchangeRate).toLocaleString()} {latinToCyrillic("so'm")}
                 </p>
               </div>
               <div className="w-14 h-14 bg-white/15 rounded-2xl flex items-center justify-center backdrop-blur-sm">
@@ -183,7 +194,7 @@ export default function DashboardModern() {
                 icon={Wallet}
                 title={latinToCyrillic('Kassa balansi')}
                 mainValue={`$${stats.cashboxBalance.toLocaleString()}`}
-                subValue={`${(stats.cashboxBalance * USD_TO_UZS).toLocaleString()} ${latinToCyrillic("so'm")}`}
+                subValue={`${(stats.cashboxBalance * exchangeRate).toLocaleString()} ${latinToCyrillic("so'm")}`}
                 variant="neutral"
               />
               <DashboardCard

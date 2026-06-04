@@ -12,12 +12,17 @@ import {
   WifiOff,
   X,
   ChevronRight,
+  Zap,
+  ShieldAlert,
 } from 'lucide-react';
 import api from '../lib/professionalApi';
 import { latinToCyrillic } from '../lib/transliterator';
 import { useToast } from '../components/ui/Toast';
 import { CardSkeleton } from '../components/ui/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
+import { useCircuitBreaker } from '../hooks/useCircuitBreaker';
+import { clearHealthCheckCache } from '../lib/healthCheck';
+
 
 interface CustomerMessage {
   id: string;
@@ -51,6 +56,11 @@ const BOT_UNAVAILABLE_DESC = latinToCyrillic(
   "Kassir boti serveri hali ulanmagan. Xizmat ulanganidan so'ng mijoz xabarlari bu yerda ko'rinadi."
 );
 
+const CIRCUIT_OPEN_TITLE = latinToCyrillic('Server xizmati vaqtinchalik yopilgan');
+const CIRCUIT_OPEN_DESC = latinToCyrillic(
+  'Server haddan tashqari yuklanibdi yoki texnik ishlarda. Avtomatik tiklash jarayoni boshlandi.'
+);
+
 export default function CashierBot() {
   const { addToast } = useToast();
   const [messages, setMessages] = useState<CustomerMessage[]>([]);
@@ -60,21 +70,38 @@ export default function CashierBot() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sending, setSending] = useState(false);
-  // Halol xato holati: backend yo'qligini yashirmaymiz.
-  const [hasError, setHasError] = useState(false);
+
+  // Circuit Breaker Configuration
+  const {
+    state: circuitState,
+
+    isAvailable: circuitAvailable,
+    executeWithCircuitBreaker,
+    manualReset: resetCircuit,
+    getNextAttemptTime,
+  } = useCircuitBreaker({
+    failureThreshold: 3,
+    recoveryTimeout: 300000, // 5 minutes
+  });
 
   const loadBotData = useCallback(
     async (mode: 'initial' | 'refresh' | 'silent' = 'initial') => {
+      // If circuit is OPEN and not a manual refresh, don't attempt
+      if (circuitState === 'OPEN' && mode !== 'refresh') {
+        return;
+      }
+
       if (mode === 'initial') setLoading(true);
       if (mode === 'refresh') setRefreshing(true);
 
       try {
-        // Haqiqiy backend so'rovlari. .catch(() => bo'sh) MASKALASH OLIB TASHLANDI:
-        // agar so'rov xato bersa — bu yerda halol catch'ga tushadi.
-        const [messagesRes, statsRes] = await Promise.all([
-          api.get('/bot/messages'),
-          api.get('/bot/stats'),
-        ]);
+        // Wrap API calls with circuit breaker
+        const [messagesRes, statsRes] = await executeWithCircuitBreaker(async () => {
+          return await Promise.all([
+            api.get('/bot/messages'),
+            api.get('/bot/stats'),
+          ]);
+        });
 
         const apiMessages: any[] = Array.isArray(messagesRes.data)
           ? messagesRes.data
@@ -91,22 +118,21 @@ export default function CashierBot() {
 
         setMessages(mapped);
         setStats(statsRes.data ?? EMPTY_STATS);
-        setHasError(false);
       } catch (error) {
         console.error('Bot data loading error:', error);
-        // Soxta bo'sh muvaffaqiyat EMAS — halol xato holati.
-        setHasError(true);
         setMessages([]);
         setStats(EMPTY_STATS);
         setSelectedMessage(null);
-        // Faqat foydalanuvchi o'zi yangilaganda Toast — silent poll'da spam qilmaymiz.
+
+        // Only show toast for user-initiated actions
         if (mode !== 'silent') {
+          const isCircuitOpen = circuitState === 'OPEN';
           addToast({
             type: 'error',
-            title: BOT_UNAVAILABLE_TITLE,
-            message: latinToCyrillic(
-              "Server bilan bog'lanib bo'lmadi. Keyinroq qayta urinib ko'ring."
-            ),
+            title: isCircuitOpen ? CIRCUIT_OPEN_TITLE : BOT_UNAVAILABLE_TITLE,
+            message: isCircuitOpen
+              ? CIRCUIT_OPEN_DESC
+              : latinToCyrillic("Server bilan bog'lanib bo'lmadi. Keyinroq qayta urinib ko'ring."),
           });
         }
       } finally {
@@ -114,24 +140,34 @@ export default function CashierBot() {
         setRefreshing(false);
       }
     },
-    [addToast]
+    [circuitState, executeWithCircuitBreaker, addToast]
   );
 
   useEffect(() => {
+    // Initial load
     loadBotData('initial');
-    const interval = setInterval(() => loadBotData('silent'), 30000);
+
+    // Silent polling only if circuit is available
+    const interval = setInterval(() => {
+      if (circuitAvailable) {
+        loadBotData('silent');
+      }
+    }, 30000);
+
     return () => clearInterval(interval);
-  }, [loadBotData]);
+  }, [loadBotData, circuitAvailable]);
 
   const sendReply = async () => {
-    if (!selectedMessage || !replyText.trim() || sending) return;
+    if (!selectedMessage || !replyText.trim() || sending || !circuitAvailable) return;
 
     setSending(true);
     try {
-      await api.post('/bot/reply', {
-        chatId: selectedMessage.telegramChatId,
-        message: replyText,
-        originalMessageId: selectedMessage.id,
+      await executeWithCircuitBreaker(async () => {
+        return await api.post('/bot/reply', {
+          chatId: selectedMessage.telegramChatId,
+          message: replyText,
+          originalMessageId: selectedMessage.id,
+        });
       });
 
       setMessages((prev) =>
@@ -155,6 +191,12 @@ export default function CashierBot() {
     }
   };
 
+  const handleManualRetry = useCallback(() => {
+    clearHealthCheckCache();
+    resetCircuit();
+    loadBotData('refresh');
+  }, [resetCircuit, loadBotData]);
+
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -166,6 +208,18 @@ export default function CashierBot() {
     if (minutes < 1440) return `${Math.floor(minutes / 60)} ${latinToCyrillic('soat oldin')}`;
     return date.toLocaleDateString('uz-UZ');
   };
+
+  const getCountdownText = useCallback(() => {
+    const nextAttempt = getNextAttemptTime();
+    if (!nextAttempt) return null;
+
+    const now = Date.now();
+    const remaining = Math.max(0, nextAttempt - now);
+    const minutes = Math.floor(remaining / 60000);
+    const seconds = Math.floor((remaining % 60000) / 1000);
+
+    return latinToCyrillic(`${minutes}:${seconds.toString().padStart(2, '0')} qoldi`);
+  }, [getNextAttemptTime]);
 
   const statusMeta: Record<
     CustomerMessage['status'],
@@ -201,16 +255,43 @@ export default function CashierBot() {
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
-            {latinToCyrillic('Kassir boti')}
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {latinToCyrillic('Mijozlar bilan Telegram orqali muloqot')}
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight">
+              {latinToCyrillic('Kassir boti')}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              {latinToCyrillic('Mijozlar bilan Telegram orqali muloqot')}
+            </p>
+          </div>
+
+          {/* Circuit Status Indicator */}
+          {circuitState !== 'CLOSED' && (
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
+              circuitState === 'OPEN'
+                ? 'bg-rose-50 text-rose-700 border-rose-200/70'
+                : circuitState === 'HALF_OPEN'
+                ? 'bg-amber-50 text-amber-700 border-amber-200/70'
+                : 'bg-emerald-50 text-emerald-700 border-emerald-200/70'
+            }`}>
+              {circuitState === 'OPEN' ? (
+                <ShieldAlert className="w-3.5 h-3.5" />
+              ) : circuitState === 'HALF_OPEN' ? (
+                <Zap className="w-3.5 h-3.5" />
+              ) : (
+                <CheckCircle className="w-3.5 h-3.5" />
+              )}
+              {circuitState === 'OPEN'
+                ? latinToCyrillic('Xavfsiz rejim')
+                : circuitState === 'HALF_OPEN'
+                ? latinToCyrillic('Tekshirilmoqda')
+                : latinToCyrillic('Faol')}
+            </div>
+          )}
         </div>
+
         <button
-          onClick={() => loadBotData('refresh')}
+          onClick={() => handleManualRetry()}
           disabled={refreshing}
           className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98] self-start"
         >
@@ -256,7 +337,30 @@ export default function CashierBot() {
       {/* Body */}
       {loading ? (
         <CardSkeleton count={4} />
-      ) : hasError ? (
+      ) : circuitState === 'OPEN' ? (
+        <div className="bg-white rounded-2xl border border-slate-200/70">
+          <EmptyState
+            icon={ShieldAlert}
+            title={CIRCUIT_OPEN_TITLE}
+            description={CIRCUIT_OPEN_DESC}
+            action={
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-slate-600">
+                  {getCountdownText()}
+                </div>
+                <button
+                  onClick={handleManualRetry}
+                  disabled={refreshing}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors active:scale-[0.98] disabled:opacity-60"
+                >
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  {latinToCyrillic('Qayta urinish')}
+                </button>
+              </div>
+            }
+          />
+        </div>
+      ) : messages.length === 0 && stats.totalCustomers === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200/70">
           <EmptyState
             icon={WifiOff}
@@ -264,7 +368,7 @@ export default function CashierBot() {
             description={BOT_UNAVAILABLE_DESC}
             action={
               <button
-                onClick={() => loadBotData('refresh')}
+                onClick={handleManualRetry}
                 disabled={refreshing}
                 className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors active:scale-[0.98] disabled:opacity-60"
               >
@@ -383,69 +487,53 @@ export default function CashierBot() {
                         </div>
                       </div>
                       <button
-                        onClick={() => {
-                          setSelectedMessage(null);
-                          setReplyText('');
-                        }}
+                        onClick={() => setSelectedMessage(null)}
+                        className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-200"
+                        aria-label={latinToCyrillic('Yopish')}
                         title={latinToCyrillic('Yopish')}
-                        aria-label={latinToCyrillic('Tanlovni bekor qilish')}
-                        className="flex-shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-                    <p className="text-sm text-slate-600 leading-relaxed">
+                    <p className="text-sm text-slate-700 leading-relaxed">
                       {selectedMessage.message}
                     </p>
                   </div>
 
                   {/* Reply textarea */}
-                  <div className="space-y-1.5">
-                    <label htmlFor="reply-text" className="block text-sm font-semibold text-slate-700">
-                      {latinToCyrillic('Javob matni')}
-                    </label>
+                  <div>
                     <textarea
-                      id="reply-text"
                       value={replyText}
                       onChange={(e) => setReplyText(e.target.value)}
-                      rows={5}
-                      placeholder={latinToCyrillic('Javobingizni shu yerga yozing…')}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 resize-none transition-all focus:outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 focus:bg-white hover:border-slate-300"
+                      placeholder={latinToCyrillic('Javob yozing...')}
+                      rows={4}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200/70 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all resize-none text-sm text-slate-700 placeholder:text-slate-400"
+                      disabled={sending || !circuitAvailable}
                     />
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex gap-3">
+                  {/* Send button */}
+                  <div className="flex justify-end">
                     <button
                       onClick={sendReply}
-                      disabled={!replyText.trim() || sending}
-                      className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!replyText.trim() || sending || !circuitAvailable}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {sending ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <Send className="w-5 h-5" />
+                        <Send className="w-4 h-4" />
                       )}
-                      {sending ? latinToCyrillic('Yuborilmoqda…') : latinToCyrillic('Javob yuborish')}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedMessage(null);
-                        setReplyText('');
-                      }}
-                      disabled={sending}
-                      className="px-4 py-3 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-colors active:scale-[0.98] disabled:opacity-50"
-                    >
-                      {latinToCyrillic('Bekor qilish')}
+                      {latinToCyrillic('Yuborish')}
                     </button>
                   </div>
                 </div>
               ) : (
                 <EmptyState
                   icon={MessageCircle}
-                  title={latinToCyrillic('Xabar tanlanmagan')}
+                  title={latinToCyrillic('Xabar tanlang')}
                   description={latinToCyrillic(
-                    "Javob berish uchun chap tomondagi ro'yxatdan mijoz xabarini tanlang."
+                    'Javob yuborish uchun chap tomondan xabarni tanlang.'
                   )}
                 />
               )}

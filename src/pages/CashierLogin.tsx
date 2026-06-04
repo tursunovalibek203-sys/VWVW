@@ -85,7 +85,7 @@ export default function CashierLogin() {
       <div className="absolute top-20 left-20 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl animate-float"></div>
       <div
         className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-float"
-        style={{ animationDelay: '2s' }}
+        style={{ animationDelay: '2s' }} // eslint-disable-line react/no-inline-styles - Animation delay
       ></div>
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-3xl animate-pulse-glow"></div>
 

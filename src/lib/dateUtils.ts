@@ -76,6 +76,37 @@ export function formatFullDate(date: Date | string): string {
   return `${d.getDate()} ${getMonthName(d)} ${d.getFullYear()}, ${getWeekday(d)}`;
 }
 
+/**
+ * Human-readable Uzbek date — replaces broken uz-UZ locale ("2026 M06 3").
+ * Examples: "3 Iyun 2026" | "24 Aprel 2026"
+ */
+export function formatUzDate(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return `${d.getDate()} ${getMonthName(d)} ${d.getFullYear()}`;
+}
+
+/**
+ * Short human-readable: "24 Apr 2026"
+ */
+export function formatUzDateShort(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const SHORT_MONTHS = [
+    'Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyn',
+    'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek',
+  ];
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/**
+ * Date + time: "24 Aprel 2026, 14:30"
+ */
+export function formatUzDateTime(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const hh = d.getHours().toString().padStart(2, '0');
+  const mm = d.getMinutes().toString().padStart(2, '0');
+  return `${formatUzDate(d)}, ${hh}:${mm}`;
+}
+
 export function formatDateRange(startDate: Date | string, endDate: Date | string): string {
   return `${formatDate(startDate)} - ${formatDate(endDate)}`;
 }

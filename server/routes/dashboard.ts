@@ -16,23 +16,23 @@ router.get('/stats', async (req, res) => {
     // Generate weekly trend data (last 7 days) - Batch queries with raw SQL for better performance
     const weeklyData = await prisma.$queryRaw`
       SELECT 
-        DATE_TRUNC('day', "createdAt") as "day",
-        SUM(CASE WHEN "totalAmount" IS NOT NULL THEN "totalAmount" ELSE 0 END) as "sales",
-        0 as "expenses"
-      FROM "Sale"
-      WHERE "createdAt" >= ${new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)}
-      GROUP BY DATE_TRUNC('day', "createdAt")
-      ORDER BY "day" DESC
+        DATE(createdAt) as day,
+        SUM(CASE WHEN totalAmount IS NOT NULL THEN totalAmount ELSE 0 END) as sales,
+        0 as expenses
+      FROM Sale
+      WHERE createdAt >= datetime(${new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()})
+      GROUP BY DATE(createdAt)
+      ORDER BY day DESC
       LIMIT 7
     `;
 
     const expenseData = await prisma.$queryRaw`
       SELECT 
-        DATE_TRUNC('day', "createdAt") as "day",
-        SUM("amount") as "total"
-      FROM "Expense"
-      WHERE "createdAt" >= ${new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)}
-      GROUP BY DATE_TRUNC('day', "createdAt")
+        DATE(createdAt) as day,
+        SUM(amount) as total
+      FROM Expense
+      WHERE createdAt >= datetime(${new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()})
+      GROUP BY DATE(createdAt)
     `;
 
     // Convert to weekly trend format
@@ -91,9 +91,9 @@ router.get('/stats', async (req, res) => {
         take: 5,
       }),
       prisma.$queryRaw`
-        SELECT id, name, "currentStock", "minStockLimit"
-        FROM "Product"
-        WHERE "currentStock" <= "minStockLimit" OR "currentStock" = 0
+        SELECT id, name, currentStock, minStockLimit
+        FROM Product
+        WHERE currentStock <= minStockLimit OR currentStock = 0
         LIMIT 10
       `,
       prisma.sale.count({

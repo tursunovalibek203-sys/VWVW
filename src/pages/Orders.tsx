@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import CustomerSelector from '../components/CustomerSelector';
 import ProductSelector from '../components/ProductSelector';
 import { Badge } from '../components/ui/Badge';
@@ -55,6 +55,7 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const loadedRef = useRef(false); // prevents React 18 StrictMode double-invocation
   const [submitting, setSubmitting] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showDetail, setShowDetail] = useState(false);
@@ -140,6 +141,8 @@ export default function Orders() {
   const [productSearches, setProductSearches] = useState<{ [key: number]: string }>({});
 
   useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     loadData();
   }, []);
 
@@ -744,13 +747,12 @@ ID: SLS-${selectedOrder.id}
 
   const hasActiveFilters = statusFilter !== 'ALL' || priorityFilter !== 'ALL' || !!searchQuery;
 
+  // 4 key metrics — most actionable for operations staff
   const stats = [
     { label: L('Jami'), value: orderStats.total, icon: Clock, tint: 'bg-indigo-50 text-indigo-600' },
     { label: L('Tasdiqlandi'), value: orderStats.confirmed, icon: CheckCircle, tint: 'bg-sky-50 text-sky-600' },
     { label: L('Ishlab chiqarish'), value: orderStats.inProduction, icon: Activity, tint: 'bg-violet-50 text-violet-600' },
     { label: L('Tayyor'), value: orderStats.ready, icon: CheckCircle, tint: 'bg-emerald-50 text-emerald-600' },
-    { label: L('Sotildi'), value: orderStats.sold, icon: DollarSign, tint: 'bg-amber-50 text-amber-600' },
-    { label: L('Botdan'), value: orderStats.fromBot, icon: Bot, tint: 'bg-sky-50 text-sky-600' },
   ];
 
   return (
@@ -795,9 +797,9 @@ ID: SLS-${selectedOrder.id}
         </div>
 
         {/* Stats cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5">
           {loading
-            ? Array.from({ length: 6 }).map((_, i) => (
+            ? Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[116px] animate-pulse" />
               ))
             : stats.map((stat) => {

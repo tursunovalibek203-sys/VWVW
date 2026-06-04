@@ -1,9 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { login } from './helpers/auth';
 
 test.describe('Analytics Dashboard', () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
     await page.goto('/analytics');
     await page.waitForTimeout(3000); // Analytics needs more time to load
   });

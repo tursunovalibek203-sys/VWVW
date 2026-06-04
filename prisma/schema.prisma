@@ -31,6 +31,7 @@ model Product {
   id              String   @id @default(uuid())
   name            String   @unique
   bagType         String
+  color           String?  // Mahsulot rangi
   unitsPerBag     Float    @default(1000)
   minStockLimit   Int
   optimalStock    Int
@@ -128,7 +129,7 @@ model Customer {
 
 model Sale {
   id             String   @id @default(uuid())
-  receiptNumber  Int      @default(autoincrement()) @unique // Ketma-ket chek raqami (unique, auto-increment)
+  receiptNumber  Int?     @unique // Ketma-ket chek raqami — set by SalesService via MAX(receiptNumber)+1
   customerId     String?
   customer       Customer? @relation(fields: [customerId], references: [id])
   productId      String?
@@ -665,6 +666,21 @@ model SystemSettings {
   description     String?
   updatedBy       String
   updatedAt       DateTime @updatedAt
+}
+
+model ExchangeRate {
+  id              String   @id @default(uuid())
+  fromCurrency    String   // "USD", "UZS", "CLICK"
+  toCurrency      String   // "USD", "UZS", "CLICK"
+  rate            Float    // 1 USD = rate UZS
+  effectiveDate   DateTime @default(now())
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([fromCurrency, toCurrency, isActive])
+  @@index([fromCurrency, toCurrency])
+  @@index([isActive])
 }
 
 // Card System Models

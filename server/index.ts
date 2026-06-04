@@ -5,10 +5,10 @@ import helmet from 'helmet';
 import compression from 'compression';
 import path from 'path';
 import jwt from 'jsonwebtoken';
-import { prisma } from './utils/prisma.js';
+import { prisma } from './utils/prisma.js'; 
 import { logger } from './utils/logger.js';
 import { setupSwagger } from './swagger.js';
-import { securityLogger, sanitizeInput } from './middleware/security.js';
+import { securityLogger, sanitizeInput, csrfProtection } from './middleware/security.js';
 import { errorHandler } from './middleware/error-handler.js';
 import authRoutes from './routes/auth.js';
 import productRoutes from './routes/products.js';
@@ -45,14 +45,14 @@ import driversRoutes from './routes/drivers.js';
 import customerChatRoutes from './routes/customer-chat.js';
 import customerChatsRoutes from './routes/customer-chats.js';
 import botApiRoutes from './routes/bot-api.js';
-import statisticsRoutes from './routes/statistics.js';
-import exportRoutes from './routes/export.js';
-import printRoutes from './routes/print.js';
-import bagLabelRoutes from './routes/bag-labels.js';
-import budgetRoutes from './routes/budgets.js';
-import realtimeRoutes from './routes/realtime.js';
-// import loanRoutes from './routes/loans'; // Fayl yo'q
-// import { botManager } from './bot/bot-manager'; // Vaqtinchalik o'chirildi
+import statisticsRoutes from './routes/statistics';
+import exportRoutes from './routes/export';
+import printRoutes from './routes/print';
+import bagLabelRoutes from './routes/bag-labels';
+import budgetRoutes from './routes/budgets';
+import realtimeRoutes from './routes/realtime';
+import employeeLoansRoutes from './routes/employee-loans';
+import exchangeRatesRoutes from './routes/exchange-rates';
 
 const app = express();
 const PORT = process.env.PORT || 5003;
@@ -68,7 +68,7 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
       imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'", process.env.CORS_ORIGIN || "http://localhost:5173"],
+      connectSrc: ["'self'", ...(process.env.CORS_ORIGIN || "http://localhost:5173").split(',').map(o => o.trim())],
     },
   },
   crossOriginEmbedderPolicy: false, // Development uchun
@@ -96,10 +96,10 @@ const limiter = rateLimit({
   skipSuccessfulRequests: false,
 });
 
-// Stricter limit for auth endpoints
+// Stricter limit for auth endpoints (relaxed in development for E2E testing)
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 daqiqa
-  max: 10, // Faqat 10 ta login urinish
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === 'development' ? 500 : 10,
   message: {
     error: 'Too many login attempts, please try again after 15 minutes.',
     retryAfter: 15 * 60
@@ -111,24 +111,25 @@ const authLimiter = rateLimit({
 // Apply rate limiting to all API routes
 app.use('/api/', limiter);
 app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/cashier-login', authLimiter);
 
 // CORS configuration - stricter in production
 const getAllowedOrigins = (): string[] => {
-  const productionOrigin = process.env.CORS_ORIGIN || 'https://luxpetplast.netlify.app';
-  
+  // CORS_ORIGIN can be comma-separated for multiple domains
+  const rawOrigins = process.env.CORS_ORIGIN || 'https://luxpetplast.vercel.app';
+  const productionOrigins = rawOrigins.split(',').map(o => o.trim()).filter(Boolean);
+
   if (process.env.NODE_ENV === 'production') {
-    // Production: only configured origin
-    return [productionOrigin].filter(Boolean) as string[];
+    return productionOrigins;
   }
-  
-  // Development: localhost origins
+
   return [
     'http://localhost:3000',
     'http://localhost:5173',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:5173',
-    productionOrigin
-  ].filter(Boolean) as string[];
+    ...productionOrigins,
+  ];
 };
 
 const allowedOrigins = getAllowedOrigins();
@@ -158,6 +159,15 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // 🔒 Security middleware - must be after body parsers but before routes
 app.use(securityLogger);
 app.use(sanitizeInput);
+
+// 🔒 CSRF protection - skip webhook endpoints
+app.use((req, res, next) => {
+  // Skip CSRF for Telegram webhooks and development
+  if (process.env.NODE_ENV === 'development' || req.path.startsWith('/api/bots/webhook')) {
+    return next();
+  }
+  return csrfProtection(req, res, next);
+});
 
 // Swagger API Documentation
 setupSwagger(app);
@@ -205,7 +215,8 @@ app.use('/api/print', printRoutes);
 app.use('/api/bag-labels', bagLabelRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/realtime', realtimeRoutes);
-// app.use('/api/loans', loanRoutes); // Fayl yo'q
+app.use('/api/employee-loans', employeeLoansRoutes);
+app.use('/api/exchange-rates', exchangeRatesRoutes);
 
 // Enhanced health check with DB connectivity
 app.get('/api/health', async (req, res) => {
@@ -277,8 +288,4 @@ app.listen(PORT, async () => {
   logger.info('Server started successfully');
   logger.info(`API available at http://localhost:${PORT}/api`);
   logger.info(`Health check at http://localhost:${PORT}/api/health`);
-  
-  // Bot manager'ni ishga tushirish (vaqtinchalik o'chirildi)
-  // console.log('🤖 Bot Manager ishga tushirilmoqda...');
-  // await botManager.initAllBots();
 });

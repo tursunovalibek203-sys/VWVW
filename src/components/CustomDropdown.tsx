@@ -147,7 +147,7 @@ export default function CustomDropdown({
         setShowAddModal(false);
         setIsOpen(false);
       } else {
-        alert('Bu variant allaqachon mavjud!');
+        console.log('Bu variant allaqachon mavjud!');
       }
     }
   };

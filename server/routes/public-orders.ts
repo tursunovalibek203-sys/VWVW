@@ -1,10 +1,28 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { prisma } from '../utils/prisma';
 
 const router = Router();
 
+// Strict rate limiter for public unauthenticated endpoints
+const publicLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,                   // 30 requests per IP per window
+  message: { error: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const orderLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,                   // max 10 orders per IP per hour
+  message: { error: 'Too many orders. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // GET - Public mahsulotlar ro'yxati (autentifikatsiya kerak emas)
-router.get('/products', async (req, res) => {
+router.get('/products', publicLimiter, async (req, res) => {
   try {
     const products = await prisma.product.findMany({
       where: {
@@ -28,7 +46,7 @@ router.get('/products', async (req, res) => {
 });
 
 // POST - Public buyurtma berish (autentifikatsiya kerak emas)
-router.post('/orders', async (req, res) => {
+router.post('/orders', orderLimiter, async (req, res) => {
   try {
     const { customer, items } = req.body;
 

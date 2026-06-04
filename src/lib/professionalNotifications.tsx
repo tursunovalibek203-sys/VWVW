@@ -159,15 +159,15 @@ function NotificationItem({
 
     // Progress animation for auto-dismiss notifications
     if (notification.duration && notification.duration > 0 && !notification.persistent) {
+      let currentProgress = 0;
       const interval = setInterval(() => {
-        setProgress(prev => {
-          const newProgress = prev + (100 / (notification.duration! / 100));
-          if (newProgress >= 100) {
-            clearInterval(interval);
-            return 100;
-          }
-          return newProgress;
-        });
+        currentProgress += 100 / (notification.duration! / 100);
+        if (currentProgress >= 100) {
+          setProgress(100);
+          clearInterval(interval);
+        } else {
+          setProgress(currentProgress);
+        }
       }, 100);
 
       return () => clearInterval(interval);

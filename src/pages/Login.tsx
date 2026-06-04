@@ -43,12 +43,11 @@ export default function Login() {
       if (loginType === 'admin') {
         endpoint = '/auth/login';
         requestData = { login, password };
-      } else {
+      } else if (loginType === 'cashier') {
         endpoint = '/auth/cashier-login';
         requestData = { login, password };
       }
       
-      // Xavfsizlik: parol/JWT konsolga chiqarilmaydi
       const { data } = await api.post(endpoint, requestData);
       
       if (!data.token || !data.user) {
@@ -77,16 +76,18 @@ export default function Login() {
       {/* Animated Background Elements */}
       <div className="absolute inset-0 bg-dots-pattern opacity-30"></div>
       <div className="absolute top-20 left-20 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl animate-float"></div>
-      <div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }}></div>
+      <div
+        className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-float animate-float-delay-2s"
+      ></div>
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-3xl animate-pulse-glow"></div>
 
       <div className={`w-full max-w-[420px] relative z-10 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-        {/* Main Card - Enhanced Glassmorphism */}
+        {/* Main Card */}
         <div className="glass-card rounded-3xl shadow-premium overflow-hidden hover-lift">
           <div className="p-8">
             {/* Logo Section */}
             <div className="flex flex-col items-center mb-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mb-4 shadow-glow group-hover:shadow-glow-lg ring-4 ring-white/20 transition-all duration-500 hover:scale-110 hover:rotate-3">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mb-4 shadow-glow ring-4 ring-white/20 transition-all duration-500 hover:scale-110">
                 <Factory className="w-10 h-10 text-white animate-pulse-soft" />
               </div>
 
@@ -96,19 +97,23 @@ export default function Login() {
               <p className="text-sm text-slate-500">{latinToCyrillic('Zavod Boshqaruv Tizimi')}</p>
             </div>
 
-            {/* Login Type Toggle - Modern Design */}
-            <div
-              className="mb-6"
-              role="tablist"
-              aria-label={latinToCyrillic('Kirish turi')}
-            >
+            {/* Error Message */}
+            {error && (
+              <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 animate-shake">
+                <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+                <p className="text-sm text-rose-700 font-medium leading-snug">{error}</p>
+              </div>
+            )}
+
+            {/* Login Type Toggle */}
+            <div className="mb-6" role="tablist" aria-label={latinToCyrillic('Kirish turi')}>
               <div className="flex p-1.5 bg-slate-100 rounded-2xl gap-1">
                 <button
                   type="button"
                   role="tab"
                   aria-selected={loginType === 'admin'}
                   onClick={() => setLoginType('admin')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-200 ease-out ${
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     loginType === 'admin'
                       ? 'btn-gradient-primary shadow-lg'
                       : 'text-slate-600 hover:text-blue-600 hover:bg-white/80'
@@ -122,7 +127,7 @@ export default function Login() {
                   role="tab"
                   aria-selected={loginType === 'cashier'}
                   onClick={() => setLoginType('cashier')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-200 ease-out ${
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     loginType === 'cashier'
                       ? 'btn-gradient-primary shadow-lg'
                       : 'text-slate-600 hover:text-blue-600 hover:bg-white/80'
@@ -133,27 +138,11 @@ export default function Login() {
                 </button>
               </div>
             </div>
-
-            {/* Error Message */}
-            {error && (
-              <div
-                role="alert"
-                aria-live="assertive"
-                className="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 animate-shake"
-              >
-                <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
-                <p className="text-sm text-rose-700 font-medium leading-snug">{error}</p>
-              </div>
-            )}
             
-            {/* Login Form */}
+            {/* Regular Login Form */}
             <form onSubmit={handleLogin} className="space-y-4" noValidate>
-              {/* Login Input */}
               <div className="space-y-1.5">
-                <label
-                  htmlFor="login"
-                  className="block text-sm font-semibold text-slate-700 px-1"
-                >
+                <label htmlFor="login" className="block text-sm font-semibold text-slate-700 px-1">
                   {latinToCyrillic('Foydalanuvchi nomi')}
                 </label>
                 <div className="relative group">
@@ -175,12 +164,8 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Password Input */}
               <div className="space-y-1.5">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-semibold text-slate-700 px-1"
-                >
+                <label htmlFor="password" className="block text-sm font-semibold text-slate-700 px-1">
                   {latinToCyrillic('Parol')}
                 </label>
                 <div className="relative group">
@@ -201,56 +186,31 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    aria-label={latinToCyrillic(showPassword ? 'Parolni yashirish' : "Parolni ko'rsatish")}
-                    aria-pressed={showPassword}
-                    tabIndex={-1}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors duration-200 p-1.5 rounded-lg hover:bg-blue-50"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors duration-200"
+                    aria-label={showPassword ? latinToCyrillic('Parolni yashirish') : latinToCyrillic('Parolni ko\'rsatish')}
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
               </div>
 
-              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={loading}
-                aria-busy={loading}
-                className="btn-gradient-primary group w-full py-3.5 mt-2 text-base disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:transform-none"
+                className="w-full btn-gradient-primary py-3.5 rounded-xl text-white font-semibold shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all duration-300 flex items-center justify-center gap-2 group"
               >
                 {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    {/* 'Tizimga' transliteratsiyada g harfi lotin qoladi, shu sabab literal Cyrillic */}
-                    <span>Тизимга {latinToCyrillic('kirilmoqda...')}</span>
-                  </>
+                  <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <>
-                    <span>Тизимга {latinToCyrillic('kirish')}</span>
-                    <ArrowRight className="w-5 h-5 transition-transform duration-200 group-hover:translate-x-1" />
+                    {latinToCyrillic('Kirish')}
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
                   </>
                 )}
               </button>
             </form>
-            
-            {/* Footer */}
-            <div className="mt-6 pt-5 border-t border-slate-200/60">
-              <div className="flex items-center justify-center gap-3 text-sm text-slate-500">
-                <span className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span className="font-medium text-emerald-700">{latinToCyrillic('Server Onlayn')}</span>
-                </span>
-                <span className="text-slate-300" aria-hidden="true">|</span>
-                <span className="font-semibold text-slate-400">v2.0</span>
-              </div>
-            </div>
           </div>
         </div>
-
-        {/* Bottom text */}
-        <p className="text-center text-sm text-white/70 mt-6">
-          © 2025 LUX PET PLAST. {latinToCyrillic('Barcha huquqlar himoyalangan.')}
-        </p>
       </div>
     </div>
   );

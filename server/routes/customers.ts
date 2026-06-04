@@ -2,7 +2,7 @@ import { Router } from 'express';
 
 import { prisma } from '../utils/prisma';
 
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
 import { sendEnhancedPaymentConfirmation } from '../bot/archive/enhanced-bot';
 import { successResponse, errorResponse } from '../utils/response';
@@ -142,13 +142,13 @@ router.get('/', async (req, res) => {
 
 
 
-router.post('/', async (req, res) => {
+router.post('/', async (req: AuthRequest, res) => {
 
   try {
 
-    const { telegramId, ...customerData } = req.body;
+    const { telegramId, balance, balanceUZS, balanceUSD, debt, debtUZS, debtUSD, telegramChatId: _tc, ...customerData } = req.body;
 
-    
+
 
     // Validatsiya - ism va telefon raqami kiritilishi shart
 
@@ -158,7 +158,7 @@ router.post('/', async (req, res) => {
 
     }
 
-    
+
 
     if (!customerData.phone || customerData.phone.trim() === '') {
 
@@ -375,42 +375,45 @@ router.get('/alerts/overdue', async (req, res) => {
 
 
 // PUT /customers/:id - Mijozni yangilash
-
-router.put('/:id', async (req, res) => {
-
+router.put('/:id', authorize('ADMIN', 'CASHIER', 'SELLER'), async (req: AuthRequest, res) => {
   try {
+    const isAdmin = req.user?.role?.toUpperCase() === 'ADMIN';
+
+    // Financial and sensitive fields restricted to ADMIN only
+    const ADMIN_ONLY_FIELDS = [
+      'balance', 'balanceUZS', 'balanceUSD',
+      'debt', 'debtUZS', 'debtUSD',
+      'creditLimit', 'category',
+      'telegramChatId', 'telegramUsername',
+      'discountPercent', 'pricePerBag', 'productPrices'
+    ];
+
+    const safeBody = { ...req.body };
+    if (!isAdmin) {
+      for (const field of ADMIN_ONLY_FIELDS) {
+        delete safeBody[field];
+      }
+    }
 
     const customer = await prisma.customer.update({
-
       where: { id: req.params.id },
-
-      data: req.body,
-
+      data: safeBody,
     });
 
     res.json(customer);
-
   } catch (error: any) {
-
     console.error('❌ PUT /customers/:id xatolik:', error.message);
-
-    res.status(500).json({ 
-
+    res.status(500).json({
       error: 'Failed to update customer',
-
-      details: error.message 
-
+      details: error.message
     });
-
   }
-
 });
 
 
 
-// DELETE /customers/:id - Mijozni o'chirish
-
-router.delete('/:id', async (req, res) => {
+// DELETE /customers/:id - Mijozni o'chirish (faqat ADMIN)
+router.delete('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
 
   try {
 
@@ -824,6 +827,8 @@ router.post('/:id/payment', async (req, res) => {
         data: {
           type: 'INCOME',
           amount,
+          currency,
+          paymentMethod: type,
           category: 'CUSTOMER_PAYMENT',
           description: `Mijoz to\'lovi: ${customer.name} (${paymentType} ${currency})${notes ? ' - ' + notes : ''}`,
           reference: newPayment.id,

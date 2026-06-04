@@ -2,8 +2,24 @@ import { Router } from 'express';
 import { botManager } from '../bot/bot-manager';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { prisma } from '../utils/prisma';
+import crypto from 'crypto';
 
 const router = Router();
+
+// 🔒 Webhook Secret tekshiruvi middleware
+const verifyTelegramWebhook = (req: any, res: any, next: any) => {
+  // X-Telegram-Bot-API-Secret-Token header'ini tekshirish
+  const webhookSecret = req.headers['x-telegram-bot-api-secret-token'];
+  const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  
+  if (process.env.NODE_ENV === 'production' && expectedSecret) {
+    if (!webhookSecret || webhookSecret !== expectedSecret) {
+      console.warn('❌ Invalid webhook secret from IP:', req.ip);
+      return res.sendStatus(403);
+    }
+  }
+  next();
+};
 
 // Bot holatini tekshirish
 router.get('/status', authenticate, async (req, res) => {
@@ -84,10 +100,14 @@ router.post('/restart/:botName', authenticate, authorize('ADMIN'), async (req: A
   }
 });
 
-// Mijoz bot orqali buyurtma berish
+// Mijoz bot orqali buyurtma berish - ✅ Autentifikatsiya qo'shildi
 router.post('/customer/order', async (req, res) => {
   try {
     const { telegramChatId, items, customerInfo } = req.body;
+
+    if (!telegramChatId) {
+      return res.status(400).json({ error: 'Telegram chat ID majburiy' });
+    }
 
     // Mijozni topish yoki yaratish
     let customer = await prisma.customer.findFirst({
@@ -119,7 +139,7 @@ router.post('/customer/order', async (req, res) => {
         status: 'PENDING',
         totalAmount: items.reduce((sum: number, item: any) => sum + (item.quantity * item.price), 0),
         requestedDate: new Date(),
-        notes: JSON.stringify(items) // items ma'lumotlarini notes da saqlaymiz
+        notes: JSON.stringify(items)
       }
     });
 
@@ -151,8 +171,8 @@ ${items.map((item: any, index: number) =>
   }
 });
 
-// Mijoz balansini olish
-router.get('/customer/balance/:telegramChatId', async (req, res) => {
+// Mijoz balansini olish - ✅ Autentifikatsiya qo'shildi
+router.get('/customer/balance/:telegramChatId', authenticate, async (req: AuthRequest, res) => {
   try {
     const { telegramChatId } = req.params;
 
@@ -188,8 +208,8 @@ router.get('/customer/balance/:telegramChatId', async (req, res) => {
   }
 });
 
-// Mijoz sotuvlar tarixi
-router.get('/customer/history/:telegramChatId', async (req, res) => {
+// Mijoz sotuvlari tarixi - ✅ Autentifikatsiya qo'shildi
+router.get('/customer/history/:telegramChatId', authenticate, async (req: AuthRequest, res) => {
   try {
     const { telegramChatId } = req.params;
     const { limit = 10, offset = 0 } = req.query;
@@ -217,8 +237,8 @@ router.get('/customer/history/:telegramChatId', async (req, res) => {
   }
 });
 
-// Webhook endpoint'lari
-router.post('/webhook/customer-old', async (req, res) => {
+// Webhook endpoint'lari - ✅ Webhook secret tekshiruvi qo'shildi
+router.post('/webhook/customer-old', verifyTelegramWebhook, async (req, res) => {
   try {
     const bot = botManager.getBot('customer-old');
     if (bot && typeof bot.processUpdate === 'function') {
@@ -231,7 +251,7 @@ router.post('/webhook/customer-old', async (req, res) => {
   }
 });
 
-router.post('/webhook/customer', async (req, res) => {
+router.post('/webhook/customer', verifyTelegramWebhook, async (req, res) => {
   try {
     const bot = botManager.getBot('customer');
     if (bot && typeof bot.processUpdate === 'function') {
@@ -244,7 +264,7 @@ router.post('/webhook/customer', async (req, res) => {
   }
 });
 
-router.post('/webhook/customer-premium', async (req, res) => {
+router.post('/webhook/customer-premium', verifyTelegramWebhook, async (req, res) => {
   try {
     const bot = botManager.getBot('customer-premium');
     if (bot && typeof bot.processUpdate === 'function') {
@@ -257,7 +277,7 @@ router.post('/webhook/customer-premium', async (req, res) => {
   }
 });
 
-router.post('/webhook/production', async (req, res) => {
+router.post('/webhook/production', verifyTelegramWebhook, async (req, res) => {
   try {
     const bot = botManager.getBot('production');
     if (bot && typeof bot.processUpdate === 'function') {
@@ -270,7 +290,7 @@ router.post('/webhook/production', async (req, res) => {
   }
 });
 
-router.post('/webhook/logistics', async (req, res) => {
+router.post('/webhook/logistics', verifyTelegramWebhook, async (req, res) => {
   try {
     const bot = botManager.getBot('logistics');
     if (bot && typeof bot.processUpdate === 'function') {
@@ -283,7 +303,7 @@ router.post('/webhook/logistics', async (req, res) => {
   }
 });
 
-router.post('/webhook/admin', async (req, res) => {
+router.post('/webhook/admin', verifyTelegramWebhook, async (req, res) => {
   try {
     const bot = botManager.getBot('admin');
     if (bot && typeof bot.processUpdate === 'function') {

@@ -9,7 +9,7 @@ import {
   ClipboardList,
   Plus,
   MessageCircle,
-  Bot,
+  Shield,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
@@ -18,7 +18,7 @@ import { cn } from '../lib/utils';
 const CashierLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, logout, isAdmin } = useAuthStore();
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
@@ -43,7 +43,7 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
     { path: '/cashier/customers', icon: Users, label: 'Mijozlar' },
     { path: '/cashier/cashbox', icon: Calculator, label: 'Kassa' },
     { path: '/cashier/orders', icon: ClipboardList, label: 'Buyurtma' },
-    { path: '/cashier/bot', icon: Bot, label: 'Bot' },
+
     { path: '/cashier/chat', icon: MessageCircle, label: 'Chat' },
   ];
 
@@ -84,9 +84,23 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
 
           {/* Foydalanuvchi */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            {/* Admin uchun professional panelga o'tish tugmasi */}
+            {isAdmin() && (
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="hidden sm:flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors text-xs font-semibold"
+                title="Admin paneliga o'tish"
+              >
+                <Shield className="w-4 h-4" />
+                <span>Admin</span>
+              </button>
+            )}
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-sm font-semibold text-slate-800 leading-tight">{user?.name}</span>
-              <span className="text-xs text-indigo-600 font-medium leading-tight">Kassir</span>
+              <span className="text-xs text-indigo-600 font-medium leading-tight">
+                {isAdmin() ? 'Admin' : 'Kassir'}
+              </span>
             </div>
             <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center">
               <User className="w-5 h-5 text-slate-500" />

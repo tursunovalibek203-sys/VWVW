@@ -54,7 +54,7 @@ export default function SalesModern() {
   const [pageSize, setPageSize] = useState(50);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  // UI-only: detail modal (replaces alert())
+  // UI-only: detail modal (replaces console.log())
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
 
   const statuses = ['all', 'completed', 'pending', 'cancelled'];
@@ -253,7 +253,8 @@ export default function SalesModern() {
   const formatDate = (value: string) => {
     const d = new Date(value);
     if (isNaN(d.getTime())) return value;
-    return d.toLocaleDateString('uz-UZ', { day: '2-digit', month: 'short', year: 'numeric' });
+    const SHORT_MONTHS = ['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'];
+    return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
   };
 
   const getTotalSales = () => {
@@ -673,7 +674,7 @@ export default function SalesModern() {
         )}
       </div>
 
-      {/* Sale detail modal (replaces alert()) */}
+      {/* Sale detail modal (replaces console.log()) */}
       <Modal
         isOpen={selectedSale !== null}
         onClose={() => setSelectedSale(null)}

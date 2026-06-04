@@ -66,7 +66,7 @@ export const clearSettingsCache = () => {
 export const getCompanyInfo = async () => {
   const settings = await getSettings();
   return {
-    name: settings.COMPANY_NAME || 'AzizTrades ERP',
+    name: settings.COMPANY_NAME || 'Lux Pet Plast',
     address: settings.COMPANY_ADDRESS || 'Toshkent, O\'zbekiston',
     phone: settings.COMPANY_PHONE || '+998901234567',
     email: settings.COMPANY_EMAIL || 'info@aziztrades.com',

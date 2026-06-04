@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Package, Users, Wallet, ClipboardList, Bot, MessageCircle } from 'lucide-react';
+import { ShoppingCart, Package, Users, Wallet, ClipboardList, MessageCircle } from 'lucide-react';
 import { latinToCyrillic } from '../../lib/transliterator';
 
 interface NavItem {
@@ -15,7 +15,7 @@ const navItems: NavItem[] = [
   { id: 'mijozlar', icon: Users, label: 'MIJOZLAR', path: '/cashier/customers' },
   { id: 'kassa', icon: Wallet, label: 'KASSA', path: '/cashier/cashbox' },
   { id: 'buyurtma', icon: ClipboardList, label: 'BUYURTMA', path: '/cashier/orders' },
-  { id: 'bot', icon: Bot, label: 'BOT', path: '/cashier/bot' },
+
   { id: 'chat', icon: MessageCircle, label: 'CHAT', path: '/cashier/chat' },
 ];
 

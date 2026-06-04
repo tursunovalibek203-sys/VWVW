@@ -81,6 +81,8 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onClose }) => {
       <button
         onClick={() => onClose(toast.id)}
         className="flex-shrink-0 p-1 rounded-md hover:bg-gray-200 transition-colors"
+        aria-label="Close notification"
+        title="Close"
       >
         <X className="w-4 h-4 text-gray-500" />
       </button>
@@ -89,7 +91,7 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onClose }) => {
         <div className="absolute bottom-0 left-0 h-1 bg-gray-300 rounded-b-lg overflow-hidden">
           <div
             className="h-full bg-gray-500 transition-all ease-linear"
-            style={{ width: `${progress}%` }}
+            style={{ width: `${progress}%` }} // eslint-disable-line react/no-inline-styles
           />
         </div>
       )}

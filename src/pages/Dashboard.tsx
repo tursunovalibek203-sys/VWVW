@@ -74,11 +74,11 @@ export default function Dashboard() {
     }
   };
 
-  const currentDate = new Date().toLocaleDateString('uz-UZ', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const currentDate = (() => {
+    const d = new Date();
+    const months = ['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentabr','Oktabr','Noyabr','Dekabr'];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  })();
 
   const nf = (n: number) => n.toLocaleString('en-US');
 
@@ -111,9 +111,11 @@ export default function Dashboard() {
     {
       label: 'Kutilayotgan buyurtma',
       value: nf(stats.pendingOrders),
-      sub: latinToCyrillic('ta buyurtma'),
+      sub: stats.pendingOrders > 0
+        ? latinToCyrillic('Bajarilishini kutmoqda')
+        : latinToCyrillic('Hamma bajarildi'),
       icon: ClipboardList,
-      tint: 'bg-violet-50 text-violet-600',
+      tint: stats.pendingOrders > 0 ? 'bg-violet-50 text-violet-600' : 'bg-slate-100 text-slate-500',
     },
   ];
 

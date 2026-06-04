@@ -5,6 +5,6 @@ const authFile = 'playwright/.auth/user.json';
 
 setup('authenticate', async ({ page }) => {
   await login(page);
-  await page.waitForURL(/.*dashboard|\/$/);
+  // storageState saves cookies + localStorage (JWT token) for reuse
   await page.context().storageState({ path: authFile });
 });

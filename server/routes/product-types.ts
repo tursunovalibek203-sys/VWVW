@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../utils/prisma';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, authorize } from '../middleware/auth';
 
 const router = Router();
 
@@ -76,7 +76,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // Mahsulot turini yangilash
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, authorize('ADMIN', 'WAREHOUSE_MANAGER'), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, defaultCard, active } = req.body;
@@ -115,7 +115,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // Mahsulot turini o'chirish (deactivate)
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, authorize('ADMIN', 'WAREHOUSE_MANAGER'), async (req, res) => {
   try {
     const { id } = req.params;
 

@@ -462,7 +462,7 @@ export default function CustomersModern() {
               : `${filteredCustomers.length.toLocaleString('en-US')} ${latinToCyrillic('ta mijoz')}`}
             {!loading && lastUpdated && (
               <span className="text-slate-400 ml-2">
-                &middot; {lastUpdated.toLocaleTimeString()}
+                &middot; {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
           </p>

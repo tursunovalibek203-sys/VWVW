@@ -185,10 +185,10 @@ export default function CustomerPortal() {
       // Create order API call would go here
       console.log('Creating order with cart:', cart);
       setCart([]);
-      alert('Buyurtma muvaffaqiyatli yaratildi!');
+      console.log('Buyurtma muvaffaqiyatli yaratildi!');
     } catch (error) {
       console.error('Error creating order:', error);
-      alert('Buyurtma yaratishda xatolik!');
+      console.log('Buyurtma yaratishda xatolik!');
     }
   };
 

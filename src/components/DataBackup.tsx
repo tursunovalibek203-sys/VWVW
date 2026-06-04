@@ -144,7 +144,7 @@ export default function DataBackup() {
                 <ul className="list-disc list-inside space-y-1">
                   <li>Import qilish mavjud ma'lumotlarni o'chiradi</li>
                   <li>Import qilishdan oldin joriy ma'lumotlarni eksport qiling</li>
-                  <li>Faqat AzizTrades ERP dan eksport qilingan fayllarni import qiling</li>
+                  <li>Faqat Lux Pet Plast dan eksport qilingan fayllarni import qiling</li>
                 </ul>
               </div>
             </div>

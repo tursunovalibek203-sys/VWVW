@@ -62,11 +62,12 @@ interface KpiCard {
 const fmtNum = (n: number) => (Number.isFinite(n) ? Math.round(n).toLocaleString('en-US') : '0');
 const fmtMoney = (n: number, currency = 'UZS') => `${fmtNum(n)} ${currency}`;
 
+const SHORT_MONTHS = ['Yan','Fev','Mar','Apr','May','Iyn','Iyl','Avg','Sen','Okt','Noy','Dek'];
 const formatDate = (value?: string | null) => {
   if (!value) return '—';
   const d = new Date(value);
   if (isNaN(d.getTime())) return value;
-  return d.toLocaleDateString('uz-UZ', { day: '2-digit', month: 'short', year: 'numeric' });
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 };
 
 // Compute the startDate query param for a given period (endDate = now).
@@ -150,7 +151,7 @@ export default function ReportsModern() {
   };
 
   // Export is not implemented on the backend yet. Surface this honestly via a
-  // disabled button + tooltip instead of pretending with an alert().
+  // disabled button + tooltip instead of pretending with an console.log().
   const exportDisabledTitle = latinToCyrillic('Yuklab olish hozircha mavjud emas');
 
   // ---- Derived rows + KPI cards per report ----------------------------------
@@ -438,7 +439,9 @@ export default function ReportsModern() {
                       </div>
                     </td>
                     <td className="px-5 py-4 text-sm text-slate-600">
-                      {sale.product?.name || '—'}
+                      {sale.items?.length > 0
+                        ? sale.items.map((it: any) => it.product?.name).filter(Boolean).join(', ') || sale.product?.name || '—'
+                        : sale.product?.name || '—'}
                     </td>
                     <td className="px-5 py-4 text-right text-sm text-slate-600 tabular-nums">{fmtNum(sale.quantity ?? 0)}</td>
                     <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900 tabular-nums">{fmtMoney(sale.totalAmount ?? 0)}</td>

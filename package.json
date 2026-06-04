@@ -16,6 +16,7 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:full": "tsx scripts/seed-full.ts",
+    "db:test-data": "tsx server/add-test-products.ts",
     "migrate:variants": "tsx scripts/migrate-to-variants.ts",
     "migrate:variants:preview": "tsx scripts/migrate-to-variants.ts preview",
     "migrate:variants:execute": "tsx scripts/migrate-to-variants.ts execute",

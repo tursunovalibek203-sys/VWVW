@@ -21,22 +21,33 @@ import type { ApiResponse } from './professionalApi';
  */
 export function extractData<T>(response: ApiResponse<T> | any, defaultValue: T): T {
   if (!response) return defaultValue;
-  
-  // New standard format: response.data contains the actual data
+
+  // professionalApi double-wraps: { success:true, data: BACKEND_RESPONSE }
+  // where BACKEND_RESPONSE itself is { success:true, data: ACTUAL_DATA }
+  // We need to unwrap both layers.
   if (response.success === true && response.data !== undefined) {
-    return response.data as T;
+    const inner = response.data;
+    if (inner && typeof inner === 'object' && !Array.isArray(inner) && inner.success === true && inner.data !== undefined) {
+      // Double-wrapped — unwrap the inner layer
+      return inner.data as T;
+    }
+    return inner as T;
   }
-  
+
   // Direct data (old format or unwrapped response)
   if (response.data !== undefined && !response.success) {
-    return response.data as T;
+    const inner = response.data;
+    if (inner && typeof inner === 'object' && !Array.isArray(inner) && inner.success === true && inner.data !== undefined) {
+      return inner.data as T;
+    }
+    return inner as T;
   }
-  
+
   // Direct array/object response
   if (Array.isArray(response) || (typeof response === 'object' && !response.success)) {
     return response as T;
   }
-  
+
   return defaultValue;
 }
 

@@ -37,7 +37,7 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:5003',
+        target: 'http://localhost:5004',
         changeOrigin: true,
         ws: true,
       },
@@ -50,7 +50,7 @@ export default defineConfig({
     watch: {
       usePolling: false,
       interval: 300,
-      batchTimeout: 300,
+
       ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**'],
     },
   },

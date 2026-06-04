@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { checkPermission, PermissionType } from '../lib/permissions';
 
 interface User {
   id: string;
@@ -13,7 +14,10 @@ interface AuthState {
   user: User | null;
   setAuth: (token: string, user: User) => void;
   logout: () => void;
-  hasPermission: (permission: string) => boolean;
+  hasPermission: (permission: PermissionType) => boolean;
+  isAdmin: () => boolean;
+  isCashier: () => boolean;
+  isSeller: () => boolean;
 }
 
 // Persist auth state to sessionStorage (more secure than localStorage against XSS)
@@ -27,17 +31,25 @@ export const useAuthStore = create<AuthState>()(
         set({ token, user });
       },
       logout: () => {
-        const { token } = get();
         // Clear from storage
         set({ token: null, user: null });
       },
-      hasPermission: (permission: string) => {
+      hasPermission: (permission: PermissionType) => {
         const { user } = get();
-        if (!user) return false;
-        // Case-insensitive role check
-        const userRole = user.role?.toLowerCase();
-        const requiredRole = permission?.toLowerCase();
-        return userRole === requiredRole || userRole === 'admin';
+        return checkPermission(user?.role, permission);
+      },
+      isAdmin: () => {
+        const { user } = get();
+        return user?.role?.toUpperCase() === 'ADMIN';
+      },
+      isCashier: () => {
+        const { user } = get();
+        const role = user?.role?.toUpperCase();
+        return role === 'CASHIER' || role === 'SELLER';
+      },
+      isSeller: () => {
+        const { user } = get();
+        return user?.role?.toUpperCase() === 'SELLER';
       },
     }),
     {

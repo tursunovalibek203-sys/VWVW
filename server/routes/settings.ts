@@ -19,7 +19,7 @@ router.get('/', authenticate, async (req, res) => {
     const defaultSettings = {
       USD_TO_UZS_RATE: '12500',
       EUR_TO_UZS_RATE: '13500',
-      COMPANY_NAME: 'AzizTrades ERP',
+      COMPANY_NAME: 'Lux Pet Plast',
       COMPANY_ADDRESS: 'Toshkent, O\'zbekiston',
       COMPANY_PHONE: '+998901234567',
       COMPANY_EMAIL: 'info@aziztrades.com',

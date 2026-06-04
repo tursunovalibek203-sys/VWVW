@@ -86,102 +86,78 @@ router.get('/summary', async (req, res) => {
     
     const totalBalance = totalIncome - totalExpense;
 
-    // Valyuta bo'yicha hisoblash - ALOHIDA (sales va payments dan)
+    // Valyuta bo'yicha hisoblash
+    // When cashboxTransactions exist they are the authoritative source (SalesService writes
+    // both Sale + CashboxTransaction inside the same DB transaction).  Using sales/payments
+    // as a fallback ONLY when the cashbox table is truly empty prevents double-counting.
     let cashUZS = 0, cashUSD = 0, cardUSD = 0, clickUZS = 0;
-    
-    // Sotuvlardan - paymentDetails parse qilib, bo'lmasa paidAmount dan
-    sales.forEach(sale => {
-      if (sale.paymentDetails) {
-        try {
-          const details = JSON.parse(sale.paymentDetails);
-          cashUZS += details.uzs || 0;
-          cashUSD += details.usd || 0;
-          clickUZS += details.click || 0;
-          cardUSD += details.card || 0; // Karta to'lovlari
-        } catch (e) {
-          // JSON parse xatolik bo'lsa, paidAmount ni currency ga qarab qo'shamiz
-          if (sale.currency === 'UZS') {
-            cashUZS += sale.paidAmount || 0;
-          } else {
-            cashUSD += sale.paidAmount || 0;
-          }
-        }
-      } else {
-        // paymentDetails yo'q bo'lsa, paidAmount ni currency ga qarab qo'shamiz
-        if (sale.currency === 'UZS') {
-          cashUZS += sale.paidAmount || 0;
-        } else {
-          cashUSD += sale.paidAmount || 0;
-        }
-      }
-    });
-    
-    // To'lovlardan
-    payments.forEach(payment => {
-      if (payment.paymentDetails) {
-        try {
-          const details = JSON.parse(payment.paymentDetails);
-          cashUZS += details.uzs || 0;
-          cashUSD += details.usd || 0;
-          clickUZS += details.click || 0;
-          cardUSD += details.card || 0;
-        } catch (e) {
-          // JSON parse xatolik bo'lsa, amount ni currency ga qarab qo'shamiz
-          if (payment.currency === 'UZS') {
-            cashUZS += payment.amount || 0;
-          } else {
-            cashUSD += payment.amount || 0;
-          }
-        }
-      } else {
-        // paymentDetails yo'q bo'lsa, amount ni currency ga qarab qo'shamiz
-        if (payment.currency === 'UZS') {
-          cashUZS += payment.amount || 0;
-        } else {
-          cashUSD += payment.amount || 0;
-        }
-      }
-    });
 
-    // Kassa kirimlaridan (manfiy expense)
-    expenses.forEach(expense => {
-      if (expense.amount < 0) { // Faqat kassa kirimlari
-        const amount = Math.abs(expense.amount);
-        if (expense.currency === 'UZS') {
-          if (expense.category === 'KASSA_KIRIM') {
-            cashUZS += amount;
-          } else if (expense.category === 'TRANSFER_IN') {
-            cashUZS += amount;
-          }
-        } else if (expense.currency === 'USD') {
-          cashUSD += amount;
-        }
-      }
-    });
-
-    // CashboxTransaction dan valyuta bo'yicha hisoblash
-    // ✅ YANGILANGAN: Database currency maydonidan foydalanish
-    cashboxTransactions.forEach(tx => {
-      if (tx.type === 'INCOME') {
-        const txCurrency = tx.currency || 'UZS'; // Database dan olish
+    if (cashboxTransactions.length > 0) {
+      // Primary path: derive currency breakdown exclusively from CashboxTransaction rows
+      cashboxTransactions.forEach(tx => {
+        if (tx.type !== 'INCOME') return;
+        const txCurrency = tx.currency || 'UZS';
         const paymentMethod = tx.paymentMethod || 'CASH';
-        
-        // Click to'lovlari
-        if (paymentMethod === 'CLICK' || tx.category === 'SALE' && tx.description?.includes('Click')) {
+
+        if (paymentMethod === 'CLICK' || (tx.category === 'SALE' && tx.description?.includes('Click'))) {
           clickUZS += tx.amount;
-        } 
-        // Karta to'lovlari
-        else if (paymentMethod === 'CARD' || tx.category === 'SALE' && (tx.description?.includes('Karta') || tx.description?.includes('CARD'))) {
+        } else if (paymentMethod === 'CARD' || (tx.category === 'SALE' && (tx.description?.includes('Karta') || tx.description?.includes('CARD')))) {
           cardUSD += tx.amount;
-        }
-        // Naqd to'lovlari - valyuta bo'yicha
-        else if (txCurrency === 'UZS') {
+        } else if (txCurrency === 'UZS') {
           cashUZS += tx.amount;
         } else if (txCurrency === 'USD') {
           cashUSD += tx.amount;
         }
-      }
-    });
+      });
+    } else {
+      // Fallback path (legacy data only): derive from Sale + Payment + Expense tables
+      sales.forEach(sale => {
+        if (sale.paymentDetails) {
+          try {
+            const details = JSON.parse(sale.paymentDetails);
+            cashUZS += details.uzs || 0;
+            cashUSD += details.usd || 0;
+            clickUZS += details.click || 0;
+            cardUSD += details.card || 0;
+          } catch {
+            if (sale.currency === 'UZS') cashUZS += sale.paidAmount || 0;
+            else cashUSD += sale.paidAmount || 0;
+          }
+        } else {
+          if (sale.currency === 'UZS') cashUZS += sale.paidAmount || 0;
+          else cashUSD += sale.paidAmount || 0;
+        }
+      });
+
+      payments.forEach(payment => {
+        if (payment.paymentDetails) {
+          try {
+            const details = JSON.parse(payment.paymentDetails);
+            cashUZS += details.uzs || 0;
+            cashUSD += details.usd || 0;
+            clickUZS += details.click || 0;
+            cardUSD += details.card || 0;
+          } catch {
+            if (payment.currency === 'UZS') cashUZS += payment.amount || 0;
+            else cashUSD += payment.amount || 0;
+          }
+        } else {
+          if (payment.currency === 'UZS') cashUZS += payment.amount || 0;
+          else cashUSD += payment.amount || 0;
+        }
+      });
+
+      expenses.forEach(expense => {
+        if (expense.amount < 0) {
+          const amount = Math.abs(expense.amount);
+          if (expense.currency === 'UZS' && ['KASSA_KIRIM', 'TRANSFER_IN'].includes(expense.category)) {
+            cashUZS += amount;
+          } else if (expense.currency === 'USD') {
+            cashUSD += amount;
+          }
+        }
+      });
+    }
 
     const dailyFlow = [];
     for (let i = 6; i >= 0; i--) {
@@ -201,8 +177,8 @@ router.get('/summary', async (req, res) => {
       });
     }
 
-    // Jami USD ekvivalentini hisoblash (kurs 12600 so'm = 1 dollar)
-    const exchangeRate = 12600;
+    // Jami USD ekvivalentini hisoblash
+    const exchangeRate = parseInt(process.env.USD_TO_UZS_RATE || '12500', 10);
     const totalUSD = (cashUZS + clickUZS) / exchangeRate + cashUSD + cardUSD;
 
     res.json({ 
@@ -306,28 +282,38 @@ router.post('/transfer', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), 
 
     if (!amount || amount <= 0) return res.status(400).json({ error: 'Transfer miqdori musbat bolishi kerak' });
 
-    // Use provided exchange rate or default
-    const rate = exchangeRate || 12600;
+    // Use provided exchange rate or fall back to environment config
+    const rate = exchangeRate || parseInt(process.env.USD_TO_UZS_RATE || '12500', 10);
 
-    // Create withdrawal record (from)
+    // Compute converted amount for the receiving side
+    let toAmount = amount;
+    if (from === 'USD' && to === 'UZS') {
+      toAmount = amount * rate;
+    } else if (from === 'UZS' && to === 'USD') {
+      toAmount = amount / rate;
+    }
+
+    // Create withdrawal record (from) — store source currency
     await prisma.cashboxTransaction.create({
       data: {
         type: 'EXPENSE',
         amount: amount,
+        currency: from,
         category: 'TRANSFER',
-        description: description || `Transfer: ${from} -> ${to}`,
+        description: description || `Transfer: ${amount} ${from} -> ${toAmount.toFixed(2)} ${to} (kurs: ${rate})`,
         userId: req.user!.id,
         userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
       }
     });
 
-    // Create deposit record (to)
+    // Create deposit record (to) — store target currency and converted amount
     await prisma.cashboxTransaction.create({
       data: {
         type: 'INCOME',
-        amount: amount,
+        amount: toAmount,
+        currency: to,
         category: 'TRANSFER',
-        description: description || `Transfer: ${from} -> ${to}`,
+        description: description || `Transfer: ${amount} ${from} -> ${toAmount.toFixed(2)} ${to} (kurs: ${rate})`,
         userId: req.user!.id,
         userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
       }
@@ -353,7 +339,7 @@ router.post('/exchange', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), 
       return res.status(400).json({ error: 'Bir xil valyutalarni ayirboshlab bolmaydi' });
     }
 
-    const rate = exchangeRate || 12600;
+    const rate = exchangeRate || parseInt(process.env.USD_TO_UZS_RATE || '12500', 10);
     let receivedAmount: number;
 
     // Ayirboshlash hisoblash

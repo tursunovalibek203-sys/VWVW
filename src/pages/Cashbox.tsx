@@ -251,7 +251,21 @@ export default function Cashbox() {
 
   useEffect(() => {
     loadCashbox();
+    loadExchangeRate();
   }, []);
+
+  const loadExchangeRate = async () => {
+    try {
+      const { data } = await api.get('/exchange-rates/pair?from=USD&to=UZS');
+      if (data?.data?.rate) {
+        setExchangeRate(data.data.rate);
+        setExchangeRateInput(data.data.rate.toString());
+        localStorage.setItem('cashboxExchangeRate', data.data.rate.toString());
+      }
+    } catch (error) {
+      console.error('Failed to load exchange rate:', error);
+    }
+  };
 
   // Byudjet tab ochilganda yuklash
   useEffect(() => {
@@ -267,12 +281,22 @@ export default function Cashbox() {
     }
   }, [activeTab]);
 
-  const saveExchangeRate = () => {
-    const rate = parseInt(exchangeRateInput) || 12500;
-    setExchangeRate(rate);
-    // Save to localStorage for persistence
-    localStorage.setItem('cashboxExchangeRate', rate.toString());
-    setShowExchangeRateModal(false);
+  const saveExchangeRate = async () => {
+    const rate = parseFloat(exchangeRateInput) || 12500;
+    try {
+      await api.post('/exchange-rates', {
+        fromCurrency: 'USD',
+        toCurrency: 'UZS',
+        rate: rate
+      });
+      setExchangeRate(rate);
+      localStorage.setItem('cashboxExchangeRate', rate.toString());
+      setShowExchangeRateModal(false);
+      addToast({ type: 'success', title: t('Valyuta kursi muvaffaqiyatli saqlandi!') });
+    } catch (error) {
+      console.error('Failed to save exchange rate:', error);
+      addToast({ type: 'error', title: t('Valyuta kursini saqlashda xatolik yuz berdi!') });
+    }
   };
 
   const loadCashbox = async (isRefresh = false) => {
@@ -680,7 +704,7 @@ export default function Cashbox() {
   const kpiCards = [
     { title: t("Naqd Som"), value: formatCurrency(cashbox?.byCurrency?.cashUZS || 0, 'UZS'), icon: Banknote, tint: 'bg-emerald-50 text-emerald-600' },
     { title: t("Naqd Dollar"), value: formatCurrency(cashbox?.byCurrency?.cashUSD || 0, 'USD'), icon: DollarSign, tint: 'bg-blue-50 text-blue-600' },
-    { title: t("Click / Karta"), value: formatCurrency(cashbox?.byCurrency?.clickUZS || 0, 'UZS'), icon: Smartphone, tint: 'bg-purple-50 text-purple-600' },
+    { title: 'Click / Karta', value: formatCurrency(cashbox?.byCurrency?.clickUZS || 0, 'UZS'), icon: Smartphone, tint: 'bg-purple-50 text-purple-600' },
     { title: t("Jami (USD eq)"), value: formatCurrency((cashbox?.totalUSD || 0), 'USD'), icon: Wallet, tint: 'bg-amber-50 text-amber-600' },
   ];
 
@@ -734,7 +758,7 @@ export default function Cashbox() {
               </div>
             </div>
             <p className="mt-3 text-4xl font-bold tracking-tight tabular-nums">
-              {formatCurrency(cashbox?.totalBalance || 0, 'USD')}
+              {formatCurrency(cashbox?.totalUSD || 0, 'USD')}
             </p>
             <p className="mt-1.5 text-sm text-slate-400 tabular-nums">{t("Jami (USD ekvivalent)")}</p>
             <div className="mt-6 pt-5 border-t border-white/10 flex items-center gap-8">

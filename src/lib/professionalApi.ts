@@ -52,8 +52,14 @@ class ProfessionalApi {
   private pendingRequests: Map<string, Promise<any>> = new Map();
 
   constructor(config: Partial<ApiConfig> = {}) {
+    // Use absolute URL for backend API if not in production
+    const backendUrl = process.env.REACT_APP_API_URL || 
+                       (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+                         ? 'http://localhost:5004/api' 
+                         : '/api');
+    
     this.config = {
-      baseURL: '/api',
+      baseURL: backendUrl,
       timeout: 15000, // Reduced from 30000 to 15000ms
       retryAttempts: 2, // Reduced from 3 to 2
       retryDelay: 500, // Reduced from 1000 to 500ms

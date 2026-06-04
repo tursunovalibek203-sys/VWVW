@@ -37,7 +37,7 @@ export const CartItem = ({
     // Stock tekshiruvi
     const availableStock = cartProduct?.currentStock || 0;
     if (bagQuantity > availableStock) {
-      alert(`⚠️ ${item.productName} uchun yetarli mahsulot yo'q!\nMavjud: ${availableStock} qop\nSo'ralgan: ${bagQuantity} qop`);
+      console.log(`⚠️ ${item.productName} uchun yetarli mahsulot yo'q!\nMavjud: ${availableStock} qop\nSo'ralgan: ${bagQuantity} qop`);
       return;
     }
     
