@@ -20,6 +20,20 @@ async function main() {
   });
   console.log('✅ Admin user created:', admin.login);
 
+  // Create cashier user
+  const kassirPassword = await bcrypt.hash('kassir123', 10);
+  const kassir = await prisma.user.upsert({
+    where: { login: 'kassir' },
+    update: {},
+    create: {
+      login: 'kassir',
+      password: kassirPassword,
+      name: 'Kassir',
+      role: 'CASHIER',
+    },
+  });
+  console.log('✅ Kassir user created:', kassir.login);
+
   // Create sample products
   const products = [
     {
