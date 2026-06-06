@@ -274,6 +274,19 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
+// Temporary debug endpoint - remove after diagnosis
+app.get('/api/debug-auth', async (req, res) => {
+  try {
+    const bcrypt = await import('bcryptjs');
+    const user = await prisma.user.findUnique({ where: { login: 'admin' } });
+    if (!user) return res.json({ found: false });
+    const valid = await bcrypt.default.compare('admin123', user.password);
+    res.json({ found: true, valid, hashPrefix: user.password.substring(0, 7), active: user.active });
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
 // Global error handler - must be last (BEFORE app.listen)
 app.use(errorHandler);
 
