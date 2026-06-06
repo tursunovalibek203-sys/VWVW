@@ -4,7 +4,7 @@ import {
   Search,
   Filter,
   ShoppingCart,
-  TrendingUp,
+
   DollarSign,
   Calendar,
   User,
@@ -54,6 +54,7 @@ export default function SalesModern() {
   const [pageSize, setPageSize] = useState(50);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [todayExpenses, setTodayExpenses] = useState(0);
   // UI-only: detail modal (replaces console.log())
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
 
@@ -94,6 +95,19 @@ export default function SalesModern() {
       setSales(mappedSales);
       setTotalPages(pagination?.totalPages || 1);
       setTotal(pagination?.total || 0);
+
+      // Bugungi xarajatlarni yuklash
+      try {
+        const today = new Date();
+        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59).toISOString();
+        const expRes = await api.get(`/expenses?startDate=${startOfDay}&endDate=${endOfDay}&limit=1000`);
+        const expData = expRes.data?.data || expRes.data?.expenses || expRes.data || [];
+        const arr = Array.isArray(expData) ? expData : [];
+        setTodayExpenses(arr.reduce((s: number, e: any) => s + (e.amount || 0), 0));
+      } catch {
+        // expenses kelmasa 0 qoladi
+      }
 
     } catch (error) {
       clearTimeout(timeout);
@@ -257,45 +271,49 @@ export default function SalesModern() {
     return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
   };
 
-  const getTotalSales = () => {
-    return filteredSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
-  };
+  const isToday = (dateStr: string) =>
+    new Date(dateStr).toDateString() === new Date().toDateString();
 
-  const getCompletedSales = () => {
-    return filteredSales.filter(sale => sale.status === 'completed' || sale.status === ('paid' as Sale['status'])).length;
-  };
+  const todaySales = sales.filter(s => isToday(s.date));
 
-  const getTodaySales = () =>
-    filteredSales
-      .filter(sale => new Date(sale.date).toDateString() === new Date().toDateString())
-      .reduce((sum, sale) => sum + sale.totalAmount, 0);
+  const todayTotal = todaySales.reduce((sum, s) => sum + s.totalAmount, 0);
+
+  const todayDebt = todaySales
+    .filter(s => s.status === 'unpaid' || s.status === 'partial' || s.status === 'pending')
+    .reduce((sum, s) => sum + s.totalAmount, 0);
+
+  const todayCash = todaySales
+    .filter(s => s.paymentType === 'cash' && (s.status === 'paid' || s.status === 'completed'))
+    .reduce((sum, s) => sum + s.totalAmount, 0);
 
   const hasActiveFilters = !!debouncedSearchTerm || selectedStatus !== 'all' || selectedPeriod !== 'all';
 
+  const fmt = (n: number) => n.toLocaleString('en-US');
+
   const stats = [
     {
-      label: latinToCyrillic('Jami sotuv'),
-      value: `${getTotalSales().toLocaleString('en-US')} UZS`,
+      label: latinToCyrillic('Bugungi savdo'),
+      value: `${fmt(todayTotal)} UZS`,
       icon: ShoppingCart,
       tint: 'bg-indigo-50 text-indigo-600',
     },
     {
-      label: latinToCyrillic('Bajarilgan'),
-      value: getCompletedSales().toLocaleString('en-US'),
-      icon: TrendingUp,
+      label: latinToCyrillic('Qarzga ketgan tovar'),
+      value: `${fmt(todayDebt)} UZS`,
+      icon: CreditCard,
+      tint: 'bg-red-50 text-red-500',
+    },
+    {
+      label: latinToCyrillic('Jami naqt olingan'),
+      value: `${fmt(todayCash)} UZS`,
+      icon: DollarSign,
       tint: 'bg-emerald-50 text-emerald-600',
     },
     {
-      label: latinToCyrillic("O'rtacha sotuv"),
-      value: `${filteredSales.length > 0 ? Math.round(getTotalSales() / filteredSales.length).toLocaleString('en-US') : 0} UZS`,
-      icon: DollarSign,
-      tint: 'bg-violet-50 text-violet-600',
-    },
-    {
-      label: latinToCyrillic('Bugungi sotuv'),
-      value: `${getTodaySales().toLocaleString('en-US')} UZS`,
+      label: latinToCyrillic('Jami xarajat'),
+      value: `${fmt(todayExpenses)} UZS`,
       icon: Receipt,
-      tint: 'bg-sky-50 text-sky-600',
+      tint: 'bg-amber-50 text-amber-600',
     },
   ];
 
