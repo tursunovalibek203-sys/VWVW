@@ -19,7 +19,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGIN
-        value: https://luxpetplast.vercel.app
+        value: https://luxpetplast-alpha.vercel.app
       - key: USD_TO_UZS_RATE
         value: "12500"
       - key: VITE_DEVICE_ID
