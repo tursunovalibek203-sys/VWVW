@@ -18,6 +18,8 @@ import {
   Crown,
   ShieldAlert,
   User,
+  CreditCard,
+  DollarSign,
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import Button from '../components/Button';
@@ -45,9 +47,10 @@ export default function CustomerProfile() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
-    amount: '',
-    currency: 'USD',
-    type: 'CASH',
+    uzs: '',
+    usd: '',
+    karta: '',
+    kurs: '12700',
     notes: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,24 +105,26 @@ export default function CustomerProfile() {
     e.preventDefault();
     if (!id) return;
 
-    const amount = parseFloat(paymentForm.amount);
-    if (!amount || amount <= 0) {
-      addToast(toast.warning(latinToCyrillic('Diqqat'), latinToCyrillic('Iltimos, to\'lov summasini kiriting')));
+    const uzs = parseFloat(paymentForm.uzs) || 0;
+    const usd = parseFloat(paymentForm.usd) || 0;
+    const karta = parseFloat(paymentForm.karta) || 0;
+
+    if (uzs <= 0 && usd <= 0 && karta <= 0) {
+      addToast(toast.warning(latinToCyrillic('Diqqat'), latinToCyrillic('Iltimos, kamida bitta to\'lov summasini kiriting')));
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await api.post(`/customers/${id}/payment`, {
-        amount,
-        currency: paymentForm.currency,
-        type: paymentForm.type,
-        notes: paymentForm.notes
-      });
+      const calls = [];
+      if (uzs > 0) calls.push(api.post(`/customers/${id}/payment`, { amount: uzs, currency: 'UZS', type: 'CASH', notes: paymentForm.notes }));
+      if (usd > 0) calls.push(api.post(`/customers/${id}/payment`, { amount: usd, currency: 'USD', type: 'CASH', notes: paymentForm.notes }));
+      if (karta > 0) calls.push(api.post(`/customers/${id}/payment`, { amount: karta, currency: 'UZS', type: 'CARD', notes: paymentForm.notes }));
+      await Promise.all(calls);
 
       addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic('Тўлов амалга оширилди ва кассага қўшилди!')));
       setShowPaymentModal(false);
-      setPaymentForm({ amount: '', currency: 'USD', type: 'CASH', notes: '' });
+      setPaymentForm({ uzs: '', usd: '', karta: '', kurs: '12700', notes: '' });
       loadCustomerData(); // Refresh customer data
     } catch (error: any) {
       console.error('To\'lov xatolik:', error);
@@ -583,102 +588,133 @@ export default function CustomerProfile() {
           title={latinToCyrillic('Mijozdan to\'lov qilish')}
           size="md"
         >
-          <form onSubmit={handlePaymentSubmit} className="space-y-5">
-            {/* Mijoz ma'lumoti */}
+          {(() => {
+            const kurs = parseFloat(paymentForm.kurs) || 0;
+            const uzs = parseFloat(paymentForm.uzs) || 0;
+            const usd = parseFloat(paymentForm.usd) || 0;
+            const karta = parseFloat(paymentForm.karta) || 0;
+            const totalUZS = uzs + (usd * kurs) + karta;
+            const totalUSD = kurs > 0 ? totalUZS / kurs : 0;
+            const hasAny = uzs > 0 || usd > 0 || karta > 0;
+            return (
+          <form onSubmit={handlePaymentSubmit} className="space-y-4">
+            {/* Mijoz info */}
             <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-4">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                   {getInitials(customer.name)}
                 </div>
                 <div className="min-w-0">
                   <h3 className="font-bold text-gray-900 truncate">{customer.name}</h3>
                   <p className="text-sm text-gray-600">
                     {latinToCyrillic('Qarz')}: <span className="font-semibold text-rose-600">${debtUSD.toFixed(2)}</span>
-                    <span className="text-gray-300 mx-1.5">|</span>
-                    {latinToCyrillic('Balans')}: <span className="font-semibold text-emerald-600">${(customer.balanceUSD || 0).toFixed(2)}</span>
+                    <span className="text-gray-300 mx-2">|</span>
+                    {debtUZS.toLocaleString()} {latinToCyrillic("so'm")}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Summa */}
+            {/* Kurs */}
             <div>
-              <label htmlFor="payment-amount" className="block text-sm font-semibold text-gray-700 mb-1.5">
-                {latinToCyrillic('To\'lov summasi')} *
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                {latinToCyrillic('Valyuta kursi')} (1$ = ? so'm)
               </label>
               <input
-                id="payment-amount"
                 type="number"
-                min="0.01"
-                step="0.01"
-                value={paymentForm.amount}
-                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                className="w-full h-12 px-4 text-lg font-bold bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all"
-                placeholder="0.00"
-                required
-                autoFocus
+                min="1"
+                value={paymentForm.kurs}
+                onChange={(e) => setPaymentForm({ ...paymentForm, kurs: e.target.value })}
+                className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                placeholder="12700"
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Valyuta */}
+            {/* 3 ta to'lov inputi */}
+            <div className="grid grid-cols-3 gap-3">
+              {/* So'm (naqt UZS) */}
               <div>
-                <label htmlFor="payment-currency" className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  {latinToCyrillic('Valyuta')}
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 mb-1.5">
+                  <Banknote className="w-3.5 h-3.5 text-emerald-600" />
+                  {latinToCyrillic("Naqt so'm")}
                 </label>
-                <select
-                  id="payment-currency"
-                  value={paymentForm.currency}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, currency: e.target.value })}
-                  className="w-full h-12 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                  aria-label={latinToCyrillic('Valyuta tanlash')}
-                >
-                  <option value="USD">USD ($)</option>
-                  <option value="UZS">UZS (so'm)</option>
-                </select>
+                <input
+                  type="number"
+                  min="0"
+                  value={paymentForm.uzs}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, uzs: e.target.value })}
+                  className="w-full h-12 px-3 text-base font-bold bg-emerald-50 border border-emerald-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
+                  placeholder="0"
+                  autoFocus
+                />
+                {uzs > 0 && kurs > 0 && (
+                  <p className="text-xs text-gray-400 mt-1 text-center">${(uzs / kurs).toFixed(2)}</p>
+                )}
               </div>
 
-              {/* To'lov turi */}
+              {/* Dollar (naqt USD) */}
               <div>
-                <label htmlFor="payment-type" className="block text-sm font-semibold text-gray-700 mb-1.5">
-                  {latinToCyrillic('To\'lov turi')}
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 mb-1.5">
+                  <DollarSign className="w-3.5 h-3.5 text-blue-600" />
+                  {latinToCyrillic('Naqt $')}
                 </label>
-                <select
-                  id="payment-type"
-                  value={paymentForm.type}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, type: e.target.value })}
-                  className="w-full h-12 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                  aria-label={latinToCyrillic('To\'lov turini tanlash')}
-                >
-                  <option value="CASH">{latinToCyrillic('Naqd pul')}</option>
-                  <option value="CARD">{latinToCyrillic('Karta')}</option>
-                  <option value="CLICK">Click</option>
-                  <option value="TRANSFER">{latinToCyrillic('Bank o\'tkazmasi')}</option>
-                </select>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={paymentForm.usd}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, usd: e.target.value })}
+                  className="w-full h-12 px-3 text-base font-bold bg-blue-50 border border-blue-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                  placeholder="0"
+                />
+                {usd > 0 && kurs > 0 && (
+                  <p className="text-xs text-gray-400 mt-1 text-center">{(usd * kurs).toLocaleString()} {latinToCyrillic("so'm")}</p>
+                )}
+              </div>
+
+              {/* Karta (UZS) */}
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 mb-1.5">
+                  <CreditCard className="w-3.5 h-3.5 text-purple-600" />
+                  {latinToCyrillic('Karta')}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={paymentForm.karta}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, karta: e.target.value })}
+                  className="w-full h-12 px-3 text-base font-bold bg-purple-50 border border-purple-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
+                  placeholder="0"
+                />
+                {karta > 0 && kurs > 0 && (
+                  <p className="text-xs text-gray-400 mt-1 text-center">${(karta / kurs).toFixed(2)}</p>
+                )}
               </div>
             </div>
+
+            {/* Jami preview */}
+            {hasAny && (
+              <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{latinToCyrillic("Jami to'lov")}</p>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-xl font-bold text-emerald-700">{totalUZS.toLocaleString()} {latinToCyrillic("so'm")}</span>
+                  <span className="text-sm font-semibold text-gray-400">≈ ${totalUSD.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
 
             {/* Izoh */}
             <div>
-              <label htmlFor="payment-notes" className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                 {latinToCyrillic('Izoh')} ({latinToCyrillic('ixtiyoriy')})
               </label>
-              <textarea
-                id="payment-notes"
+              <input
+                type="text"
                 value={paymentForm.notes}
                 onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all resize-none"
-                rows={2}
-                placeholder={latinToCyrillic('Qo\'shimcha ma\'lumot...')}
+                className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                placeholder={latinToCyrillic("Qo'shimcha ma'lumot...")}
               />
-            </div>
-
-            {/* Ogohlantirish */}
-            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 flex gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-amber-800">
-                {latinToCyrillic('Бу тўлов автоматик равишда кассага қўшилади ва мижоз баланси янгиланади.')}
-              </p>
             </div>
 
             {/* Tugmalar */}
@@ -711,6 +747,8 @@ export default function CustomerProfile() {
               </Button>
             </div>
           </form>
+            );
+          })()}
         </Modal>
       )}
     </div>
