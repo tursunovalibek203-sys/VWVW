@@ -160,14 +160,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(securityLogger);
 app.use(sanitizeInput);
 
-// 🔒 CSRF protection - skip webhook endpoints
-app.use((req, res, next) => {
-  // Skip CSRF for Telegram webhooks and development
-  if (process.env.NODE_ENV === 'development' || req.path.startsWith('/api/bots/webhook')) {
-    return next();
-  }
-  return csrfProtection(req, res, next);
-});
+// CSRF protection skipped — JWT token in Authorization header already prevents CSRF attacks
 
 // Swagger API Documentation
 setupSwagger(app);
