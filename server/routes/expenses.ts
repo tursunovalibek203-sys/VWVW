@@ -6,10 +6,10 @@ const router = Router();
 
 router.use(authenticate);
 
-// Only ADMIN and ACCOUNTANT can view expense details
+// ADMIN, ACCOUNTANT, and CASHIER can view expenses
 router.get(
   '/',
-  authorize('ADMIN', 'ACCOUNTANT'),
+  authorize('ADMIN', 'ACCOUNTANT', 'CASHIER'),
   async (req: AuthRequest, res) => {
     try {
       const { startDate, endDate, category, currency } = req.query;

@@ -44,8 +44,8 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
       eventSourceRef.current.close();
     }
 
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5003';
-    const url = `${apiUrl}/api/realtime/events`;
+    const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5003/api';
+    const url = `${apiUrl}/realtime/events`;
     
     // Create EventSource with token in query param (for SSE compatibility)
     try {
