@@ -80,7 +80,6 @@
     "@types/xlsx": "^0.0.35",
     "archiver": "^8.0.0",
     "axios": "^1.6.7",
-    "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "buffer": "^6.0.3",
     "bullmq": "^5.1.0",
