@@ -32,6 +32,7 @@ interface Sale {
   date: string;
   customerName: string;
   totalAmount: number;
+  paidAmount: number;
   paymentType: string;
   status: 'completed' | 'pending' | 'cancelled';
   items: number;
@@ -86,6 +87,7 @@ export default function SalesModern() {
         date: s.createdAt || s.date || new Date().toISOString().split('T')[0],
         customerName: s.manualCustomerName || s.customer?.name || s.customerName || 'Noma\'lum',
         totalAmount: s.totalAmount || s.amount || 0,
+        paidAmount: s.paidAmount || 0,
         paymentType: s.paymentMethod || s.paymentType || 'cash',
         status: s.paymentStatus?.toLowerCase() || 'completed',
         items: s.itemCount || s.items?.length || 0,
@@ -279,12 +281,11 @@ export default function SalesModern() {
   const todayTotal = todaySales.reduce((sum, s) => sum + s.totalAmount, 0);
 
   const todayDebt = todaySales
-    .filter(s => s.status === 'unpaid' || s.status === 'partial' || s.status === 'pending')
-    .reduce((sum, s) => sum + s.totalAmount, 0);
+    .reduce((sum, s) => sum + Math.max(0, s.totalAmount - s.paidAmount), 0);
 
   const todayCash = todaySales
-    .filter(s => s.paymentType === 'cash' && (s.status === 'paid' || s.status === 'completed'))
-    .reduce((sum, s) => sum + s.totalAmount, 0);
+    .filter(s => s.paymentType === 'cash')
+    .reduce((sum, s) => sum + s.paidAmount, 0);
 
   const hasActiveFilters = !!debouncedSearchTerm || selectedStatus !== 'all' || selectedPeriod !== 'all';
 
