@@ -209,32 +209,31 @@ router.get('/summary', async (req, res) => {
   }
 });
 
-router.get('/transactions', async (req, res) => {
+router.get('/transactions', async (req: AuthRequest, res) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
-    const sales = await prisma.sale.findMany({ where: { paymentStatus: { in: ['PAID', 'PARTIAL'] } }, include: { customer: true }, orderBy: { createdAt: 'desc' }, take: limit });
-    const expenses = await prisma.expense.findMany({ orderBy: { createdAt: 'desc' }, take: limit });
-    const payments = await prisma.payment.findMany({ include: { customer: true }, orderBy: { createdAt: 'desc' }, take: limit });
+    const limit = parseInt(req.query.limit as string) || 200;
+    const { type, paymentMethod, startDate, endDate } = req.query;
 
-    const getPaymentMethod = (paymentDetails: string | null): string => {
-      if (!paymentDetails) return 'CASH';
-      try {
-        const details = JSON.parse(paymentDetails);
-        if (details.click > 0) return 'CLICK';
-        if (details.usd > 0) return 'CARD';
-        if (details.uzs > 0) return 'CASH';
-      } catch (e) {}
-      return 'CASH';
-    };
+    const where: any = {};
+    if (type && type !== 'ALL') where.type = type as string;
+    if (paymentMethod && paymentMethod !== 'ALL') where.paymentMethod = paymentMethod as string;
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate as string);
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
 
-    const transactions = [
-      ...sales.map(s => ({ id: `sale-${s.id}`, type: 'INCOME', amount: s.paidAmount, currency: s.currency, description: `Sotuv - ${s.customer?.name}`, paymentMethod: getPaymentMethod(s.paymentDetails), createdAt: s.createdAt })),
-      ...expenses.map(e => ({ id: `expense-${e.id}`, type: 'EXPENSE', amount: e.amount, currency: e.currency, description: `${e.category} - ${e.description}`, paymentMethod: 'CASH', createdAt: e.createdAt })),
-      ...payments.map(p => ({ id: `payment-${p.id}`, type: 'INCOME', amount: p.amount, currency: p.currency, description: `Qarz tolovi - ${p.customer?.name}`, paymentMethod: getPaymentMethod(p.paymentDetails), createdAt: p.createdAt })),
-    ];
+    const txs = await prisma.cashboxTransaction.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
 
-    transactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    res.json(transactions.slice(0, limit));
+    res.json(txs);
   } catch (error) {
     console.error('Transactions error:', error);
     res.status(500).json({ error: 'Tranzaksiyalarni yuklashda xatolik' });
