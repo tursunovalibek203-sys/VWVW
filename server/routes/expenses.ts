@@ -37,17 +37,20 @@ router.get(
   }
 );
 
-router.post('/', authorize('ADMIN', 'ACCOUNTANT'), async (req: AuthRequest, res) => {
+router.post('/', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER'), async (req: AuthRequest, res) => {
   try {
-    const { amount, currency, category, description } = req.body;
+    const { amount, currency, category, description, paymentMethod } = req.body;
 
     if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
       return res.status(400).json({ error: 'Summa musbat son bo\'lishi kerak' });
     }
 
+    // Karta faqat UZS bo'lishi kerak
+    const resolvedCurrency = paymentMethod === 'CARD' ? 'UZS' : (currency || 'UZS');
+
     const expense = await prisma.$transaction(async (tx) => {
       const created = await tx.expense.create({
-        data: { ...req.body, userId: req.user!.id },
+        data: { ...req.body, currency: resolvedCurrency, userId: req.user!.id },
       });
 
       // Mirror every expense into cashboxTransaction so totals stay in sync
@@ -55,7 +58,8 @@ router.post('/', authorize('ADMIN', 'ACCOUNTANT'), async (req: AuthRequest, res)
         data: {
           type: 'EXPENSE',
           amount: Math.abs(parseFloat(amount)),
-          currency: currency || 'UZS',
+          currency: resolvedCurrency,
+          paymentMethod: paymentMethod || 'CASH',
           category: category || 'OTHER',
           description: description || `Xarajat: ${category}`,
           userId: req.user!.id,

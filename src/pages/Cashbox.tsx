@@ -684,14 +684,15 @@ export default function Cashbox() {
   }
 
   const paymentMethodsData = [
-    { name: 'ÐÐ°Ò›Ð´ (UZS)', value: cashbox?.byCurrency?.cashUZS || 0, color: COLORS[0] },
-    { name: 'Ð”Ð¾Ð»Ð»Ð°Ñ€ (USD)', value: cashbox?.byCurrency?.cashUSD || 0, color: COLORS[1] },
-    { name: 'Click (UZS)', value: cashbox?.byCurrency?.clickUZS || 0, color: COLORS[2] },
+    { name: t('Naqd (UZS)'),   value: cashbox?.byCurrency?.cashUZS  || 0, color: COLORS[0] },
+    { name: t('Dollar (USD)'), value: (cashbox?.byCurrency?.cashUSD || 0) * exchangeRate, color: COLORS[1] },
+    { name: t('Karta (UZS)'),  value: cashbox?.byCurrency?.cardUZS  || 0, color: COLORS[2] },
+    { name: 'Click (UZS)',     value: cashbox?.byCurrency?.clickUZS || 0, color: '#8b5cf6' },
   ];
 
   // Limit ogohlantirishlari
-  const cashWarning = limits.alertEnabled && (cashbox?.byCurrency?.cashUZS || 0) > limits.cashLimit;
-  const cardWarning = limits.alertEnabled && (cashbox?.byCurrency?.cashUSD || 0) > limits.cardLimit;
+  const cashWarning  = limits.alertEnabled && (cashbox?.byCurrency?.cashUZS  || 0) > limits.cashLimit;
+  const cardWarning  = limits.alertEnabled && (cashbox?.byCurrency?.cardUZS  || 0) > limits.cardLimit;
   const clickWarning = limits.alertEnabled && (cashbox?.byCurrency?.clickUZS || 0) > limits.clickLimit;
 
   // Active filter count for the period/filter badge
@@ -702,10 +703,10 @@ export default function Cashbox() {
     (filters.paymentMethod !== 'ALL' ? 1 : 0);
 
   const kpiCards = [
-    { title: t("Naqd Som"), value: formatCurrency(cashbox?.byCurrency?.cashUZS || 0, 'UZS'), icon: Banknote, tint: 'bg-emerald-50 text-emerald-600' },
-    { title: t("Naqd Dollar"), value: formatCurrency(cashbox?.byCurrency?.cashUSD || 0, 'USD'), icon: DollarSign, tint: 'bg-blue-50 text-blue-600' },
-    { title: 'Click / Karta', value: formatCurrency(cashbox?.byCurrency?.clickUZS || 0, 'UZS'), icon: Smartphone, tint: 'bg-purple-50 text-purple-600' },
-    { title: t("Jami (USD eq)"), value: formatCurrency((cashbox?.totalUSD || 0), 'USD'), icon: Wallet, tint: 'bg-amber-50 text-amber-600' },
+    { title: t('Naqd Som'),    value: formatCurrency(cashbox?.byCurrency?.cashUZS  || 0, 'UZS'), icon: Banknote,   tint: 'bg-emerald-50 text-emerald-600' },
+    { title: t('Naqd Dollar'), value: formatCurrency(cashbox?.byCurrency?.cashUSD  || 0, 'USD'), icon: DollarSign, tint: 'bg-blue-50 text-blue-600' },
+    { title: t('Karta (UZS)'), value: formatCurrency(cashbox?.byCurrency?.cardUZS  || 0, 'UZS'), icon: CreditCard, tint: 'bg-indigo-50 text-indigo-600' },
+    { title: 'Click (UZS)',    value: formatCurrency(cashbox?.byCurrency?.clickUZS || 0, 'UZS'), icon: Smartphone, tint: 'bg-purple-50 text-purple-600' },
   ];
 
   // Period label: from active date filter or "Bugungi holat"
@@ -800,16 +801,13 @@ export default function Cashbox() {
         </div>
       </div>
 
-      {/* Action buttons: Kirim / Chiqim / Transfer / Ayirboshlash */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Action buttons: Kirim / Chiqim / Ayirboshlash */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <Button variant="success" size="lg" fullWidth leftIcon={<ArrowDownRight className="w-5 h-5" />} onClick={() => setShowAddMoney(true)}>
           {t("Kirim")}
         </Button>
         <Button variant="danger" size="lg" fullWidth leftIcon={<ArrowUpRight className="w-5 h-5" />} onClick={() => setShowWithdraw(true)}>
           {t("Chiqim")}
-        </Button>
-        <Button variant="primary" size="lg" fullWidth leftIcon={<ArrowLeftRight className="w-5 h-5" />} onClick={() => setShowTransfer(true)}>
-          {t("Transfer")}
         </Button>
         <Button variant="secondary" size="lg" fullWidth leftIcon={<ArrowLeftRight className="w-5 h-5" />} onClick={() => setShowExchange(true)}>
           {t("Ayirboshlash")}
@@ -1376,7 +1374,7 @@ export default function Cashbox() {
       {/* Kirim Modal */}
       {showAddMoney && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xl flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-gray-900 w-full max-w-xl rounded-[3rem] overflow-hidden shadow-2xl border border-white/20 animate-in zoom-in-95 duration-300">
+          <div className="bg-white dark:bg-gray-900 w-full max-w-xl rounded-[3rem] overflow-hidden max-h-[90vh] flex flex-col shadow-2xl border border-white/20 animate-in zoom-in-95 duration-300">
             <div className="p-10 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center bg-emerald-50/30 dark:bg-emerald-900/10">
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
                 <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center text-emerald-600">
@@ -1744,7 +1742,7 @@ export default function Cashbox() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleExchange} className="p-10 space-y-8">
+            <form onSubmit={handleExchange} className="p-10 space-y-8 overflow-y-auto flex-1">
               {/* Kurs inputi */}
               <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-[2rem] border border-amber-100 dark:border-amber-800">
                 <label className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-widest block text-center mb-3">

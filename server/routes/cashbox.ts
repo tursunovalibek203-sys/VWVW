@@ -90,25 +90,32 @@ router.get('/summary', async (req, res) => {
     // When cashboxTransactions exist they are the authoritative source (SalesService writes
     // both Sale + CashboxTransaction inside the same DB transaction).  Using sales/payments
     // as a fallback ONLY when the cashbox table is truly empty prevents double-counting.
-    let cashUZS = 0, cashUSD = 0, cardUSD = 0, clickUZS = 0;
+    let cashUZS = 0, cashUSD = 0, cardUZS = 0, clickUZS = 0;
 
     if (cashboxTransactions.length > 0) {
-      // Primary path: derive currency breakdown exclusively from CashboxTransaction rows
+      // Primary path: derive currency breakdown from CashboxTransaction rows
       cashboxTransactions.forEach(tx => {
-        if (tx.type !== 'INCOME') return;
         const txCurrency = tx.currency || 'UZS';
         const paymentMethod = tx.paymentMethod || 'CASH';
+        const sign = tx.type === 'INCOME' ? 1 : -1;
 
         if (paymentMethod === 'CLICK' || (tx.category === 'SALE' && tx.description?.includes('Click'))) {
-          clickUZS += tx.amount;
+          clickUZS += sign * tx.amount;
         } else if (paymentMethod === 'CARD' || (tx.category === 'SALE' && (tx.description?.includes('Karta') || tx.description?.includes('CARD')))) {
-          cardUSD += tx.amount;
-        } else if (txCurrency === 'UZS') {
-          cashUZS += tx.amount;
+          // Karta faqat UZS
+          cardUZS += sign * tx.amount;
         } else if (txCurrency === 'USD') {
-          cashUSD += tx.amount;
+          cashUSD += sign * tx.amount;
+        } else {
+          // UZS naqd
+          cashUZS += sign * tx.amount;
         }
       });
+      // Manfiy qoldiqni nolga tenglashtirish (ma'lumot nomuvofiqligi uchun)
+      cashUZS  = Math.max(0, cashUZS);
+      cashUSD  = Math.max(0, cashUSD);
+      cardUZS  = Math.max(0, cardUZS);
+      clickUZS = Math.max(0, clickUZS);
     } else {
       // Fallback path (legacy data only): derive from Sale + Payment + Expense tables
       sales.forEach(sale => {
@@ -118,7 +125,7 @@ router.get('/summary', async (req, res) => {
             cashUZS += details.uzs || 0;
             cashUSD += details.usd || 0;
             clickUZS += details.click || 0;
-            cardUSD += details.card || 0;
+            cardUZS += details.card || 0;
           } catch {
             if (sale.currency === 'UZS') cashUZS += sale.paidAmount || 0;
             else cashUSD += sale.paidAmount || 0;
@@ -136,7 +143,7 @@ router.get('/summary', async (req, res) => {
             cashUZS += details.uzs || 0;
             cashUSD += details.usd || 0;
             clickUZS += details.click || 0;
-            cardUSD += details.card || 0;
+            cardUZS += details.card || 0;
           } catch {
             if (payment.currency === 'UZS') cashUZS += payment.amount || 0;
             else cashUSD += payment.amount || 0;
@@ -179,22 +186,22 @@ router.get('/summary', async (req, res) => {
 
     // Jami USD ekvivalentini hisoblash
     const exchangeRate = parseInt(process.env.USD_TO_UZS_RATE || '12500', 10);
-    const totalUSD = (cashUZS + clickUZS) / exchangeRate + cashUSD + cardUSD;
+    const totalUSD = (cashUZS + clickUZS + cardUZS) / exchangeRate + cashUSD;
 
-    res.json({ 
-      totalBalance, 
+    res.json({
+      totalBalance,
       totalUSD,
-      todayIncome, 
-      todayExpense, 
-      monthlyIncome, 
-      monthlyExpense, 
-      byCurrency: { 
+      todayIncome,
+      todayExpense,
+      monthlyIncome,
+      monthlyExpense,
+      byCurrency: {
         cashUZS,
-        cashUSD, 
-        cardUSD, 
-        clickUZS 
-      }, 
-      dailyFlow 
+        cashUSD,
+        cardUZS,
+        clickUZS
+      },
+      dailyFlow
     });
   } catch (error) {
     console.error('Cashbox summary error:', error);
