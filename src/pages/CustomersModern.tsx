@@ -18,8 +18,50 @@ import {
   RefreshCw,
   ShieldAlert,
   Crown,
+  Layers,
+  Pencil,
+  AlertCircle,
 } from 'lucide-react';
+
+interface ColorRule {
+  id: string;
+  name: string;
+  color: 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple';
+  conditions: { field: 'debtUSD' | 'debtUZS' | 'monthlySales' | 'debtPeriod'; operator: '>' | '<' | '>=' | '<='; value: number }[];
+  logic: 'AND' | 'OR';
+}
+
+const DEFAULT_RULES: ColorRule[] = [
+  { id: 'r1', name: "Qarz to'lamagan", color: 'red', logic: 'AND', conditions: [{ field: 'debtUSD', operator: '>=', value: 10000 }, { field: 'debtPeriod', operator: '>=', value: 30 }] },
+  { id: 'r2', name: "Kam savdo", color: 'red', logic: 'AND', conditions: [{ field: 'monthlySales', operator: '<', value: 5000 }] },
+];
+
+const STORAGE_KEY = 'customer_color_rules_v2';
+
+const loadRules = (): ColorRule[] => {
+  try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : DEFAULT_RULES; } catch { return DEFAULT_RULES; }
+};
+const saveRules = (rules: ColorRule[]) => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rules)); } catch {} };
+
+const RULE_COLORS: { value: ColorRule['color']; label: string; cls: string; dot: string }[] = [
+  { value: 'red',    label: 'Qizil',   cls: 'bg-rose-50 text-rose-700 border-rose-200',     dot: 'bg-rose-500' },
+  { value: 'orange', label: "To'q sariq", cls: 'bg-orange-50 text-orange-700 border-orange-200', dot: 'bg-orange-500' },
+  { value: 'yellow', label: 'Sariq',   cls: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-400' },
+  { value: 'green',  label: 'Yashil',  cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+  { value: 'blue',   label: "Ko'k",    cls: 'bg-blue-50 text-blue-700 border-blue-200',     dot: 'bg-blue-500' },
+  { value: 'purple', label: 'Binafsha',cls: 'bg-purple-50 text-purple-700 border-purple-200', dot: 'bg-purple-500' },
+];
+
+const FIELDS = [
+  { value: 'debtUSD',      label: 'Qarz ($)' },
+  { value: 'debtUZS',      label: "Qarz (so'm)" },
+  { value: 'monthlySales', label: 'Oylik savdo ($)' },
+  { value: 'debtPeriod',   label: 'Qarz muddati (kun)' },
+] as const;
+
+const OPERATORS = ['>', '<', '>=', '<='] as const;
 import { latinToCyrillic } from '../lib/transliterator';
+import { getExchangeRates } from '../lib/settings';
 import api from '../lib/professionalApi';
 import { extractArray, extractPaginatedData, extractData } from '../lib/apiHelpers';
 import { customerSchema, CustomerFormData } from '../lib/validation';
@@ -65,6 +107,11 @@ export default function CustomersModern() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [usdRate, setUsdRate] = useState(12700);
+  const [rules, setRules] = useState<ColorRule[]>(loadRules);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [editingRule, setEditingRule] = useState<ColorRule | null>(null);
+  const [ruleForm, setRuleForm] = useState<Omit<ColorRule, 'id'>>({ name: '', color: 'red', logic: 'AND', conditions: [{ field: 'debtUSD', operator: '>=', value: 0 }] });
   // UI-only: delete confirmation target (replaces window.confirm)
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
 
@@ -90,17 +137,56 @@ export default function CustomersModern() {
 
   const categories = ['all', 'NORMAL', 'VIP', 'WHOLESALE'];
 
-  // Mijozlar status rangini hisoblash - sozlamalar asosida
-  const calculateStatusColor = (monthlySales: number, debtPeriod: number): 'green' | 'yellow' | 'red' => {
-    // Qarz muddati oshgan bo'lsa QIZIL
-    if (debtPeriod > colorSettings.debtPeriodThreshold) return 'red';
-    // Oylik savdo yashil chegaradan yuqori bo'lsa YASHIL
-    if (monthlySales >= colorSettings.greenThreshold) return 'green';
-    // Oylik savdo sariq chegaradan kam bo'lsa QIZIL
-    if (monthlySales < colorSettings.yellowThreshold) return 'red';
-    // O'rtacha - SARIQ
-    return 'yellow';
+  const matchRule = (c: Customer, rule: ColorRule): boolean => {
+    const get = (field: ColorRule['conditions'][0]['field']): number => {
+      if (field === 'debtUSD') return c.debtUSD || 0;
+      if (field === 'debtUZS') return c.debtUZS || c.debt || 0;
+      if (field === 'monthlySales') return c.monthlySales || 0;
+      if (field === 'debtPeriod') return c.debtPeriod || 0;
+      return 0;
+    };
+    const results = rule.conditions.map(({ field, operator, value }) => {
+      const v = get(field);
+      if (operator === '>') return v > value;
+      if (operator === '<') return v < value;
+      if (operator === '>=') return v >= value;
+      return v <= value;
+    });
+    return rule.logic === 'AND' ? results.every(Boolean) : results.some(Boolean);
   };
+
+  const getCustomerRule = (c: Customer): ColorRule | null =>
+    rules.find(r => matchRule(c, r)) ?? null;
+
+  const saveAndUpdateRules = (newRules: ColorRule[]) => { setRules(newRules); saveRules(newRules); };
+
+  const openAddRule = () => {
+    setEditingRule(null);
+    setRuleForm({ name: '', color: 'red', logic: 'AND', conditions: [{ field: 'debtUSD', operator: '>=', value: 0 }] });
+  };
+
+  const openEditRule = (rule: ColorRule) => {
+    setEditingRule(rule);
+    setRuleForm({ name: rule.name, color: rule.color, logic: rule.logic, conditions: rule.conditions.map(c => ({ ...c })) });
+  };
+
+  const deleteRule = (id: string) => saveAndUpdateRules(rules.filter(r => r.id !== id));
+
+  const submitRuleForm = () => {
+    if (!ruleForm.name.trim() || ruleForm.conditions.length === 0) return;
+    if (editingRule) {
+      saveAndUpdateRules(rules.map(r => r.id === editingRule.id ? { ...ruleForm, id: editingRule.id } : r));
+    } else {
+      saveAndUpdateRules([...rules, { ...ruleForm, id: `r${Date.now()}` }]);
+    }
+    setEditingRule(null);
+    setRuleForm({ name: '', color: 'red', logic: 'AND', conditions: [{ field: 'debtUSD', operator: '>=', value: 0 }] });
+  };
+
+  const addCondition = () => setRuleForm(f => ({ ...f, conditions: [...f.conditions, { field: 'debtUSD', operator: '>=', value: 0 }] }));
+  const removeCondition = (i: number) => setRuleForm(f => ({ ...f, conditions: f.conditions.filter((_, idx) => idx !== i) }));
+  const updateCondition = (i: number, patch: Partial<ColorRule['conditions'][0]>) =>
+    setRuleForm(f => ({ ...f, conditions: f.conditions.map((c, idx) => idx === i ? { ...c, ...patch } : c) }));
 
   // Mijozlarni yuklash funksiyasi
   const loadCustomers = async () => {
@@ -161,8 +247,8 @@ export default function CustomersModern() {
         // Ko'rsatish uchun UZS balansini ishlatamiz (asosiy valyuta)
         const balance = balanceUZS;
 
-        // Rangni hisoblash
-        const statusColor = calculateStatusColor(monthlySales, debtPeriod);
+        // statusColor rules orqali keyinroq hisoblanadi
+        const statusColor: 'red' | 'yellow' | 'green' = 'green';
 
         const lastSaleDateValue: string | undefined = lastSale ? (lastSale.createdAt || lastSale.date) : undefined;
 
@@ -199,6 +285,7 @@ export default function CustomersModern() {
   };
 
   useEffect(() => {
+    getExchangeRates().then(r => setUsdRate(r.USD_TO_UZS || 12700)).catch(() => {});
     loadCustomers();
 
     // Avto-yangilash har 30 soniyada
@@ -319,12 +406,20 @@ export default function CustomersModern() {
     }
   };
 
-  // Avatar: soft slate/indigo tint (premium, not rainbow). Risk holatda nozik rose ishorasi.
-  const avatarTint = (color?: string) => {
-    switch (color) {
-      case 'red': return 'bg-rose-50 text-rose-600';
-      default: return 'bg-indigo-50 text-indigo-600';
-    }
+  const avatarTint = (rule: ColorRule | null) => {
+    if (!rule) return 'bg-indigo-50 text-indigo-600';
+    return RULE_COLORS.find(c => c.value === rule.color)?.cls ?? 'bg-indigo-50 text-indigo-600';
+  };
+
+  const ruleBadge = (rule: ColorRule | null) => {
+    if (!rule) return null;
+    const rc = RULE_COLORS.find(c => c.value === rule.color);
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${rc?.cls}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${rc?.dot}`} />
+        {rule.name}
+      </span>
+    );
   };
 
   const getInitials = (name: string) => {
@@ -335,8 +430,9 @@ export default function CustomersModern() {
   };
 
   const hasActiveFilters = !!searchTerm || selectedCategory !== 'all';
-  const debtorsCount = customers.filter(c => (c.debt || 0) > 0).length;
-  const totalDebt = customers.reduce((sum, c) => sum + (c.debt || 0), 0);
+  const totalDebtUZS = customers.reduce((sum, c) => sum + (c.debtUZS || c.debt || 0), 0);
+  const totalDebtUSD = customers.reduce((sum, c) => sum + (c.debtUSD || 0), 0);
+  const totalDebtInUSD = totalDebtUSD + (usdRate > 0 ? totalDebtUZS / usdRate : 0);
   const vipCount = customers.filter(c => c.category === 'VIP').length;
 
   const stats = [
@@ -345,25 +441,28 @@ export default function CustomersModern() {
       value: customers.length.toLocaleString('en-US'),
       icon: Users,
       tint: 'bg-sky-50 text-sky-600',
+      sub: null,
     },
     {
       label: latinToCyrillic('VIP mijozlar'),
       value: vipCount.toLocaleString('en-US'),
       icon: Crown,
       tint: 'bg-emerald-50 text-emerald-600',
+      sub: null,
     },
     {
-      label: latinToCyrillic('Qarzdorlar'),
-      value: debtorsCount.toLocaleString('en-US'),
+      label: latinToCyrillic("Qarz (so'm)"),
+      value: `${totalDebtUZS.toLocaleString('en-US')} UZS`,
       icon: TrendingUp,
       tint: 'bg-amber-50 text-amber-600',
+      sub: usdRate > 0 ? `≈ $${(totalDebtUZS / usdRate).toFixed(0)}` : null,
     },
     {
-      label: latinToCyrillic('Jami qarz'),
-      value: `${totalDebt.toLocaleString('en-US')} UZS`,
+      label: latinToCyrillic('Qarz ($)'),
+      value: `$${totalDebtUSD.toLocaleString('en-US')}`,
       icon: DollarSign,
       tint: 'bg-rose-50 text-rose-600',
-      muted: totalDebt === 0,
+      sub: latinToCyrillic(`Jami: ~$${Math.round(totalDebtInUSD).toLocaleString('en-US')}`),
     },
   ];
 
@@ -477,6 +576,13 @@ export default function CustomersModern() {
             <span className="hidden sm:inline">{latinToCyrillic('Yangilash')}</span>
           </button>
           <button
+            onClick={() => { setShowRulesModal(true); openAddRule(); }}
+            className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-600 transition-colors active:scale-[0.98]"
+          >
+            <Layers className="w-4 h-4" />
+            <span className="hidden sm:inline">{latinToCyrillic('Guruhlash')}</span>
+          </button>
+          <button
             onClick={() => setShowAddForm(true)}
             className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.98]"
           >
@@ -507,9 +613,12 @@ export default function CustomersModern() {
                       <Icon className="w-[18px] h-[18px]" />
                     </div>
                   </div>
-                  <p className={`mt-3 text-2xl font-bold tracking-tight tabular-nums ${stat.muted ? 'text-slate-400' : 'text-slate-900'}`}>
+                  <p className="mt-3 text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
                     {stat.value}
                   </p>
+                  {stat.sub && (
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{stat.sub}</p>
+                  )}
                 </div>
               );
             })}
@@ -628,12 +737,13 @@ export default function CustomersModern() {
                   <tr key={customer.id} className="group hover:bg-slate-50/70 transition-colors">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarTint(customer.statusColor)}`}>
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarTint(getCustomerRule(customer))}`}>
                           {getInitials(customer.name)}
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-slate-900 truncate">{customer.name}</p>
-                          {customer.address && (
+                          {ruleBadge(getCustomerRule(customer))}
+                          {!getCustomerRule(customer) && customer.address && (
                             <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 truncate">
                               <MapPin className="w-3 h-3 flex-shrink-0" />
                               <span className="truncate">{customer.address}</span>
@@ -720,7 +830,7 @@ export default function CustomersModern() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${avatarTint(customer.statusColor)}`}>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${avatarTint(getCustomerRule(customer))}`}>
                     {getInitials(customer.name)}
                   </div>
                   <div className="min-w-0">
@@ -996,6 +1106,155 @@ export default function CustomersModern() {
                 loading={customerFormLoading}
               />
             </ValidatedForm>
+          </div>
+        </div>
+      )}
+      {/* Guruhlash (Rang qoidalari) modal */}
+      {showRulesModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl my-8">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-lg font-bold text-slate-900">{latinToCyrillic('Mijoz guruhlash qoidalari')}</h3>
+              </div>
+              <button onClick={() => setShowRulesModal(false)} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Mavjud qoidalar */}
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{latinToCyrillic('Mavjud qoidalar')} ({rules.length})</p>
+                {rules.length === 0 && (
+                  <p className="text-sm text-slate-400 text-center py-4">{latinToCyrillic("Hali qoida yo'q")}</p>
+                )}
+                <div className="space-y-2">
+                  {rules.map((rule) => {
+                    const rc = RULE_COLORS.find(c => c.value === rule.color);
+                    return (
+                      <div key={rule.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <span className={`w-3 h-3 rounded-full flex-shrink-0 ${rc?.dot}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-900">{rule.name}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {rule.conditions.map((cond, i) => {
+                              const f = FIELDS.find(f => f.value === cond.field)?.label ?? cond.field;
+                              return (
+                                <span key={i}>{i > 0 && <span className="mx-1 font-bold">{rule.logic}</span>}{f} {cond.operator} {cond.value}</span>
+                              );
+                            })}
+                          </p>
+                        </div>
+                        <button onClick={() => openEditRule(rule)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => deleteRule(rule.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Qoida qo'shish/tahrirlash formasi */}
+              <div className="border-t border-slate-100 pt-5">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                  {editingRule ? latinToCyrillic('Qoidani tahrirlash') : latinToCyrillic("Yangi qoida qo'shish")}
+                </p>
+                <div className="space-y-3">
+                  {/* Nom */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">{latinToCyrillic('Nomi (badge matn)')} *</label>
+                      <input
+                        type="text"
+                        value={ruleForm.name}
+                        onChange={e => setRuleForm(f => ({ ...f, name: e.target.value }))}
+                        placeholder={latinToCyrillic("Qarz to'lamagan")}
+                        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">{latinToCyrillic('Rang')}</label>
+                      <select
+                        value={ruleForm.color}
+                        onChange={e => setRuleForm(f => ({ ...f, color: e.target.value as ColorRule['color'] }))}
+                        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                      >
+                        {RULE_COLORS.map(rc => <option key={rc.value} value={rc.value}>{rc.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Shartlar */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-semibold text-slate-600">{latinToCyrillic('Shartlar')} *</label>
+                      {ruleForm.conditions.length > 1 && (
+                        <div className="flex gap-1">
+                          {(['AND', 'OR'] as const).map(l => (
+                            <button key={l} onClick={() => setRuleForm(f => ({ ...f, logic: l }))}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${ruleForm.logic === l ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                              {l}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {ruleForm.conditions.map((cond, i) => (
+                        <div key={i} className="flex gap-2 items-center">
+                          <select value={cond.field} onChange={e => updateCondition(i, { field: e.target.value as any })}
+                            className="flex-1 h-10 px-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            {FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                          </select>
+                          <select value={cond.operator} onChange={e => updateCondition(i, { operator: e.target.value as any })}
+                            className="w-16 h-10 px-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            {OPERATORS.map(op => <option key={op} value={op}>{op}</option>)}
+                          </select>
+                          <input type="number" value={cond.value} onChange={e => updateCondition(i, { value: parseFloat(e.target.value) || 0 })}
+                            className="w-24 h-10 px-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center" />
+                          <button onClick={() => removeCondition(i)} disabled={ruleForm.conditions.length === 1}
+                            className="p-2 text-slate-400 hover:text-rose-500 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg transition-colors">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={addCondition} className="mt-2 text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1">
+                      <Plus className="w-3.5 h-3.5" />
+                      {latinToCyrillic("Shart qo'shish")}
+                    </button>
+                  </div>
+
+                  {/* Preview + Save */}
+                  {ruleForm.name && (
+                    <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <AlertCircle className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                      <p className="text-xs text-slate-500">{latinToCyrillic('Korespondensiya')}:</p>
+                      {ruleBadge({ id: 'preview', ...ruleForm })}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-1">
+                    {editingRule && (
+                      <button onClick={() => { setEditingRule(null); setRuleForm({ name: '', color: 'red', logic: 'AND', conditions: [{ field: 'debtUSD', operator: '>=', value: 0 }] }); }}
+                        className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-colors">
+                        {latinToCyrillic('Bekor qilish')}
+                      </button>
+                    )}
+                    <button onClick={submitRuleForm} disabled={!ruleForm.name.trim()}
+                      className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold transition-colors">
+                      {editingRule ? latinToCyrillic('Saqlash') : latinToCyrillic("Qo'shish")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

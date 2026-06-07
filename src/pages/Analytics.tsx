@@ -40,6 +40,7 @@ import StrategicRecommendations from '../components/StrategicRecommendations';
 import RiskAssessment from '../components/RiskAssessment';
 import AnomaliesDetection from '../components/AnomaliesDetection';
 import ProfessionalCEOAnalytics from '../components/ProfessionalCEOAnalytics';
+import AnalyticsMetricsDashboard from '../components/AnalyticsMetricsDashboard';
 
 export default function Analytics() {
   const t = latinToCyrillic;
@@ -50,7 +51,7 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [timeRange, setTimeRange] = useState('30');
-  const [activeView, setActiveView] = useState<'ai' | 'business' | 'charts' | 'ceo'>('ceo');
+  const [activeView, setActiveView] = useState<'metrics' | 'ai' | 'business' | 'charts' | 'ceo'>('metrics');
 
   useEffect(() => {
     loadAnalytics();
@@ -98,6 +99,7 @@ export default function Analytics() {
   };
 
   const tabs = [
+    { id: 'metrics' as const, name: t('Ko\'rsatkichlar'), icon: BarChart3 },
     { id: 'ceo' as const, name: t('CEO Tahlil'), icon: Crown },
     { id: 'ai' as const, name: t('AI Tahlil'), icon: Brain },
     { id: 'business' as const, name: t('Biznes Metrikalar'), icon: BarChart3 },
@@ -458,6 +460,13 @@ export default function Analytics() {
               />
             </div>
           )}
+        </div>
+      )}
+
+      {/* Ko'rsatkichlar View */}
+      {activeView === 'metrics' && (
+        <div className="animate-in fade-in duration-500">
+          <AnalyticsMetricsDashboard timeRange={timeRange} />
         </div>
       )}
 
