@@ -50,7 +50,13 @@ router.post('/', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER'), async (req: AuthRe
 
     const expense = await prisma.$transaction(async (tx) => {
       const created = await tx.expense.create({
-        data: { ...req.body, currency: resolvedCurrency, userId: req.user!.id },
+        data: {
+          amount: Math.abs(parseFloat(amount)),
+          currency: resolvedCurrency,
+          category: category || 'OTHER',
+          description: description || `Xarajat: ${category || 'OTHER'}`,
+          userId: req.user!.id,
+        },
       });
 
       // Mirror every expense into cashboxTransaction so totals stay in sync
