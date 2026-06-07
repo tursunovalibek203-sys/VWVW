@@ -35,6 +35,7 @@ const CustomerProfileModern = lazy(() => import('./pages/CustomerProfileModern')
 // Orders & Cashbox
 const Orders = lazy(() => import('./pages/Orders'));
 const Cashbox = lazy(() => import('./pages/Cashbox'));
+const Daftar = lazy(() => import('./pages/Daftar'));
 
 // Finance
 const Expenses = lazy(() => import('./pages/Expenses'));
@@ -150,6 +151,7 @@ function AppRoutes() {
                 {/* Orders & Cashbox */}
                 <Route path="orders" element={<Orders />} />
                 <Route path="cashbox" element={<Cashbox />} />
+                <Route path="daftar" element={<Daftar />} />
                 
                 {/* Finance */}
                 <Route path="expenses" element={<Expenses />} />

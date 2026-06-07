@@ -1705,3 +1705,45 @@ model Loan {
   @@index([loanDate])
 }
 
+// ─── Daftar (Ledger) tizimi ──────────────────────────────────────────────────
+// Haydovchilar, hodimlar, yetkazib beruvchilar va xarajat kategoriyalari bilan oldi-berdi
+
+model Ledger {
+  id              String        @id @default(uuid())
+  type            String        // EXPENSE | DRIVER | EMPLOYEE | SUPPLIER
+  name            String        // Ism, kategoriya, kompaniya nomi
+  description     String?
+  currency        String        @default("UZS")
+  totalDebit      Float         @default(0)  // Jami qarzdorlik (berish kerak)
+  totalCredit     Float         @default(0)  // Jami to'langan
+  balance         Float         @default(0)  // Qolgan (totalDebit - totalCredit)
+  dueDate         DateTime?
+  notes           String?
+  status          String        @default("ACTIVE") // ACTIVE | PAID | OVERDUE
+  userId          String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  entries         LedgerEntry[]
+
+  @@index([type])
+  @@index([status])
+  @@index([userId])
+}
+
+model LedgerEntry {
+  id         String   @id @default(uuid())
+  ledgerId   String
+  ledger     Ledger   @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  entryType  String   // DEBIT (qarzdorlik - berish kerak) | CREDIT (to'lov - berildi)
+  amount     Float
+  currency   String   @default("UZS")
+  dueDate    DateTime?
+  paidDate   DateTime?
+  notes      String?
+  userId     String
+  createdAt  DateTime @default(now())
+
+  @@index([ledgerId])
+  @@index([entryType])
+}
+

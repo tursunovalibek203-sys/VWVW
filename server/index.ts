@@ -53,6 +53,7 @@ import budgetRoutes from './routes/budgets';
 import realtimeRoutes from './routes/realtime';
 import employeeLoansRoutes from './routes/employee-loans';
 import exchangeRatesRoutes from './routes/exchange-rates';
+import ledgerRoutes from './routes/ledger';
 
 const app = express();
 const PORT = process.env.PORT || 5003;
@@ -210,6 +211,7 @@ app.use('/api/budgets', budgetRoutes);
 app.use('/api/realtime', realtimeRoutes);
 app.use('/api/employee-loans', employeeLoansRoutes);
 app.use('/api/exchange-rates', exchangeRatesRoutes);
+app.use('/api/ledger', ledgerRoutes);
 
 // Enhanced health check with DB connectivity
 app.get('/api/health', async (req, res) => {

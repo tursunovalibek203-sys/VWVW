@@ -8,7 +8,7 @@ import {
   Factory, Package2, Truck, CheckSquare,
   Wallet, Brain, Menu, Bot,
   BarChart3, Activity, Zap, Cloud, Shield,
-  PanelLeftClose, PanelLeft, User as UserIcon,
+  PanelLeftClose, PanelLeft, User as UserIcon, BookOpen,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/utils';
@@ -46,6 +46,7 @@ const getSections = (t: (key: string) => string): NavSection[] => [
       { name: t('navigation.products'), href: '/products', icon: Package2 },
       { name: t('navigation.customers'), href: '/customers', icon: Users, allowedRoles: [...SELLER_ROLES, 'ACCOUNTANT'] },
       { name: t('navigation.cashbox'), href: '/cashbox', icon: Wallet, allowedRoles: FINANCE_ROLES },
+      { name: 'Daftar', href: '/daftar', icon: BookOpen, allowedRoles: FINANCE_ROLES },
       { name: t('navigation.cashierManagement'), href: '/cashiers', icon: Shield, adminOnly: true },
       { name: t('navigation.reports'), href: '/reports', icon: FileText, allowedRoles: FINANCE_ROLES },
       { name: t('navigation.settings'), href: '/settings', icon: SettingsIcon, adminOnly: true },
