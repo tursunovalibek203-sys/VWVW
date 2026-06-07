@@ -20,7 +20,7 @@ import { ArrowLeft, Package, ShoppingCart, User, WifiOff, AlertCircle, RefreshCw
 import { useNavigate, useLocation } from 'react-router-dom';
 import { latinToCyrillic } from '../lib/transliterator';
 import { useSaleForm } from '../hooks/useSaleForm';
-import { ProductTypeCard, CartItem, CustomerSelector, PaymentSection } from '../components/sales';
+import { ProductTypeCard, CartItem, PaymentSection } from '../components/sales';
 import { filterProductsByCategory, getCurrencySymbol, getDisplayAmount } from '../lib/saleUtils';
 import { useRealtime } from '../hooks/useRealtime';
 import api from '../lib/professionalApi';
@@ -811,71 +811,29 @@ export default function AddSaleClean() {
               />
             )}
           </div>
+
+          {/* Payment Section */}
+          <PaymentSection
+            form={saleForm.form}
+            totalAmount={saleForm.totalAmount}
+            paidAmount={saleForm.paidAmount}
+            debtAmount={saleForm.debtAmount}
+            exchangeRate={saleForm.exchangeRate}
+            currency={saleForm.form.currency}
+            isSubmitting={saleForm.isSubmitting}
+            isEditMode={saleForm.isEditMode}
+            latinToCyrillic={latinToCyrillic}
+            onUpdateForm={(updates) => {
+              Object.entries(updates).forEach(([key, value]) => {
+                saleForm.updateFormField(key as any, value);
+              });
+            }}
+            onExchangeRateChange={saleForm.setExchangeRate}
+            onSubmit={handleSubmit}
+            onCancel={() => navigate('/cashier/sales')}
+            onReset={saleForm.resetForm}
+          />
           </div>{/* end sticky right column wrapper */}
-        </div>
-
-        {/* Zone 2: Customer (detailed) & Payment (checkout) */}
-        <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden">
-          <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-slate-200/70">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
-              <User className="w-[18px] h-[18px]" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-slate-900 tracking-tight">{latinToCyrillic('Mijoz va to\'lov')}</h2>
-              <p className="text-xs text-slate-400 tabular-nums">
-                {latinToCyrillic('Sotuvni yakunlash')} • {saleForm.customers.length} {latinToCyrillic('ta mijoz')}
-              </p>
-            </div>
-          </div>
-
-          <div className="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Customer Selector */}
-            <CustomerSelector
-              customers={saleForm.customers}
-              selectedCustomerId={saleForm.form.customerId}
-              isKocha={saleForm.form.isKocha}
-              customerSearch={saleForm.customerSearch}
-              manualCustomerName={saleForm.form.manualCustomerName}
-              manualCustomerPhone={saleForm.form.manualCustomerPhone}
-              latinToCyrillic={latinToCyrillic}
-              onSelectCustomer={(customer) => {
-                saleForm.updateFormField('customerId', customer.id);
-                saleForm.updateFormField('customerName', customer.name);
-                saleForm.updateFormField('isKocha', false);
-                saleForm.setCustomerSearch('');
-              }}
-              onSelectKocha={() => {
-                saleForm.updateFormField('customerId', '');
-                saleForm.updateFormField('customerName', '');
-                saleForm.updateFormField('isKocha', true);
-              }}
-              onSearchChange={saleForm.setCustomerSearch}
-              onManualNameChange={(val) => saleForm.updateFormField('manualCustomerName', val)}
-              onManualPhoneChange={(val) => saleForm.updateFormField('manualCustomerPhone', val)}
-            />
-
-            {/* Payment Section */}
-            <PaymentSection
-              form={saleForm.form}
-              totalAmount={saleForm.totalAmount}
-              paidAmount={saleForm.paidAmount}
-              debtAmount={saleForm.debtAmount}
-              exchangeRate={saleForm.exchangeRate}
-              currency={saleForm.form.currency}
-              isSubmitting={saleForm.isSubmitting}
-              isEditMode={saleForm.isEditMode}
-              latinToCyrillic={latinToCyrillic}
-              onUpdateForm={(updates) => {
-                Object.entries(updates).forEach(([key, value]) => {
-                  saleForm.updateFormField(key as any, value);
-                });
-              }}
-              onExchangeRateChange={saleForm.setExchangeRate}
-              onSubmit={handleSubmit}
-              onCancel={() => navigate('/cashier/sales')}
-              onReset={saleForm.resetForm}
-            />
-          </div>
         </div>
       </div>
     </div>
