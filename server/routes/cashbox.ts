@@ -243,13 +243,17 @@ router.get('/transactions', async (req, res) => {
 
 router.post('/add', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), async (req: AuthRequest, res) => {
   try {
-    const { amount, currency, type, description } = req.body;
+    const { amount, currency, paymentMethod, type, description } = req.body;
+    const method = paymentMethod || type || 'CASH';
+    const resolvedCurrency = method === 'CARD' ? 'UZS' : (currency || 'UZS');
     await prisma.cashboxTransaction.create({
       data: {
         type: 'INCOME',
         amount: Math.abs(amount),
+        currency: resolvedCurrency,
+        paymentMethod: method,
         category: 'DEPOSIT',
-        description: description || `Kassa kirim: ${type || 'CASH'} ${currency || 'UZS'}`,
+        description: description || `Kassa kirim: ${method} ${resolvedCurrency}`,
         userId: req.user!.id,
         userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
       }
@@ -263,13 +267,17 @@ router.post('/add', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), async
 
 router.post('/withdraw', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), async (req: AuthRequest, res) => {
   try {
-    const { amount, currency, type, description } = req.body;
+    const { amount, currency, paymentMethod, type, description } = req.body;
+    const method = paymentMethod || type || 'CASH';
+    const resolvedCurrency = method === 'CARD' ? 'UZS' : (currency || 'UZS');
     await prisma.cashboxTransaction.create({
       data: {
         type: 'EXPENSE',
         amount: Math.abs(amount),
+        currency: resolvedCurrency,
+        paymentMethod: method,
         category: 'WITHDRAWAL',
-        description: description || `Kassa chiqim: ${type || 'CASH'} ${currency || 'UZS'}`,
+        description: description || `Kassa chiqim: ${method} ${resolvedCurrency}`,
         userId: req.user!.id,
         userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
       }
@@ -363,6 +371,8 @@ router.post('/exchange', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), 
       data: {
         type: 'EXPENSE',
         amount: amount,
+        currency: fromCurrency,
+        paymentMethod: fromType || 'CASH',
         category: 'EXCHANGE',
         description: description || `Ayirboshlash: ${amount} ${fromCurrency} -> ${receivedAmount.toFixed(2)} ${toCurrency} (kurs: ${rate})`,
         userId: req.user!.id,
@@ -375,6 +385,8 @@ router.post('/exchange', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), 
       data: {
         type: 'INCOME',
         amount: receivedAmount,
+        currency: toCurrency,
+        paymentMethod: toType || 'CASH',
         category: 'EXCHANGE',
         description: description || `Ayirboshlash: ${amount} ${fromCurrency} -> ${receivedAmount.toFixed(2)} ${toCurrency} (kurs: ${rate})`,
         userId: req.user!.id,
