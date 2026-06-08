@@ -95,11 +95,8 @@ export async function sendSaleReceiptToTopic(saleId: string): Promise<void> {
 
     if (!sale || !sale.customer) return;
 
-    // Topic yo'q bo'lsa, avtomatik yaratamiz
-    let topicId = sale.customer.telegramTopicId;
-    if (!topicId) {
-      topicId = await createCustomerTopic(sale.customer.id);
-    }
+    // Faqat aniq belgilangan topicga yuboramiz — avtomatik yaratmaymiz
+    const topicId = sale.customer.telegramTopicId;
     if (!topicId) return;
 
     // Mahsulotlar ro'yxati

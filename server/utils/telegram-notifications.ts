@@ -23,66 +23,49 @@ export async function notifyCustomerSale(saleId: string) {
       return;
     }
 
-    // Mijozning Telegram ulangan bo'lmasa ham forum topicga chek yuboramiz
-    if (!sale.customer.telegramChatId) {
-      console.log(`ℹ️ ${sale.customer.name} Telegram ulanmagan — faqat forum topicga yuboriladi`);
-      sendSaleReceiptToTopic(saleId).catch(err =>
-        console.error('Forum topicga chek yuborishda xatolik:', err)
-      );
+    const { telegramChatId, telegramTopicId } = sale.customer;
+
+    // Ikkalasi ham yo'q — yuborish kerak emas
+    if (!telegramChatId && !telegramTopicId) {
+      console.log(`ℹ️ ${sale.customer.name}: Telegram ulanmagan, chek yuborilmadi`);
       return;
     }
 
-    const customerBot = botManager.getBot('super-customer') || botManager.getBot('customer-enhanced') || botManager.getBot('customer');
-    if (!customerBot) {
-      console.log('❌ Customer bot ishlamayapti');
-      return;
-    }
+    // === SHAXSIY XABAR — faqat telegramChatId belgilangan bo'lsa ===
+    if (telegramChatId) {
+      const customerBot = botManager.getBot('super-customer') || botManager.getBot('customer-enhanced') || botManager.getBot('customer');
+      if (customerBot) {
+        // Mahsulotlar ro'yxati
+        let productsText = '';
+        if (sale.items && sale.items.length > 0) {
+          productsText = sale.items.map((item, index) =>
+            `${index + 1}. ${item.product?.name || 'Noma\'lum'} - ${item.quantity} qop x ${item.pricePerBag} = ${item.subtotal} USD`
+          ).join('\n');
+        } else if (sale.product) {
+          productsText = `1. ${sale.product.name} - ${sale.quantity} qop x ${sale.pricePerBag} = ${sale.totalAmount} USD`;
+        }
 
-    // Mahsulotlar ro'yxati
-    let productsText = '';
-    if (sale.items && sale.items.length > 0) {
-      productsText = sale.items.map((item, index) => 
-        `${index + 1}. ${item.product?.name || 'Noma\'lum'} - ${item.quantity} qop x ${item.pricePerBag} = ${item.subtotal} USD`
-      ).join('\n');
-    } else if (sale.product) {
-      productsText = `1. ${sale.product.name} - ${sale.quantity} qop x ${sale.pricePerBag} = ${sale.totalAmount} USD`;
-    }
+        let paymentInfo = '';
+        if (sale.paymentDetails) {
+          try {
+            const details = JSON.parse(sale.paymentDetails);
+            const parts = [];
+            if (details.uzs) parts.push(`💵 Naqd: ${details.uzs.toLocaleString()} so'm`);
+            if (details.usd) parts.push(`💳 Karta: ${details.usd} USD`);
+            if (details.click) parts.push(`📱 CLICK: ${details.click.toLocaleString()} so'm`);
+            paymentInfo = parts.join('\n');
+          } catch {
+            paymentInfo = `💰 To'langan: ${sale.paidAmount} USD`;
+          }
+        } else {
+          paymentInfo = `💰 To'langan: ${sale.paidAmount} USD`;
+        }
 
-    // To'lov ma'lumotlari
-    let paymentInfo = '';
-    if (sale.paymentDetails) {
-      try {
-        const details = JSON.parse(sale.paymentDetails);
-        const parts = [];
-        if (details.uzs) parts.push(`💵 Naqd: ${details.uzs.toLocaleString()} so'm`);
-        if (details.usd) parts.push(`💳 Karta: ${details.usd} USD`);
-        if (details.click) parts.push(`📱 CLICK: ${details.click.toLocaleString()} so'm`);
-        paymentInfo = parts.join('\n');
-      } catch (e) {
-        paymentInfo = `💰 To'langan: ${sale.paidAmount} USD`;
-      }
-    } else {
-      paymentInfo = `💰 To'langan: ${sale.paidAmount} USD`;
-    }
+        const debt = sale.totalAmount - sale.paidAmount;
+        const statusEmoji = { 'PAID': '✅', 'PARTIAL': '⚠️', 'UNPAID': '❌' }[sale.paymentStatus] || '❓';
+        const statusText = { 'PAID': "To'liq to'langan", 'PARTIAL': "Qisman to'langan", 'UNPAID': "To'lanmagan" }[sale.paymentStatus] || sale.paymentStatus;
 
-    // Qarz hisoblash
-    const debt = sale.totalAmount - sale.paidAmount;
-    const debtText = debt > 0 ? `\n\n⚠️ **Qarz:** ${debt.toFixed(2)} USD` : '';
-
-    // Status
-    const statusEmoji = {
-      'PAID': '✅',
-      'PARTIAL': '⚠️',
-      'UNPAID': '❌'
-    }[sale.paymentStatus] || '❓';
-
-    const statusText = {
-      'PAID': 'To\'liq to\'langan',
-      'PARTIAL': 'Qisman to\'langan',
-      'UNPAID': 'To\'lanmagan'
-    }[sale.paymentStatus] || sale.paymentStatus;
-
-    const message = `
+        const message = `
 🛒 **YANGI SOTUV**
 
 👤 **Mijoz:** ${sale.customer.name}
@@ -95,23 +78,26 @@ ${productsText}
 
 ${paymentInfo}
 
-${statusEmoji} **Holat:** ${statusText}${debtText}
+${statusEmoji} **Holat:** ${statusText}${debt > 0 ? `\n\n⚠️ **Qarz:** ${debt.toFixed(2)} USD` : ''}
 
-${debt > 0 ? '\n📞 Qarzni to\'lash uchun biz bilan bog\'laning.' : '\n✅ Rahmat! Xaridingiz uchun tashakkur!'}
+${debt > 0 ? '📞 Qarzni to\'lash uchun biz bilan bog\'laning.' : '✅ Rahmat! Xaridingiz uchun tashakkur!'}
 
 📱 Savollar uchun: /help
-    `;
+        `;
 
-    await customerBot.sendMessage(sale.customer.telegramChatId, message, {
-      parse_mode: 'Markdown'
-    });
+        await customerBot.sendMessage(telegramChatId, message, { parse_mode: 'Markdown' });
+        console.log(`✅ Shaxsiy xabar yuborildi: ${sale.customer.name}`);
+      } else {
+        console.log('❌ Customer bot ishlamayapti — shaxsiy xabar yuborilmadi');
+      }
+    }
 
-    console.log(`✅ Mijozga xabar yuborildi: ${sale.customer.name}`);
-
-    // Forum topicga ham chek yuborish (parallel, xatosiz)
-    sendSaleReceiptToTopic(saleId).catch(err =>
-      console.error('Forum topicga chek yuborishda xatolik:', err)
-    );
+    // === FORUM TOPIC — faqat telegramTopicId belgilangan bo'lsa ===
+    if (telegramTopicId) {
+      sendSaleReceiptToTopic(saleId).catch(err =>
+        console.error('Forum topicga chek yuborishda xatolik:', err)
+      );
+    }
   } catch (error) {
     console.error('Mijozga xabar yuborishda xatolik:', error);
   }
