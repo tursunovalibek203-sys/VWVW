@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   Phone,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
 import { formatDate, formatCurrency } from '../lib/utils';
+import { exportToExcel } from '../lib/excelUtils';
 import api from '../lib/professionalApi';
 import { extractData, extractPaginatedData } from '../lib/apiHelpers';
 import { useToast, toast } from '../components/ui/Toast';
@@ -71,6 +72,7 @@ interface Sale {
 export default function CustomerProfileModern() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { addToast } = useToast();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -114,22 +116,29 @@ export default function CustomerProfileModern() {
   };
 
   const handleExportExcel = () => {
-    // Excel export logic
-    console.log('Exporting to Excel...');
-    addToast(
-      toast.info(
-        latinToCyrillic('Tayyorlanmoqda'),
-        latinToCyrillic('Eksport funksiyasi tez orada')
-      )
-    );
+    if (!customer || sales.length === 0) return;
+    const rows = sales.map(s => ({
+      [latinToCyrillic('Sana')]:        formatDate(s.createdAt),
+      [latinToCyrillic('Mahsulotlar')]: getProductNames(s),
+      [latinToCyrillic('Jami')]:        s.totalAmount,
+      [latinToCyrillic("To'langan")]:   s.paidAmount,
+      [latinToCyrillic('Qarz')]:        s.debtAmount || 0,
+      [latinToCyrillic('Valyuta')]:     s.currency,
+      [latinToCyrillic('Holat')]:       s.paymentStatus,
+    }));
+    exportToExcel(rows, {
+      fileName: `${customer.name} - savdolar`,
+      sheetName: latinToCyrillic('Savdolar'),
+    });
   };
 
   const handlePayment = () => {
-    navigate(`/cashier/payments?customerId=${id}`);
+    navigate(`/customers/${id}?tab=payment`);
   };
 
   const handleNewSale = () => {
-    navigate('/cashier/sales/new', { state: { customerId: id } });
+    const base = location.pathname.startsWith('/cashier') ? '/cashier/sales/add' : '/sales/add';
+    navigate(base, { state: { customerId: id } });
   };
 
   if (loading) {
@@ -285,7 +294,7 @@ export default function CustomerProfileModern() {
       {/* Header: back + clean identity + actions */}
       <div className="space-y-4">
         <button
-          onClick={() => navigate('/cashier/customers')}
+          onClick={() => navigate(-1)}
           className="inline-flex items-center gap-2 px-3 py-1.5 -ml-1 text-sm font-semibold text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors active:scale-[0.98]"
         >
           <ArrowLeft className="w-4 h-4" />
