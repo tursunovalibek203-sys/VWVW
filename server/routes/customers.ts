@@ -7,6 +7,7 @@ import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { sendEnhancedPaymentConfirmation } from '../bot/archive/enhanced-bot';
 import { successResponse, errorResponse } from '../utils/response';
 import { DecimalHelper } from '../utils/decimal-helper';
+import { createCustomerTopic } from '../utils/telegram-forum';
 
 
 
@@ -922,6 +923,51 @@ router.get('/:id/payments', async (req, res) => {
 });
 
 
+
+// Mijoz uchun Telegram forum topic yaratish
+router.post('/:id/create-topic', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await prisma.customer.findUnique({ where: { id } });
+    if (!customer) {
+      return res.status(404).json(errorResponse('Mijoz topilmadi'));
+    }
+
+    const topicId = await createCustomerTopic(id);
+    if (!topicId) {
+      return res.status(400).json(errorResponse(
+        'Forum topic yaratib bo\'lmadi. TELEGRAM_SALES_CHANNEL_ID ni tekshiring va bot groupda admin ekanligiga ishonch hosil qiling.'
+      ));
+    }
+
+    res.json(successResponse({ topicId }, 'Forum topic muvaffaqiyatli yaratildi'));
+  } catch (error: any) {
+    console.error('Forum topic yaratishda xatolik:', error);
+    res.status(500).json(errorResponse('Forum topic yaratishda xatolik', error.message));
+  }
+});
+
+// Barcha mijozlar uchun forum topic yaratish (batch)
+router.post('/create-all-topics', async (req: AuthRequest, res) => {
+  try {
+    const customers = await prisma.customer.findMany({
+      where: { telegramTopicId: null }
+    });
+
+    const results: { name: string; topicId: number | null }[] = [];
+    for (const customer of customers) {
+      const topicId = await createCustomerTopic(customer.id);
+      results.push({ name: customer.name, topicId });
+      // Rate limit: Telegram 1 req/sec
+      await new Promise(r => setTimeout(r, 1100));
+    }
+
+    res.json(successResponse(results, `${results.length} ta mijoz uchun topic yaratildi`));
+  } catch (error: any) {
+    res.status(500).json(errorResponse('Batch topic yaratishda xatolik', error.message));
+  }
+});
 
 export default router;
 

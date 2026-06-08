@@ -100,6 +100,7 @@ model Customer {
   address         String?           // Mijoz manzili
   telegramChatId  String?           @unique // Telegram bot uchun
   telegramUsername String?          // Telegram username
+  telegramTopicId Int?              // Telegram forum group topic (message_thread_id)
   notificationsEnabled Boolean      @default(true) // Eslatmalarni yoqish/o'chirish
   debtReminderDays Int              @default(7) // Necha kundan keyin eslatma
   category        String            @default("NORMAL") // VIP, NORMAL, RISK

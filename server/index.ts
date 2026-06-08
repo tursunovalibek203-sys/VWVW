@@ -239,17 +239,34 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
+// Telegram Web Z — chat sahifasi uchun static serve (har doim, production ham dev ham)
+// Fayl manzili: VWVW/telegram_v6 (1)/telegram-web-z/dist/
+const telegramWebZPath = path.join(process.cwd(), '..', 'telegram_v6 (1)', 'telegram-web-z', 'dist');
+app.use('/telegram-web', (req, res, next) => {
+  // iframe ichida ishlashi uchun X-Frame-Options va CSP ni o'chiramiz
+  res.removeHeader('X-Frame-Options');
+  res.setHeader('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;");
+  next();
+}, express.static(telegramWebZPath));
+
+// SPA fallback: /telegram-web/* → index.html
+app.get('/telegram-web/*', (req, res) => {
+  res.removeHeader('X-Frame-Options');
+  res.setHeader('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;");
+  res.sendFile(path.join(telegramWebZPath, 'index.html'));
+});
+
 // Serve static frontend files in production
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(process.cwd(), 'dist');
-  
+
   logger.info('Serving static files', { path: distPath });
-  
+
   app.use(express.static(distPath));
-  
+
   // SPA catch-all route - serve index.html for all non-API routes
   app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/telegram-web')) {
       res.sendFile(path.join(distPath, 'index.html'));
     }
   });

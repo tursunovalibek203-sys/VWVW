@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import { botManager } from '../bot/bot-manager';
+import { sendSaleReceiptToTopic } from './telegram-forum';
 
 /**
  * Mijozga sotuv haqida xabar yuborish
@@ -17,8 +18,17 @@ export async function notifyCustomerSale(saleId: string) {
       }
     });
 
-    if (!sale || !sale.customer?.telegramChatId) {
-      console.log('❌ Sale yoki customer telegramChatId topilmadi');
+    if (!sale || !sale.customer) {
+      console.log('❌ Sale yoki customer topilmadi');
+      return;
+    }
+
+    // Mijozning Telegram ulangan bo'lmasa ham forum topicga chek yuboramiz
+    if (!sale.customer.telegramChatId) {
+      console.log(`ℹ️ ${sale.customer.name} Telegram ulanmagan — faqat forum topicga yuboriladi`);
+      sendSaleReceiptToTopic(saleId).catch(err =>
+        console.error('Forum topicga chek yuborishda xatolik:', err)
+      );
       return;
     }
 
@@ -97,6 +107,11 @@ ${debt > 0 ? '\n📞 Qarzni to\'lash uchun biz bilan bog\'laning.' : '\n✅ Rahm
     });
 
     console.log(`✅ Mijozga xabar yuborildi: ${sale.customer.name}`);
+
+    // Forum topicga ham chek yuborish (parallel, xatosiz)
+    sendSaleReceiptToTopic(saleId).catch(err =>
+      console.error('Forum topicga chek yuborishda xatolik:', err)
+    );
   } catch (error) {
     console.error('Mijozga xabar yuborishda xatolik:', error);
   }

@@ -1,6 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { prisma } from '../utils/prisma';
 import { OrderWorkflow } from '../services/order-workflow';
+import { createCustomerTopic } from '../utils/telegram-forum';
 
 let customerBot: TelegramBot | null = null;
 
@@ -29,48 +30,118 @@ function setupCustomerCommands() {
   // Start komandasi
   customerBot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
-    const customer = await findOrCreateCustomer(chatId, msg.from);
-    
-    const welcomeMessage = `
-👋 **Xush kelibsiz, ${customer.name}!**
 
-🛍️ **MIJOZ BOTI**
-
-Bu bot orqali siz:
-📱 Buyurtma berishingiz
-💰 Balans va qarzlaringizni ko'rishingiz
-📊 Sotuvlar tarixingizni ko'rishingiz
-📞 Yordam olishingiz mumkin
-
-📋 **Mavjud komandalar:**
-/profile - Profil ma'lumotlari
-/balance - Balans va qarzlar
-/orders - Buyurtmalar
-/history - Sotuvlar tarixi
-/catalog - Mahsulotlar katalogi
-/help - Yordam
-
-🛒 Xarid qilishni boshlash uchun tugmalardan foydalaning!
-    `;
-
-    await customerBot?.sendMessage(chatId, welcomeMessage, {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        keyboard: [
-          [{ text: '🛒 Buyurtma berish' }, { text: '💰 Balans' }],
-          [{ text: '📊 Mening sotuvlarim' }, { text: '📋 Katalog' }],
-          [{ text: '👤 Profil' }, { text: '❓ Yordam' }]
-        ],
-        resize_keyboard: true,
-        one_time_keyboard: false
-      }
+    // Allaqachon ulangan mijozni tekshirish
+    const existing = await prisma.customer.findFirst({
+      where: { telegramChatId: chatId.toString() }
     });
+
+    if (existing) {
+      await sendMainMenu(chatId, existing.name);
+      return;
+    }
+
+    // Yangi foydalanuvchi — telefon raqam so'rash
+    await customerBot?.sendMessage(
+      chatId,
+      '👋 *Xush kelibsiz!*\n\nTizimga kirish uchun telefon raqamingizni yuboring\\. Bot sizni mijozlar ro\'yxatidan topib ulaydi\\.',
+      {
+        parse_mode: 'MarkdownV2',
+        reply_markup: {
+          keyboard: [
+            [{ text: '📱 Telefon raqamni yuborish', request_contact: true }]
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        }
+      }
+    );
+  });
+
+  // Telefon raqam qabul qilish va mijozni ulash
+  customerBot.on('contact', async (msg) => {
+    const chatId = msg.chat.id;
+    const contact = msg.contact;
+    if (!contact) return;
+
+    const phone = contact.phone_number.replace(/\D/g, '');
+
+    // Telefon raqam bo'yicha mijozni qidirish (oxirgi 9 raqam bo'yicha)
+    const allCustomers = await prisma.customer.findMany({
+      where: { telegramChatId: null }
+    });
+
+    const matched = allCustomers.find(c => {
+      const dbPhone = c.phone.replace(/\D/g, '');
+      return dbPhone.endsWith(phone.slice(-9)) || phone.endsWith(dbPhone.slice(-9));
+    });
+
+    if (matched) {
+      // Mavjud mijozga Telegram ulash
+      await prisma.customer.update({
+        where: { id: matched.id },
+        data: {
+          telegramChatId: chatId.toString(),
+          telegramUsername: msg.from?.username || matched.telegramUsername || undefined
+        }
+      });
+
+      // Forum topicni avtomatik yaratish
+      createCustomerTopic(matched.id).catch(err =>
+        console.error('Topic yaratishda xatolik:', err)
+      );
+
+      await sendMainMenu(chatId, matched.name);
+      console.log(`✅ Mijoz ulandi: ${matched.name} (${chatId})`);
+    } else {
+      // Yangi mijoz yaratish
+      const newCustomer = await prisma.customer.create({
+        data: {
+          name: `${msg.from?.first_name || ''} ${msg.from?.last_name || ''}`.trim() || 'Yangi mijoz',
+          phone: `+${phone}`,
+          telegramChatId: chatId.toString(),
+          telegramUsername: msg.from?.username || '',
+          category: 'NEW'
+        }
+      });
+
+      createCustomerTopic(newCustomer.id).catch(err =>
+        console.error('Topic yaratishda xatolik:', err)
+      );
+
+      await sendMainMenu(chatId, newCustomer.name);
+      console.log(`✅ Yangi mijoz yaratildi: ${newCustomer.name} (${chatId})`);
+    }
   });
 
   // Komandalar
   customerBot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
+
+    // Telefon yuborish (contact) — yuqoridagi handler ushlaydi
+    if (msg.contact) return;
+
+    // Ulanmagan foydalanuvchilar uchun — telefon so'rash
+    const linked = await prisma.customer.findFirst({
+      where: { telegramChatId: chatId.toString() }
+    });
+    if (!linked && text !== '/start') {
+      await customerBot?.sendMessage(
+        chatId,
+        '📱 Iltimos, avval telefon raqamingizni yuboring.',
+        {
+          reply_markup: {
+            keyboard: [
+              [{ text: '📱 Telefon raqamni yuborish', request_contact: true }]
+            ],
+            resize_keyboard: true,
+            one_time_keyboard: true
+          }
+        }
+      );
+      return;
+    }
 
     if (text === '🛒 Buyurtma berish' || text === '/orders') {
       await handleNewOrder(chatId);
@@ -115,6 +186,29 @@ Bu bot orqali siz:
       }
     } catch (error) {
       console.error('Customer bot callback error:', error);
+    }
+  });
+}
+
+// Asosiy menyu yuborish
+async function sendMainMenu(chatId: number, name: string) {
+  const msg =
+    `👋 *Xush kelibsiz, ${name}\\!*\n\n` +
+    `📱 Buyurtma berish\n` +
+    `💰 Balans va qarzlar\n` +
+    `📊 Sotuvlar tarixi\n\n` +
+    `Tugmalardan foydalaning:`;
+
+  await customerBot?.sendMessage(chatId, msg, {
+    parse_mode: 'MarkdownV2',
+    reply_markup: {
+      keyboard: [
+        [{ text: '🛒 Buyurtma berish' }, { text: '💰 Balans' }],
+        [{ text: '📊 Mening sotuvlarim' }, { text: '📋 Katalog' }],
+        [{ text: '👤 Profil' }, { text: '❓ Yordam' }]
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: false
     }
   });
 }
