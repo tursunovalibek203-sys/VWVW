@@ -464,24 +464,52 @@ router.post('/loans', async (req: AuthRequest, res) => {
       notes
     } = req.body;
 
-    const loan = await prisma.loan.create({
-      data: {
-        employeeName,
-        employeeId: employeeId || null,
-        amount: parseFloat(amount),
-        currency: currency || 'UZS',
-        purpose: purpose || '',
-        loanDate: loanDate ? new Date(loanDate) : new Date(),
-        dueDate: dueDate ? new Date(dueDate) : null,
-        repaymentType: repaymentType || 'SALARY_DEDUCTION',
-        monthlyDeduction: monthlyDeduction ? parseFloat(monthlyDeduction) : null,
-        notes: notes || '',
-        remainingAmount: parseFloat(amount),
-        status: 'ACTIVE'
-      }
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({ error: 'Summa musbat son bo\'lishi kerak' });
+    }
+    const resolvedCurrency = currency || 'UZS';
+    const isAdvance = repaymentType === 'ADVANCE';
+
+    const result = await prisma.$transaction(async (tx) => {
+      const loan = await tx.loan.create({
+        data: {
+          employeeName,
+          employeeId: employeeId || null,
+          amount: parsedAmount,
+          currency: resolvedCurrency,
+          purpose: purpose || '',
+          loanDate: loanDate ? new Date(loanDate) : new Date(),
+          dueDate: dueDate ? new Date(dueDate) : null,
+          repaymentType: repaymentType || 'SALARY_DEDUCTION',
+          monthlyDeduction: monthlyDeduction ? parseFloat(monthlyDeduction) : null,
+          notes: notes || '',
+          remainingAmount: parsedAmount,
+          status: 'ACTIVE'
+        }
+      });
+
+      // Kassadan chiqim qilish (avans yoki qarz berilganda)
+      await tx.cashboxTransaction.create({
+        data: {
+          type: 'EXPENSE',
+          amount: parsedAmount,
+          currency: resolvedCurrency,
+          paymentMethod: 'CASH',
+          category: isAdvance ? 'ADVANCE' : 'LOAN',
+          description: isAdvance
+            ? `Avans: ${employeeName}${purpose ? ' - ' + purpose : ''}`
+            : `Qarz: ${employeeName}${purpose ? ' - ' + purpose : ''}`,
+          userId: req.user!.id,
+          userName: (req.user as any)?.name || req.user?.email || 'Admin',
+          reference: loan.id,
+        }
+      });
+
+      return loan;
     });
 
-    res.json({ success: true, loan });
+    res.json({ success: true, loan: result });
   } catch (error) {
     console.error('Create loan error:', error);
     res.status(500).json({ error: 'Qarz yaratishda xatolik' });

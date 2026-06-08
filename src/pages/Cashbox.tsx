@@ -19,6 +19,8 @@ const t = latinToCyrillic;
 
 const EXPENSE_CATS = [
   { id: 'SALARY',        label: 'Ish haqi',    icon: Users,          color: '#3b82f6' },
+  { id: 'ADVANCE',       label: 'Avans',        icon: Users,          color: '#6366f1' },
+  { id: 'LOAN',          label: 'Qarz',         icon: Users,          color: '#8b5cf6' },
   { id: 'ELECTRICITY',   label: 'Elektr',       icon: Zap,            color: '#f59e0b' },
   { id: 'RAW_MATERIALS', label: 'Xom ashyo',    icon: Truck,          color: '#10b981' },
   { id: 'MAINTENANCE',   label: 'Tamirlash',    icon: Wrench,         color: '#f97316' },
