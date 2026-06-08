@@ -298,13 +298,16 @@ router.post('/transfer', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), 
 
     // Use provided exchange rate or fall back to environment config
     const rate = exchangeRate || parseInt(process.env.USD_TO_UZS_RATE || '12500', 10);
+    if (!rate || rate <= 0 || !Number.isFinite(rate)) {
+      return res.status(400).json({ error: 'Noto\'g\'ri kurs qiymati' });
+    }
 
     // Compute converted amount for the receiving side
     let toAmount = amount;
     if (from === 'USD' && to === 'UZS') {
-      toAmount = amount * rate;
+      toAmount = Math.round(amount * rate * 100) / 100;
     } else if (from === 'UZS' && to === 'USD') {
-      toAmount = amount / rate;
+      toAmount = Math.round((amount / rate) * 100) / 100;
     }
 
     // Create withdrawal record (from) — store source currency
@@ -354,13 +357,16 @@ router.post('/exchange', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), 
     }
 
     const rate = exchangeRate || parseInt(process.env.USD_TO_UZS_RATE || '12500', 10);
+    if (!rate || rate <= 0 || !Number.isFinite(rate)) {
+      return res.status(400).json({ error: 'Noto\'g\'ri kurs qiymati' });
+    }
     let receivedAmount: number;
 
-    // Ayirboshlash hisoblash
+    // Ayirboshlash hisoblash — round to 2 decimal places to avoid float precision issues
     if (fromCurrency === 'USD' && toCurrency === 'UZS') {
-      receivedAmount = amount * rate;
+      receivedAmount = Math.round(amount * rate * 100) / 100;
     } else if (fromCurrency === 'UZS' && toCurrency === 'USD') {
-      receivedAmount = amount / rate;
+      receivedAmount = Math.round((amount / rate) * 100) / 100;
     } else {
       return res.status(400).json({ error: 'Qo\'llab-quvvatlanmaydigan valyuta juftligi' });
     }

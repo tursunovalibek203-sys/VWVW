@@ -52,9 +52,10 @@ function Lbl({ children }: { children: React.ReactNode }) {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    ACTIVE:  { label: t('Faol'),         cls: 'bg-amber-50 text-amber-700' },
-    PAID:    { label: t('Tolangan'),      cls: 'bg-emerald-50 text-emerald-700' },
-    OVERDUE: { label: t('Muddati otgan'), cls: 'bg-rose-50 text-rose-700' },
+    ACTIVE:   { label: t('Faol'),          cls: 'bg-amber-50 text-amber-700' },
+    PAID:     { label: t('Tolangan'),       cls: 'bg-emerald-50 text-emerald-700' },
+    OVERDUE:  { label: t('Muddati otgan'),  cls: 'bg-rose-50 text-rose-700' },
+    OVERPAID: { label: t('Ortiqcha tolangan'), cls: 'bg-purple-50 text-purple-700' },
   };
   const s = map[status] ?? map.ACTIVE;
   return <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${s.cls}`}>{s.label}</span>;
@@ -152,7 +153,7 @@ export default function Daftar() {
   };
 
   const handleAddEntry = async () => {
-    if (!selected || !entryForm.amount || +entryForm.amount <= 0) return;
+    if (submitting || !selected || !entryForm.amount || +entryForm.amount <= 0) return;
     setSubmitting(true);
     try {
       const res = await api.post(`/ledger/${selected.id}/entries`, {
@@ -299,20 +300,23 @@ export default function Daftar() {
                   <div>
                     <p className="text-[10px] text-slate-400 uppercase">{t('Berish kerak')}</p>
                     <p className="text-xs font-bold text-rose-600 tabular-nums">
-                      {l.totalDebit.toLocaleString()}
+                      {l.totalDebit.toLocaleString()} <span className="font-normal text-[9px]">{l.currency}</span>
                     </p>
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-400 uppercase">{t('Berildi')}</p>
                     <p className="text-xs font-bold text-emerald-600 tabular-nums">
-                      {l.totalCredit.toLocaleString()}
+                      {l.totalCredit.toLocaleString()} <span className="font-normal text-[9px]">{l.currency}</span>
                     </p>
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-400 uppercase">{t('Qoldi')}</p>
                     <p className="text-xs font-bold text-indigo-600 tabular-nums">
-                      {l.balance.toLocaleString()}
+                      {l.balance.toLocaleString()} <span className="font-normal text-[9px]">{l.currency}</span>
                     </p>
+                    {l.currency === 'USD' && l.balance > 0 && (
+                      <p className="text-[9px] text-slate-400">≈{Math.round(l.balance * exchangeRate).toLocaleString()} UZS</p>
+                    )}
                   </div>
                 </div>
                 {l.dueDate && (

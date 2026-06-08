@@ -234,6 +234,7 @@ export default function Cashbox() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const doPost = async (url: string, body: any, msg: string, onDone: ()=>void) => {
+    if (submitting) return;
     setSubmitting(true);
     try {
       await api.post(url, body);

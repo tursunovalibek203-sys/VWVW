@@ -13,20 +13,24 @@ router.get('/', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER'), async (req: AuthReq
     if (type && type !== 'ALL') where.type = type as string;
     if (status && status !== 'ALL') where.status = status as string;
 
+    const now = new Date();
+
+    // Persist OVERDUE status to DB for ledgers that are past due
+    await prisma.ledger.updateMany({
+      where: {
+        status: 'ACTIVE',
+        dueDate: { lt: now },
+      },
+      data: { status: 'OVERDUE' },
+    });
+
     const ledgers = await prisma.ledger.findMany({
       where,
       include: { entries: { orderBy: { createdAt: 'desc' }, take: 5 } },
       orderBy: { createdAt: 'desc' },
     });
 
-    // Auto-mark overdue
-    const now = new Date();
-    const result = ledgers.map(l => ({
-      ...l,
-      status: l.status !== 'PAID' && l.dueDate && new Date(l.dueDate) < now ? 'OVERDUE' : l.status,
-    }));
-
-    res.json(result);
+    res.json(ledgers);
   } catch (err) {
     console.error('Get ledgers error:', err);
     res.status(500).json({ error: 'Daftarlarni yuklashda xatolik' });
@@ -36,11 +40,19 @@ router.get('/', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER'), async (req: AuthReq
 // GET /api/ledger/:id  (full with all entries)
 router.get('/:id', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER'), async (req: AuthRequest, res) => {
   try {
+    const now = new Date();
     const ledger = await prisma.ledger.findUnique({
       where: { id: req.params.id },
       include: { entries: { orderBy: { createdAt: 'desc' } } },
     });
     if (!ledger) return res.status(404).json({ error: 'Daftar topilmadi' });
+
+    // Persist overdue if needed
+    if (ledger.status === 'ACTIVE' && ledger.dueDate && new Date(ledger.dueDate) < now) {
+      await prisma.ledger.update({ where: { id: req.params.id }, data: { status: 'OVERDUE' } });
+      ledger.status = 'OVERDUE';
+    }
+
     res.json(ledger);
   } catch (err) {
     res.status(500).json({ error: 'Daftarni yuklashda xatolik' });
@@ -135,14 +147,16 @@ router.post('/:id/entries', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER'), async (
       const newDebit  = entryType === 'DEBIT'  ? ledger.totalDebit  + parsedAmount : ledger.totalDebit;
       const newCredit = entryType === 'CREDIT' ? ledger.totalCredit + parsedAmount : ledger.totalCredit;
       const newBalance = newDebit - newCredit;
+      // Preserve actual balance including negative (overpayment = OVERPAID status)
+      const newStatus = newBalance <= 0 ? (newBalance < 0 ? 'OVERPAID' : 'PAID') : 'ACTIVE';
 
       const updated = await tx.ledger.update({
         where: { id: req.params.id },
         data: {
           totalDebit:  newDebit,
           totalCredit: newCredit,
-          balance:     Math.max(0, newBalance),
-          status:      newBalance <= 0 ? 'PAID' : 'ACTIVE',
+          balance:     newBalance,
+          status:      newStatus,
         },
         include: { entries: { orderBy: { createdAt: 'desc' } } },
       });
@@ -169,17 +183,18 @@ router.delete('/:id/entries/:entryId', authorize('ADMIN', 'ACCOUNTANT'), async (
     await prisma.$transaction(async (tx) => {
       await tx.ledgerEntry.delete({ where: { id: req.params.entryId } });
 
-      const newDebit  = entry.entryType === 'DEBIT'  ? ledger.totalDebit  - entry.amount : ledger.totalDebit;
-      const newCredit = entry.entryType === 'CREDIT' ? ledger.totalCredit - entry.amount : ledger.totalCredit;
-      const newBalance = Math.max(0, newDebit - newCredit);
+      const newDebit  = Math.max(0, entry.entryType === 'DEBIT'  ? ledger.totalDebit  - entry.amount : ledger.totalDebit);
+      const newCredit = Math.max(0, entry.entryType === 'CREDIT' ? ledger.totalCredit - entry.amount : ledger.totalCredit);
+      const newBalance = newDebit - newCredit;
+      const newStatus = newBalance <= 0 ? (newBalance < 0 ? 'OVERPAID' : 'PAID') : 'ACTIVE';
 
       await tx.ledger.update({
         where: { id: req.params.id },
         data: {
-          totalDebit:  Math.max(0, newDebit),
-          totalCredit: Math.max(0, newCredit),
+          totalDebit:  newDebit,
+          totalCredit: newCredit,
           balance:     newBalance,
-          status:      newBalance <= 0 ? 'PAID' : 'ACTIVE',
+          status:      newStatus,
         },
       });
     });

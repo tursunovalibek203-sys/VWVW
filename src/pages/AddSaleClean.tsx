@@ -553,6 +553,7 @@ export default function AddSaleClean() {
 
 
   const handleSubmit = useCallback(async () => {
+    if (saleForm.isSubmitting) return;
     try {
       await saleForm.submitSale();
     } catch (error: any) {
@@ -626,7 +627,7 @@ export default function AddSaleClean() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate('/cashier/sales')}
+            onClick={() => navigate(-1)}
             aria-label={latinToCyrillic('Orqaga')}
             className="w-11 h-11 flex-shrink-0 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl flex items-center justify-center transition-all active:scale-[0.97]"
           >
@@ -830,7 +831,7 @@ export default function AddSaleClean() {
             }}
             onExchangeRateChange={saleForm.setExchangeRate}
             onSubmit={handleSubmit}
-            onCancel={() => navigate('/cashier/sales')}
+            onCancel={() => navigate(-1)}
             onReset={saleForm.resetForm}
           />
           </div>{/* end sticky right column wrapper */}
