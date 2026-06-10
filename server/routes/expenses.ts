@@ -48,36 +48,66 @@ router.post('/', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER'), async (req: AuthRe
     // Karta faqat UZS bo'lishi kerak
     const resolvedCurrency = paymentMethod === 'CARD' ? 'UZS' : (currency || 'UZS');
 
-    const expense = await prisma.$transaction(async (tx) => {
+    const absAmount = Math.abs(parseFloat(amount));
+    const cat = category || 'OTHER';
+    const now = new Date();
+
+    const { expense, budgetWarning, budgetInfo } = await prisma.$transaction(async (tx) => {
       const created = await tx.expense.create({
         data: {
-          amount: Math.abs(parseFloat(amount)),
+          amount: absAmount,
           currency: resolvedCurrency,
-          category: category || 'OTHER',
-          description: description || `Xarajat: ${category || 'OTHER'}`,
+          category: cat,
+          description: description || `Xarajat: ${cat}`,
           userId: req.user!.id,
         },
       });
 
-      // Mirror every expense into cashboxTransaction so totals stay in sync
       await tx.cashboxTransaction.create({
         data: {
           type: 'EXPENSE',
-          amount: Math.abs(parseFloat(amount)),
+          amount: absAmount,
           currency: resolvedCurrency,
           paymentMethod: paymentMethod || 'CASH',
-          category: category || 'OTHER',
-          description: description || `Xarajat: ${category}`,
+          category: cat,
+          description: description || `Xarajat: ${cat}`,
           userId: req.user!.id,
           userName: (req.user as any)?.name || 'Admin',
           reference: created.id,
         },
       });
 
-      return created;
+      // Budjet yangilash va ogohlantirish — transaction ichida (atomik)
+      // Haqiqiy sarflangan summa expense jadvalidan hisoblanadi (GET /cashbox/budgets bilan mos)
+      let warning = false;
+      let info: any = null;
+      const budget = await tx.budget.findUnique({
+        where: { category_year_month: { category: cat, year: now.getFullYear(), month: now.getMonth() + 1 } },
+      });
+      if (budget) {
+        // Expense hozir yaratildi — aggregate uни o'z ichiga oladi
+        const mStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const mEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        const agg = await tx.expense.aggregate({
+          where: { category: cat, createdAt: { gte: mStart, lte: mEnd } },
+          _sum: { amount: true },
+        });
+        const newSpent = agg._sum.amount || 0;
+        const prevSpent = Math.max(0, newSpent - absAmount);
+        if (newSpent > budget.amount) {
+          warning = true;
+          info = { category: cat, allocated: budget.amount, spent: prevSpent, newTotal: newSpent, over: newSpent - budget.amount, currency: budget.currency };
+        }
+        await tx.budget.update({
+          where: { id: budget.id },
+          data: { spent: newSpent, remaining: Math.max(0, budget.amount - newSpent) },
+        });
+      }
+
+      return { expense: created, budgetWarning: warning, budgetInfo: info };
     });
 
-    res.json(expense);
+    res.json({ ...expense, budgetWarning, budgetInfo });
   } catch (error) {
     console.error('Create expense error:', error);
     res.status(500).json({ error: 'Failed to create expense' });

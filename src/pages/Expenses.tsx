@@ -21,6 +21,10 @@ import {
   Layers,
   CalendarDays,
   X,
+  Users,
+  Wrench,
+  Building2,
+  ShoppingCart,
 } from 'lucide-react';
 
 const t = latinToCyrillic;
@@ -35,22 +39,23 @@ type CategoryMeta = {
 };
 
 const CATEGORIES: CategoryMeta[] = [
-  { id: 'SALARY', name: 'Ish haqi', icon: UserCheck, tint: 'bg-sky-50 text-sky-600', badge: 'info' },
-  { id: 'ELECTRICITY', name: 'Elektr', icon: Zap, tint: 'bg-amber-50 text-amber-600', badge: 'warning' },
-  { id: 'RAW_MATERIALS', name: 'Xom ashyo', icon: Receipt, tint: 'bg-emerald-50 text-emerald-600', badge: 'success' },
-  { id: 'TRANSPORT', name: 'Transport', icon: Truck, tint: 'bg-indigo-50 text-indigo-600', badge: 'info' },
-  { id: 'TAX', name: 'Soliq', icon: DollarSign, tint: 'bg-rose-50 text-rose-600', badge: 'error' },
-  { id: 'OTHER', name: 'Boshqa', icon: MoreHorizontal, tint: 'bg-slate-100 text-slate-600', badge: 'neutral' },
+  { id: 'SALARY',        name: 'Ish haqi',  icon: UserCheck,     tint: 'bg-sky-50 text-sky-600',       badge: 'info' },
+  { id: 'ADVANCE',       name: 'Avans',     icon: Users,         tint: 'bg-indigo-50 text-indigo-600', badge: 'info' },
+  { id: 'LOAN',          name: 'Qarz',      icon: Users,         tint: 'bg-purple-50 text-purple-600', badge: 'neutral' },
+  { id: 'ELECTRICITY',   name: 'Elektr',    icon: Zap,           tint: 'bg-amber-50 text-amber-600',   badge: 'warning' },
+  { id: 'RAW_MATERIALS', name: 'Xom ashyo', icon: Receipt,       tint: 'bg-emerald-50 text-emerald-600', badge: 'success' },
+  { id: 'MAINTENANCE',   name: 'Tamirlash', icon: Wrench,        tint: 'bg-orange-50 text-orange-600', badge: 'warning' },
+  { id: 'RENT',          name: 'Ijara',     icon: Building2,     tint: 'bg-violet-50 text-violet-600', badge: 'info' },
+  { id: 'MARKETING',     name: 'Marketing', icon: ShoppingCart,  tint: 'bg-pink-50 text-pink-600',     badge: 'neutral' },
+  { id: 'TAX',           name: 'Soliq',     icon: DollarSign,    tint: 'bg-rose-50 text-rose-600',     badge: 'error' },
+  { id: 'TRANSPORT',     name: 'Transport', icon: Truck,         tint: 'bg-indigo-50 text-indigo-600', badge: 'info' },
+  { id: 'UTILITIES',     name: 'Kommunal',  icon: Zap,           tint: 'bg-lime-50 text-lime-600',     badge: 'warning' },
+  { id: 'SUPPLIES',      name: 'Taminot',   icon: ShoppingCart,  tint: 'bg-teal-50 text-teal-600',     badge: 'info' },
+  { id: 'OTHER',         name: 'Boshqa',    icon: MoreHorizontal, tint: 'bg-slate-100 text-slate-600', badge: 'neutral' },
 ];
 
 const getCategory = (id: string): CategoryMeta =>
-  CATEGORIES.find((c) => c.id === id) || {
-    id,
-    name: id,
-    icon: MoreHorizontal,
-    tint: 'bg-slate-100 text-slate-600',
-    badge: 'neutral',
-  };
+  CATEGORIES.find((c) => c.id === id) ?? CATEGORIES[CATEGORIES.length - 1];
 
 export default function Expenses() {
   const { addToast } = useToast();
@@ -75,16 +80,22 @@ export default function Expenses() {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const [expRes, sumRes] = await Promise.all([
+      const [expRes, sumRes] = await Promise.allSettled([
         api.get('/expenses'),
         api.get('/expenses/summary'),
       ]);
-      setExpenses(expRes.data);
-      const chartData = sumRes.data.map((item: any) => ({
-        name: item.category,
-        value: item._sum.amount,
-      }));
-      setSummary(chartData);
+      if (expRes.status === 'fulfilled') {
+        setExpenses(Array.isArray(expRes.value.data) ? expRes.value.data : []);
+      } else {
+        addToast(toast.error(t('Xatolik'), t('Malumotlarni yuklashda xatolik yuz berdi')));
+      }
+      if (sumRes.status === 'fulfilled') {
+        const chartData = sumRes.value.data.map((item: any) => ({
+          name: item.category,
+          value: item._sum.amount,
+        }));
+        setSummary(chartData);
+      }
     } catch (err) {
       console.error(err);
       addToast(toast.error(t('Xatolik'), t('Malumotlarni yuklashda xatolik yuz berdi')));

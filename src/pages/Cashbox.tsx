@@ -8,6 +8,7 @@ import {
   Smartphone, ArrowLeftRight, Receipt, Users, Zap, Truck, Wrench,
   Building2, ShoppingCart, MoreHorizontal, RefreshCw, Plus, Loader2, X,
   History, UserCheck, ArrowUpRight, ArrowDownRight, Download, Clock,
+  AlertTriangle, CheckCircle2, BarChart2, Scale,
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -31,13 +32,16 @@ const EXPENSE_CATS = [
   { id: 'UTILITIES',     label: 'Kommunal',     icon: Zap,            color: '#84cc16' },
   { id: 'SUPPLIES',      label: 'Taminot',      icon: ShoppingCart,   color: '#14b8a6' },
   { id: 'OTHER',         label: 'Boshqa',       icon: MoreHorizontal, color: '#6b7280' },
+  { id: 'LOAN_REPAYMENT', label: 'Qarz qaytarish', icon: CheckCircle2, color: '#10b981' },
+  { id: 'ADJUSTMENT',    label: 'Tekshiruv',    icon: Scale,          color: '#64748b' },
+  { id: 'REVERSAL',      label: 'Bekor qilindi', icon: AlertTriangle, color: '#ef4444' },
 ];
 
-const getCat = (id: string) =>
-  EXPENSE_CATS.find(c => c.id === id) ?? EXPENSE_CATS[EXPENSE_CATS.length - 1];
+const OTHER_CAT = EXPENSE_CATS.find(c => c.id === 'OTHER')!;
+const getCat = (id: string) => EXPENSE_CATS.find(c => c.id === id) ?? OTHER_CAT;
 
 const BUCKET_COLORS = ['#10b981', '#3b82f6', '#6366f1', '#8b5cf6'];
-type TabType = 'overview' | 'history' | 'expenses' | 'loans' | 'advances';
+type TabType = 'overview' | 'history' | 'expenses' | 'loans' | 'advances' | 'budget';
 
 // ─── Small shared components ────────────────────────────────────────────────
 function KpiCard({ title, value, sub, icon: Icon, color }: {
@@ -132,8 +136,10 @@ export default function Cashbox() {
   const [loading,      setLoading]      = useState(true);
   const [refreshing,   setRefreshing]   = useState(false);
   const [submitting,   setSubmitting]   = useState(false);
-  const [exchangeRate, setExchangeRate] = useState(() =>
-    parseInt(localStorage.getItem('cashboxExchangeRate') || '12500', 10));
+  const [exchangeRate, setExchangeRate] = useState(() => {
+    const v = parseInt(localStorage.getItem('cashboxExchangeRate') || '12500', 10);
+    return Number.isFinite(v) && v > 0 ? v : 12500;
+  });
   const [rateInput, setRateInput] = useState(
     localStorage.getItem('cashboxExchangeRate') || '12500');
 
@@ -144,6 +150,22 @@ export default function Cashbox() {
   const [showLoan,     setShowLoan]     = useState(false);
   const [showAdvance,  setShowAdvance]  = useState(false);
   const [showRate,     setShowRate]     = useState(false);
+
+  const [budgets,      setBudgets]      = useState<any[]>([]);
+  const [showRepay,    setShowRepay]    = useState(false);
+  const [repayTarget,  setRepayTarget]  = useState<any>(null);
+  const [repayForm,    setRepayForm]    = useState({ amount: '', currency: 'UZS', paymentMethod: 'CASH', notes: '' });
+  const [showCancel,   setShowCancel]   = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<any>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [showReconcile, setShowReconcile] = useState(false);
+  const [reconcileForm, setReconcileForm] = useState({ physicalUZS: '', physicalUSD: '', reason: '' });
+  const [showNewBudget, setShowNewBudget] = useState(false);
+  const [budgetForm,   setBudgetForm]   = useState({ category: 'SALARY', amount: '', currency: 'UZS', alertThreshold: '80' });
+  const [budgetMonth,  setBudgetMonth]  = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
 
   const INIT = { amount: '', currency: 'UZS', paymentMethod: 'CASH', description: '' };
   const [kirimForm,    setKirimForm]    = useState(INIT);
@@ -161,12 +183,13 @@ export default function Cashbox() {
   const loadAll = useCallback(async (quiet = false) => {
     if (quiet) setRefreshing(true); else setLoading(true);
     try {
-      const [sumR, txR, expR, loanR, rateR] = await Promise.allSettled([
+      const [sumR, txR, expR, loanR, rateR, budgetR] = await Promise.allSettled([
         api.get('/cashbox/summary'),
         api.get('/cashbox/transactions?limit=300'),
         api.get('/expenses'),
         api.get('/cashbox/loans'),
         api.get('/exchange-rates'),
+        api.get('/cashbox/budgets'),
       ]);
       if (sumR.status  === 'fulfilled') setCashbox(sumR.value.data);
       if (txR.status   === 'fulfilled') setTransactions(Array.isArray(txR.value.data) ? txR.value.data : []);
@@ -178,6 +201,7 @@ export default function Cashbox() {
           ? parseInt(arr[0].rate || arr[0].rateToUZS || '12500', 10) : 0;
         if (r > 0) { setExchangeRate(r); setRateInput(String(r)); localStorage.setItem('cashboxExchangeRate', String(r)); }
       }
+      if (budgetR.status === 'fulfilled') setBudgets(Array.isArray(budgetR.value.data) ? budgetR.value.data : []);
     } catch { addToast({ type: 'error', title: t('Malumot yuklashda xatolik') }); }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
@@ -260,9 +284,23 @@ export default function Cashbox() {
     doPost('/cashbox/exchange', { fromCurrency:exchForm.fromCurrency, toCurrency:exchForm.toCurrency, fromType:exchForm.fromType, toType:exchForm.toType, amount:+exchForm.amount, exchangeRate, description:exchForm.description||t('Ayirboshlash') },
       'Ayirboshlash amalga oshirildi', ()=>{ setShowExchange(false); setExchForm({fromCurrency:'USD',toCurrency:'UZS',fromType:'CASH',toType:'CASH',amount:'',description:''}); }); };
 
-  const handleExpense  = () => { if (!expForm.amount||+expForm.amount<=0) return;
-    doPost('/expenses', { amount:+expForm.amount, currency:expForm.currency, category:expForm.category, paymentMethod:expForm.paymentMethod, description:expForm.description },
-      'Xarajat qoshildi', ()=>{ setShowExpense(false); setExpForm({amount:'',currency:'UZS',category:'SALARY',paymentMethod:'CASH',description:''}); }); };
+  const handleExpense  = async () => {
+    if (!expForm.amount || +expForm.amount <= 0 || submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await api.post('/expenses', { amount:+expForm.amount, currency:expForm.currency, category:expForm.category, paymentMethod:expForm.paymentMethod, description:expForm.description });
+      setShowExpense(false);
+      setExpForm({ amount:'', currency:'UZS', category:'SALARY', paymentMethod:'CASH', description:'' });
+      loadAll(true);
+      addToast({ type: 'success', title: t('Xarajat qoshildi') });
+      if (res.data?.budgetWarning) {
+        const info = res.data.budgetInfo;
+        addToast({ type: 'warning', title: t('Budjet oshdi'), message: `${getCat(info?.category).label}: ${Math.round(info?.newTotal||0).toLocaleString()} / ${Math.round(info?.allocated||0).toLocaleString()} ${info?.currency}` });
+      }
+    } catch (err: any) {
+      addToast({ type: 'error', title: t('Xatolik'), message: err?.response?.data?.error || t('Xatolik') });
+    } finally { setSubmitting(false); }
+  };
 
   const handleLoan     = () => { if (!loanForm.employeeName||!loanForm.amount) return;
     doPost('/cashbox/loans', { ...loanForm, amount:+loanForm.amount, repaymentType:'SALARY_DEDUCTION', loanDate:new Date().toISOString() },
@@ -280,6 +318,75 @@ export default function Cashbox() {
       setShowRate(false); loadAll(true);
       addToast({ type:'success', title: t('Kurs yangilandi') });
     }
+  };
+
+  const handleRepay = async () => {
+    if (!repayTarget || !repayForm.amount || +repayForm.amount <= 0 || submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await api.post(`/cashbox/loans/${repayTarget.id}/repay`, {
+        amount: +repayForm.amount, currency: repayForm.currency,
+        paymentMethod: repayForm.paymentMethod, notes: repayForm.notes,
+        exchangeRate,
+      });
+      setShowRepay(false); setRepayTarget(null);
+      setRepayForm({ amount: '', currency: 'UZS', paymentMethod: 'CASH', notes: '' });
+      loadAll(true);
+      addToast({ type: 'success', title: res.data?.message || t('Tolash amalga oshirildi') });
+      if (res.data?.capped) addToast({ type: 'info', title: t('Summa qirqildi'), message: t('Qoldig dan oshmas miqdorda tolandi') });
+    } catch (err: any) {
+      addToast({ type: 'error', title: t('Xatolik'), message: err?.response?.data?.error || t('Tolashda xatolik') });
+    } finally { setSubmitting(false); }
+  };
+
+  const handleCancel = async () => {
+    if (!cancelTarget || !cancelReason.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      await api.post(`/cashbox/transactions/${cancelTarget.id}/cancel`, { reason: cancelReason });
+      setShowCancel(false); setCancelTarget(null); setCancelReason('');
+      loadAll(true);
+      addToast({ type: 'success', title: t('Tranzaksiya bekor qilindi') });
+    } catch (err: any) {
+      addToast({ type: 'error', title: t('Xatolik'), message: err?.response?.data?.error || t('Bekor qilishda xatolik') });
+    } finally { setSubmitting(false); }
+  };
+
+  const handleReconcile = async () => {
+    if (!reconcileForm.reason.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await api.post('/cashbox/reconcile', {
+        physicalUZS: +reconcileForm.physicalUZS || 0,
+        physicalUSD: +reconcileForm.physicalUSD || 0,
+        reason: reconcileForm.reason,
+      });
+      setShowReconcile(false);
+      setReconcileForm({ physicalUZS: '', physicalUSD: '', reason: '' });
+      loadAll(true);
+      addToast({ type: 'success', title: res.data?.message || t('Tekshiruv amalga oshirildi') });
+    } catch (err: any) {
+      addToast({ type: 'error', title: t('Xatolik'), message: err?.response?.data?.error || t('Tekshiruvda xatolik') });
+    } finally { setSubmitting(false); }
+  };
+
+  const handleNewBudget = async () => {
+    if (!budgetForm.amount || +budgetForm.amount <= 0 || submitting) return;
+    setSubmitting(true);
+    const [year, month] = budgetMonth.split('-').map(Number);
+    try {
+      await api.post('/cashbox/budgets', {
+        category: budgetForm.category, amount: +budgetForm.amount,
+        currency: budgetForm.currency, alertThreshold: +budgetForm.alertThreshold || 80,
+        year, month,
+      });
+      setShowNewBudget(false);
+      setBudgetForm({ category: 'SALARY', amount: '', currency: 'UZS', alertThreshold: '80' });
+      loadAll(true);
+      addToast({ type: 'success', title: t('Budjet saqlandi') });
+    } catch (err: any) {
+      addToast({ type: 'error', title: t('Xatolik'), message: err?.response?.data?.error || t('Budjet saqlashda xatolik') });
+    } finally { setSubmitting(false); }
   };
 
   const handleExport = () => {
@@ -303,6 +410,7 @@ export default function Cashbox() {
     { id:'expenses',  label: t('Xarajatlar'), icon: Receipt },
     { id:'loans',     label: t('Qarzlar'),    icon: DollarSign },
     { id:'advances',  label: t('Avanslar'),   icon: UserCheck },
+    { id:'budget',    label: t('Budjet'),     icon: BarChart2 },
   ];
 
   if (loading) return (
@@ -335,10 +443,17 @@ export default function Cashbox() {
       {/* Balance banner */}
       <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-5 sm:p-6 text-white shadow-lg shadow-indigo-500/20">
         <p className="text-indigo-200 text-sm font-medium">{t('Umumiy balans')}</p>
-        <p className="text-4xl font-bold tabular-nums mt-1">
+        <p className={`text-4xl font-bold tabular-nums mt-1 ${totalUZS < 0 ? 'text-rose-300' : ''}`}>
           {Math.round(totalUZS).toLocaleString('en-US')} <span className="text-2xl text-indigo-200">UZS</span>
         </p>
-        <p className="text-indigo-200 text-sm mt-1">≈ {(totalUZS / exchangeRate).toFixed(2)} USD</p>
+        {totalUZS < 0 ? (
+          <div className="flex items-center gap-1.5 mt-1">
+            <AlertTriangle className="w-4 h-4 text-rose-300"/>
+            <span className="text-rose-300 text-sm font-semibold">{t('Manfiy balans — tekshiruv talab qilinadi')}</span>
+          </div>
+        ) : (
+          <p className="text-indigo-200 text-sm mt-1">≈ {(totalUZS / exchangeRate).toFixed(2)} USD</p>
+        )}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-white/20">
           {[
             { label: t('Naqd UZS'),  val: cashUZS.toLocaleString('en-US'),              sub: 'UZS' },
@@ -487,6 +602,23 @@ export default function Cashbox() {
                 </div>
               </div>
 
+              {/* Reconciliation widget */}
+              <div className="bg-slate-50 rounded-xl p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <Scale className="w-4 h-4 text-amber-600"/>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">{t('Kassa tekshiruvi')}</p>
+                    <p className="text-xs text-slate-400">{t('Fizik naqd va tizim balansini solishtirish')}</p>
+                  </div>
+                </div>
+                <button onClick={()=>setShowReconcile(true)}
+                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold transition-colors flex-shrink-0">
+                  {t('Tekshirish')}
+                </button>
+              </div>
+
               {/* Recent */}
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -587,39 +719,59 @@ export default function Cashbox() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                      {[t('Sana'),t('Tur'),t('Tavsif'),t('Usul'),t('Summa')].map((h,i)=>(
-                        <th key={h} className={`px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide ${i===4?'text-right':'text-left'}`}>{h}</th>
+                      {[t('Sana'),t('Tur'),t('Tavsif'),t('Usul'),t('Summa'),''].map((h,i)=>(
+                        <th key={i} className={`px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide ${i===4?'text-right':i===5?'w-8':''}`}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredTx.length === 0
-                      ? <tr><td colSpan={5} className="text-center py-10 text-slate-400 text-sm">{t('Tranzaksiyalar yoq')}</td></tr>
-                      : filteredTx.map(tx => (
-                        <tr key={tx.id} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap tabular-nums">
-                            {new Date(tx.createdAt).toLocaleString('uz-UZ',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
-                              ${tx.type==='INCOME'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>
-                              {tx.type==='INCOME'?<ArrowUpRight className="w-3 h-3"/>:<ArrowDownRight className="w-3 h-3"/>}
-                              {tx.type==='INCOME'?t('Kirim'):t('Chiqim')}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-700 max-w-xs truncate text-sm">{tx.description||tx.category||'—'}</td>
-                          <td className="px-4 py-3 text-xs text-slate-500">
-                            {tx.paymentMethod==='CASH'  ? <span className="flex items-center gap-1"><Banknote  className="w-3.5 h-3.5 text-emerald-500"/>{t('Naqd')}</span>
-                            :tx.paymentMethod==='CARD'  ? <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5 text-blue-500"/>{t('Karta')}</span>
-                            :tx.paymentMethod==='CLICK' ? <span className="flex items-center gap-1"><Smartphone className="w-3.5 h-3.5 text-violet-500"/>Click</span>
-                            : tx.paymentMethod||'—'}
-                          </td>
-                          <td className={`px-4 py-3 text-right font-bold tabular-nums ${tx.type==='INCOME'?'text-emerald-600':'text-rose-600'}`}>
-                            {tx.type==='INCOME'?'+':'-'}{tx.amount.toLocaleString('en-US')}
-                            <span className="text-xs font-normal ml-0.5 text-slate-400">{tx.currency||'UZS'}</span>
-                          </td>
-                        </tr>
-                      ))
+                      ? <tr><td colSpan={6} className="text-center py-10 text-slate-400 text-sm">{t('Tranzaksiyalar yoq')}</td></tr>
+                      : filteredTx.map(tx => {
+                        const isReversal = tx.category === 'REVERSAL';
+                        const canCancel = ['INCOME','EXPENSE'].includes(tx.type) && !isReversal
+                          && !['EXCHANGE','TRANSFER'].includes(tx.category||'')
+                          && !transactions.some(r => r.category==='REVERSAL' && r.reference===tx.id);
+                        return (
+                          <tr key={tx.id} className={`transition-colors ${isReversal?'bg-slate-50/80 opacity-60':'hover:bg-slate-50/60'}`}>
+                            <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap tabular-nums">
+                              {new Date(tx.createdAt).toLocaleString('uz-UZ',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}
+                            </td>
+                            <td className="px-4 py-3">
+                              {isReversal ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">
+                                  <AlertTriangle className="w-3 h-3"/>{t('Bekor')}
+                                </span>
+                              ) : (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
+                                  ${tx.type==='INCOME'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'}`}>
+                                  {tx.type==='INCOME'?<ArrowUpRight className="w-3 h-3"/>:<ArrowDownRight className="w-3 h-3"/>}
+                                  {tx.type==='INCOME'?t('Kirim'):t('Chiqim')}
+                                </span>
+                              )}
+                            </td>
+                            <td className={`px-4 py-3 text-slate-700 max-w-xs truncate text-sm ${isReversal?'line-through text-slate-400':''}`}>{tx.description||tx.category||'—'}</td>
+                            <td className="px-4 py-3 text-xs text-slate-500">
+                              {tx.paymentMethod==='CASH'  ? <span className="flex items-center gap-1"><Banknote  className="w-3.5 h-3.5 text-emerald-500"/>{t('Naqd')}</span>
+                              :tx.paymentMethod==='CARD'  ? <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5 text-blue-500"/>{t('Karta')}</span>
+                              :tx.paymentMethod==='CLICK' ? <span className="flex items-center gap-1"><Smartphone className="w-3.5 h-3.5 text-violet-500"/>Click</span>
+                              : tx.paymentMethod||'—'}
+                            </td>
+                            <td className={`px-4 py-3 text-right font-bold tabular-nums ${isReversal?'text-slate-400 line-through':tx.type==='INCOME'?'text-emerald-600':'text-rose-600'}`}>
+                              {tx.type==='INCOME'?'+':'-'}{tx.amount.toLocaleString('en-US')}
+                              <span className="text-xs font-normal ml-0.5 text-slate-400">{tx.currency||'UZS'}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              {canCancel && (
+                                <button onClick={()=>{setCancelTarget(tx);setShowCancel(true);}}
+                                  className="p-1 rounded-lg hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-colors" title={t('Bekor qilish')}>
+                                  <X className="w-3.5 h-3.5"/>
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
                     }
                   </tbody>
                 </table>
@@ -759,6 +911,12 @@ export default function Cashbox() {
                               </span>
                             )}
                           </div>
+                          {active && (
+                            <button onClick={()=>{setRepayTarget(loan);setRepayForm({amount:String(loan.remainingAmount??loan.amount),currency:loan.currency||'UZS',paymentMethod:'CASH',notes:''});setShowRepay(true);}}
+                              className="mt-3 w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5"/> {t('Tolash')}
+                            </button>
+                          )}
                         </div>
                       );
                     })}
@@ -828,12 +986,85 @@ export default function Cashbox() {
                           {adv.notes && (
                             <p className="mt-3 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">{adv.notes}</p>
                           )}
+                          {active && (
+                            <button onClick={()=>{setRepayTarget(adv);setRepayForm({amount:String(adv.remainingAmount??adv.amount),currency:adv.currency||'UZS',paymentMethod:'CASH',notes:''});setShowRepay(true);}}
+                              className="mt-3 w-full py-2 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5"/> {t('Qaytarish')}
+                            </button>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                 )
               }
+            </div>
+          )}
+
+          {/* ══ BUDGET ══ */}
+          {activeTab === 'budget' && (
+            <div className="space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <input type="month" value={budgetMonth} onChange={e=>setBudgetMonth(e.target.value)}
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+                  <p className="text-sm text-slate-400">{budgets.length} {t('ta budjet')}</p>
+                </div>
+                <button onClick={()=>setShowNewBudget(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors self-start">
+                  <Plus className="w-4 h-4"/> {t('Yangi budjet')}
+                </button>
+              </div>
+
+              {budgets.length === 0 ? (
+                <div className="text-center py-16 text-slate-400">
+                  <BarChart2 className="w-12 h-12 mx-auto mb-3 opacity-20"/>
+                  <p className="text-sm font-medium">{t('Budjet belgilanmagan')}</p>
+                  <p className="text-xs mt-1">{t('Yangi budjet qoshish uchun yuqoridagi tugmani bosing')}</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {budgets.map(b => {
+                    const pct = b.amount > 0 ? Math.min(100, Math.round((b.spent||0)/b.amount*100)) : 0;
+                    const barColor = pct >= 80 ? '#ef4444' : pct >= 60 ? '#f59e0b' : '#10b981';
+                    const cat = getCat(b.category);
+                    const Icon = cat.icon;
+                    const over = (b.spent||0) > b.amount;
+                    return (
+                      <div key={b.id} className={`bg-white rounded-xl border p-4 ${over?'border-rose-200':'border-slate-200/70'}`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{backgroundColor:cat.color+'20'}}>
+                              <Icon className="w-4 h-4" style={{color:cat.color}}/>
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-slate-800">{t(cat.label)}</p>
+                              <p className="text-xs text-slate-400">{b.year}/{String(b.month).padStart(2,'0')}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-sm font-bold tabular-nums ${over?'text-rose-600':'text-slate-800'}`}>
+                              {Math.round(b.spent||0).toLocaleString()} <span className="text-xs font-normal text-slate-400">/ {Math.round(b.amount).toLocaleString()} {b.currency}</span>
+                            </p>
+                            {over && <p className="text-xs text-rose-500 font-medium">{t('Oshdi')}: +{Math.round((b.spent||0)-b.amount).toLocaleString()}</p>}
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs text-slate-400">
+                            <span>{pct}% {t('sarflangan')}</span>
+                            <span className={`font-semibold ${over?'text-rose-500':''}`}>
+                              {Math.max(0,Math.round(b.amount-(b.spent||0))).toLocaleString()} {b.currency} {t('qoldi')}
+                            </span>
+                          </div>
+                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all" style={{width:`${pct}%`,backgroundColor:barColor}}/>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -1022,6 +1253,151 @@ export default function Cashbox() {
           <Lbl>1 USD = ? UZS</Lbl>
           <input value={rateInput} onChange={e=>setRateInput(e.target.value)} type="number" min="1" className={inp}/>
           <p className="text-xs text-slate-400 mt-1">{t('Hozirgi kurs')}: {exchangeRate.toLocaleString('en-US')} UZS</p>
+        </div>
+      </CModal>
+
+      {/* Repay Loan / Advance */}
+      <CModal open={showRepay} onClose={()=>{setShowRepay(false);setRepayTarget(null);}} title={repayTarget?.repaymentType==='ADVANCE'?t('Avansni qaytarish'):t('Qarzni tolash')}
+        footer={<>
+          <button onClick={()=>{setShowRepay(false);setRepayTarget(null);}} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold">{t('Bekor')}</button>
+          <button onClick={handleRepay} disabled={submitting} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold inline-flex items-center gap-2">
+            {submitting&&<Loader2 className="w-4 h-4 animate-spin"/>}{t('Tasdiqlash')}
+          </button>
+        </>}>
+        {repayTarget && (
+          <>
+            <div className="bg-slate-50 rounded-xl p-3 text-sm">
+              <p className="font-semibold text-slate-800">{repayTarget.employeeName}</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {t('Qolgan qarz')}: <b className="text-slate-700">{(repayTarget.remainingAmount??repayTarget.amount).toLocaleString()} {repayTarget.currency}</b>
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Lbl>{t('Summa')}</Lbl>
+                <input value={repayForm.amount} onChange={e=>setRepayForm({...repayForm,amount:e.target.value})} type="number" min="0" placeholder="0.00" className={inp}/>
+              </div>
+              <div><Lbl>{t('Valyuta')}</Lbl>
+                <select value={repayForm.currency} onChange={e=>setRepayForm({...repayForm,currency:e.target.value})} className={inp}>
+                  <option value="UZS">UZS</option><option value="USD">USD</option>
+                </select>
+              </div>
+            </div>
+            {repayForm.currency !== (repayTarget.currency||'UZS') && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
+                <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5"/>
+                {t('Valyuta farqi bor. Tizim avtomatik joriy kursdan foydalanadi')}: 1 USD = {exchangeRate.toLocaleString()} UZS
+              </div>
+            )}
+            <div><Lbl>{t('Tolov usuli')}</Lbl>
+              <MethodPicker value={repayForm.paymentMethod} onChange={v=>setRepayForm({...repayForm,paymentMethod:v})}/>
+            </div>
+            <div><Lbl>{t('Izoh')}</Lbl>
+              <input value={repayForm.notes} onChange={e=>setRepayForm({...repayForm,notes:e.target.value})} placeholder={t('Ixtiyoriy...')} className={inp}/>
+            </div>
+          </>
+        )}
+      </CModal>
+
+      {/* Cancel Transaction */}
+      <CModal open={showCancel} onClose={()=>{setShowCancel(false);setCancelTarget(null);setCancelReason('');}} title={t('Tranzaksiyani bekor qilish')}
+        footer={<>
+          <button onClick={()=>{setShowCancel(false);setCancelTarget(null);setCancelReason('');}} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold">{t('Yopish')}</button>
+          <button onClick={handleCancel} disabled={submitting||!cancelReason.trim()} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold inline-flex items-center gap-2">
+            {submitting&&<Loader2 className="w-4 h-4 animate-spin"/>}{t('Bekor qilish')}
+          </button>
+        </>}>
+        {cancelTarget && (
+          <>
+            <div className="bg-slate-50 rounded-xl p-3 text-sm">
+              <p className="font-medium text-slate-700">{cancelTarget.description||cancelTarget.category}</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {cancelTarget.type==='INCOME'?'+':'-'}{cancelTarget.amount?.toLocaleString()} {cancelTarget.currency} · {new Date(cancelTarget.createdAt).toLocaleDateString('uz-UZ')}
+              </p>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 flex gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5"/>
+              <span>{t('Tranzaksiya uchrilmaydi — teskari yozuv (reversal) yaratiladi. Bu buxgalteriya talabi')}</span>
+            </div>
+            <div>
+              <Lbl>{t('Bekor qilish sababi')} *</Lbl>
+              <input value={cancelReason} onChange={e=>setCancelReason(e.target.value)} placeholder={t('Masalan: xato kiritildi...')} className={inp}/>
+            </div>
+          </>
+        )}
+      </CModal>
+
+      {/* Reconcile */}
+      <CModal open={showReconcile} onClose={()=>setShowReconcile(false)} title={t('Kassa tekshiruvi')}
+        footer={<>
+          <button onClick={()=>setShowReconcile(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold">{t('Bekor')}</button>
+          <button onClick={handleReconcile} disabled={submitting||!reconcileForm.reason.trim()} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white rounded-xl text-sm font-semibold inline-flex items-center gap-2">
+            {submitting&&<Loader2 className="w-4 h-4 animate-spin"/>}{t('Tasdiqlash')}
+          </button>
+        </>}>
+        <div className="bg-slate-50 rounded-xl p-3 text-sm space-y-1">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">{t('Tizim hisoblagan')}</p>
+          <div className="flex justify-between"><span className="text-slate-500">Naqd UZS:</span><b className={`tabular-nums ${cashUZS<0?'text-rose-600':''}`}>{Math.round(cashUZS).toLocaleString()}</b></div>
+          <div className="flex justify-between"><span className="text-slate-500">Naqd USD:</span><b className={`tabular-nums ${cashUSD<0?'text-rose-600':''}`}>{cashUSD.toFixed(2)}</b></div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><Lbl>{t('Fizik UZS')}</Lbl>
+            <input value={reconcileForm.physicalUZS} onChange={e=>setReconcileForm({...reconcileForm,physicalUZS:e.target.value})} type="number" min="0" placeholder="0" className={inp}/>
+          </div>
+          <div><Lbl>{t('Fizik USD')}</Lbl>
+            <input value={reconcileForm.physicalUSD} onChange={e=>setReconcileForm({...reconcileForm,physicalUSD:e.target.value})} type="number" min="0" placeholder="0.00" className={inp}/>
+          </div>
+        </div>
+        {(reconcileForm.physicalUZS || reconcileForm.physicalUSD) && (
+          <div className="bg-blue-50 rounded-xl p-3 text-xs space-y-1">
+            <p className="font-semibold text-blue-700">{t('Farq')}</p>
+            {reconcileForm.physicalUZS && (
+              <p className="text-slate-600">UZS: {((+reconcileForm.physicalUZS||0)-cashUZS>0?'+':'')+Math.round((+reconcileForm.physicalUZS||0)-cashUZS).toLocaleString()}</p>
+            )}
+            {reconcileForm.physicalUSD && (
+              <p className="text-slate-600">USD: {((+reconcileForm.physicalUSD||0)-cashUSD>0?'+':'')+((+reconcileForm.physicalUSD||0)-cashUSD).toFixed(2)}</p>
+            )}
+          </div>
+        )}
+        <div>
+          <Lbl>{t('Sabab')} *</Lbl>
+          <input value={reconcileForm.reason} onChange={e=>setReconcileForm({...reconcileForm,reason:e.target.value})} placeholder={t('Kunlik tekshiruv, xato tuzatish...')} className={inp}/>
+        </div>
+      </CModal>
+
+      {/* New Budget */}
+      <CModal open={showNewBudget} onClose={()=>setShowNewBudget(false)} title={t('Yangi budjet')}
+        footer={<>
+          <button onClick={()=>setShowNewBudget(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold">{t('Bekor')}</button>
+          <button onClick={handleNewBudget} disabled={submitting} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold inline-flex items-center gap-2">
+            {submitting&&<Loader2 className="w-4 h-4 animate-spin"/>}{t('Saqlash')}
+          </button>
+        </>}>
+        <div>
+          <Lbl>{t('Kategoriya')}</Lbl>
+          <select value={budgetForm.category} onChange={e=>setBudgetForm({...budgetForm,category:e.target.value})} className={inp}>
+            {EXPENSE_CATS.filter(c=>!['LOAN_REPAYMENT','ADJUSTMENT','REVERSAL'].includes(c.id)).map(c=>(
+              <option key={c.id} value={c.id}>{t(c.label)}</option>
+            ))}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><Lbl>{t('Summa')}</Lbl>
+            <input value={budgetForm.amount} onChange={e=>setBudgetForm({...budgetForm,amount:e.target.value})} type="number" min="0" placeholder="0.00" className={inp}/>
+          </div>
+          <div><Lbl>{t('Valyuta')}</Lbl>
+            <select value={budgetForm.currency} onChange={e=>setBudgetForm({...budgetForm,currency:e.target.value})} className={inp}>
+              <option value="UZS">UZS</option><option value="USD">USD</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <Lbl>{t('Ogohlantirish chegara')} %</Lbl>
+          <input value={budgetForm.alertThreshold} onChange={e=>setBudgetForm({...budgetForm,alertThreshold:e.target.value})} type="number" min="1" max="100" placeholder="80" className={inp}/>
+          <p className="text-xs text-slate-400 mt-1">{t('Budjet shuncha foizga yetganda ogohlantirish beradi')}</p>
+        </div>
+        <div>
+          <Lbl>{t('Oy')}</Lbl>
+          <input type="month" value={budgetMonth} onChange={e=>setBudgetMonth(e.target.value)} className={inp}/>
         </div>
       </CModal>
 
