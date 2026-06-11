@@ -43,6 +43,7 @@ interface Sale {
 export default function SalesModern() {
   const navigate = useNavigate();
   const location = useLocation();
+  const isCashier = location.pathname.startsWith('/cashier');
   const { addToast } = useToast();
   const [sales, setSales] = useState<Sale[]>([]);
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
