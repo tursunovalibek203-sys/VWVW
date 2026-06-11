@@ -308,4 +308,13 @@ app.listen(PORT, async () => {
   } catch (err: any) {
     logger.warn('Admin bot ishga tushirishda xatolik: ' + err.message);
   }
+
+  // Render free tier uxlab qolmaslik uchun har 9 daqiqada o'zini ping qiladi
+  if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {
+    const selfUrl = process.env.RENDER_EXTERNAL_URL + '/api/health';
+    setInterval(() => {
+      fetch(selfUrl).catch(() => {});
+    }, 9 * 60 * 1000);
+    logger.info('Keep-alive ping started: ' + selfUrl);
+  }
 });
