@@ -40,7 +40,6 @@ const getSections = (t: (key: string) => string): NavSection[] => [
     label: 'Asosiy',
     items: [
       { name: t('navigation.dashboard'), href: '/dashboard', icon: LayoutDashboard },
-      { name: 'Kassir paneli', href: '/cashier/sales', icon: ShoppingCart, allowedRoles: SELLER_ROLES },
       { name: t('navigation.sales'), href: '/sales', icon: ShoppingCart, allowedRoles: [...SELLER_ROLES, 'ACCOUNTANT'] },
       { name: t('navigation.orders'), href: '/orders', icon: Package, allowedRoles: MGMT_ROLES },
       { name: t('navigation.products'), href: '/products', icon: Package2 },
