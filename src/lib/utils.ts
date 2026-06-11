@@ -13,7 +13,7 @@ export function formatCurrency(amount: number, currency: string = 'UZS') {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
       useGrouping: true
-    }).format(numAmount) + ' UZS';
+    }).format(numAmount) + " so'm";
   }
   if (currency === 'USD') {
     return '$' + new Intl.NumberFormat('en-US', {

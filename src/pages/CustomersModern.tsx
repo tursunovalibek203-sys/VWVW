@@ -63,7 +63,7 @@ const OPERATORS = ['>', '<', '>=', '<='] as const;
 import { latinToCyrillic } from '../lib/transliterator';
 import { getExchangeRates } from '../lib/settings';
 import api from '../lib/professionalApi';
-import { extractArray, extractPaginatedData, extractData } from '../lib/apiHelpers';
+import { extractArray, extractData } from '../lib/apiHelpers';
 import { customerSchema, CustomerFormData } from '../lib/validation';
 import { ValidatedForm } from '../components/forms/ValidatedForm';
 import { FormField, FormActions } from '../components/forms/FormField';
@@ -193,64 +193,36 @@ export default function CustomersModern() {
     try {
       setLoading(true);
 
-      // Mijozlarni olish - handle standardized API response format
-      const customersResponse = await api.get('/customers');
-      const customersData = extractArray(customersResponse, []);
+      // Parallel: mijozlar + oylik savdo statistikasi
+      const [customersResponse, statsResponse] = await Promise.allSettled([
+        api.get('/customers'),
+        api.get('/customers/stats/monthly'),
+      ]);
 
-      // Sales ma'lumotlarini olish - handle standardized API response format
-      const salesResponse = await api.get('/sales?limit=1000');
-      const { data: salesData } = extractPaginatedData<any>(salesResponse, 'sales', []);
+      const customersData = customersResponse.status === 'fulfilled'
+        ? extractArray(customersResponse.value, []) : [];
 
-      // Har bir mijoz uchun hisoblash
+      const statsMap: Record<string, { monthlySales: number; lastSaleDate: string | null }> =
+        statsResponse.status === 'fulfilled' ? (statsResponse.value.data ?? {}) : {};
+
+      const now = new Date().getTime();
+
       const enrichedCustomers = customersData.map((c: any) => {
-        // Mijozning sotuvlarini topish
-        const customerSales = salesData.filter((s: any) => s.customerId === c.id);
+        const stat = statsMap[c.id];
+        const monthlySales = stat?.monthlySales ?? 0;
+        const lastSaleDateValue = stat?.lastSaleDate
+          ?? (c.lastPurchase ? c.lastPurchase : undefined);
 
-        // Jami savdo
-        const totalSales = customerSales.reduce((sum: number, s: any) => {
-          const amount = s.totalAmount || s.amount || 0;
-          return sum + (typeof amount === 'number' ? amount : parseFloat(amount) || 0);
-        }, 0);
-
-        // Oxirgi 30 kun ichidagi savdo
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-        const monthlySales = customerSales
-          .filter((s: any) => {
-            const saleDate = new Date(s.createdAt || s.date);
-            return saleDate >= thirtyDaysAgo;
-          })
-          .reduce((sum: number, s: any) => {
-            const amount = s.totalAmount || s.amount || 0;
-            return sum + (typeof amount === 'number' ? amount : parseFloat(amount) || 0);
-          }, 0);
-
-        // Oxirgi sotuv sanasi
-        const lastSale: any = customerSales
-          .sort((a: any, b: any) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime())[0];
-
-        // debtUZS ishlatildi
-        let debtPeriod = 0;
-        const totalDebt = (c.debtUZS || c.debt || 0) + (c.debtUSD || 0) * 12500;
-        if (totalDebt > 0 && lastSale) {
-          const lastSaleDate = new Date(lastSale.createdAt || lastSale.date);
-          const daysSinceLastSale = Math.floor((new Date().getTime() - lastSaleDate.getTime()) / (1000 * 60 * 60 * 24));
-          debtPeriod = daysSinceLastSale;
-        }
-
-        // API dan kelgan balanceUZS/balanceUSD ishlatiladi
         const balanceUZS = c.balanceUZS || c.balance || 0;
         const balanceUSD = c.balanceUSD || 0;
-        const debtUZS = c.debtUZS || c.debt || 0;
-        const debtUSD = c.debtUSD || 0;
-        // Ko'rsatish uchun UZS balansini ishlatamiz (asosiy valyuta)
-        const balance = balanceUZS;
+        const debtUZS    = c.debtUZS || c.debt || 0;
+        const debtUSD    = c.debtUSD || 0;
 
-        // statusColor rules orqali keyinroq hisoblanadi
-        const statusColor: 'red' | 'yellow' | 'green' = 'green';
-
-        const lastSaleDateValue: string | undefined = lastSale ? (lastSale.createdAt || lastSale.date) : undefined;
+        let debtPeriod = 0;
+        const totalDebt = debtUZS + debtUSD * 12500;
+        if (totalDebt > 0 && lastSaleDateValue) {
+          debtPeriod = Math.floor((now - new Date(lastSaleDateValue).getTime()) / 86_400_000);
+        }
 
         return {
           id: c.id,
@@ -259,25 +231,24 @@ export default function CustomersModern() {
           phone: c.phone,
           address: c.address,
           category: c.category,
-          balance: balance,  // UZS
+          balance: balanceUZS,
           balanceUZS,
           balanceUSD,
-          debt: debtUZS,  // UZS for backward compatibility
+          debt: debtUZS,
           debtUZS,
           debtUSD,
           createdAt: c.createdAt,
           monthlySales,
-          totalSales,
+          totalSales: 0,
           lastSaleDate: lastSaleDateValue,
           debtPeriod,
-          statusColor
+          statusColor: 'green' as const,
         };
       });
 
       setCustomers(enrichedCustomers);
       setLastUpdated(new Date());
-
-    } catch (error) {
+    } catch {
       // Error handled by empty customers state
     } finally {
       setLoading(false);
@@ -452,7 +423,7 @@ export default function CustomersModern() {
     },
     {
       label: latinToCyrillic("Qarz (so'm)"),
-      value: `${totalDebtUZS.toLocaleString('en-US')} UZS`,
+      value: `${totalDebtUZS.toLocaleString('en-US')} so'm`,
       icon: TrendingUp,
       tint: 'bg-amber-50 text-amber-600',
       sub: usdRate > 0 ? `≈ $${(totalDebtUZS / usdRate).toFixed(0)}` : null,
@@ -781,13 +752,20 @@ export default function CustomersModern() {
                       </Badge>
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <span className="text-sm font-semibold text-slate-900 tabular-nums">{customer.balance.toLocaleString('en-US')} UZS</span>
+                      <span className="text-sm font-semibold text-slate-900 tabular-nums">{customer.balance.toLocaleString('en-US')} so'm</span>
                     </td>
                     <td className="px-5 py-4 text-right">
-                      {customer.debt > 0 ? (
-                        <Badge variant="error"><span className="tabular-nums">{customer.debt.toLocaleString('en-US')} UZS</span></Badge>
+                      {customer.debtUSD > 0 || customer.debtUZS > 0 ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          {customer.debtUSD > 0 && (
+                            <Badge variant="error"><span className="tabular-nums">${customer.debtUSD.toFixed(2)}</span></Badge>
+                          )}
+                          {customer.debtUZS > 0 && (
+                            <Badge variant="error"><span className="tabular-nums">{customer.debtUZS.toLocaleString('en-US')} so'm</span></Badge>
+                          )}
+                        </div>
                       ) : (
-                        <span className="text-sm text-slate-400 tabular-nums">0 UZS</span>
+                        <span className="text-sm text-slate-400 tabular-nums">0</span>
                       )}
                     </td>
                     <td className="px-5 py-4">
@@ -855,12 +833,15 @@ export default function CustomersModern() {
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div className="bg-slate-50 rounded-xl p-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic('Balans')}</p>
-                  <p className="mt-0.5 text-sm font-bold text-slate-900 tabular-nums">{customer.balance.toLocaleString('en-US')} UZS</p>
+                  <p className="mt-0.5 text-sm font-bold text-slate-900 tabular-nums">{customer.balance.toLocaleString('en-US')} so'm</p>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic('Qarz')}</p>
-                  <p className={`mt-0.5 text-sm font-bold tabular-nums ${customer.debt > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
-                    {customer.debt.toLocaleString('en-US')} UZS
+                  <p className={`mt-0.5 text-sm font-bold tabular-nums ${customer.debtUZS > 0 || customer.debtUSD > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                    {customer.debtUSD > 0 && <span>${customer.debtUSD.toFixed(2)} </span>}
+                    {customer.debtUZS > 0
+                      ? `${customer.debtUZS.toLocaleString('en-US')} so'm`
+                      : !customer.debtUSD && '0'}
                   </p>
                 </div>
               </div>

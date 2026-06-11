@@ -300,4 +300,12 @@ app.listen(PORT, async () => {
   logger.info('Server started successfully');
   logger.info(`API available at http://localhost:${PORT}/api`);
   logger.info(`Health check at http://localhost:${PORT}/api/health`);
+
+  // Admin bot — kunlik 19:00 hisobot va backup tugmasi
+  try {
+    const { initAdminBot } = await import('./bot/admin-bot.js');
+    initAdminBot();
+  } catch (err: any) {
+    logger.warn('Admin bot ishga tushirishda xatolik: ' + err.message);
+  }
 });

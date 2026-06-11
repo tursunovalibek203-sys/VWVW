@@ -410,6 +410,14 @@ export class SalesService {
       }
     });
 
+    // Real-time backup: Excel faylni background da yangilash
+    setImmediate(async () => {
+      try {
+        const { generateDailyExcelBackup } = await import('../utils/daily-excel-backup.js');
+        await generateDailyExcelBackup();
+      } catch { /* silent */ }
+    });
+
     return completeSale as SaleWithRelations;
   }
 

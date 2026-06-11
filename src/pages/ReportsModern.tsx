@@ -187,11 +187,17 @@ export default function ReportsModern() {
   const kpiCards: KpiCard[] = useMemo(() => {
     if (activeTab === 'sales') {
       const s = data?.summary ?? {};
+      const uzs = s.totalRevenueUZS ?? s.totalRevenue ?? 0;
+      const usd = s.totalRevenueUSD ?? 0;
+      const revenueLabel = [uzs > 0 ? fmtMoney(uzs, "so'm") : '', usd > 0 ? `$${usd.toFixed(2)}` : ''].filter(Boolean).join(' + ') || "0 so'm";
+      const avgUzs = s.averageSale ?? 0;
+      const avgUsd = s.averageSaleUSD ?? 0;
+      const avgLabel = [avgUzs > 0 ? fmtMoney(avgUzs, "so'm") : '', avgUsd > 0 ? `$${avgUsd.toFixed(2)}` : ''].filter(Boolean).join(' / ') || "0 so'm";
       return [
         { label: latinToCyrillic('Sotuvlar soni'), value: fmtNum(s.totalSales ?? salesRows.length), icon: Receipt, tint: 'bg-indigo-50 text-indigo-600' },
-        { label: latinToCyrillic('Umumiy tushum'), value: fmtMoney(s.totalRevenue ?? 0), icon: DollarSign, tint: 'bg-emerald-50 text-emerald-600' },
+        { label: latinToCyrillic('Umumiy tushum'), value: revenueLabel, icon: DollarSign, tint: 'bg-emerald-50 text-emerald-600' },
         { label: latinToCyrillic('Sotilgan miqdor'), value: fmtNum(s.totalQuantity ?? 0), icon: Boxes, tint: 'bg-violet-50 text-violet-600' },
-        { label: latinToCyrillic('Ortacha chek'), value: fmtMoney(s.averageSale ?? 0), icon: TrendingUp, tint: 'bg-sky-50 text-sky-600' },
+        { label: latinToCyrillic('Ortacha chek'), value: avgLabel, icon: TrendingUp, tint: 'bg-sky-50 text-sky-600' },
       ];
     }
     if (activeTab === 'inventory') {
@@ -206,14 +212,18 @@ export default function ReportsModern() {
       ];
     }
     if (activeTab === 'customers') {
-      const totalPurchases = customerRows.reduce((sum: number, c: any) => sum + (c.totalPurchases || 0), 0);
-      const totalDebt = customerRows.reduce((sum: number, c: any) => sum + (c.debt || 0), 0);
-      const debtors = customerRows.filter((c: any) => (c.debt || 0) > 0).length;
+      const totalPurchasesUZS = customerRows.reduce((sum: number, c: any) => sum + (c.totalPurchasesUZS || 0), 0);
+      const totalPurchasesUSD = customerRows.reduce((sum: number, c: any) => sum + (c.totalPurchasesUSD || 0), 0);
+      const totalDebtUZS = customerRows.reduce((sum: number, c: any) => sum + (c.debtUZS ?? c.debt ?? 0), 0);
+      const totalDebtUSD = customerRows.reduce((sum: number, c: any) => sum + (c.debtUSD ?? 0), 0);
+      const debtors = customerRows.filter((c: any) => (c.debtUZS ?? c.debt ?? 0) > 0 || (c.debtUSD ?? 0) > 0).length;
+      const purchasesLabel = [totalPurchasesUZS > 0 ? fmtMoney(totalPurchasesUZS, "so'm") : '', totalPurchasesUSD > 0 ? `$${totalPurchasesUSD.toFixed(2)}` : ''].filter(Boolean).join(' + ') || "0 so'm";
+      const debtLabel = [totalDebtUZS > 0 ? fmtMoney(totalDebtUZS, "so'm") : '', totalDebtUSD > 0 ? `$${totalDebtUSD.toFixed(2)}` : ''].filter(Boolean).join(' + ') || '0';
       return [
         { label: latinToCyrillic('Mijozlar'), value: fmtNum(customerRows.length), icon: Users, tint: 'bg-indigo-50 text-indigo-600' },
-        { label: latinToCyrillic('Jami xaridlar'), value: fmtMoney(totalPurchases), icon: ShoppingCart, tint: 'bg-emerald-50 text-emerald-600' },
+        { label: latinToCyrillic('Jami xaridlar'), value: purchasesLabel, icon: ShoppingCart, tint: 'bg-emerald-50 text-emerald-600' },
         { label: latinToCyrillic('Qarzdorlar'), value: fmtNum(debtors), icon: AlertTriangle, tint: 'bg-amber-50 text-amber-600' },
-        { label: latinToCyrillic('Umumiy qarz'), value: fmtMoney(totalDebt), icon: Wallet, tint: 'bg-rose-50 text-rose-600' },
+        { label: latinToCyrillic('Umumiy qarz'), value: debtLabel, icon: Wallet, tint: 'bg-rose-50 text-rose-600' },
       ];
     }
     // financial
@@ -444,7 +454,11 @@ export default function ReportsModern() {
                         : sale.product?.name || '—'}
                     </td>
                     <td className="px-5 py-4 text-right text-sm text-slate-600 tabular-nums">{fmtNum(sale.quantity ?? 0)}</td>
-                    <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900 tabular-nums">{fmtMoney(sale.totalAmount ?? 0)}</td>
+                    <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900 tabular-nums">
+                      {sale.currency === 'USD'
+                        ? `$${(sale.totalAmount ?? 0).toFixed(2)}`
+                        : fmtMoney(sale.totalAmount ?? 0, "so'm")}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -519,10 +533,17 @@ export default function ReportsModern() {
                       </div>
                     </td>
                     <td className="px-5 py-4 text-right text-sm text-slate-600 tabular-nums">{fmtNum(c.salesCount ?? 0)}</td>
-                    <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900 tabular-nums">{fmtMoney(c.totalPurchases ?? 0)}</td>
+                    <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900 tabular-nums">
+                      {c.totalPurchasesUZS > 0 && <div>{fmtMoney(c.totalPurchasesUZS, "so'm")}</div>}
+                      {c.totalPurchasesUSD > 0 && <div>${c.totalPurchasesUSD.toFixed(2)}</div>}
+                      {!c.totalPurchasesUZS && !c.totalPurchasesUSD && fmtMoney(c.totalPurchases ?? 0, "so'm")}
+                    </td>
                     <td className="px-5 py-4 text-right">
-                      {(c.debt ?? 0) > 0 ? (
-                        <span className="text-sm font-bold text-rose-600 tabular-nums">{fmtMoney(c.debt)}</span>
+                      {(c.debtUZS ?? c.debt ?? 0) > 0 || (c.debtUSD ?? 0) > 0 ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          {(c.debtUZS ?? c.debt ?? 0) > 0 && <span className="text-sm font-bold text-rose-600 tabular-nums">{fmtMoney(c.debtUZS ?? c.debt, "so'm")}</span>}
+                          {(c.debtUSD ?? 0) > 0 && <span className="text-sm font-bold text-rose-600 tabular-nums">${(c.debtUSD ?? 0).toFixed(2)}</span>}
+                        </div>
                       ) : (
                         <span className="text-sm text-slate-300">—</span>
                       )}

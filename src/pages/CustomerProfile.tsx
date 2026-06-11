@@ -339,14 +339,14 @@ export default function CustomerProfile() {
                 <p className="mt-0.5 text-lg sm:text-xl font-bold text-white tracking-tight">
                   ${(customer.balanceUSD || 0).toFixed(2)}
                 </p>
-                <p className="text-xs text-white/60">{(customer.balanceUZS || 0).toLocaleString()} UZS</p>
+                <p className="text-xs text-white/60">{(customer.balanceUZS || 0).toLocaleString()} so'm</p>
               </div>
               <div className={`rounded-2xl backdrop-blur-sm px-4 py-3 min-w-[9rem] ${hasDebt ? 'bg-rose-500/30' : 'bg-white/15'}`}>
                 <p className="text-xs font-medium text-white/70">{latinToCyrillic('Qarz')}</p>
                 <p className={`mt-0.5 text-lg sm:text-xl font-bold tracking-tight ${hasDebt ? 'text-rose-100' : 'text-white'}`}>
                   ${debtUSD.toFixed(2)}
                 </p>
-                <p className="text-xs text-white/60">{debtUZS.toLocaleString()} UZS</p>
+                <p className="text-xs text-white/60">{debtUZS.toLocaleString()} so'm</p>
               </div>
             </div>
           </div>
@@ -392,7 +392,7 @@ export default function CustomerProfile() {
           </div>
           <p className="text-xs font-medium text-gray-500">{latinToCyrillic('Balans')}</p>
           <p className="mt-1 text-lg sm:text-xl font-bold text-gray-900 tracking-tight">${(customer.balanceUSD || 0).toFixed(2)}</p>
-          <p className="text-xs text-gray-400">{(customer.balanceUZS || 0).toLocaleString()} UZS</p>
+          <p className="text-xs text-gray-400">{(customer.balanceUZS || 0).toLocaleString()} so'm</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 transition-all duration-200 hover:shadow-md">
@@ -401,7 +401,7 @@ export default function CustomerProfile() {
           </div>
           <p className="text-xs font-medium text-gray-500">{latinToCyrillic('Qarz')}</p>
           <p className={`mt-1 text-lg sm:text-xl font-bold tracking-tight ${hasDebt ? 'text-rose-600' : 'text-gray-900'}`}>${debtUSD.toFixed(2)}</p>
-          <p className="text-xs text-gray-400">{debtUZS.toLocaleString()} UZS</p>
+          <p className="text-xs text-gray-400">{debtUZS.toLocaleString()} so'm</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 transition-all duration-200 hover:shadow-md">

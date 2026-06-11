@@ -80,7 +80,7 @@ function App() {
     <ErrorBoundary>
       <ToastProvider>
         <LanguageProvider>
-          <BrowserRouter>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Suspense fallback={null}>
               <AppRoutes />
             </Suspense>

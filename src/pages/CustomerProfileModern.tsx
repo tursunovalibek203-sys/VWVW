@@ -168,8 +168,12 @@ export default function CustomerProfileModern() {
     );
   }
 
-  const totalPurchases = sales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0);
-  const averagePurchase = sales.length > 0 ? totalPurchases / sales.length : 0;
+  const totalPurchasesUZS = sales.filter(s => s.currency === 'UZS').reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+  const totalPurchasesUSD = sales.filter(s => s.currency === 'USD').reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+  const uzsCount = sales.filter(s => s.currency === 'UZS').length;
+  const usdCount = sales.filter(s => s.currency === 'USD').length;
+  const avgUZS = uzsCount > 0 ? totalPurchasesUZS / uzsCount : 0;
+  const avgUSD = usdCount > 0 ? totalPurchasesUSD / usdCount : 0;
   const hasDebt = (customer.debtUSD || 0) > 0 || (customer.debtUZS || 0) > 0;
 
   const getInitials = (name: string) => {
@@ -254,20 +258,31 @@ export default function CustomerProfileModern() {
     },
   ];
 
+  const fmtBoth = (uzs: number, usd: number) => {
+    const parts: string[] = [];
+    if (uzs > 0) parts.push(`${Math.round(uzs).toLocaleString('en-US')} so'm`);
+    if (usd > 0) parts.push(`$${usd.toFixed(2)}`);
+    return parts.join(' / ') || '0';
+  };
+
   const financialCards = [
     {
       icon: Wallet,
       label: latinToCyrillic('Balans'),
-      main: formatCurrency(customer.balanceUSD || 0, 'USD'),
-      sub: `${(customer.balanceUZS || 0).toLocaleString('en-US')} UZS`,
+      main: (customer.balanceUZS || 0) > 0
+        ? `${(customer.balanceUZS || 0).toLocaleString('en-US')} so'm`
+        : formatCurrency(customer.balanceUSD || 0, 'USD'),
+      sub: (customer.balanceUZS || 0) > 0 && (customer.balanceUSD || 0) > 0
+        ? `+ ${formatCurrency(customer.balanceUSD || 0, 'USD')}`
+        : latinToCyrillic('Balans'),
       mainClass: 'text-slate-900',
       tint: 'bg-emerald-50 text-emerald-600',
     },
     {
       icon: AlertTriangle,
       label: latinToCyrillic('Qarz'),
-      main: formatCurrency(customer.debtUSD || 0, 'USD'),
-      sub: `${(customer.debtUZS || 0).toLocaleString('en-US')} UZS`,
+      main: fmtBoth(customer.debtUZS || 0, customer.debtUSD || 0),
+      sub: latinToCyrillic(hasDebt ? 'To\'lanmagan' : 'Qarz yo\'q'),
       mainClass: hasDebt ? 'text-rose-600' : 'text-slate-900',
       tint: hasDebt ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-600',
     },
@@ -275,14 +290,14 @@ export default function CustomerProfileModern() {
       icon: ShoppingCart,
       label: latinToCyrillic('Jami xaridlar'),
       main: `${sales.length} ${latinToCyrillic('ta')}`,
-      sub: formatCurrency(totalPurchases, 'USD'),
+      sub: fmtBoth(totalPurchasesUZS, totalPurchasesUSD),
       mainClass: 'text-slate-900',
       tint: 'bg-sky-50 text-sky-600',
     },
     {
       icon: TrendingUp,
       label: latinToCyrillic("O'rtacha"),
-      main: formatCurrency(averagePurchase, 'USD'),
+      main: fmtBoth(avgUZS, avgUSD),
       sub: latinToCyrillic('Har bir savdo'),
       mainClass: 'text-slate-900',
       tint: 'bg-amber-50 text-amber-600',

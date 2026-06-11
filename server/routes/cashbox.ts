@@ -9,178 +9,127 @@ router.use(authenticate);
 
 router.get('/summary', async (req, res) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const now   = new Date();
+    const today = new Date(now); today.setHours(0, 0, 0, 0);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const weekAgo    = new Date(today); weekAgo.setDate(weekAgo.getDate() - 6);
 
-    // Kassa tranzaksiyalaridan hisoblash (asosiy manba)
-    const cashboxTransactions = await prisma.cashboxTransaction.findMany();
-    
-    // ✅ DECIMAL FIX: Use DecimalHelper for sum calculations
-    const cashboxIncome = cashboxTransactions
-      .filter(t => t.type === 'INCOME')
-      .reduce((sum, t) => DecimalHelper.add(sum, t.amount), 0);
-    const cashboxExpense = cashboxTransactions
-      .filter(t => t.type === 'EXPENSE')
-      .reduce((sum, t) => DecimalHelper.add(sum, t.amount), 0);
-    
-    // Bugungi tranzaksiyalar
-    const todayCashboxIncome = cashboxTransactions
-      .filter(t => t.type === 'INCOME' && new Date(t.createdAt) >= today)
-      .reduce((sum, t) => DecimalHelper.add(sum, t.amount), 0);
-    const todayCashboxExpense = cashboxTransactions
-      .filter(t => t.type === 'EXPENSE' && new Date(t.createdAt) >= today)
-      .reduce((sum, t) => DecimalHelper.add(sum, t.amount), 0);
-    
-    // Oylik tranzaksiyalar
-    const monthlyCashboxIncome = cashboxTransactions
-      .filter(t => t.type === 'INCOME' && new Date(t.createdAt) >= monthStart)
-      .reduce((sum, t) => DecimalHelper.add(sum, t.amount), 0);
-    const monthlyCashboxExpense = cashboxTransactions
-      .filter(t => t.type === 'EXPENSE' && new Date(t.createdAt) >= monthStart)
-      .reduce((sum, t) => DecimalHelper.add(sum, t.amount), 0);
+    // ── DB-level aggregations — no full table scan in JS ──────────────────
+    const [
+      totalAgg,
+      todayAgg,
+      monthAgg,
+      txCount,
+      currencyRaw,
+      weeklyRaw,
+    ] = await Promise.all([
+      // Jami kirim/chiqim
+      prisma.cashboxTransaction.groupBy({
+        by: ['type'],
+        _sum: { amount: true },
+      }),
+      // Bugungi kirim/chiqim
+      prisma.cashboxTransaction.groupBy({
+        by: ['type'],
+        where: { createdAt: { gte: today } },
+        _sum: { amount: true },
+      }),
+      // Oylik kirim/chiqim
+      prisma.cashboxTransaction.groupBy({
+        by: ['type'],
+        where: { createdAt: { gte: monthStart } },
+        _sum: { amount: true },
+      }),
+      // Tranzaksiyalar soni (kassa bo'sh ekanligini bilish uchun)
+      prisma.cashboxTransaction.count(),
+      // Valyuta + to'lov usuli bo'yicha qoldiq (SQL)
+      prisma.$queryRaw<Array<{
+        type: string; currency: string; paymentMethod: string; total: number;
+      }>>`
+        SELECT type, COALESCE(currency,'UZS') as currency,
+               COALESCE(paymentMethod,'CASH') as paymentMethod,
+               COALESCE(SUM(amount),0) as total
+        FROM "CashboxTransaction"
+        GROUP BY type, currency, paymentMethod
+      `,
+      // Haftalik kirim/chiqim (SQL da GROUP BY sana)
+      prisma.$queryRaw<Array<{ day: string; type: string; total: number }>>`
+        SELECT DATE(createdAt) as day, type,
+               COALESCE(SUM(amount),0) as total
+        FROM "CashboxTransaction"
+        WHERE createdAt >= ${weekAgo.toISOString()}
+        GROUP BY DATE(createdAt), type
+        ORDER BY day ASC
+      `,
+    ]);
 
-    // Backup: Sales, expenses, payments jadvallaridan ham hisoblash
-    const sales = await prisma.sale.findMany({
-      where: { paymentStatus: { in: ['PAID', 'PARTIAL'] } },
-    });
-    const expenses = await prisma.expense.findMany();
-    const payments = await prisma.payment.findMany();
+    const getAgg = (rows: { type: string; _sum: { amount: number | null } }[], t: string) =>
+      rows.find(r => r.type === t)?._sum?.amount ?? 0;
 
-    // Agar cashboxTransaction bo'sh bo'lsa, sales/payments dan hisoblash
-    let totalIncome = cashboxIncome;
-    let totalExpense = cashboxExpense;
-    let todayIncome = todayCashboxIncome;
-    let todayExpense = todayCashboxExpense;
-    let monthlyIncome = monthlyCashboxIncome;
-    let monthlyExpense = monthlyCashboxExpense;
-    
-    if (cashboxTransactions.length === 0) {
-      // CashboxTransaction bo'sh bo'lsa, eski usul bilan hisoblash
-      const salesIncome = sales.reduce((sum, s) => sum + s.paidAmount, 0);
-      const paymentsIncome = payments.reduce((sum, p) => sum + p.amount, 0);
-      const expensesIncome = expenses.reduce((sum, e) => sum + (e.amount < 0 ? Math.abs(e.amount) : 0), 0);
-      const expensesExpense = expenses.reduce((sum, e) => sum + (e.amount > 0 ? e.amount : 0), 0);
-      
-      totalIncome = salesIncome + paymentsIncome + expensesIncome;
-      totalExpense = expensesExpense;
-      
-      // Bugungi hisoblash
-      const todaySales = sales.filter(s => s.createdAt >= today);
-      const todayExpenses = expenses.filter(e => e.createdAt >= today);
-      const todayPayments = payments.filter(p => p.createdAt >= today);
-      todayIncome = todaySales.reduce((sum, s) => sum + s.paidAmount, 0) + 
-                    todayPayments.reduce((sum, p) => sum + p.amount, 0) +
-                    todayExpenses.reduce((sum, e) => sum + (e.amount < 0 ? Math.abs(e.amount) : 0), 0);
-      todayExpense = todayExpenses.reduce((sum, e) => sum + (e.amount > 0 ? e.amount : 0), 0);
-      
-      // Oylik hisoblash
-      const monthlySales = sales.filter(s => s.createdAt >= monthStart);
-      const monthlyExpenses = expenses.filter(e => e.createdAt >= monthStart);
-      const monthlyPayments = payments.filter(p => p.createdAt >= monthStart);
-      monthlyIncome = monthlySales.reduce((sum, s) => sum + s.paidAmount, 0) + 
-                      monthlyPayments.reduce((sum, p) => sum + p.amount, 0) +
-                      monthlyExpenses.reduce((sum, e) => sum + (e.amount < 0 ? Math.abs(e.amount) : 0), 0);
-      monthlyExpense = monthlyExpenses.reduce((sum, e) => sum + (e.amount > 0 ? e.amount : 0), 0);
+    // Agar cashboxTransaction mavjud bo'lsa — ular asosiy manba
+    let totalIncome   = getAgg(totalAgg  as any, 'INCOME');
+    let totalExpense  = getAgg(totalAgg  as any, 'EXPENSE');
+    let todayIncome   = getAgg(todayAgg  as any, 'INCOME');
+    let todayExpense  = getAgg(todayAgg  as any, 'EXPENSE');
+    let monthlyIncome = getAgg(monthAgg  as any, 'INCOME');
+    let monthlyExpense= getAgg(monthAgg  as any, 'EXPENSE');
+
+    // Fallback — agar kassa bo'sh bo'lsa (eski ma'lumotlar)
+    if (txCount === 0) {
+      const [saleAgg, payAgg, expAgg] = await Promise.all([
+        prisma.sale.aggregate({
+          where: { paymentStatus: { in: ['PAID', 'PARTIAL'] } },
+          _sum: { paidAmount: true },
+        }),
+        prisma.payment.aggregate({ _sum: { amount: true } }),
+        prisma.expense.aggregate({ _sum: { amount: true } }),
+      ]);
+      totalIncome  = (saleAgg._sum.paidAmount ?? 0) + (payAgg._sum.amount ?? 0);
+      totalExpense = expAgg._sum.amount ?? 0;
+      todayIncome = monthlyIncome = 0;
+      todayExpense = monthlyExpense = 0;
     }
-    
+
     const totalBalance = totalIncome - totalExpense;
 
-    // Valyuta bo'yicha hisoblash
-    // When cashboxTransactions exist they are the authoritative source (SalesService writes
-    // both Sale + CashboxTransaction inside the same DB transaction).  Using sales/payments
-    // as a fallback ONLY when the cashbox table is truly empty prevents double-counting.
+    // ── Valyuta qoldiqlari (cashboxTransactions dan) ─────────────────────
     let cashUZS = 0, cashUSD = 0, cardUZS = 0, clickUZS = 0;
+    (currencyRaw as any[]).forEach(row => {
+      const sign   = row.type === 'INCOME' ? 1 : -1;
+      const amount = Number(row.total);
+      const method = (row.paymentMethod || 'CASH').toUpperCase();
+      const curr   = (row.currency     || 'UZS').toUpperCase();
 
-    if (cashboxTransactions.length > 0) {
-      // Primary path: derive currency breakdown from CashboxTransaction rows
-      cashboxTransactions.forEach(tx => {
-        const txCurrency = tx.currency || 'UZS';
-        const paymentMethod = tx.paymentMethod || 'CASH';
-        const sign = tx.type === 'INCOME' ? 1 : -1;
+      if (method === 'CLICK') {
+        clickUZS += sign * amount;
+      } else if (method === 'CARD') {
+        cardUZS  += sign * amount;
+      } else if (curr === 'USD') {
+        cashUSD  += sign * amount;
+      } else {
+        cashUZS  += sign * amount;
+      }
+    });
 
-        if (paymentMethod === 'CLICK' || (tx.category === 'SALE' && tx.description?.includes('Click'))) {
-          clickUZS += sign * tx.amount;
-        } else if (paymentMethod === 'CARD' || (tx.category === 'SALE' && (tx.description?.includes('Karta') || tx.description?.includes('CARD')))) {
-          // Karta faqat UZS
-          cardUZS += sign * tx.amount;
-        } else if (txCurrency === 'USD') {
-          cashUSD += sign * tx.amount;
-        } else {
-          // UZS naqd
-          cashUZS += sign * tx.amount;
-        }
-      });
-      // Manfiy qoldiq saqlanadi — frontend ogohlantirish ko'rsatadi (yashirilmaydi)
-    } else {
-      // Fallback path (legacy data only): derive from Sale + Payment + Expense tables
-      sales.forEach(sale => {
-        if (sale.paymentDetails) {
-          try {
-            const details = JSON.parse(sale.paymentDetails);
-            cashUZS += details.uzs || 0;
-            cashUSD += details.usd || 0;
-            clickUZS += details.click || 0;
-            cardUZS += details.card || 0;
-          } catch {
-            if (sale.currency === 'UZS') cashUZS += sale.paidAmount || 0;
-            else cashUSD += sale.paidAmount || 0;
-          }
-        } else {
-          if (sale.currency === 'UZS') cashUZS += sale.paidAmount || 0;
-          else cashUSD += sale.paidAmount || 0;
-        }
-      });
-
-      payments.forEach(payment => {
-        if (payment.paymentDetails) {
-          try {
-            const details = JSON.parse(payment.paymentDetails);
-            cashUZS += details.uzs || 0;
-            cashUSD += details.usd || 0;
-            clickUZS += details.click || 0;
-            cardUZS += details.card || 0;
-          } catch {
-            if (payment.currency === 'UZS') cashUZS += payment.amount || 0;
-            else cashUSD += payment.amount || 0;
-          }
-        } else {
-          if (payment.currency === 'UZS') cashUZS += payment.amount || 0;
-          else cashUSD += payment.amount || 0;
-        }
-      });
-
-      expenses.forEach(expense => {
-        if (expense.amount < 0) {
-          const amount = Math.abs(expense.amount);
-          if (expense.currency === 'UZS' && ['KASSA_KIRIM', 'TRANSFER_IN'].includes(expense.category)) {
-            cashUZS += amount;
-          } else if (expense.currency === 'USD') {
-            cashUSD += amount;
-          }
-        }
-      });
-    }
-
+    // ── Haftalik oqim (cashboxTransactions dan) ──────────────────────────
     const dailyFlow = [];
     for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const nextDate = new Date(date);
-      nextDate.setDate(nextDate.getDate() + 1);
-      const daySales = sales.filter(s => s.createdAt >= date && s.createdAt < nextDate);
-      const dayExpenses = expenses.filter(e => e.createdAt >= date && e.createdAt < nextDate);
-      const dayPayments = payments.filter(p => p.createdAt >= date && p.createdAt < nextDate);
-      const income = daySales.reduce((sum, s) => sum + s.paidAmount, 0) + dayPayments.reduce((sum, p) => sum + p.amount, 0);
-      // Faqat musbat kunlik xarajatlarni hisoblaymiz
-      const expense = dayExpenses.reduce((sum, e) => sum + (e.amount > 0 ? e.amount : 0), 0);
+      const d   = new Date(today); d.setDate(d.getDate() - i);
+      const ds  = d.toISOString().slice(0, 10);
+      const inc = (weeklyRaw as any[])
+        .filter(r => r.day === ds && r.type === 'INCOME')
+        .reduce((s, r) => s + Number(r.total), 0);
+      const exp = (weeklyRaw as any[])
+        .filter(r => r.day === ds && r.type === 'EXPENSE')
+        .reduce((s, r) => s + Number(r.total), 0);
       dailyFlow.push({
-        date: date.toLocaleDateString('uz-UZ', { month: 'short', day: 'numeric' }),
-        income, expense, net: income - expense,
+        date: d.toLocaleDateString('uz-UZ', { month: 'short', day: 'numeric' }),
+        income: Math.round(inc),
+        expense: Math.round(exp),
+        net: Math.round(inc - exp),
       });
     }
 
-    // Jami USD ekvivalentini hisoblash
     const exchangeRate = parseInt(process.env.USD_TO_UZS_RATE || '12500', 10);
     const totalUSD = (cashUZS + clickUZS + cardUZS) / exchangeRate + cashUSD;
 
@@ -191,13 +140,8 @@ router.get('/summary', async (req, res) => {
       todayExpense,
       monthlyIncome,
       monthlyExpense,
-      byCurrency: {
-        cashUZS,
-        cashUSD,
-        cardUZS,
-        clickUZS
-      },
-      dailyFlow
+      byCurrency: { cashUZS, cashUSD, cardUZS, clickUZS },
+      dailyFlow,
     });
   } catch (error) {
     console.error('Cashbox summary error:', error);

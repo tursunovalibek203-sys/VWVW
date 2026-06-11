@@ -281,6 +281,41 @@ router.post('/', async (req: AuthRequest, res) => {
 
 
 
+// Per-customer monthly sales stats — replaces client-side 1000-sale load
+router.get('/stats/monthly', async (req, res) => {
+  try {
+    const monthStart = new Date();
+    monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+
+    const rows = await prisma.$queryRaw<Array<{
+      customerId: string;
+      monthlySales: number;
+      lastSaleDate: string | null;
+    }>>`
+      SELECT
+        customerId,
+        COALESCE(SUM(totalAmount), 0)             AS monthlySales,
+        MAX(DATE(createdAt))                       AS lastSaleDate
+      FROM "Sale"
+      WHERE customerId IS NOT NULL
+        AND createdAt >= ${monthStart.toISOString()}
+      GROUP BY customerId
+    `;
+
+    const map: Record<string, { monthlySales: number; lastSaleDate: string | null }> = {};
+    (rows as any[]).forEach(r => {
+      map[r.customerId] = {
+        monthlySales: Number(r.monthlySales),
+        lastSaleDate: r.lastSaleDate ?? null,
+      };
+    });
+    res.json(map);
+  } catch (error) {
+    console.error('Customer stats error:', error);
+    res.status(500).json({ error: 'Customer stats fetch failed' });
+  }
+});
+
 router.get('/:id', async (req, res) => {
 
   try {
@@ -845,6 +880,14 @@ router.post('/:id/payment', async (req, res) => {
     });
 
 
+
+    // Real-time backup yangilash
+    setImmediate(async () => {
+      try {
+        const { generateDailyExcelBackup } = await import('../utils/daily-excel-backup.js');
+        await generateDailyExcelBackup();
+      } catch { /* silent */ }
+    });
 
     res.json({
 

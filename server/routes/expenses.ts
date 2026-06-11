@@ -107,6 +107,14 @@ router.post('/', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER'), async (req: AuthRe
       return { expense: created, budgetWarning: warning, budgetInfo: info };
     });
 
+    // Real-time backup yangilash
+    setImmediate(async () => {
+      try {
+        const { generateDailyExcelBackup } = await import('../utils/daily-excel-backup.js');
+        await generateDailyExcelBackup();
+      } catch { /* silent */ }
+    });
+
     res.json({ ...expense, budgetWarning, budgetInfo });
   } catch (error) {
     console.error('Create expense error:', error);

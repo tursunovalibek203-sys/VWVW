@@ -14,6 +14,11 @@ export const SaleCard = ({ sale, latinToCyrillic, onEdit, onPrint }: SaleCardPro
   const paidAmount = sale.paidAmount || sale.paid || 0;
   const hasDebt = debtAmount > 0;
 
+  const fmtAmt = (n: number) =>
+    sale.currency === 'UZS'
+      ? `${Math.round(n).toLocaleString('en-US')} so'm`
+      : `$${n.toFixed(2)}`;
+
   return (
     <div className="group relative bg-white rounded-3xl p-6 shadow-lg shadow-slate-200/60 hover:shadow-2xl hover:shadow-slate-300/50 transition-all duration-500 hover:-translate-y-2 border border-slate-100/50 overflow-hidden">
       {/* Status Badge */}
@@ -63,11 +68,11 @@ export const SaleCard = ({ sale, latinToCyrillic, onEdit, onPrint }: SaleCardPro
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="p-3 bg-gradient-to-br from-blue-50 to-blue-100/30 rounded-xl border border-blue-100">
           <p className="text-xs text-blue-600 font-medium mb-1">{latinToCyrillic('Jami summa')}</p>
-          <p className="text-lg font-bold text-slate-900">${(sale.total || sale.totalAmount || 0).toFixed(0)}</p>
+          <p className="text-lg font-bold text-slate-900">{fmtAmt(sale.total || sale.totalAmount || 0)}</p>
         </div>
         <div className="p-3 bg-gradient-to-br from-emerald-50 to-emerald-100/30 rounded-xl border border-emerald-100">
           <p className="text-xs text-emerald-600 font-medium mb-1">{latinToCyrillic("To'langan")}</p>
-          <p className="text-lg font-bold text-slate-900">${paidAmount.toFixed(0)}</p>
+          <p className="text-lg font-bold text-slate-900">{fmtAmt(paidAmount)}</p>
         </div>
       </div>
 
@@ -79,7 +84,7 @@ export const SaleCard = ({ sale, latinToCyrillic, onEdit, onPrint }: SaleCardPro
               <AlertCircle className="w-3.5 h-3.5" />
               {latinToCyrillic('Qarz')}
             </span>
-            <span className="text-lg font-bold text-rose-600">${debtAmount.toFixed(0)}</span>
+            <span className="text-lg font-bold text-rose-600">{fmtAmt(debtAmount)}</span>
           </div>
         </div>
       )}

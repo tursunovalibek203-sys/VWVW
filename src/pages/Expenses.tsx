@@ -155,7 +155,7 @@ export default function Expenses() {
   const summaryCards = [
     {
       label: t('Umumiy xarajat'),
-      value: `${totalExpenses.toLocaleString('en-US')} UZS`,
+      value: `${totalExpenses.toLocaleString('en-US')} so'm`,
       icon: TrendingDown,
       tint: 'bg-rose-50 text-rose-600',
     },
@@ -167,7 +167,7 @@ export default function Expenses() {
     },
     {
       label: t('Bu oy'),
-      value: `${monthTotal.toLocaleString('en-US')} UZS`,
+      value: `${monthTotal.toLocaleString('en-US')} so'm`,
       icon: CalendarDays,
       tint: 'bg-amber-50 text-amber-600',
     },
@@ -191,7 +191,7 @@ export default function Expenses() {
             <p className="mt-1 text-sm text-slate-500 tabular-nums">
               {loading
                 ? t('Yuklanmoqda...')
-                : `${totalExpenses.toLocaleString('en-US')} UZS · ${expenses.length} ${t('ta operatsiya')}`}
+                : `${totalExpenses.toLocaleString('en-US')} so'm · ${expenses.length} ${t('ta operatsiya')}`}
             </p>
           </div>
           <div className="flex items-center gap-2 self-start">
@@ -263,7 +263,7 @@ export default function Expenses() {
                         <div className="flex items-center justify-between gap-2 mb-1.5">
                           <span className="text-sm font-medium text-slate-700 truncate">{t(cat.name)}</span>
                           <span className="text-sm font-semibold text-slate-900 flex-shrink-0 tabular-nums">
-                            {(item.value || 0).toLocaleString('en-US')} UZS
+                            {(item.value || 0).toLocaleString('en-US')} so'm
                           </span>
                         </div>
                         <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">

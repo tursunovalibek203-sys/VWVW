@@ -430,7 +430,7 @@ export default function Cashbox() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{t('Kassa')}</h1>
           <p className="text-sm text-slate-400 mt-0.5">
-            1 USD = {exchangeRate.toLocaleString('en-US')} UZS
+            1 USD = {exchangeRate.toLocaleString('en-US')} so'm
             <button onClick={()=>setShowRate(true)} className="ml-2 text-indigo-500 hover:underline text-xs font-medium">{t('ozgartirish')}</button>
           </p>
         </div>
@@ -444,7 +444,7 @@ export default function Cashbox() {
       <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-5 sm:p-6 text-white shadow-lg shadow-indigo-500/20">
         <p className="text-indigo-200 text-sm font-medium">{t('Umumiy balans')}</p>
         <p className={`text-4xl font-bold tabular-nums mt-1 ${totalUZS < 0 ? 'text-rose-300' : ''}`}>
-          {Math.round(totalUZS).toLocaleString('en-US')} <span className="text-2xl text-indigo-200">UZS</span>
+          {Math.round(totalUZS).toLocaleString('en-US')} <span className="text-2xl text-indigo-200">so'm</span>
         </p>
         {totalUZS < 0 ? (
           <div className="flex items-center gap-1.5 mt-1">
@@ -456,10 +456,10 @@ export default function Cashbox() {
         )}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-white/20">
           {[
-            { label: t('Naqd UZS'),  val: cashUZS.toLocaleString('en-US'),              sub: 'UZS' },
+            { label: t('Naqd UZS'),  val: cashUZS.toLocaleString('en-US'),              sub: "so'm" },
             { label: t('Naqd USD'),  val: cashUSD.toLocaleString('en-US'),               sub: 'USD' },
-            { label: t('Karta UZS'), val: cardUZS.toLocaleString('en-US'),              sub: 'UZS' },
-            { label: 'Click UZS',    val: clickUZS.toLocaleString('en-US'),             sub: 'UZS' },
+            { label: t('Karta UZS'), val: cardUZS.toLocaleString('en-US'),              sub: "so'm" },
+            { label: 'Click UZS',    val: clickUZS.toLocaleString('en-US'),             sub: "so'm" },
           ].map(b => (
             <div key={b.label}>
               <p className="text-indigo-300 text-xs">{b.label}</p>
@@ -473,7 +473,7 @@ export default function Cashbox() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard title={t('Naqd (UZS)')}  value={formatCurrency(cashUZS,'UZS')}  icon={Banknote}   color="#10b981"/>
         <KpiCard title={t('Naqd (USD)')}  value={formatCurrency(cashUSD,'USD')}  icon={DollarSign} color="#3b82f6"
-          sub={cashUSD>0 ? '≈ '+Math.round(cashUSD*exchangeRate).toLocaleString()+' UZS' : undefined}/>
+          sub={cashUSD>0 ? '≈ '+Math.round(cashUSD*exchangeRate).toLocaleString()+" so'm" : undefined}/>
         <KpiCard title={t('Karta (UZS)')} value={formatCurrency(cardUZS,'UZS')}  icon={CreditCard} color="#6366f1"/>
         <KpiCard title="Click (UZS)"      value={formatCurrency(clickUZS,'UZS')} icon={Smartphone} color="#8b5cf6"/>
       </div>
@@ -566,7 +566,7 @@ export default function Cashbox() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9"/>
                       <XAxis dataKey="name" tick={{fontSize:11}}/>
                       <YAxis tick={{fontSize:11}}/>
-                      <Tooltip formatter={(v:any)=>[(v*1000).toLocaleString()+' UZS']}/>
+                      <Tooltip formatter={(v:any)=>[(v*1000).toLocaleString()+" so'm"]}/>
                       <Area type="monotone" dataKey="kirim"  stroke="#10b981" fill="url(#gInc)" strokeWidth={2} name={t('Kirim')}/>
                       <Area type="monotone" dataKey="chiqim" stroke="#ef4444" fill="url(#gExp)" strokeWidth={2} name={t('Chiqim')}/>
                     </AreaChart>
@@ -581,7 +581,7 @@ export default function Cashbox() {
                           <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" paddingAngle={3}>
                             {pieData.map((_,i)=><Cell key={i} fill={BUCKET_COLORS[i%4]}/>)}
                           </Pie>
-                          <Tooltip formatter={(v:any)=>[Math.round(v).toLocaleString()+' UZS']}/>
+                          <Tooltip formatter={(v:any)=>[Math.round(v).toLocaleString()+" so'm"]}/>
                         </PieChart>
                       </ResponsiveContainer>
                       <div className="space-y-1.5 mt-1">
@@ -708,7 +708,7 @@ export default function Cashbox() {
                   <div key={s.label} className="bg-slate-50 rounded-xl p-3 text-center">
                     <p className="text-xs text-slate-400 font-medium">{s.label}</p>
                     <p className={`text-base font-bold tabular-nums mt-0.5 ${s.c}`}>
-                      {Math.round(s.val).toLocaleString()} <span className="text-xs font-normal">UZS</span>
+                      {Math.round(s.val).toLocaleString()} <span className="text-xs font-normal">so'm</span>
                     </p>
                   </div>
                 ))}
@@ -786,7 +786,7 @@ export default function Cashbox() {
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-slate-700">
-                  {t('Jami')}: {Math.round(expenses.reduce((s,e)=>s+toUZS(e.amount,e.currency||'UZS'),0)).toLocaleString()} UZS
+                  {t('Jami')}: {Math.round(expenses.reduce((s,e)=>s+toUZS(e.amount,e.currency||'UZS'),0)).toLocaleString()} so'm
                   <span className="text-slate-400 font-normal ml-1">({expenses.length} {t('ta')})</span>
                 </p>
                 <button onClick={()=>setShowExpense(true)}
@@ -803,7 +803,7 @@ export default function Cashbox() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false}/>
                       <XAxis type="number" tick={{fontSize:10}} tickFormatter={v=>(v/1000).toFixed(0)+'k'}/>
                       <YAxis dataKey="label" type="category" width={85} tick={{fontSize:11}}/>
-                      <Tooltip formatter={(v:any)=>[Math.round(v).toLocaleString()+' UZS']}/>
+                      <Tooltip formatter={(v:any)=>[Math.round(v).toLocaleString()+" so'm"]}/>
                       <Bar dataKey="val" fill="#6366f1" radius={[0,6,6,0]} maxBarSize={18}/>
                     </BarChart>
                   </ResponsiveContainer>
@@ -933,7 +933,7 @@ export default function Cashbox() {
                 <p className="text-sm font-semibold text-slate-700">
                   {t('Avanslar')}: {advanceList.length}
                   <span className="text-slate-400 font-normal ml-1">
-                    ({Math.round(advanceList.reduce((s,a)=>s+toUZS(a.amount,a.currency||'UZS'),0)/1000)}k UZS)
+                    ({Math.round(advanceList.reduce((s,a)=>s+toUZS(a.amount,a.currency||'UZS'),0)/1000)}k so'm)
                   </span>
                 </p>
                 <button onClick={()=>setShowAdvance(true)}
@@ -976,7 +976,7 @@ export default function Cashbox() {
                                 {adv.amount.toLocaleString()} <span className="text-base font-medium text-slate-400">{adv.currency}</span>
                               </p>
                               {adv.currency === 'USD' && (
-                                <p className="text-xs text-slate-400">≈ {Math.round(adv.amount*exchangeRate).toLocaleString()} UZS</p>
+                                <p className="text-xs text-slate-400">≈ {Math.round(adv.amount*exchangeRate).toLocaleString()} so'm</p>
                               )}
                             </div>
                             <p className="text-xs text-slate-400 tabular-nums">
@@ -1141,7 +1141,7 @@ export default function Cashbox() {
           {exchForm.amount && +exchForm.amount > 0 && (
             <p className="text-xs text-slate-500 mt-1">
               ≈ {exchForm.fromCurrency==='USD'
-                ? (+exchForm.amount*exchangeRate).toLocaleString()+' UZS'
+                ? (+exchForm.amount*exchangeRate).toLocaleString()+" so'm"
                 : (+exchForm.amount/exchangeRate).toFixed(2)+' USD'}
             </p>
           )}
@@ -1252,7 +1252,7 @@ export default function Cashbox() {
         <div>
           <Lbl>1 USD = ? UZS</Lbl>
           <input value={rateInput} onChange={e=>setRateInput(e.target.value)} type="number" min="1" className={inp}/>
-          <p className="text-xs text-slate-400 mt-1">{t('Hozirgi kurs')}: {exchangeRate.toLocaleString('en-US')} UZS</p>
+          <p className="text-xs text-slate-400 mt-1">{t('Hozirgi kurs')}: {exchangeRate.toLocaleString('en-US')} so'm</p>
         </div>
       </CModal>
 
@@ -1285,7 +1285,7 @@ export default function Cashbox() {
             {repayForm.currency !== (repayTarget.currency||'UZS') && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
                 <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5"/>
-                {t('Valyuta farqi bor. Tizim avtomatik joriy kursdan foydalanadi')}: 1 USD = {exchangeRate.toLocaleString()} UZS
+                {t('Valyuta farqi bor. Tizim avtomatik joriy kursdan foydalanadi')}: 1 USD = {exchangeRate.toLocaleString()} so'm
               </div>
             )}
             <div><Lbl>{t('Tolov usuli')}</Lbl>

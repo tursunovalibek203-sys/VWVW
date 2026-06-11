@@ -59,6 +59,21 @@ export default function Production() {
   const [showForm, setShowForm] = useState(false);
   const [productSearch, setProductSearch] = useState('');
 
+  // ── Partiyalar (Batch) ─────────────────────────────────────────────────────
+  const [activeTab,          setActiveTab]          = useState<'orders' | 'batches'>('orders');
+  const [batches,            setBatches]            = useState<any[]>([]);
+  const [batchStats,         setBatchStats]         = useState<any>(null);
+  const [batchTotal,         setBatchTotal]         = useState(0);
+  const [batchProductFilter, setBatchProductFilter] = useState('');
+  const [batchLoading,       setBatchLoading]       = useState(false);
+  const [showBatchForm,      setShowBatchForm]      = useState(false);
+  const [submittingBatch,    setSubmittingBatch]    = useState(false);
+  const [batchForm,          setBatchForm]          = useState({
+    productId: '', productName: '',
+    quantity: '', productionDate: '',
+    shift: 'Kunduzgi', responsiblePerson: '',
+  });
+
   // Confirm dialog (replaces alert / window.confirm)
   const [confirmState, setConfirmState] = useState<{
     open: boolean;
@@ -114,6 +129,55 @@ export default function Production() {
   const handleRefresh = () => {
     setRefreshing(true);
     loadData();
+    if (activeTab === 'batches') loadBatchData();
+  };
+
+  const loadBatchData = async (productId?: string) => {
+    setBatchLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: '100' });
+      if (productId) params.set('productId', productId);
+      const [batchRes, statsRes] = await Promise.all([
+        api.get(`/production/batches?${params}`),
+        api.get('/production/batches/stats'),
+      ]);
+      setBatches(batchRes.data?.batches || []);
+      setBatchTotal(batchRes.data?.total || 0);
+      setBatchStats(statsRes.data || null);
+    } catch {
+      addToast(toastFactory.error(L('Xatolik'), L("Partiyalarni yuklashda xatolik")));
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  const handleBatchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!batchForm.productId || !batchForm.quantity || +batchForm.quantity <= 0) return;
+    setSubmittingBatch(true);
+    try {
+      await api.post('/production/batches', {
+        productId:        batchForm.productId,
+        quantity:         +batchForm.quantity,
+        productionDate:   batchForm.productionDate || new Date().toISOString(),
+        shift:            batchForm.shift,
+        responsiblePerson: batchForm.responsiblePerson || L("Noma'lum"),
+      });
+      setShowBatchForm(false);
+      setBatchForm({ productId: '', productName: '', quantity: '', productionDate: '', shift: 'Kunduzgi', responsiblePerson: '' });
+      addToast(toastFactory.success(L('Partiya qo\'shildi')));
+      loadBatchData(batchProductFilter || undefined);
+    } catch {
+      addToast(toastFactory.error(L('Xatolik'), L('Partiya yaratilmadi')));
+    } finally {
+      setSubmittingBatch(false);
+    }
+  };
+
+  // Batch tab aktivlashganda ma'lumotlarni yuklash
+  const handleTabChange = (tab: 'orders' | 'batches') => {
+    setActiveTab(tab);
+    if (tab === 'batches' && batches.length === 0) loadBatchData();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -268,27 +332,59 @@ export default function Production() {
               {t('Ishlab Chiqarish')}
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              {loading ? L('Yuklanmoqda...') : `${orders.length} ${L('ta buyurtma')}`}
+              {activeTab === 'orders'
+                ? (loading ? L('Yuklanmoqda...') : `${orders.length} ${L('ta buyurtma')}`)
+                : (batchLoading ? L('Yuklanmoqda...') : `${batchTotal} ${L('ta partiya')}`)}
             </p>
           </div>
           <div className="flex items-center gap-2 self-start">
             <button
               onClick={handleRefresh}
-              disabled={refreshing || loading}
+              disabled={refreshing || loading || batchLoading}
               className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">{L('Yangilash')}</span>
             </button>
-            <button
-              onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.98]"
-            >
-              <Plus className="w-4 h-4" />
-              {t('Yangi ishlab chiqarish')}
-            </button>
+            {activeTab === 'orders' ? (
+              <button
+                onClick={() => setShowForm(true)}
+                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.98]"
+              >
+                <Plus className="w-4 h-4" />
+                {t('Yangi ishlab chiqarish')}
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowBatchForm(true)}
+                className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.98]"
+              >
+                <Plus className="w-4 h-4" />
+                {L('Yangi partiya')}
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Tab tugmalari */}
+        <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+          {(['orders', 'batches'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => handleTabChange(tab)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                activeTab === tab
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {tab === 'orders' ? L('Buyurtmalar') : L('Partiyalar')}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Buyurtmalar tab ──────────────────────────────────────────────────── */}
+        {activeTab === 'orders' && <>
 
         {/* Stats cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
@@ -500,7 +596,7 @@ export default function Production() {
               return (
                 <div
                   key={order.id}
-                  className="bg-white rounded-2xl border border-slate-200/70 p-4"
+                  className="bg-white rounded-2xl border border-slate-200/70 p-4 cursor-default"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
@@ -579,6 +675,155 @@ export default function Production() {
             })}
           </div>
         )}
+
+        </> /* end activeTab === 'orders' */}
+
+        {/* ── Partiyalar tab ───────────────────────────────────────────────────── */}
+        {activeTab === 'batches' && <>
+
+          {/* Batch stats */}
+          {batchStats && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { label: L('Bugun'), value: batchStats.today?.qty ?? 0, sub: `${batchStats.today?.count ?? 0} ta partiya`, tint: 'bg-indigo-50 text-indigo-600', icon: Factory },
+                { label: L('Bu hafta'), value: batchStats.week?.qty ?? 0, sub: `${batchStats.week?.count ?? 0} ta partiya`, tint: 'bg-violet-50 text-violet-600', icon: Layers },
+                { label: L('Bu oy'), value: batchStats.month?.qty ?? 0, sub: `${batchStats.month?.count ?? 0} ta partiya`, tint: 'bg-emerald-50 text-emerald-600', icon: Package },
+                { label: L('Haftalik o\'rtacha'), value: batchStats.week?.count ? Math.round((batchStats.week?.qty ?? 0) / 7) : 0, sub: L('qop/kun'), tint: 'bg-amber-50 text-amber-600', icon: CheckCircle },
+              ].map(s => {
+                const Icon = s.icon;
+                return (
+                  <div key={s.label} className="bg-white rounded-2xl border border-slate-200/70 p-5">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{s.label}</p>
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${s.tint}`}><Icon className="w-[18px] h-[18px]" /></div>
+                    </div>
+                    <p className="mt-3 text-2xl font-bold text-slate-900 tabular-nums">{s.value.toLocaleString()} <span className="text-sm font-medium text-slate-400">qop</span></p>
+                    <p className="mt-1 text-xs text-slate-400">{s.sub}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Haftalik grafik */}
+          {batchStats?.weeklyTrend?.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200/70 p-5">
+              <p className="text-sm font-semibold text-slate-700 mb-4">{L('Haftalik ishlab chiqarish (qop)')}</p>
+              <div className="flex items-end gap-2 h-24">
+                {batchStats.weeklyTrend.map((d: any) => {
+                  const max = Math.max(...batchStats.weeklyTrend.map((x: any) => x.total), 1);
+                  const h = Math.max(4, Math.round((d.total / max) * 100));
+                  return (
+                    <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
+                      <span className="text-[10px] text-slate-500 tabular-nums">{d.total > 0 ? d.total : ''}</span>
+                      <div className={`w-full rounded-t-md ${d.isToday ? 'bg-violet-500' : 'bg-slate-200'}`} style={{ height: `${h}%` }} title={`${d.day}: ${d.total} qop`} />
+                      <span className={`text-[10px] ${d.isToday ? 'text-violet-600 font-bold' : 'text-slate-400'}`}>{d.day}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Mahsulot filtri */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <select
+                aria-label={L('Mahsulot tanlash')}
+                value={batchProductFilter}
+                onChange={e => {
+                  setBatchProductFilter(e.target.value);
+                  loadBatchData(e.target.value || undefined);
+                }}
+                className="w-full pl-4 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-violet-500"
+              >
+                <option value="">{L("Barcha mahsulotlar")}</option>
+                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            {/* Top mahsulotlar */}
+            {batchStats?.topProducts?.map((tp: any) => (
+              <button
+                key={tp.productId}
+                onClick={() => { setBatchProductFilter(tp.productId); loadBatchData(tp.productId); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                  batchProductFilter === tp.productId
+                    ? 'bg-violet-600 text-white border-violet-600'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                {tp.name} · {tp.qty.toLocaleString()} qop
+              </button>
+            ))}
+          </div>
+
+          {/* Batch jadval */}
+          {batchLoading ? (
+            <div className="bg-white rounded-2xl border border-slate-200/70 p-6">
+              <div className="space-y-3">{[0,1,2,3,4].map(i=><div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse"/>)}</div>
+            </div>
+          ) : batches.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200/70 p-10 text-center">
+              <Factory className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">{L("Partiyalar yo'q")}</p>
+              <p className="text-sm text-slate-400 mt-1">{L("Birinchi partiyani qo'shing")}</p>
+              <button onClick={() => setShowBatchForm(true)} className="mt-4 inline-flex items-center gap-2 bg-violet-600 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-violet-700 transition-colors">
+                <Plus className="w-4 h-4" />{L("Yangi partiya")}
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-200/70 bg-slate-50/60">
+                      {[L('Mahsulot'), L('Miqdor'), L('Sana va vaqt'), L('Smena'), L('Mas\'ul shaxs')].map(h => (
+                        <th key={h} className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {batches.map(b => {
+                      const dt = new Date(b.productionDate);
+                      const dateStr = dt.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'short', year: 'numeric' });
+                      const timeStr = dt.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+                      return (
+                        <tr key={b.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600 flex-shrink-0">
+                                <Package className="w-4 h-4" />
+                              </div>
+                              <p className="text-sm font-semibold text-slate-900">{b.product?.name ?? L("Noma'lum")}</p>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className="text-sm font-bold text-slate-900 tabular-nums">{b.quantity.toLocaleString()}</span>
+                            <span className="text-xs text-slate-400 ml-1">qop</span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <p className="text-sm text-slate-900 tabular-nums">{dateStr}</p>
+                            <p className="text-xs text-slate-400 tabular-nums mt-0.5 flex items-center gap-1"><Clock className="w-3 h-3" />{timeStr}</p>
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${b.shift === 'Tungi' ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-700'}`}>
+                              {b.shift}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
+                            <p className="text-sm text-slate-700">{b.responsiblePerson}</p>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+        </> /* end activeTab === 'batches' */}
+
       </div>
 
       {/* New Order Form Modal */}
@@ -992,6 +1237,93 @@ export default function Production() {
                     <Factory className="w-5 h-5" />
                   )}
                   {t('production.createOrder')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* New Batch Form Modal */}
+      {showBatchForm && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-violet-50/50">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-3">
+                <span className="w-9 h-9 bg-violet-100 rounded-xl flex items-center justify-center text-violet-600">
+                  <Factory className="w-5 h-5" />
+                </span>
+                {L('Yangi partiya')}
+              </h3>
+              <button type="button" onClick={() => setShowBatchForm(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleBatchSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{L('Mahsulot')}</label>
+                <select
+                  aria-label={L('Mahsulot tanlash')}
+                  value={batchForm.productId}
+                  onChange={e => setBatchForm(f => ({ ...f, productId: e.target.value }))}
+                  required
+                  className="mt-1.5 w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-violet-500"
+                >
+                  <option value="">{L('Tanlang...')}</option>
+                  {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{L('Miqdor (qop)')}</label>
+                <input
+                  type="number" min="1" required
+                  value={batchForm.quantity}
+                  onChange={e => setBatchForm(f => ({ ...f, quantity: e.target.value }))}
+                  placeholder="0"
+                  className="mt-1.5 w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{L('Sana va vaqt')}</label>
+                <input
+                  type="datetime-local" required
+                  value={batchForm.productionDate}
+                  onChange={e => setBatchForm(f => ({ ...f, productionDate: e.target.value }))}
+                  defaultValue={new Date().toISOString().slice(0, 16)}
+                  className="mt-1.5 w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{L('Smena')}</label>
+                  <select
+                    aria-label={L('Smena tanlash')}
+                    value={batchForm.shift}
+                    onChange={e => setBatchForm(f => ({ ...f, shift: e.target.value }))}
+                    className="mt-1.5 w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  >
+                    <option value="Kunduzgi">{L('Kunduzgi')}</option>
+                    <option value="Tungi">{L('Tungi')}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{L("Mas'ul shaxs")}</label>
+                  <input
+                    type="text"
+                    value={batchForm.responsiblePerson}
+                    onChange={e => setBatchForm(f => ({ ...f, responsiblePerson: e.target.value }))}
+                    placeholder={L("F.I.O")}
+                    className="mt-1.5 w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowBatchForm(false)} className="flex-1 h-11 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all">
+                  {L('Bekor')}
+                </button>
+                <button type="submit" disabled={submittingBatch} className="flex-[2] h-11 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                  {submittingBatch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Factory className="w-4 h-4" />}
+                  {L("Qo'shish")}
                 </button>
               </div>
             </form>

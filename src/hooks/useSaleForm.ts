@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { SaleFormData, NewItemForm, SaleItemForm, Product, Customer } from '../types';
 import {
@@ -70,6 +70,12 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
 
   const exchangeRateNum = useMemo(() => parseFloat(exchangeRate) || DEFAULT_EXCHANGE_RATE, [exchangeRate]);
 
+  // Ref so the currency-change effect always reads the latest rate without being triggered by rate changes
+  const exchangeRateRef = useRef(exchangeRateNum);
+  useEffect(() => { exchangeRateRef.current = exchangeRateNum; }, [exchangeRateNum]);
+  // Track previous currency to skip the initial mount run
+  const prevCurrencyRef = useRef(form.currency);
+
   const totalAmount = useMemo(() => calculateTotal(form.items), [form.items]);
 
   const paidAmount = useMemo(() => 
@@ -134,31 +140,34 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     }
   }, [initialOrderData, products]);
 
-  // Update prices when currency changes only (not exchange rate)
-  // Note: This approach has floating point precision issues. Better to store base price in USD always.
+  // Convert item prices when the user toggles currency (UZS ↔ USD).
+  // Uses a ref for the exchange rate so a rate change alone does NOT re-trigger conversion.
+  // prevCurrencyRef guards against the initial mount run.
   useEffect(() => {
-    if (exchangeRateNum <= 0) return; // Prevent division by zero
-    
+    if (prevCurrencyRef.current === form.currency) return;
+    prevCurrencyRef.current = form.currency;
+
+    const rate = exchangeRateRef.current;
+    if (rate <= 0) return;
+
     setForm((prev) => ({
       ...prev,
       items: prev.items.map((item) => {
-        // Round to avoid floating point issues
         const newPricePerBag = form.currency === 'UZS'
-          ? Math.round(item.pricePerBag * exchangeRateNum)
-          : Math.round((item.pricePerBag / exchangeRateNum) * 100) / 100;
-        const newSubtotal = typeof item.quantity === 'number'
-          ? item.quantity * newPricePerBag
-          : parseFloat(item.quantity as string || '0') * newPricePerBag;
-
+          ? Math.round(item.pricePerBag * rate)
+          : Math.round((item.pricePerBag / rate) * 100) / 100;
+        const qty = typeof item.quantity === 'number'
+          ? item.quantity
+          : parseFloat(item.quantity as string || '0');
         return {
           ...item,
           pricePerBag: newPricePerBag,
           pricePerPiece: newPricePerBag / item.unitsPerBag,
-          subtotal: newSubtotal,
+          subtotal: qty * newPricePerBag,
         };
       }),
     }));
-  }, [form.currency, exchangeRateNum]);
+  }, [form.currency]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Form actions
   const updateFormField = useCallback(<K extends keyof SaleFormData>(field: K, value: SaleFormData[K]) => {

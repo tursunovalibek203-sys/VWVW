@@ -37,6 +37,7 @@ interface Sale {
   status: 'completed' | 'pending' | 'cancelled';
   items: number;
   cashier: string;
+  currency: 'UZS' | 'USD';
 }
 
 export default function SalesModern() {
@@ -91,7 +92,8 @@ export default function SalesModern() {
         paymentType: s.paymentMethod || s.paymentType || 'cash',
         status: s.paymentStatus?.toLowerCase() || 'completed',
         items: s.itemCount || s.items?.length || 0,
-        cashier: s.user?.name || s.cashier?.name || s.cashierName || 'Admin'
+        cashier: s.user?.name || s.cashier?.name || s.cashierName || 'Admin',
+        currency: (s.currency === 'USD' ? 'USD' : 'UZS') as 'UZS' | 'USD',
       }));
 
       setSales(mappedSales);
@@ -278,41 +280,49 @@ export default function SalesModern() {
 
   const todaySales = sales.filter(s => isToday(s.date));
 
-  const todayTotal = todaySales.reduce((sum, s) => sum + s.totalAmount, 0);
+  const todayTotalUZS = todaySales.filter(s => s.currency === 'UZS').reduce((sum, s) => sum + s.totalAmount, 0);
+  const todayTotalUSD = todaySales.filter(s => s.currency === 'USD').reduce((sum, s) => sum + s.totalAmount, 0);
 
-  const todayDebt = todaySales
-    .reduce((sum, s) => sum + Math.max(0, s.totalAmount - s.paidAmount), 0);
+  const todayDebtUZS = todaySales.filter(s => s.currency === 'UZS').reduce((sum, s) => sum + Math.max(0, s.totalAmount - s.paidAmount), 0);
+  const todayDebtUSD = todaySales.filter(s => s.currency === 'USD').reduce((sum, s) => sum + Math.max(0, s.totalAmount - s.paidAmount), 0);
 
-  const todayCash = todaySales
-    .filter(s => s.paymentType === 'cash')
-    .reduce((sum, s) => sum + s.paidAmount, 0);
+  const todayCashUZS = todaySales.filter(s => s.paymentType === 'cash' && s.currency === 'UZS').reduce((sum, s) => sum + s.paidAmount, 0);
+  const todayCashUSD = todaySales.filter(s => s.paymentType === 'cash' && s.currency === 'USD').reduce((sum, s) => sum + s.paidAmount, 0);
 
   const hasActiveFilters = !!debouncedSearchTerm || selectedStatus !== 'all' || selectedPeriod !== 'all';
 
   const fmt = (n: number) => n.toLocaleString('en-US');
+  const fmtSaleAmt = (amount: number, currency: string) =>
+    currency === 'USD' ? `$${amount.toFixed(2)}` : `${Math.round(amount).toLocaleString('en-US')} so'm`;
+  const fmtDual = (uzs: number, usd: number) => {
+    const parts: string[] = [];
+    if (uzs > 0) parts.push(`${fmt(uzs)} so'm`);
+    if (usd > 0) parts.push(`$${usd.toFixed(2)}`);
+    return parts.length ? parts.join(' + ') : "0 so'm";
+  };
 
   const stats = [
     {
       label: latinToCyrillic('Bugungi savdo'),
-      value: `${fmt(todayTotal)} UZS`,
+      value: fmtDual(todayTotalUZS, todayTotalUSD),
       icon: ShoppingCart,
       tint: 'bg-indigo-50 text-indigo-600',
     },
     {
       label: latinToCyrillic('Qarzga ketgan tovar'),
-      value: `${fmt(todayDebt)} UZS`,
+      value: fmtDual(todayDebtUZS, todayDebtUSD),
       icon: CreditCard,
       tint: 'bg-red-50 text-red-500',
     },
     {
       label: latinToCyrillic('Jami naqt olingan'),
-      value: `${fmt(todayCash)} UZS`,
+      value: fmtDual(todayCashUZS, todayCashUSD),
       icon: DollarSign,
       tint: 'bg-emerald-50 text-emerald-600',
     },
     {
       label: latinToCyrillic('Jami xarajat'),
-      value: `${fmt(todayExpenses)} UZS`,
+      value: `${fmt(todayExpenses)} so'm`,
       icon: Receipt,
       tint: 'bg-amber-50 text-amber-600',
     },
@@ -512,7 +522,7 @@ export default function SalesModern() {
                         <Badge variant="neutral">{sale.items}</Badge>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <span className="text-sm font-semibold text-slate-900 tabular-nums">{sale.totalAmount.toLocaleString('en-US')} UZS</span>
+                        <span className="text-sm font-semibold text-slate-900 tabular-nums">{fmtSaleAmt(sale.totalAmount, sale.currency)}</span>
                       </td>
                       <td className="px-5 py-4">
                         <span className="inline-flex items-center gap-1.5 text-sm text-slate-600">
@@ -585,7 +595,7 @@ export default function SalesModern() {
                 </div>
 
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="text-base font-bold text-slate-900 tabular-nums">{sale.totalAmount.toLocaleString('en-US')} UZS</span>
+                  <span className="text-base font-bold text-slate-900 tabular-nums">{fmtSaleAmt(sale.totalAmount, sale.currency)}</span>
                   <div className="flex items-center gap-2 text-xs text-slate-500">
                     <span className="inline-flex items-center gap-1 tabular-nums">
                       <Package className="w-3.5 h-3.5" />
@@ -724,7 +734,7 @@ export default function SalesModern() {
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-slate-50 border border-slate-200/70 rounded-xl p-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic('Summa')}</p>
-                <p className="mt-1 text-lg font-bold text-slate-900 tabular-nums">{selectedSale.totalAmount.toLocaleString('en-US')} UZS</p>
+                <p className="mt-1 text-lg font-bold text-slate-900 tabular-nums">{fmtSaleAmt(selectedSale.totalAmount, selectedSale.currency)}</p>
               </div>
               <div className="bg-slate-50 border border-slate-200/70 rounded-xl p-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic('Mahsulotlar')}</p>
