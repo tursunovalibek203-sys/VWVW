@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { checkPermission, PermissionType } from '../lib/permissions';
 
+const TOKEN_TTL = 12 * 60 * 60 * 1000; // 12 soat
+
 interface User {
   id: string;
   name: string;
@@ -12,6 +14,7 @@ interface User {
 interface AuthState {
   token: string | null;
   user: User | null;
+  loginTime: number | null;
   setAuth: (token: string, user: User) => void;
   logout: () => void;
   hasPermission: (permission: PermissionType) => boolean;
@@ -20,19 +23,17 @@ interface AuthState {
   isSeller: () => boolean;
 }
 
-// Persist auth state to sessionStorage (more secure than localStorage against XSS)
-// NOTE: For production, use httpOnly cookies instead
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       token: null,
       user: null,
+      loginTime: null,
       setAuth: (token, user) => {
-        set({ token, user });
+        set({ token, user, loginTime: Date.now() });
       },
       logout: () => {
-        // Clear from storage
-        set({ token: null, user: null });
+        set({ token: null, user: null, loginTime: null });
       },
       hasPermission: (permission: PermissionType) => {
         const { user } = get();
@@ -54,7 +55,14 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      storage: createJSONStorage(() => sessionStorage), // XSS protection: sessionStorage instead of localStorage
+      storage: createJSONStorage(() => localStorage),
+      onRehydrateStorage: () => (state) => {
+        if (state?.loginTime && Date.now() - state.loginTime > TOKEN_TTL) {
+          state.token = null;
+          state.user = null;
+          state.loginTime = null;
+        }
+      },
     }
   )
 );
