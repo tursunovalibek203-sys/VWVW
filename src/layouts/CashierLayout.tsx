@@ -42,7 +42,6 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
     { path: '/cashier/products', icon: Package, label: 'Ombor' },
     { path: '/cashier/customers', icon: Users, label: 'Mijozlar' },
     { path: '/cashier/cashbox', icon: Calculator, label: 'Kassa' },
-    { path: '/cashier/orders', icon: ClipboardList, label: 'Buyurtma' },
 
     { path: '/cashier/chat', icon: MessageCircle, label: 'Chat' },
   ];
