@@ -77,9 +77,13 @@ router.get('/customer-analysis', async (req, res) => {
       id: customer.id,
       name: customer.name,
       category: customer.category,
-      totalPurchases: customer.sales.reduce((sum, sale) => sum + sale.totalAmount, 0),
-      totalPayments: customer.payments.reduce((sum, payment) => sum + payment.amount, 0),
-      debt: customer.debt,
+      totalPurchasesUZS: customer.sales.filter((s: any) => s.currency === 'UZS').reduce((sum: number, sale: any) => sum + sale.totalAmount, 0),
+      totalPurchasesUSD: customer.sales.filter((s: any) => s.currency === 'USD').reduce((sum: number, sale: any) => sum + sale.totalAmount, 0),
+      totalPurchases: customer.sales.reduce((sum: number, sale: any) => sum + sale.totalAmount, 0),
+      totalPayments: customer.payments.reduce((sum: number, payment: any) => sum + payment.amount, 0),
+      debt: (customer as any).debtUZS || customer.debt || 0,
+      debtUZS: (customer as any).debtUZS || customer.debt || 0,
+      debtUSD: (customer as any).debtUSD || 0,
       salesCount: customer.sales.length,
       lastPurchase: customer.lastPurchase,
       lastPayment: customer.lastPayment,
@@ -191,16 +195,23 @@ router.get('/sales', async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    const totalRevenue = sales.reduce((sum, sale) => sum + sale.totalAmount, 0);
-    const totalQuantity = sales.reduce((sum, sale) => sum + sale.quantity, 0);
+    const salesUZS = sales.filter((s: any) => s.currency === 'UZS');
+    const salesUSD = sales.filter((s: any) => s.currency === 'USD');
+    const totalRevenueUZS = salesUZS.reduce((sum: number, s: any) => sum + s.totalAmount, 0);
+    const totalRevenueUSD = salesUSD.reduce((sum: number, s: any) => sum + s.totalAmount, 0);
+    const totalRevenue = totalRevenueUZS;
+    const totalQuantity = sales.reduce((sum: number, sale: any) => sum + sale.quantity, 0);
 
     res.json({
       sales,
       summary: {
         totalSales: sales.length,
         totalRevenue,
+        totalRevenueUZS,
+        totalRevenueUSD,
         totalQuantity,
-        averageSale: sales.length > 0 ? totalRevenue / sales.length : 0,
+        averageSale: salesUZS.length > 0 ? totalRevenueUZS / salesUZS.length : 0,
+        averageSaleUSD: salesUSD.length > 0 ? totalRevenueUSD / salesUSD.length : 0,
       },
     });
   } catch (error) {

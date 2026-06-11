@@ -62,17 +62,25 @@ router.get('/stats', async (req, res) => {
     }
 
     // Optimize: Batch all queries together
-    const [dailySales, monthlySales, totalDebt, expenses, topProducts, topCustomers, lowStock, todaySalesCount, totalCustomers, totalProducts, activeProduction, pendingTasks, pendingDeliveries] = await Promise.all([
+    const [dailySalesUZS, dailySalesUSD, monthlySalesUZS, monthlySalesUSD, totalDebtAgg, expenses, topProducts, topCustomers, lowStock, todaySalesCount, totalCustomers, totalProducts, activeProduction, pendingTasks, pendingDeliveries] = await Promise.all([
       prisma.sale.aggregate({
-        where: { createdAt: { gte: today } },
+        where: { createdAt: { gte: today }, currency: 'UZS' },
         _sum: { totalAmount: true },
       }),
       prisma.sale.aggregate({
-        where: { createdAt: { gte: monthStart } },
+        where: { createdAt: { gte: today }, currency: 'USD' },
+        _sum: { totalAmount: true },
+      }),
+      prisma.sale.aggregate({
+        where: { createdAt: { gte: monthStart }, currency: 'UZS' },
+        _sum: { totalAmount: true },
+      }),
+      prisma.sale.aggregate({
+        where: { createdAt: { gte: monthStart }, currency: 'USD' },
         _sum: { totalAmount: true },
       }),
       prisma.customer.aggregate({
-        _sum: { debt: true },
+        _sum: { debt: true, debtUZS: true, debtUSD: true },
       }),
       prisma.expense.aggregate({
         where: { createdAt: { gte: monthStart } },
@@ -114,20 +122,20 @@ router.get('/stats', async (req, res) => {
       }),
     ]);
 
-    // Calculate cash balance from recent cashbox transactions (limit to last 1000)
+    // Calculate cash balance from recent cashbox transactions, split by currency
     const cashboxSummary = await prisma.cashboxTransaction.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 1000,
-      select: { type: true, amount: true }
+      take: 2000,
+      select: { type: true, amount: true, currency: true }
     });
 
-    const cashboxIncome = cashboxSummary
-      .filter(t => t.type === 'INCOME')
-      .reduce((sum, t) => sum + t.amount, 0);
-    const cashboxExpense = cashboxSummary
-      .filter(t => t.type === 'EXPENSE')
-      .reduce((sum, t) => sum + t.amount, 0);
-    const cashBalance = cashboxIncome - cashboxExpense;
+    const cashBalanceUZS = cashboxSummary
+      .filter(t => (t.currency === 'UZS' || !t.currency))
+      .reduce((sum, t) => sum + (t.type === 'INCOME' ? t.amount : -t.amount), 0);
+    const cashBalanceUSD = cashboxSummary
+      .filter(t => t.currency === 'USD')
+      .reduce((sum, t) => sum + (t.type === 'INCOME' ? t.amount : -t.amount), 0);
+    const cashBalance = cashBalanceUZS;
 
     const productIds = topProducts.map(p => p.productId).filter((id): id is string => id !== null);
     const products = await prisma.product.findMany({ 
@@ -141,9 +149,12 @@ router.get('/stats', async (req, res) => {
       select: { id: true, name: true, debt: true }
     });
 
-    const revenue = monthlySales._sum.totalAmount || 0;
+    const dailyRevenueUZS = dailySalesUZS._sum.totalAmount || 0;
+    const dailyRevenueUSD = dailySalesUSD._sum.totalAmount || 0;
+    const monthlyRevenueUZS = monthlySalesUZS._sum.totalAmount || 0;
+    const monthlyRevenueUSD = monthlySalesUSD._sum.totalAmount || 0;
     const totalExpenses = expenses._sum.amount || 0;
-    const netProfit = revenue - totalExpenses;
+    const netProfit = monthlyRevenueUZS - totalExpenses;
 
     // Calculate trends (mock data for now)
     const dailyTrend = Math.floor(Math.random() * 20) - 10; // -10 to +10
@@ -151,12 +162,20 @@ router.get('/stats', async (req, res) => {
     const profitTrend = Math.floor(Math.random() * 25) - 12; // -12 to +12
 
     res.json({
-      dailyRevenue: dailySales._sum.totalAmount || 0,
-      monthlyRevenue: revenue,
+      dailyRevenue: dailyRevenueUZS,
+      dailyRevenueUZS,
+      dailyRevenueUSD,
+      monthlyRevenue: monthlyRevenueUZS,
+      monthlyRevenueUZS,
+      monthlyRevenueUSD,
       netProfit,
       totalExpenses,
-      totalDebt: totalDebt._sum.debt || 0,
+      totalDebt: totalDebtAgg._sum.debtUZS || totalDebtAgg._sum.debt || 0,
+      totalDebtUZS: totalDebtAgg._sum.debtUZS || totalDebtAgg._sum.debt || 0,
+      totalDebtUSD: totalDebtAgg._sum.debtUSD || 0,
       cashBalance,
+      cashBalanceUZS,
+      cashBalanceUSD,
       weeklyTrend,
       todaySales: todaySalesCount,
       debtorsCount: customers.filter(c => c.debt > 0).length,
