@@ -205,10 +205,6 @@ body {
   font-optical-sizing: auto;
   line-height: 1.6;
   color: var(--neutral-900);
-  background: var(--gradient-primary);
-  background-attachment: fixed;
-  background-size: 400% 400%;
-  animation: gradientShift 15s ease infinite;
 }
 
 @keyframes gradientShift {
