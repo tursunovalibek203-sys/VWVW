@@ -352,13 +352,15 @@ export default function SalesModern() {
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">{latinToCyrillic('Yangilash')}</span>
             </button>
-            <button
-              onClick={() => navigate('/cashier/sales/add')}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
-            >
-              <Plus className="w-4 h-4" />
-              {latinToCyrillic('Yangi sotuv')}
-            </button>
+            {isCashier && (
+              <button
+                onClick={() => navigate('/cashier/sales/add')}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+              >
+                <Plus className="w-4 h-4" />
+                {latinToCyrillic('Yangi sotuv')}
+              </button>
+            )}
           </div>
         </div>
 
@@ -471,7 +473,7 @@ export default function SalesModern() {
                   ? latinToCyrillic("Qidiruv shartlarini o'zgartirib qayta urinib ko'ring")
                   : latinToCyrillic("Birinchi savdoni yarating va u shu yerda ko'rinadi")
               }
-              action={
+              action={isCashier ? (
                 <button
                   onClick={() => navigate('/cashier/sales/add')}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
@@ -479,7 +481,7 @@ export default function SalesModern() {
                   <Plus className="w-4 h-4" />
                   {latinToCyrillic('Yangi sotuv')}
                 </button>
-              }
+              ) : undefined}
             />
           </div>
         )}
@@ -549,15 +551,17 @@ export default function SalesModern() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => navigate('/cashier/sales/add')}
-                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                            aria-label={latinToCyrillic('Yangi sotuv')}
-                            title={latinToCyrillic('Yangi sotuv')}
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
+                          {isCashier && (
+                            <button
+                              type="button"
+                              onClick={() => navigate('/cashier/sales/add')}
+                              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                              aria-label={latinToCyrillic('Yangi sotuv')}
+                              title={latinToCyrillic('Yangi sotuv')}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
