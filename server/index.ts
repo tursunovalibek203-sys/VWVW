@@ -117,7 +117,7 @@ app.use('/api/auth/cashier-login', authLimiter);
 // CORS configuration - stricter in production
 const getAllowedOrigins = (): string[] => {
   // CORS_ORIGIN can be comma-separated for multiple domains
-  const rawOrigins = process.env.CORS_ORIGIN || 'https://luxpetplast.vercel.app';
+  const rawOrigins = process.env.CORS_ORIGIN || 'https://luxpetplast.vercel.app,https://luxpetplast-alpha.vercel.app';
   const productionOrigins = rawOrigins.split(',').map(o => o.trim()).filter(Boolean);
 
   if (process.env.NODE_ENV === 'production') {
