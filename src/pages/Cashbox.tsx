@@ -18,6 +18,17 @@ import { exportToExcel } from '../lib/excelUtils';
 
 const t = latinToCyrillic;
 
+// Fix mojibake: UTF-8 Cyrillic bytes stored/transmitted as Latin-1
+function fixDesc(str: string): string {
+  if (!str || !/[ÐÑ]/.test(str)) return str;
+  try {
+    const bytes = new Uint8Array([...str].map(c => c.charCodeAt(0)));
+    return new TextDecoder('utf-8').decode(bytes);
+  } catch {
+    return str;
+  }
+}
+
 const EXPENSE_CATS = [
   { id: 'SALARY',        label: 'Ish haqi',    icon: Users,          color: '#3b82f6' },
   { id: 'ADVANCE',       label: 'Avans',        icon: Users,          color: '#6366f1' },
@@ -492,8 +503,8 @@ export default function Cashbox() {
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{s.label}</p>
             </div>
             <p className="text-lg font-bold text-slate-900 tabular-nums">
-              {Math.round(s.val).toLocaleString()}
-              <span className="text-xs font-medium text-slate-400 ml-1">UZS</span>
+              {Math.round(s.val).toLocaleString()}{' '}
+              <span className="text-xs font-medium text-slate-400">so'm</span>
             </p>
           </div>
         ))}
@@ -639,7 +650,7 @@ export default function Cashbox() {
                             </div>
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-slate-700 truncate">
-                                {tx.description || (tx.type==='INCOME' ? t('Kirim') : t('Chiqim'))}
+                                {fixDesc(tx.description) || (tx.type==='INCOME' ? t('Kirim') : t('Chiqim'))}
                               </p>
                               <p className="text-xs text-slate-400 tabular-nums">
                                 {new Date(tx.createdAt).toLocaleDateString('uz-UZ')}
@@ -750,7 +761,7 @@ export default function Cashbox() {
                                 </span>
                               )}
                             </td>
-                            <td className={`px-4 py-3 text-slate-700 max-w-xs truncate text-sm ${isReversal?'line-through text-slate-400':''}`}>{tx.description||tx.category||'—'}</td>
+                            <td className={`px-4 py-3 text-slate-700 max-w-xs truncate text-sm ${isReversal?'line-through text-slate-400':''}`}>{fixDesc(tx.description)||tx.category||'—'}</td>
                             <td className="px-4 py-3 text-xs text-slate-500">
                               {tx.paymentMethod==='CASH'  ? <span className="flex items-center gap-1"><Banknote  className="w-3.5 h-3.5 text-emerald-500"/>{t('Naqd')}</span>
                               :tx.paymentMethod==='CARD'  ? <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5 text-blue-500"/>{t('Karta')}</span>
@@ -838,7 +849,7 @@ export default function Cashbox() {
                                 <span className="text-sm font-medium text-slate-700">{t(cat.label)}</span>
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-slate-500 text-sm max-w-xs truncate">{e.description||'—'}</td>
+                            <td className="px-4 py-3 text-slate-500 text-sm max-w-xs truncate">{fixDesc(e.description)||'—'}</td>
                             <td className="px-4 py-3 text-right text-rose-600 font-bold tabular-nums">
                               -{e.amount.toLocaleString('en-US')}
                               <span className="text-xs font-normal ml-0.5 text-slate-400">{e.currency||'UZS'}</span>
@@ -1309,7 +1320,7 @@ export default function Cashbox() {
         {cancelTarget && (
           <>
             <div className="bg-slate-50 rounded-xl p-3 text-sm">
-              <p className="font-medium text-slate-700">{cancelTarget.description||cancelTarget.category}</p>
+              <p className="font-medium text-slate-700">{fixDesc(cancelTarget.description)||cancelTarget.category}</p>
               <p className="text-xs text-slate-400 mt-0.5">
                 {cancelTarget.type==='INCOME'?'+':'-'}{cancelTarget.amount?.toLocaleString()} {cancelTarget.currency} · {new Date(cancelTarget.createdAt).toLocaleDateString('uz-UZ')}
               </p>
