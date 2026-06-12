@@ -184,16 +184,18 @@ export class SalesService {
         },
       });
 
-      // 5. CREATE SALE ITEMS
-      await tx.saleItem.createMany({
-        data: items.map(item => ({
-          saleId: sale.id,
-          productId: item.productId,
-          quantity: item.quantity,
-          pricePerBag: item.pricePerBag,
-          subtotal: DecimalHelper.multiply(item.quantity, item.pricePerBag),
-        }))
-      });
+      // 5. CREATE SALE ITEMS — createMany() has SQLite issues, use sequential create()
+      for (const item of items) {
+        await tx.saleItem.create({
+          data: {
+            saleId: sale.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            pricePerBag: item.pricePerBag,
+            subtotal: DecimalHelper.multiply(item.quantity, item.pricePerBag),
+          }
+        });
+      }
 
       // 5. ATOMIC STOCK UPDATE — sequential to avoid SQLite concurrent write errors
       for (const item of items) {
@@ -483,16 +485,18 @@ export class SalesService {
         // Eski itemsni o'chirish
         await tx.saleItem.deleteMany({ where: { saleId: id } });
 
-        // Yangi items qo'shish
-        await tx.saleItem.createMany({
-          data: items.map(item => ({
-            saleId: id,
-            productId: item.productId,
-            quantity: item.quantity,
-            pricePerBag: item.pricePerBag,
-            subtotal: DecimalHelper.multiply(item.quantity, item.pricePerBag),
-          }))
-        });
+        // Yangi items qo'shish — createMany() SQLite bilan muammo, create() ishlatamiz
+        for (const item of items) {
+          await tx.saleItem.create({
+            data: {
+              saleId: id,
+              productId: item.productId,
+              quantity: item.quantity,
+              pricePerBag: item.pricePerBag,
+              subtotal: DecimalHelper.multiply(item.quantity, item.pricePerBag),
+            }
+          });
+        }
 
         // Yangi stock o'chirish
         const productIds = items.map(i => i.productId);
