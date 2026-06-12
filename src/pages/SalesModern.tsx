@@ -4,7 +4,6 @@ import {
   Search,
   Filter,
   ShoppingCart,
-
   DollarSign,
   Calendar,
   User,
@@ -16,6 +15,8 @@ import {
   RefreshCw,
   CreditCard,
   Receipt,
+  Banknote,
+  Smartphone,
 } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
 import api from '../lib/professionalApi';
@@ -287,47 +288,20 @@ export default function SalesModern() {
   const todayDebtUZS = todaySales.filter(s => s.currency === 'UZS').reduce((sum, s) => sum + Math.max(0, s.totalAmount - s.paidAmount), 0);
   const todayDebtUSD = todaySales.filter(s => s.currency === 'USD').reduce((sum, s) => sum + Math.max(0, s.totalAmount - s.paidAmount), 0);
 
-  const todayCashUZS = todaySales.filter(s => s.paymentType === 'cash' && s.currency === 'UZS').reduce((sum, s) => sum + s.paidAmount, 0);
-  const todayCashUSD = todaySales.filter(s => s.paymentType === 'cash' && s.currency === 'USD').reduce((sum, s) => sum + s.paidAmount, 0);
+  // To'lov usuli bo'yicha breakdown
+  const pm = (type: string) => type?.toUpperCase();
+  const todayCashUZS  = todaySales.filter(s => pm(s.paymentType) === 'CASH'  && s.currency === 'UZS').reduce((sum, s) => sum + s.paidAmount, 0);
+  const todayCashUSD  = todaySales.filter(s => pm(s.paymentType) === 'CASH'  && s.currency === 'USD').reduce((sum, s) => sum + s.paidAmount, 0);
+  const todayCardUZS  = todaySales.filter(s => pm(s.paymentType) === 'CARD'  && s.currency === 'UZS').reduce((sum, s) => sum + s.paidAmount, 0);
+  const todayCardUSD  = todaySales.filter(s => pm(s.paymentType) === 'CARD'  && s.currency === 'USD').reduce((sum, s) => sum + s.paidAmount, 0);
+  const todayClickUZS = todaySales.filter(s => pm(s.paymentType) === 'CLICK' && s.currency === 'UZS').reduce((sum, s) => sum + s.paidAmount, 0);
 
   const hasActiveFilters = !!debouncedSearchTerm || selectedStatus !== 'all' || selectedPeriod !== 'all';
 
   const fmt = (n: number) => n.toLocaleString('en-US');
   const fmtSaleAmt = (amount: number, currency: string) =>
     currency === 'USD' ? `$${amount.toFixed(2)}` : `${Math.round(amount).toLocaleString('en-US')} so'm`;
-  const fmtDual = (uzs: number, usd: number) => {
-    const parts: string[] = [];
-    if (uzs > 0) parts.push(`${fmt(uzs)} so'm`);
-    if (usd > 0) parts.push(`$${usd.toFixed(2)}`);
-    return parts.length ? parts.join(' + ') : "0 so'm";
-  };
 
-  const stats = [
-    {
-      label: latinToCyrillic('Bugungi savdo'),
-      value: fmtDual(todayTotalUZS, todayTotalUSD),
-      icon: ShoppingCart,
-      tint: 'bg-indigo-50 text-indigo-600',
-    },
-    {
-      label: latinToCyrillic('Qarzga ketgan tovar'),
-      value: fmtDual(todayDebtUZS, todayDebtUSD),
-      icon: CreditCard,
-      tint: 'bg-red-50 text-red-500',
-    },
-    {
-      label: latinToCyrillic('Jami naqt olingan'),
-      value: fmtDual(todayCashUZS, todayCashUSD),
-      icon: DollarSign,
-      tint: 'bg-emerald-50 text-emerald-600',
-    },
-    {
-      label: latinToCyrillic('Jami xarajat'),
-      value: `${fmt(todayExpenses)} so'm`,
-      icon: Receipt,
-      tint: 'bg-amber-50 text-amber-600',
-    },
-  ];
 
   return (
     <>
@@ -365,36 +339,113 @@ export default function SalesModern() {
           </div>
         </div>
 
-        {/* Stats cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-          {loading
-            ? Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[116px] animate-pulse" />
-              ))
-            : stats.map((stat) => {
-                const Icon = stat.icon;
-                return (
-                  <div
-                    key={stat.label}
-                    className="rounded-2xl bg-white border border-slate-200/70 p-5 hover:border-slate-300 hover:shadow-[0_4px_20px_rgba(15,23,42,0.06)] transition-all duration-200"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400 leading-tight">
-                        {stat.label}
-                      </p>
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${stat.tint}`}>
-                        <Icon className="w-[18px] h-[18px]" />
-                      </div>
-                    </div>
-                    <p className="mt-3 text-2xl font-bold text-slate-900 tracking-tight tabular-nums">{stat.value}</p>
+        {/* Stats cards — ikki valyutada */}
+        {loading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[140px] animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+
+            {/* 1. Bugungi savdo */}
+            <div className="rounded-2xl bg-white border border-slate-200/70 p-4 hover:shadow-md transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{latinToCyrillic('Bugungi savdo')}</p>
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
+                  <ShoppingCart className="w-4 h-4 text-indigo-600" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500 flex items-center gap-1"><Banknote className="w-3 h-3 text-emerald-500"/>{latinToCyrillic('Naqt so\'m')}</span>
+                  <span className="font-bold tabular-nums text-slate-900">{fmt(Math.round(todayTotalUZS))} <span className="text-xs font-normal text-slate-400">so'm</span></span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500 flex items-center gap-1"><DollarSign className="w-3 h-3 text-amber-500"/>Dollar</span>
+                  <span className="font-bold tabular-nums text-slate-900">{todayTotalUSD % 1 === 0 ? todayTotalUSD.toLocaleString() : todayTotalUSD.toFixed(2)} <span className="text-xs font-normal text-slate-400">$</span></span>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. To'langan (naqt / karta / click / $) */}
+            <div className="rounded-2xl bg-white border border-slate-200/70 p-4 hover:shadow-md transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{latinToCyrillic('To\'langan')}</p>
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-emerald-600" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500 flex items-center gap-1"><Banknote className="w-3 h-3 text-emerald-500"/>{latinToCyrillic('Naqt so\'m')}</span>
+                  <span className="font-bold tabular-nums text-slate-900">{fmt(Math.round(todayCashUZS))} <span className="text-xs font-normal text-slate-400">so'm</span></span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500 flex items-center gap-1"><CreditCard className="w-3 h-3 text-blue-500"/>{latinToCyrillic('Karta so\'m')}</span>
+                  <span className="font-bold tabular-nums text-slate-900">{fmt(Math.round(todayCardUZS))} <span className="text-xs font-normal text-slate-400">so'm</span></span>
+                </div>
+                {todayClickUZS > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500 flex items-center gap-1"><Smartphone className="w-3 h-3 text-violet-500"/>Click</span>
+                    <span className="font-bold tabular-nums text-slate-900">{fmt(Math.round(todayClickUZS))} <span className="text-xs font-normal text-slate-400">so'm</span></span>
                   </div>
-                );
-              })}
-        </div>
+                )}
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500 flex items-center gap-1"><DollarSign className="w-3 h-3 text-amber-500"/>Dollar</span>
+                  <span className="font-bold tabular-nums text-slate-900">{todayCashUSD % 1 === 0 ? todayCashUSD.toLocaleString() : todayCashUSD.toFixed(2)} <span className="text-xs font-normal text-slate-400">$</span>
+                  {todayCardUSD > 0 && <span className="text-xs font-normal text-slate-400"> (+{todayCardUSD.toFixed(2)} karta)</span>}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Qarzga ketgan */}
+            <div className="rounded-2xl bg-white border border-slate-200/70 p-4 hover:shadow-md transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{latinToCyrillic('Qarzga ketgan')}</p>
+                <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
+                  <CreditCard className="w-4 h-4 text-red-500" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">{latinToCyrillic('UZS qarz')}</span>
+                  <span className={`font-bold tabular-nums ${todayDebtUZS > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                    {fmt(Math.round(todayDebtUZS))} <span className="text-xs font-normal text-slate-400">so'm</span>
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">{latinToCyrillic('$ qarz')}</span>
+                  <span className={`font-bold tabular-nums ${todayDebtUSD > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                    {todayDebtUSD % 1 === 0 ? todayDebtUSD.toLocaleString() : todayDebtUSD.toFixed(2)} <span className="text-xs font-normal text-slate-400">$</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Jami xarajat */}
+            <div className="rounded-2xl bg-white border border-slate-200/70 p-4 hover:shadow-md transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{latinToCyrillic('Jami xarajat')}</p>
+                <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center">
+                  <Receipt className="w-4 h-4 text-amber-600" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">{latinToCyrillic('Bugun')}</span>
+                  <span className="font-bold tabular-nums text-rose-600">{fmt(Math.round(todayExpenses))} <span className="text-xs font-normal text-slate-400">so'm</span></span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        )}
 
         {/* Filters bar */}
         <div className="bg-white rounded-2xl border border-slate-200/70 p-4">
-          <div className="flex flex-col lg:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />

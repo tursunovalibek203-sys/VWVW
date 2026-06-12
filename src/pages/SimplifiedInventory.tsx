@@ -41,6 +41,7 @@ interface Product {
   unitsPerBag: number;
   warehouse: string;
   bagType: string;
+  subType?: string;
   active: boolean;
 }
 
@@ -298,12 +299,21 @@ export default function SimplifiedInventory() {
   const matchesCategory = (product: Product, category: CategoryId): boolean => {
     if (category === 'all') return true;
 
-    if (product.warehouse) {
-      return product.warehouse === category;
-    }
-
+    const wh = (product.warehouse || '').toLowerCase();
     const name = product.name.toLowerCase();
+    const bag = (product.bagType || '').toLowerCase();
+
+    if (category === 'krishka') {
+      return wh === 'krishka' || wh === 'caps' ||
+        name.includes('krishka') || name.includes('qopqoq') ||
+        bag.includes('krishka') || bag.includes('cap') || bag.includes('qopqoq');
+    }
+    if (category === 'ruchka') {
+      return wh === 'ruchka' || wh === 'handles' ||
+        name.includes('ruchka') || bag.includes('ruchka') || bag.includes('handle');
+    }
     if (category === 'preform') {
+      if (wh === 'preform') return true;
       const gramMatch = name.match(/(\d+)\s*(?:g|gr|gram|г|гр|грамм)/i);
       const gramValue = gramMatch ? parseInt(gramMatch[1]) : 0;
       const hasPreform = name.includes('preform') || name.includes('преформ');
@@ -311,13 +321,13 @@ export default function SimplifiedInventory() {
         !name.includes('krishka') && !name.includes('cap') && !name.includes('крышка') &&
         !name.includes('ruchka') && !name.includes('handle') && !name.includes('ручка');
     }
-    if (category === 'krishka') {
-      return name.includes('krishka') || name.includes('cap') || name.includes('qopqoq') || name.includes('крышка') || name.includes('копкок');
+    if (category === 'other') {
+      return wh !== 'preform' && wh !== 'krishka' && wh !== 'ruchka' &&
+        wh !== 'caps' && wh !== 'handles' &&
+        !name.includes('preform') && !name.includes('krishka') &&
+        !name.includes('qopqoq') && !name.includes('ruchka');
     }
-    if (category === 'ruchka') {
-      return name.includes('ruchka') || name.includes('handle') || name.includes('ручка');
-    }
-    return category === 'other';
+    return false;
   };
 
   const filteredProducts = useMemo(() => {
@@ -335,6 +345,7 @@ export default function SimplifiedInventory() {
     const name = product.name.toLowerCase();
     const warehouse = (product.warehouse || '').toLowerCase();
     const bagTypeLower = (product.bagType || '').toLowerCase();
+    const subType = (product.subType || '').trim();
 
     const extractNum = (str: string): string | null => {
       const m = str.match(/(\d+)/);
@@ -343,6 +354,7 @@ export default function SimplifiedInventory() {
 
     const isKrishka =
       warehouse === 'krishka' ||
+      warehouse === 'caps' ||
       name.includes('krishka') ||
       name.includes('qopqoq') ||
       bagTypeLower.includes('krishka') ||
@@ -351,8 +363,10 @@ export default function SimplifiedInventory() {
 
     const isRuchka =
       warehouse === 'ruchka' ||
+      warehouse === 'handles' ||
       name.includes('ruchka') ||
-      bagTypeLower.includes('ruchka');
+      bagTypeLower.includes('ruchka') ||
+      bagTypeLower.includes('handle');
 
     const isPreform =
       warehouse === 'preform' ||
@@ -370,7 +384,10 @@ export default function SimplifiedInventory() {
     }
 
     if (isKrishka) {
+      // subType → bagType → nom bo'yicha razmer aniqlash
+      const sizeFromSubType = subType ? extractNum(subType) : null;
       const size =
+        sizeFromSubType ||
         extractNum(bagTypeLower) ||
         extractNum(name) ||
         'Boshqa';
@@ -378,7 +395,10 @@ export default function SimplifiedInventory() {
     }
 
     if (isRuchka) {
+      // subType → bagType → nom bo'yicha razmer aniqlash
+      const sizeFromSubType = subType ? extractNum(subType) : null;
       const size =
+        sizeFromSubType ||
         extractNum(bagTypeLower) ||
         extractNum(name) ||
         'Boshqa';
@@ -689,7 +709,7 @@ export default function SimplifiedInventory() {
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5">
         {loading
           ? Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[108px] animate-pulse" />
@@ -737,7 +757,7 @@ export default function SimplifiedInventory() {
 
       {/* Filters bar */}
       <div className="bg-white rounded-2xl border border-slate-200/70 p-4">
-        <div className="flex flex-col lg:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           {/* Search */}
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 pointer-events-none" />
@@ -952,7 +972,7 @@ export default function SimplifiedInventory() {
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-8">
+            <div className="p-5 sm:p-8">
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">

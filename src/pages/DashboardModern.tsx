@@ -29,6 +29,8 @@ interface DashboardStats {
   totalCustomers: number;
   newCustomers: number;
   cashboxBalance: number;
+  cashboxUZS: number;
+  cashboxCardUZS: number;
   pendingOrders: number;
 }
 
@@ -42,6 +44,8 @@ export default function DashboardModern() {
     totalCustomers: 0,
     newCustomers: 0,
     cashboxBalance: 0,
+    cashboxUZS: 0,
+    cashboxCardUZS: 0,
     pendingOrders: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -68,7 +72,13 @@ export default function DashboardModern() {
     setRefreshing(true);
     try {
       // Haqiqiy backend ma'lumotlari
-      const { data } = await api.get('/dashboard/stats');
+      const [dashRes, cbRes] = await Promise.allSettled([
+        api.get('/dashboard/stats'),
+        api.get('/cashbox/summary'),
+      ]);
+      if (dashRes.status === 'rejected') throw dashRes.reason;
+      const data = dashRes.value.data;
+      const cbData = cbRes.status === 'fulfilled' ? cbRes.value.data : null;
       setStats({
         todaySales: data.todaySales ?? 0,
         todayRevenue: data.dailyRevenue ?? 0,
@@ -76,7 +86,9 @@ export default function DashboardModern() {
         lowStockProducts: Array.isArray(data.lowStock) ? data.lowStock.length : 0,
         totalCustomers: data.totalCustomers ?? 0,
         newCustomers: data.newCustomers ?? 0,
-        cashboxBalance: data.cashBalance ?? 0,
+        cashboxBalance: cbData?.totalUSD ?? data.cashBalance ?? 0,
+        cashboxUZS: cbData?.byCurrency?.cashUZS ?? 0,
+        cashboxCardUZS: cbData?.byCurrency?.cardUZS ?? 0,
         pendingOrders: data.pendingDeliveries ?? 0,
       });
     } catch (error) {
@@ -193,8 +205,8 @@ export default function DashboardModern() {
               <DashboardCard
                 icon={Wallet}
                 title={latinToCyrillic('Kassa balansi')}
-                mainValue={`$${stats.cashboxBalance.toLocaleString()}`}
-                subValue={`${(stats.cashboxBalance * exchangeRate).toLocaleString()} ${latinToCyrillic("so'm")}`}
+                mainValue={`$${typeof stats.cashboxBalance === 'number' ? stats.cashboxBalance.toFixed(2) : '0'}`}
+                subValue={`${Math.round(stats.cashboxUZS).toLocaleString()} so'm${stats.cashboxCardUZS > 0 ? ` + ${Math.round(stats.cashboxCardUZS).toLocaleString()} karta` : ''}`}
                 variant="neutral"
               />
               <DashboardCard

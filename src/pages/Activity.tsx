@@ -213,7 +213,7 @@ export default function ActivityMonitor() {
 
         {/* Filters bar */}
         <div className="bg-white rounded-2xl border border-slate-200/70 p-4">
-          <div className="flex flex-col lg:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />

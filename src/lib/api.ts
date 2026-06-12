@@ -9,10 +9,7 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  // authStore sessionStorage'ga persist qiladi (localStorage emas).
-  // Moslik uchun sessionStorage -> localStorage tartibida o'qiymiz.
-  const storage =
-    sessionStorage.getItem('auth-storage') || localStorage.getItem('auth-storage');
+  const storage = localStorage.getItem('auth-storage');
   if (storage) {
     try {
       const parsed = JSON.parse(storage);
@@ -40,8 +37,6 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
-      // Tokenni tozalash (ikkala storage'dan ham)
-      sessionStorage.removeItem('auth-storage');
       localStorage.removeItem('auth-storage');
       // Login ga yo'naltirish (faqat login sahifasida bo'lmasa)
       if (window.location.pathname !== '/' && window.location.pathname !== '/login') {

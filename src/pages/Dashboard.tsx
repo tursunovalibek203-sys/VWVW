@@ -98,7 +98,7 @@ function Skeleton({ className = '', style }: { className?: string; style?: React
 
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-white border border-slate-200 rounded-2xl p-5 ${className}`}>
+    <div className={`bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm transition-shadow hover:shadow-md ${className}`}>
       {children}
     </div>
   );
@@ -111,7 +111,7 @@ function KpiCard({
   trend?: number; tint?: string; alert?: boolean; loading?: boolean; onClick?: () => void;
 }) {
   return (
-    <Card className={`hover:shadow-md transition-shadow cursor-default ${onClick ? 'cursor-pointer' : ''}`}>
+    <Card className={`cursor-default ${onClick ? 'cursor-pointer hover:border-indigo-200' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${tint}`}>
@@ -214,12 +214,12 @@ export default function Dashboard() {
       {/* ── Sarlavha ─────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Boshqaruv paneli</h1>
-          <p className="mt-0.5 text-sm text-slate-500 capitalize">{dateStr}</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Boshqaruv paneli</h1>
+          <p className="mt-1 text-sm text-slate-500 capitalize">{dateStr}</p>
         </div>
         <div className="flex items-center gap-3">
           {lastUpdate && (
-            <span className="text-xs text-slate-400 flex items-center gap-1">
+            <span className="text-xs text-slate-400 flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-lg">
               <Clock className="w-3 h-3" />
               {lastUpdate.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })} da yangilandi
             </span>
@@ -227,7 +227,7 @@ export default function Dashboard() {
           <button
             onClick={load}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-colors shadow-sm shadow-indigo-200"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Yangilash
@@ -236,11 +236,12 @@ export default function Dashboard() {
       </div>
 
       {/* ── 1-qator: Katta hero + bugungi 3 ta KPI ───────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
 
         {/* Kassa balansi — katta qora karta */}
-        <div className="lg:col-span-1 relative overflow-hidden rounded-2xl bg-slate-900 p-6 text-white">
-          <div className="absolute -top-12 -right-12 w-40 h-40 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="lg:col-span-1 relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-6 text-white">
+          <div className="absolute -top-12 -right-12 w-44 h-44 bg-indigo-500/25 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-blue-500/15 rounded-full blur-xl pointer-events-none" />
           <div className="relative space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Kassa balansi</p>
@@ -405,7 +406,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── 3-qator: Haftalik grafik + Top mahsulotlar ───────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
         {/* Haftalik sotuv grafiki */}
         <Card className="lg:col-span-2">
@@ -414,27 +415,47 @@ export default function Dashboard() {
             <p className="text-xs text-slate-400">Oxirgi 7 kun</p>
           </div>
           {loading ? (
-            <div className="h-32 flex items-end gap-2">
+            <div className="h-40 flex items-end gap-1.5">
               {Array.from({ length: 7 }).map((_, i) => (
-                <Skeleton key={i} className={`flex-1 rounded`} style={{ height: `${30 + Math.random() * 60}%` }} />
+                <Skeleton key={i} className="flex-1 rounded-t-lg" style={{ height: `${30 + i * 8}%` }} />
               ))}
             </div>
           ) : (
-            <div className="flex items-end gap-2 h-32">
-              {stats.weeklyTrend.map((d) => {
-                const h = Math.max(4, Math.round((d.sales / maxSales) * 100));
-                const isToday = d.date === new Date().toISOString().slice(0, 10);
-                return (
-                  <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
-                    <div
-                      className={`w-full rounded-t-md transition-all ${isToday ? 'bg-indigo-500' : 'bg-slate-200'}`}
-                      style={{ height: `${h}%` }}
-                      title={`${d.day}: ${uzs(d.sales)}`}
-                    />
-                    <p className={`text-[10px] ${isToday ? 'text-indigo-600 font-bold' : 'text-slate-400'}`}>{d.day}</p>
-                  </div>
-                );
-              })}
+            <div className="relative">
+              {/* Subtle grid lines */}
+              <div className="absolute inset-x-0 bottom-6 top-0 flex flex-col justify-between pointer-events-none">
+                {[0, 1, 2, 3].map(i => (
+                  <div key={i} className="w-full h-px bg-slate-100" />
+                ))}
+              </div>
+              <div className="flex items-end gap-1.5 h-40 relative">
+                {stats.weeklyTrend.map((d) => {
+                  const h = Math.max(6, Math.round((d.sales / maxSales) * 100));
+                  const isToday = d.date === new Date().toISOString().slice(0, 10);
+                  return (
+                    <div key={d.date} className="flex-1 flex flex-col items-center gap-1.5 group cursor-default">
+                      <div className="w-full flex flex-col justify-end" style={{ height: 'calc(100% - 20px)' }}>
+                        <div
+                          className={[
+                            'w-full rounded-t-lg transition-all duration-300 group-hover:opacity-80',
+                            isToday
+                              ? 'bg-gradient-to-t from-indigo-600 to-indigo-400 shadow-sm shadow-indigo-200'
+                              : 'bg-gradient-to-t from-slate-300 to-slate-200',
+                          ].join(' ')}
+                          style={{ height: `${h}%` }}
+                          title={`${d.day}: ${uzs(d.sales)}`}
+                        />
+                      </div>
+                      <p className={[
+                        'text-[10px] leading-none font-medium',
+                        isToday ? 'text-indigo-600 font-bold' : 'text-slate-400',
+                      ].join(' ')}>
+                        {d.day}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
           <div className="mt-3 pt-3 border-t border-slate-100 flex gap-6">
@@ -494,7 +515,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── 4-qator: So'nggi sotuvlar + Kam qolgan mahsulotlar ───────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
         {/* Oxirgi 5 sotuv */}
         <Card className="lg:col-span-2">

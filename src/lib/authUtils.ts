@@ -5,7 +5,7 @@ const TOKEN_REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes in ms
 
 // Tokenni tekshirish va yangilash
 export const checkAndRefreshToken = async () => {
-  const authStorage = sessionStorage.getItem('auth-storage');
+  const authStorage = localStorage.getItem('auth-storage');
   if (!authStorage) return false;
 
   try {
@@ -33,7 +33,7 @@ export const checkAndRefreshToken = async () => {
 
 // Yangi token olish
 const refreshToken = async () => {
-  const authStorage = sessionStorage.getItem('auth-storage');
+  const authStorage = localStorage.getItem('auth-storage');
   if (!authStorage) throw new Error('Token topilmadi');
 
   const { state } = JSON.parse(authStorage);
@@ -67,7 +67,7 @@ const refreshToken = async () => {
 
 // Token validligini tekshirish
 export const isTokenValid = () => {
-  const authStorage = sessionStorage.getItem('auth-storage');
+  const authStorage = localStorage.getItem('auth-storage');
   if (!authStorage) return false;
 
   try {

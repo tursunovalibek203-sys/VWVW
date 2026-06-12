@@ -195,68 +195,66 @@ export class SalesService {
         }))
       });
 
-      // 5. ATOMIC STOCK UPDATE (prevents overselling with conditional update)
-      const stockPromises = items.map(async (item) => {
-        const product = productMap.get(item.productId)!;
+      // 5. ATOMIC STOCK UPDATE — sequential to avoid SQLite concurrent write errors
+      for (const item of items) {
+        const product = productMap.get(item.productId);
+        if (!product) {
+          throw new Error(`Mahsulot topilmadi: ${item.productId}`);
+        }
+
         const isPieceSale = item.saleType === 'piece';
-        
+
         const unitsPerBag = product.unitsPerBag || 1;
         if (unitsPerBag <= 0) {
           throw new Error(`${product.name} uchun unitsPerBag noto'g'ri`);
         }
-        
-        // ✅ USE DECIMAL for stock calculations
-        const bagsToDeduct = isPieceSale 
+
+        const bagsToDeduct = isPieceSale
           ? DecimalHelper.divide(item.quantity, unitsPerBag)
           : item.quantity;
-        const unitsToDeduct = isPieceSale 
-          ? item.quantity 
+        const unitsToDeduct = isPieceSale
+          ? item.quantity
           : DecimalHelper.multiply(item.quantity, unitsPerBag);
 
-        // 🔒 ATOMIC CONDITIONAL UPDATE - Prevents race conditions
-        // This single query checks stock AND updates atomically
+        // SQLite: datetime('now') — NOT NOW() which is MySQL/PostgreSQL only
         const updateResult = await tx.$executeRaw`
           UPDATE "Product"
-          SET 
+          SET
             "currentStock" = "currentStock" - ${bagsToDeduct},
             "currentUnits" = "currentUnits" - ${unitsToDeduct},
-            "updatedAt" = NOW()
-          WHERE 
+            "updatedAt" = datetime('now')
+          WHERE
             "id" = ${item.productId}
             AND "currentStock" >= ${bagsToDeduct}
             AND "currentUnits" >= ${unitsToDeduct}
         `;
 
-        // If no rows affected, stock was insufficient
         if (updateResult === 0) {
-          throw new Error(`${product.name} uchun omborda yetarli mahsulot yo'q (race condition prevented)`);
+          throw new Error(`${product.name} uchun omborda yetarli mahsulot yo'q`);
         }
 
-        // Fetch updated stock for logging
         const updatedProduct = await tx.product.findUnique({
           where: { id: item.productId },
-          select: { currentStock: true, currentUnits: true }
+          select: { currentStock: true, currentUnits: true },
         });
 
-        // Stock movement log
+        // StockMovement.quantity/units are Int in schema — must round floats
         await tx.stockMovement.create({
           data: {
             productId: item.productId,
             type: 'SALE',
-            quantity: -bagsToDeduct,
-            units: -unitsToDeduct,
-            previousStock: product.currentStock,
-            previousUnits: product.currentUnits,
-            newStock: updatedProduct?.currentStock || 0,
-            newUnits: updatedProduct?.currentUnits || 0,
+            quantity: -Math.round(bagsToDeduct),
+            units: -Math.round(unitsToDeduct),
+            previousStock: Math.round(product.currentStock),
+            previousUnits: Math.round(product.currentUnits),
+            newStock: Math.round(updatedProduct?.currentStock ?? 0),
+            newUnits: Math.round(updatedProduct?.currentUnits ?? 0),
             userId,
             userName,
             reason: `Sotuv: ${sale.id}`,
-          }
+          },
         });
-      });
-      
-      await Promise.all(stockPromises);
+      }
 
       // 6. CASHBOX TRANSACTIONS - ENABLED
       const method = paymentMethod || 'CASH';

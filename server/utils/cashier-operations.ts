@@ -3,6 +3,7 @@ import { prisma } from './prisma';
 interface AddToCashboxParams {
   amount: number;
   currency?: string;
+  paymentMethod?: string;
   type: 'INCOME' | 'EXPENSE';
   category: string;
   description: string;
@@ -14,10 +15,14 @@ interface AddToCashboxParams {
 
 export async function addToCashbox(params: AddToCashboxParams) {
   try {
+    const method = (params.paymentMethod || 'CASH').toUpperCase();
+    const resolvedCurrency = method === 'CARD' ? 'UZS' : (params.currency || 'UZS');
     const transaction = await prisma.cashboxTransaction.create({
       data: {
         type: params.type,
         amount: params.amount,
+        currency: resolvedCurrency,
+        paymentMethod: method,
         category: params.category,
         description: params.description,
         userId: params.userId,

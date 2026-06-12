@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../lib/professionalApi';
-import { formatCurrency } from '../lib/utils';
 import { latinToCyrillic } from '../lib/transliterator';
 import { useToast } from '../components/ui/Toast';
 import {
@@ -70,24 +69,6 @@ const BUCKET_COLORS = ['#10b981', '#3b82f6', '#6366f1', '#8b5cf6'];
 type TabType = 'overview' | 'history' | 'expenses' | 'loans' | 'advances' | 'budget';
 
 // ─── Small shared components ────────────────────────────────────────────────
-function KpiCard({ title, value, sub, icon: Icon, color }: {
-  title: string; value: string; sub?: string; icon: any; color: string;
-}) {
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200/70 p-5 hover:shadow-md transition-all">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 leading-tight">{title}</p>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: color + '20' }}>
-          <Icon className="w-[18px] h-[18px]" style={{ color }} />
-        </div>
-      </div>
-      <p className="mt-3 text-xl font-bold text-slate-900 tabular-nums leading-none">{value}</p>
-      {sub && <p className="mt-1 text-xs text-slate-400 tabular-nums">{sub}</p>}
-    </div>
-  );
-}
-
 function CModal({ open, onClose, title, children, footer }: {
   open: boolean; onClose: () => void; title: string;
   children: React.ReactNode; footer?: React.ReactNode;
@@ -235,11 +216,37 @@ export default function Cashbox() {
   useEffect(() => { loadAll(); }, [loadAll]);
 
   // ── Computed ─────────────────────────────────────────────────────────────
+  // Naqt qo'ldagi pul (NET balans: kirim - chiqim)
   const cashUZS  = cashbox?.byCurrency?.cashUZS  || 0;
   const cashUSD  = cashbox?.byCurrency?.cashUSD  || 0;
   const cardUZS  = cashbox?.byCurrency?.cardUZS  || 0;
   const clickUZS = cashbox?.byCurrency?.clickUZS || 0;
   const totalUZS = cashUZS + cashUSD * exchangeRate + cardUZS + clickUZS;
+  const totalUSD = cashUSD + (cashUZS + cardUZS + clickUZS) / exchangeRate;
+
+  // Bugungi kirim breakdown
+  const todayIncomeCashUZS  = cashbox?.todayIncomeBy?.cashUZS  || 0;
+  const todayIncomeCardUZS  = cashbox?.todayIncomeBy?.cardUZS  || 0;
+  const todayIncomeClickUZS = cashbox?.todayIncomeBy?.clickUZS || 0;
+  const todayIncomeCashUSD  = cashbox?.todayIncomeBy?.cashUSD  || 0;
+
+  // Bugungi chiqim breakdown
+  const todayExpenseCashUZS  = cashbox?.todayExpenseBy?.cashUZS  || 0;
+  const todayExpenseCardUZS  = cashbox?.todayExpenseBy?.cardUZS  || 0;
+  const todayExpenseClickUZS = cashbox?.todayExpenseBy?.clickUZS || 0;
+  const todayExpenseCashUSD  = cashbox?.todayExpenseBy?.cashUSD  || 0;
+
+  // Oylik kirim breakdown
+  const monthIncomeCashUZS  = cashbox?.monthIncomeBy?.cashUZS  || 0;
+  const monthIncomeCardUZS  = cashbox?.monthIncomeBy?.cardUZS  || 0;
+  const monthIncomeClickUZS = cashbox?.monthIncomeBy?.clickUZS || 0;
+  const monthIncomeCashUSD  = cashbox?.monthIncomeBy?.cashUSD  || 0;
+
+  // Oylik chiqim breakdown
+  const monthExpenseCashUZS  = cashbox?.monthExpenseBy?.cashUZS  || 0;
+  const monthExpenseCardUZS  = cashbox?.monthExpenseBy?.cardUZS  || 0;
+  const monthExpenseClickUZS = cashbox?.monthExpenseBy?.clickUZS || 0;
+  const monthExpenseCashUSD  = cashbox?.monthExpenseBy?.cashUSD  || 0;
 
   const toUZS = (amount: number, currency: string) =>
     currency === 'USD' ? amount * exchangeRate : amount;
@@ -466,63 +473,294 @@ export default function Cashbox() {
         </button>
       </div>
 
-      {/* Balance banner */}
+      {/* ── 1. NAQT QO'LDAGI PUL ────────────────────────────────────────── */}
       <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-5 sm:p-6 text-white shadow-lg shadow-indigo-500/20">
-        <p className="text-indigo-200 text-sm font-medium">{t('Umumiy balans')}</p>
-        <p className={`text-4xl font-bold tabular-nums mt-1 ${totalUZS < 0 ? 'text-rose-300' : ''}`}>
-          {Math.round(totalUZS).toLocaleString('en-US')} <span className="text-2xl text-indigo-200">so'm</span>
-        </p>
-        {totalUZS < 0 ? (
-          <div className="flex items-center gap-1.5 mt-1">
-            <AlertTriangle className="w-4 h-4 text-rose-300"/>
-            <span className="text-rose-300 text-sm font-semibold">{t('Manfiy balans — tekshiruv talab qilinadi')}</span>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-indigo-200 text-xs font-semibold uppercase tracking-widest">{t('Naqt qoldagi pul')}</p>
+            <p className="text-indigo-100 text-xs mt-0.5">{t('Jami kirim')} − {t('Jami chiqim')}</p>
           </div>
-        ) : (
-          <p className="text-indigo-200 text-sm mt-1">≈ {(totalUZS / exchangeRate).toFixed(2)} USD</p>
-        )}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-white/20">
-          {[
-            { label: t('Naqd UZS'),  val: cashUZS.toLocaleString('en-US'),              sub: "so'm" },
-            { label: t('Naqd USD'),  val: cashUSD.toLocaleString('en-US'),               sub: 'USD' },
-            { label: t('Karta UZS'), val: cardUZS.toLocaleString('en-US'),              sub: "so'm" },
-            { label: 'Click UZS',    val: clickUZS.toLocaleString('en-US'),             sub: "so'm" },
-          ].map(b => (
-            <div key={b.label}>
-              <p className="text-indigo-300 text-xs">{b.label}</p>
-              <p className="text-white font-bold text-sm tabular-nums">{b.val} <span className="text-indigo-300 text-xs font-normal">{b.sub}</span></p>
+          {totalUZS < 0 && (
+            <div className="flex items-center gap-1.5 bg-rose-500/20 px-3 py-1.5 rounded-xl">
+              <AlertTriangle className="w-4 h-4 text-rose-300"/>
+              <span className="text-rose-200 text-xs font-semibold">{t('Manfiy')}</span>
             </div>
-          ))}
+          )}
+        </div>
+
+        {/* 3 ta asosiy bucket: Naqt so'm | Karta so'm | Naqt $ */}
+        <div className="grid grid-cols-3 gap-3 mb-4 pb-4 border-b border-white/20">
+          <div className="bg-white/10 rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Banknote className="w-3.5 h-3.5 text-emerald-300"/>
+              <p className="text-indigo-200 text-xs font-semibold uppercase">{t('Naqt som')}</p>
+            </div>
+            <p className={`text-xl font-bold tabular-nums ${cashUZS < 0 ? 'text-rose-300' : 'text-white'}`}>
+              {Math.round(cashUZS).toLocaleString('en-US')}
+            </p>
+            <p className="text-indigo-300 text-xs mt-0.5">so'm</p>
+          </div>
+
+          <div className="bg-white/10 rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <CreditCard className="w-3.5 h-3.5 text-blue-300"/>
+              <p className="text-indigo-200 text-xs font-semibold uppercase">{t('Karta som')}</p>
+            </div>
+            <p className={`text-xl font-bold tabular-nums ${cardUZS < 0 ? 'text-rose-300' : 'text-white'}`}>
+              {Math.round(cardUZS).toLocaleString('en-US')}
+            </p>
+            <p className="text-indigo-300 text-xs mt-0.5">so'm</p>
+          </div>
+
+          <div className="bg-white/10 rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <DollarSign className="w-3.5 h-3.5 text-amber-300"/>
+              <p className="text-indigo-200 text-xs font-semibold uppercase">{t('Naqt dollar')}</p>
+            </div>
+            <p className={`text-xl font-bold tabular-nums ${cashUSD < 0 ? 'text-rose-300' : 'text-white'}`}>
+              {cashUSD % 1 === 0 ? cashUSD.toLocaleString('en-US') : cashUSD.toFixed(2)}
+            </p>
+            <p className="text-indigo-300 text-xs mt-0.5">$</p>
+          </div>
+        </div>
+
+        {/* Jami */}
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-indigo-200 text-xs font-medium mb-1">{t('Jami (dollar hisobida)')}</p>
+            <p className={`text-3xl font-bold tabular-nums ${totalUSD < 0 ? 'text-rose-300' : ''}`}>
+              {totalUSD % 1 === 0 ? Math.round(totalUSD).toLocaleString('en-US') : totalUSD.toFixed(2)}{' '}
+              <span className="text-xl text-indigo-200">$</span>
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-indigo-200 text-xs font-medium mb-1">{t('So mda')}</p>
+            <p className="text-indigo-100 font-semibold tabular-nums text-sm">
+              {Math.round(totalUZS).toLocaleString('en-US')} so'm
+            </p>
+            {clickUZS > 0 && (
+              <p className="text-indigo-300 text-xs mt-1">
+                <Smartphone className="w-3 h-3 inline mr-0.5"/>Click: {Math.round(clickUZS).toLocaleString()} so'm
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard title={t('Naqd (UZS)')}  value={formatCurrency(cashUZS,'UZS')}  icon={Banknote}   color="#10b981"/>
-        <KpiCard title={t('Naqd (USD)')}  value={formatCurrency(cashUSD,'USD')}  icon={DollarSign} color="#3b82f6"
-          sub={cashUSD>0 ? '≈ '+Math.round(cashUSD*exchangeRate).toLocaleString()+" so'm" : undefined}/>
-        <KpiCard title={t('Karta (UZS)')} value={formatCurrency(cardUZS,'UZS')}  icon={CreditCard} color="#6366f1"/>
-        <KpiCard title="Click (UZS)"      value={formatCurrency(clickUZS,'UZS')} icon={Smartphone} color="#8b5cf6"/>
+      {/* ── 2. BUGUNGI KIRIM / CHIQIM ────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Bugungi kirim */}
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-emerald-600"/>
+            </div>
+            <p className="text-sm font-bold text-slate-700 uppercase tracking-wide">{t('Bugungi kirim')}</p>
+          </div>
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between py-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Banknote className="w-3.5 h-3.5 text-emerald-500"/>
+                <span className="text-sm text-slate-600">{t('Naqt som')}</span>
+              </div>
+              <span className="text-sm font-bold text-slate-900 tabular-nums">
+                {Math.round(todayIncomeCashUZS).toLocaleString('en-US')}
+                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-3.5 h-3.5 text-blue-500"/>
+                <span className="text-sm text-slate-600">{t('Karta som')}</span>
+              </div>
+              <span className="text-sm font-bold text-slate-900 tabular-nums">
+                {Math.round(todayIncomeCardUZS).toLocaleString('en-US')}
+                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+              </span>
+            </div>
+            {todayIncomeClickUZS > 0 && (
+              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-3.5 h-3.5 text-violet-500"/>
+                  <span className="text-sm text-slate-600">Click</span>
+                </div>
+                <span className="text-sm font-bold text-slate-900 tabular-nums">
+                  {Math.round(todayIncomeClickUZS).toLocaleString('en-US')}
+                  <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-3.5 h-3.5 text-amber-500"/>
+                <span className="text-sm text-slate-600">{t('Dollar')}</span>
+              </div>
+              <span className="text-sm font-bold text-slate-900 tabular-nums">
+                {todayIncomeCashUSD % 1 === 0 ? todayIncomeCashUSD.toLocaleString('en-US') : todayIncomeCashUSD.toFixed(2)}
+                <span className="text-xs font-normal text-slate-400 ml-1">$</span>
+              </span>
+            </div>
+            <div className="mt-1 pt-2.5 border-t border-emerald-100 flex justify-between items-center">
+              <span className="text-xs text-slate-400">{t('Jami')}</span>
+              <div className="text-right">
+                <span className="text-base font-bold text-emerald-600 tabular-nums">
+                  +{Math.round(todayIncomeCashUZS + todayIncomeCardUZS + todayIncomeClickUZS + todayIncomeCashUSD * exchangeRate).toLocaleString('en-US')}
+                  <span className="text-xs font-normal ml-1">so'm</span>
+                </span>
+                {todayIncomeCashUSD > 0 && (
+                  <p className="text-xs text-emerald-500 tabular-nums">
+                    +{(todayIncomeCashUSD + (todayIncomeCashUZS + todayIncomeCardUZS + todayIncomeClickUZS) / exchangeRate).toFixed(2)} $
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bugungi chiqim */}
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-xl bg-rose-50 flex items-center justify-center">
+              <TrendingDown className="w-4 h-4 text-rose-600"/>
+            </div>
+            <p className="text-sm font-bold text-slate-700 uppercase tracking-wide">{t('Bugungi chiqim')}</p>
+          </div>
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between py-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Banknote className="w-3.5 h-3.5 text-emerald-500"/>
+                <span className="text-sm text-slate-600">{t('Naqt som')}</span>
+              </div>
+              <span className="text-sm font-bold text-slate-900 tabular-nums">
+                {Math.round(todayExpenseCashUZS).toLocaleString('en-US')}
+                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-3.5 h-3.5 text-blue-500"/>
+                <span className="text-sm text-slate-600">{t('Karta som')}</span>
+              </div>
+              <span className="text-sm font-bold text-slate-900 tabular-nums">
+                {Math.round(todayExpenseCardUZS).toLocaleString('en-US')}
+                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+              </span>
+            </div>
+            {todayExpenseClickUZS > 0 && (
+              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-3.5 h-3.5 text-violet-500"/>
+                  <span className="text-sm text-slate-600">Click</span>
+                </div>
+                <span className="text-sm font-bold text-slate-900 tabular-nums">
+                  {Math.round(todayExpenseClickUZS).toLocaleString('en-US')}
+                  <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-3.5 h-3.5 text-amber-500"/>
+                <span className="text-sm text-slate-600">{t('Dollar')}</span>
+              </div>
+              <span className="text-sm font-bold text-slate-900 tabular-nums">
+                {todayExpenseCashUSD % 1 === 0 ? todayExpenseCashUSD.toLocaleString('en-US') : todayExpenseCashUSD.toFixed(2)}
+                <span className="text-xs font-normal text-slate-400 ml-1">$</span>
+              </span>
+            </div>
+            <div className="mt-1 pt-2.5 border-t border-rose-100 flex justify-between items-center">
+              <span className="text-xs text-slate-400">{t('Jami')}</span>
+              <div className="text-right">
+                <span className="text-base font-bold text-rose-600 tabular-nums">
+                  -{Math.round(todayExpenseCashUZS + todayExpenseCardUZS + todayExpenseClickUZS + todayExpenseCashUSD * exchangeRate).toLocaleString('en-US')}
+                  <span className="text-xs font-normal ml-1">so'm</span>
+                </span>
+                {todayExpenseCashUSD > 0 && (
+                  <p className="text-xs text-rose-500 tabular-nums">
+                    -{(todayExpenseCashUSD + (todayExpenseCashUZS + todayExpenseCardUZS + todayExpenseClickUZS) / exchangeRate).toFixed(2)} $
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Today stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: t('Bugungi kirim'),   val: cashbox?.todayIncome   ||0, c:'text-emerald-600', Icon: TrendingUp },
-          { label: t('Bugungi chiqim'),  val: cashbox?.todayExpense  ||0, c:'text-rose-600',    Icon: TrendingDown },
-          { label: t('Oylik kirim'),     val: cashbox?.monthlyIncome ||0, c:'text-blue-600',    Icon: TrendingUp },
-          { label: t('Oylik chiqim'),    val: cashbox?.monthlyExpense||0, c:'text-orange-600',  Icon: TrendingDown },
-        ].map(s => (
-          <div key={s.label} className="bg-white rounded-2xl border border-slate-200/70 p-4">
-            <div className="flex items-center gap-1.5 mb-2">
-              <s.Icon className={`w-3.5 h-3.5 ${s.c}`}/>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{s.label}</p>
-            </div>
-            <p className="text-lg font-bold text-slate-900 tabular-nums">
-              {Math.round(s.val).toLocaleString()}{' '}
-              <span className="text-xs font-medium text-slate-400">so'm</span>
-            </p>
+      {/* ── 3. OYLIK STATISTIKA ──────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="w-4 h-4 text-blue-500"/>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{t('Oylik kirim')}</p>
           </div>
-        ))}
+          <div className="space-y-2">
+            {[
+              { label: t('Naqt som'), icon: Banknote, clr: 'text-emerald-500', val: monthIncomeCashUZS, unit: "so'm" },
+              { label: t('Karta som'), icon: CreditCard, clr: 'text-blue-500', val: monthIncomeCardUZS, unit: "so'm" },
+              { label: t('Dollar'), icon: DollarSign, clr: 'text-amber-500', val: monthIncomeCashUSD, unit: '$', isUSD: true },
+            ].map(({ label, icon: Icon, clr, val, unit, isUSD }) => (
+              <div key={label} className="flex justify-between items-center text-sm">
+                <div className="flex items-center gap-1.5">
+                  <Icon className={`w-3.5 h-3.5 ${clr}`}/>
+                  <span className="text-slate-500">{label}</span>
+                </div>
+                <span className="font-semibold text-slate-800 tabular-nums">
+                  {isUSD ? (val % 1 === 0 ? Math.round(val).toLocaleString('en-US') : val.toFixed(2)) : Math.round(val).toLocaleString('en-US')}
+                  <span className="text-xs font-normal text-slate-400 ml-1">{unit}</span>
+                </span>
+              </div>
+            ))}
+            {monthIncomeClickUZS > 0 && (
+              <div className="flex justify-between items-center text-sm">
+                <div className="flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-violet-500"/>
+                  <span className="text-slate-500">Click</span>
+                </div>
+                <span className="font-semibold text-slate-800 tabular-nums">
+                  {Math.round(monthIncomeClickUZS).toLocaleString('en-US')}
+                  <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingDown className="w-4 h-4 text-orange-500"/>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{t('Oylik chiqim')}</p>
+          </div>
+          <div className="space-y-2">
+            {[
+              { label: t('Naqt som'), icon: Banknote, clr: 'text-emerald-500', val: monthExpenseCashUZS, unit: "so'm" },
+              { label: t('Karta som'), icon: CreditCard, clr: 'text-blue-500', val: monthExpenseCardUZS, unit: "so'm" },
+              { label: t('Dollar'), icon: DollarSign, clr: 'text-amber-500', val: monthExpenseCashUSD, unit: '$', isUSD: true },
+            ].map(({ label, icon: Icon, clr, val, unit, isUSD }) => (
+              <div key={label} className="flex justify-between items-center text-sm">
+                <div className="flex items-center gap-1.5">
+                  <Icon className={`w-3.5 h-3.5 ${clr}`}/>
+                  <span className="text-slate-500">{label}</span>
+                </div>
+                <span className="font-semibold text-slate-800 tabular-nums">
+                  {isUSD ? (val % 1 === 0 ? Math.round(val).toLocaleString('en-US') : val.toFixed(2)) : Math.round(val).toLocaleString('en-US')}
+                  <span className="text-xs font-normal text-slate-400 ml-1">{unit}</span>
+                </span>
+              </div>
+            ))}
+            {monthExpenseClickUZS > 0 && (
+              <div className="flex justify-between items-center text-sm">
+                <div className="flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-violet-500"/>
+                  <span className="text-slate-500">Click</span>
+                </div>
+                <span className="font-semibold text-slate-800 tabular-nums">
+                  {Math.round(monthExpenseClickUZS).toLocaleString('en-US')}
+                  <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Quick actions */}
@@ -574,7 +812,7 @@ export default function Cashbox() {
           {/* ══ OVERVIEW ══ */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="lg:col-span-2">
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{t('Haftalik pul oqimi (ming UZS)')}</p>
                   <ResponsiveContainer width="100%" height={200}>

@@ -269,11 +269,11 @@ export default function CustomerProfileModern() {
     {
       icon: Wallet,
       label: latinToCyrillic('Balans'),
-      main: (customer.balanceUZS || 0) > 0
-        ? `${(customer.balanceUZS || 0).toLocaleString('en-US')} so'm`
-        : formatCurrency(customer.balanceUSD || 0, 'USD'),
-      sub: (customer.balanceUZS || 0) > 0 && (customer.balanceUSD || 0) > 0
-        ? `+ ${formatCurrency(customer.balanceUSD || 0, 'USD')}`
+      main: (customer.balanceUZS || 0) > 0 || (customer.balanceUSD || 0) > 0
+        ? `${Math.round(customer.balanceUZS || 0).toLocaleString('en-US')} so'm`
+        : '0',
+      sub: (customer.balanceUSD || 0) > 0
+        ? `+ $${(customer.balanceUSD || 0).toFixed(2)}`
         : latinToCyrillic('Balans'),
       mainClass: 'text-slate-900',
       tint: 'bg-emerald-50 text-emerald-600',
@@ -281,8 +281,12 @@ export default function CustomerProfileModern() {
     {
       icon: AlertTriangle,
       label: latinToCyrillic('Qarz'),
-      main: fmtBoth(customer.debtUZS || 0, customer.debtUSD || 0),
-      sub: latinToCyrillic(hasDebt ? 'To\'lanmagan' : 'Qarz yo\'q'),
+      main: (customer.debtUZS || 0) > 0
+        ? `${Math.round(customer.debtUZS || 0).toLocaleString('en-US')} so'm`
+        : (customer.debtUSD || 0) > 0 ? `$${(customer.debtUSD || 0).toFixed(2)}` : '0',
+      sub: (customer.debtUSD || 0) > 0 && (customer.debtUZS || 0) > 0
+        ? `+ $${(customer.debtUSD || 0).toFixed(2)}`
+        : latinToCyrillic(hasDebt ? 'To\'lanmagan' : 'Qarz yo\'q'),
       mainClass: hasDebt ? 'text-rose-600' : 'text-slate-900',
       tint: hasDebt ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-600',
     },

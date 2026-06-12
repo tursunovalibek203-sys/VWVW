@@ -13,6 +13,9 @@ import {
   Percent,
   Receipt,
   Boxes,
+  FileArchive,
+  Send,
+  Loader2,
 } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
 import api from '../lib/professionalApi';
@@ -27,9 +30,9 @@ import { useToast, toast } from '../components/ui/Toast';
 //   GET /reports/sales, /reports/inventory,
 //   GET /reports/customer-analysis, /reports/profit-loss
 // ---------------------------------------------------------------------------
-type ReportType = 'sales' | 'inventory' | 'customers' | 'financial';
+type ReportType = 'sales' | 'inventory' | 'customers' | 'financial' | 'excel';
 
-const REPORT_ENDPOINT: Record<ReportType, string> = {
+const REPORT_ENDPOINT: Record<Exclude<ReportType, 'excel'>, string> = {
   sales: '/reports/sales',
   inventory: '/reports/inventory',
   customers: '/reports/customer-analysis',
@@ -47,6 +50,7 @@ const REPORT_TABS: ReportTab[] = [
   { id: 'inventory', label: latinToCyrillic('Ombor'), icon: Package },
   { id: 'customers', label: latinToCyrillic('Mijozlar'), icon: Users },
   { id: 'financial', label: latinToCyrillic('Foyda / Zarar'), icon: DollarSign },
+  { id: 'excel', label: latinToCyrillic('Excel Arxiv'), icon: FileArchive },
 ];
 
 const PERIODS = ['all', 'today', 'week', 'month', 'year'] as const;
@@ -57,6 +61,14 @@ interface KpiCard {
   value: string;
   icon: typeof ShoppingCart;
   tint: string;
+}
+
+interface ExcelFile {
+  filename: string;
+  date: string | null;
+  size: number;
+  sizeFormatted: string;
+  createdAt: string;
 }
 
 const fmtNum = (n: number) => (Number.isFinite(n) ? Math.round(n).toLocaleString('en-US') : '0');
@@ -104,8 +116,67 @@ export default function ReportsModern() {
   // keep it as `any` here and narrow at render time.
   const [data, setData] = useState<any>(null);
 
+  // Excel Arxiv tab state
+  const [excelFiles, setExcelFiles] = useState<ExcelFile[]>([]);
+  const [excelLoading, setExcelLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [sendingFile, setSendingFile] = useState<string | null>(null);
+
+  const loadExcelFiles = useCallback(async () => {
+    setExcelLoading(true);
+    try {
+      const res = await api.get('/reports/excel-files');
+      setExcelFiles(res.data.files ?? []);
+    } catch {
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Fayllar royxatini yuklashda xatolik')));
+    } finally {
+      setExcelLoading(false);
+    }
+  }, [addToast]);
+
+  const handleGenerateNow = async () => {
+    setGenerating(true);
+    try {
+      const res = await api.post('/reports/excel-files/generate-now');
+      addToast(toast.success(latinToCyrillic('Hisobot yaratildi'), `${res.data.filename} — ${res.data.sizeFormatted}`));
+      await loadExcelFiles();
+    } catch {
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Hisobot yaratishda xatolik')));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleSendBot = async (filename: string) => {
+    setSendingFile(filename);
+    try {
+      await api.post(`/reports/excel-files/send-bot/${filename}`);
+      addToast(toast.success(latinToCyrillic('Yuborildi'), `${filename} Telegram ga yuborildi`));
+    } catch {
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Yuborishda xatolik')));
+    } finally {
+      setSendingFile(null);
+    }
+  };
+
+  const handleDownload = (filename: string) => {
+    api.get(`/reports/excel-files/download/${filename}`, { responseType: 'blob' })
+      .then(res => {
+        const url = window.URL.createObjectURL(res.data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      })
+      .catch(() => addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Faylni yuklab olishda xatolik'))));
+  };
+
   const loadReport = useCallback(
     async (type: ReportType, selectedPeriod: Period) => {
+      if (type === 'excel') return;
       setLoading(true);
       setError(false);
 
@@ -143,8 +214,12 @@ export default function ReportsModern() {
   );
 
   useEffect(() => {
-    loadReport(activeTab, period);
+    if (activeTab !== 'excel') loadReport(activeTab, period);
   }, [activeTab, period, loadReport]);
+
+  useEffect(() => {
+    if (activeTab === 'excel') loadExcelFiles();
+  }, [activeTab, loadExcelFiles]);
 
   const handleRefresh = () => {
     loadReport(activeTab, period);
@@ -179,12 +254,15 @@ export default function ReportsModern() {
         return customerRows.length === 0;
       case 'financial':
         return data == null;
+      case 'excel':
+        return false;
       default:
         return true;
     }
   }, [activeTab, loading, error, salesRows, inventoryRows, customerRows, data]);
 
   const kpiCards: KpiCard[] = useMemo(() => {
+    if (activeTab === 'excel') return [];
     if (activeTab === 'sales') {
       const s = data?.summary ?? {};
       const uzs = s.totalRevenueUZS ?? s.totalRevenue ?? 0;
@@ -280,46 +358,52 @@ export default function ReportsModern() {
         </div>
 
         <div className="flex items-center gap-2 self-start">
-          {/* Period selector */}
-          <div className="relative">
-            <label htmlFor="reports-period" className="sr-only">
-              {latinToCyrillic('Davr')}
-            </label>
-            <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <select
-              id="reports-period"
-              value={period}
-              onChange={(e) => setPeriod(e.target.value as Period)}
-              className="appearance-none cursor-pointer pl-10 pr-8 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+          {/* Period selector — hidden on Excel tab */}
+          {activeTab !== 'excel' && (
+            <div className="relative">
+              <label htmlFor="reports-period" className="sr-only">
+                {latinToCyrillic('Davr')}
+              </label>
+              <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <select
+                id="reports-period"
+                value={period}
+                onChange={(e) => setPeriod(e.target.value as Period)}
+                className="appearance-none cursor-pointer pl-10 pr-8 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+              >
+                {PERIODS.map((p) => (
+                  <option key={p} value={p}>
+                    {periodLabel(p)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {activeTab !== 'excel' && (
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
             >
-              {PERIODS.map((p) => (
-                <option key={p} value={p}>
-                  {periodLabel(p)}
-                </option>
-              ))}
-            </select>
-          </div>
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{latinToCyrillic('Yangilash')}</span>
+            </button>
+          )}
 
-          <button
-            onClick={handleRefresh}
-            disabled={loading}
-            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 disabled:opacity-60 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 transition-colors active:scale-[0.98]"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{latinToCyrillic('Yangilash')}</span>
-          </button>
-
-          {/* Honest export: disabled with explanatory tooltip */}
-          <button
-            type="button"
-            disabled
-            title={exportDisabledTitle}
-            aria-disabled="true"
-            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white rounded-xl text-sm font-semibold text-slate-300 border border-slate-200 cursor-not-allowed"
-          >
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">{latinToCyrillic('Yuklab olish')}</span>
-          </button>
+          {/* Honest export: disabled with explanatory tooltip — hidden on Excel tab */}
+          {activeTab !== 'excel' && (
+            <button
+              type="button"
+              disabled
+              title={exportDisabledTitle}
+              aria-disabled="true"
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-white rounded-xl text-sm font-semibold text-slate-300 border border-slate-200 cursor-not-allowed"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">{latinToCyrillic('Yuklab olish')}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -346,8 +430,8 @@ export default function ReportsModern() {
         })}
       </div>
 
-      {/* Summary KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      {/* Summary KPI cards — hidden on Excel tab */}
+      {activeTab !== 'excel' && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {loading
           ? Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[116px] animate-pulse" />
@@ -371,17 +455,17 @@ export default function ReportsModern() {
                 </div>
               );
             })}
-      </div>
+      </div>}
 
       {/* Loading state */}
-      {loading && (
+      {loading && activeTab !== 'excel' && (
         <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-6">
           <TableSkeleton rows={8} cols={5} />
         </div>
       )}
 
       {/* Error state */}
-      {!loading && error && (
+      {!loading && error && activeTab !== 'excel' && (
         <div className="bg-white rounded-2xl border border-slate-200/70">
           <EmptyState
             icon={AlertTriangle}
@@ -401,7 +485,7 @@ export default function ReportsModern() {
       )}
 
       {/* Empty state */}
-      {!loading && !error && isEmpty && (
+      {!loading && !error && isEmpty && activeTab !== 'excel' && (
         <div className="bg-white rounded-2xl border border-slate-200/70">
           <EmptyState
             icon={activeTabMeta.icon}
@@ -593,6 +677,103 @@ export default function ReportsModern() {
               <span className="text-sm font-bold text-violet-700 tabular-nums">{(data.profitMargin ?? 0).toLocaleString('en-US')}%</span>
             </div>
           </div>
+        </div>
+      )}
+      {/* ---- EXCEL ARXIV ---- */}
+      {activeTab === 'excel' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <p className="text-sm text-slate-500">
+              {latinToCyrillic('Barcha kunlik Excel hisobotlar. Yuklab oling yoki Telegram bot orqali yuboring.')}
+            </p>
+            <button
+              onClick={handleGenerateNow}
+              disabled={generating}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+            >
+              {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileArchive className="w-4 h-4" />}
+              {generating ? latinToCyrillic('Yaratilmoqda...') : latinToCyrillic("Bugungi hisobot yaratish")}
+            </button>
+          </div>
+
+          {excelLoading ? (
+            <div className="bg-white rounded-2xl border border-slate-200/70 p-10 flex items-center justify-center">
+              <Loader2 className="w-7 h-7 animate-spin text-slate-400" />
+            </div>
+          ) : excelFiles.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200/70">
+              <EmptyState
+                icon={FileArchive}
+                title={latinToCyrillic('Fayl topilmadi')}
+                description={latinToCyrillic("Hali Excel hisobot yaratilmagan. Bugungi hisobot yaratish tugmasini bosing.")}
+                action={
+                  <button
+                    onClick={handleGenerateNow}
+                    disabled={generating}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold transition-colors"
+                  >
+                    <FileArchive className="w-4 h-4" />
+                    {latinToCyrillic("Hisobot yaratish")}
+                  </button>
+                }
+              />
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200/70 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-200/70 bg-slate-50/60">
+                      <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Fayl nomi')}</th>
+                      <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Sana')}</th>
+                      <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Hajmi')}</th>
+                      <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider px-5 py-3.5">{latinToCyrillic('Amallar')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {excelFiles.map((file) => (
+                      <tr key={file.filename} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-5 py-4">
+                          <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+                            <FileArchive className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                            {file.filename}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="inline-flex items-center gap-2 text-sm text-slate-600">
+                            <Calendar className="w-4 h-4 text-slate-400" />
+                            {file.date ? formatDate(file.date) : '—'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-right text-sm text-slate-500 tabular-nums">{file.sizeFormatted}</td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleDownload(file.filename)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors active:scale-[0.97]"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              {latinToCyrillic('Yuklab olish')}
+                            </button>
+                            <button
+                              onClick={() => handleSendBot(file.filename)}
+                              disabled={sendingFile === file.filename}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-60 text-indigo-700 rounded-lg text-xs font-semibold transition-colors active:scale-[0.97]"
+                            >
+                              {sendingFile === file.filename
+                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                : <Send className="w-3.5 h-3.5" />}
+                              {latinToCyrillic('Bot orqali yuborish')}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

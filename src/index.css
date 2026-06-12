@@ -294,17 +294,27 @@
     background: var(--glass-bg);
     -webkit-backdrop-filter: var(--glass-blur);
     backdrop-filter: var(--glass-blur);
-    border: 2px solid var(--glass-border);
-    border-radius: 1rem;
-    padding: 1rem 1.25rem;
-    transition: all 0.3s var(--ease-out);
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    border-radius: 0.875rem;
+    padding: 0.875rem 1.25rem;
+    width: 100%;
+    min-height: 3rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: #1e293b;
+    outline: none;
+    transition: all 0.25s var(--ease-out);
   }
 
   .input-glass:focus {
     background: var(--glass-bg-strong);
-    border-color: var(--color-primary-300);
-    box-shadow: var(--shadow-glow);
-    transform: scale(1.02);
+    border-color: rgba(99, 102, 241, 0.5);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(99, 102, 241, 0.1);
+  }
+
+  .input-glass::placeholder {
+    color: rgba(100, 116, 139, 0.7);
+    font-weight: 400;
   }
 
   /* Enhanced Badge Styles */

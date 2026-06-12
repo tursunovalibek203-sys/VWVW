@@ -460,6 +460,8 @@ router.post('/:id/sell', authorize('ADMIN', 'CASHIER', 'MANAGER'), async (req: A
             data: {
               type: 'INCOME',
               amount: paymentDetails.uzs,
+              currency: 'UZS',
+              paymentMethod: 'CASH',
               category: 'SALE',
               description: `Buyurtma #${order.orderNumber} (Naqd)`,
               userId: req.user!.id,
@@ -469,31 +471,33 @@ router.post('/:id/sell', authorize('ADMIN', 'CASHIER', 'MANAGER'), async (req: A
           });
           console.log(`✅ Kassa (UZS): ${paymentDetails.uzs} so'm`);
         }
-        
-        // USD (Dollar) - Convert to UZS for consistent cashbox tracking
+
+        // USD (Dollar)
         if (paymentDetails.usd && paymentDetails.usd > 0) {
-          const usdInUZS = paymentDetails.usd * exchangeRates.USD_TO_UZS;
           await prisma.cashboxTransaction.create({
             data: {
               type: 'INCOME',
-              amount: usdInUZS,  // Store in UZS for consistency
-              currency: 'UZS',     // Explicitly set currency
+              amount: paymentDetails.usd,
+              currency: 'USD',
+              paymentMethod: 'CASH',
               category: 'SALE',
-              description: `Buyurtma #${order.orderNumber} (Dollar ${paymentDetails.usd} USD)`,
+              description: `Buyurtma #${order.orderNumber} (Dollar)`,
               userId: req.user!.id,
               userName: req.user!.name || 'Admin',
               reference: order.id
             }
           });
-          console.log(`✅ Kassa (USD): $${paymentDetails.usd} = ${usdInUZS} UZS`);
+          console.log(`✅ Kassa (USD): $${paymentDetails.usd}`);
         }
-        
+
         // CLICK
         if (paymentDetails.click && paymentDetails.click > 0) {
           await prisma.cashboxTransaction.create({
             data: {
               type: 'INCOME',
               amount: paymentDetails.click,
+              currency: 'UZS',
+              paymentMethod: 'CLICK',
               category: 'SALE',
               description: `Buyurtma #${order.orderNumber} (Click)`,
               userId: req.user!.id,

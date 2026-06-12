@@ -115,12 +115,14 @@ export default function AddProduct() {
   useEffect(() => {
     if (!isEditing && !isNameManuallyEdited) {
       setFormData(prev => {
-        const hasSizeInBagType = prev.bagType && prev.sizeName && 
+        const hasSizeInBagType = prev.bagType && prev.sizeName &&
           prev.bagType.toLowerCase().includes(prev.sizeName.toLowerCase().replace('g', ''));
-          
+
         const sizePart = (prev.sizeName && !hasSizeInBagType) ? ` ${prev.sizeName}` : '';
-        const subTypePart = prev.subType ? ` ${prev.subType}` : '';
-        
+        // subType'ni faqat bagType tarkibida yo'q bo'lsa qo'shish (takrorlanishni oldini olish)
+        const subTypeAlreadyInBagType = prev.subType && prev.bagType && prev.bagType.includes(prev.subType);
+        const subTypePart = (prev.subType && !subTypeAlreadyInBagType) ? ` ${prev.subType}` : '';
+
         if (prev.bagType && prev.color) {
           const autoName = `${prev.bagType}${sizePart}${subTypePart} ${prev.color}`.trim();
           const finalName = (autoName + ' ' + manualSuffix).trim();
@@ -391,7 +393,12 @@ export default function AddProduct() {
                 <button
                   key={type.id}
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, warehouse: type.id }))}
+                  onClick={() => setFormData(prev => ({
+                    ...prev,
+                    warehouse: type.id,
+                    subType: '',
+                    bagType: type.id === 'preform' ? '15G' : ''
+                  }))}
                   className={`p-4 rounded-xl border transition-all duration-200 text-center active:scale-[0.98] ${
                     isActive
                       ? 'border-indigo-500 bg-indigo-50 shadow-sm'
@@ -414,23 +421,37 @@ export default function AddProduct() {
             </button>
           </div>
 
-          {formData.warehouse === 'preform' && (
+          {(formData.warehouse === 'preform' || formData.warehouse === 'krishka' || formData.warehouse === 'ruchka') && (
             <div className="mt-5 bg-slate-50 p-5 rounded-xl border border-slate-200/70">
               <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
-                {latinToCyrillic("Aksessuar o'lchami")}
+                {latinToCyrillic(formData.warehouse === 'preform' ? "Aksessuar o'lchami" : "Razmer (o'lcham)")}
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {[
-                  { id: '28', label: '28 MM', desc: '15g - 30g' },
-                  { id: '38', label: '38 MM', desc: '52g - 70g' },
-                  { id: '48', label: '48 MM', desc: '75g+' },
-                ].map((size) => {
+              <div className={`grid gap-3 ${formData.warehouse === 'preform' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-4'}`}>
+                {(formData.warehouse === 'preform'
+                  ? [
+                      { id: '28', label: '28 MM', desc: '15g - 30g' },
+                      { id: '38', label: '38 MM', desc: '52g - 70g' },
+                      { id: '48', label: '48 MM', desc: '75g+' },
+                    ]
+                  : [
+                      { id: '28', label: '28 MM', desc: '' },
+                      { id: '38', label: '38 MM', desc: '' },
+                      { id: '48', label: '48 MM', desc: '' },
+                      { id: '55', label: '55 MM', desc: '' },
+                    ]
+                ).map((size) => {
                   const isActive = formData.subType === size.id;
                   return (
                     <button
                       key={size.id}
                       type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, subType: size.id }))}
+                      onClick={() => setFormData(prev => {
+                        // krishka/ruchka uchun bagType ni avtomatik "{razmer}{ombor}" formatida o'rnatish
+                        const newBagType = (prev.warehouse === 'krishka' || prev.warehouse === 'ruchka')
+                          ? `${size.id}${prev.warehouse}`
+                          : prev.bagType;
+                        return { ...prev, subType: size.id, bagType: newBagType };
+                      })}
                       className={`p-4 rounded-xl border transition-all duration-200 active:scale-[0.98] ${
                         isActive
                           ? 'border-indigo-500 bg-white shadow-sm'
@@ -438,7 +459,7 @@ export default function AddProduct() {
                       }`}
                     >
                       <p className={`font-bold text-lg tabular-nums ${isActive ? 'text-slate-900' : 'text-slate-500'}`}>{size.label}</p>
-                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-tight">{size.desc}</p>
+                      {size.desc && <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-tight">{size.desc}</p>}
                     </button>
                   );
                 })}

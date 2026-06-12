@@ -22,6 +22,8 @@ router.get('/summary', async (req, res) => {
       txCount,
       currencyRaw,
       weeklyRaw,
+      todayBreakdownRaw,
+      monthBreakdownRaw,
     ] = await Promise.all([
       // Jami kirim/chiqim
       prisma.cashboxTransaction.groupBy({
@@ -60,6 +62,28 @@ router.get('/summary', async (req, res) => {
         WHERE createdAt >= ${weekAgo.toISOString()}
         GROUP BY DATE(createdAt), type
         ORDER BY day ASC
+      `,
+      // Bugungi kirim/chiqim valyuta + usul bo'yicha
+      prisma.$queryRaw<Array<{
+        type: string; currency: string; paymentMethod: string; total: number;
+      }>>`
+        SELECT type, COALESCE(currency,'UZS') as currency,
+               COALESCE(paymentMethod,'CASH') as paymentMethod,
+               COALESCE(SUM(amount),0) as total
+        FROM "CashboxTransaction"
+        WHERE createdAt >= ${today.toISOString()}
+        GROUP BY type, currency, paymentMethod
+      `,
+      // Oylik kirim/chiqim valyuta + usul bo'yicha
+      prisma.$queryRaw<Array<{
+        type: string; currency: string; paymentMethod: string; total: number;
+      }>>`
+        SELECT type, COALESCE(currency,'UZS') as currency,
+               COALESCE(paymentMethod,'CASH') as paymentMethod,
+               COALESCE(SUM(amount),0) as total
+        FROM "CashboxTransaction"
+        WHERE createdAt >= ${monthStart.toISOString()}
+        GROUP BY type, currency, paymentMethod
       `,
     ]);
 
@@ -133,6 +157,26 @@ router.get('/summary', async (req, res) => {
     const exchangeRate = parseInt(process.env.USD_TO_UZS_RATE || '12500', 10);
     const totalUSD = (cashUZS + clickUZS + cardUZS) / exchangeRate + cashUSD;
 
+    // Valyuta bo'yicha breakdown ni hisoblash
+    const parseBreakdown = (rows: any[], txType: string) => {
+      let cashUZS = 0, cardUZS = 0, clickUZS = 0, cashUSD = 0;
+      rows.filter((r: any) => r.type === txType).forEach((r: any) => {
+        const amt = Number(r.total);
+        const method = (r.paymentMethod || 'CASH').toUpperCase();
+        const curr   = (r.currency     || 'UZS').toUpperCase();
+        if (method === 'CLICK')    clickUZS += amt;
+        else if (method === 'CARD') cardUZS += amt;
+        else if (curr === 'USD')   cashUSD  += amt;
+        else                       cashUZS  += amt;
+      });
+      return { cashUZS, cardUZS, clickUZS, cashUSD };
+    };
+
+    const todayIncomeBy  = parseBreakdown(todayBreakdownRaw  as any[], 'INCOME');
+    const todayExpenseBy = parseBreakdown(todayBreakdownRaw  as any[], 'EXPENSE');
+    const monthIncomeBy  = parseBreakdown(monthBreakdownRaw  as any[], 'INCOME');
+    const monthExpenseBy = parseBreakdown(monthBreakdownRaw  as any[], 'EXPENSE');
+
     res.json({
       totalBalance,
       totalUSD,
@@ -142,6 +186,10 @@ router.get('/summary', async (req, res) => {
       monthlyExpense,
       byCurrency: { cashUZS, cashUSD, cardUZS, clickUZS },
       dailyFlow,
+      todayIncomeBy,
+      todayExpenseBy,
+      monthIncomeBy,
+      monthExpenseBy,
     });
   } catch (error) {
     console.error('Cashbox summary error:', error);

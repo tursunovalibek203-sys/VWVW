@@ -136,7 +136,7 @@ class ProfessionalApi {
 
   private getAuthToken(): string | null {
     try {
-      const storage = sessionStorage.getItem('auth-storage');
+      const storage = localStorage.getItem('auth-storage');
       if (storage) {
         const parsed = JSON.parse(storage);
         return parsed.state?.token || null;
@@ -176,15 +176,16 @@ class ProfessionalApi {
   }
 
   private async handleUnauthorized() {
-    // Sessiyani saqlash
     saveSessionBeforeLogout();
-    
-    // Clear auth storage
-    sessionStorage.removeItem('auth-storage');
-    
-    // Faqat agar login sahifasida bo'lmasa, redirect qilish
-    if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
-      window.location.href = '/';
+
+    // Zustand store orqali logout (localStorage ham tozalanadi)
+    const { useAuthStore } = await import('../store/authStore');
+    useAuthStore.getState().logout();
+
+    // Faqat protected sahifada bo'lsa redirect
+    const path = window.location.pathname;
+    if (path !== '/' && path !== '/login' && path !== '/cashier/login') {
+      window.location.href = '/login';
     }
   }
 

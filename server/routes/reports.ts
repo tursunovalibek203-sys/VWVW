@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import { prisma } from '../utils/prisma';
 import { authenticate } from '../middleware/auth';
+import fs from 'fs';
+import path from 'path';
+import { generateDailyExcelBackup } from '../utils/daily-excel-backup';
+import { sendBufferToAdmins } from '../bot/admin-bot';
 
 const router = Router();
 
@@ -533,5 +537,94 @@ function getTopProductsFromSales(sales: any[]) {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 5);
 }
+
+// ── Excel fayl arxiv endpointlari ─────────────────────────────────────────────
+
+const BACKUP_DIR = path.join(process.cwd(), 'backup', 'excel');
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// GET /reports/excel-files — barcha Excel backup fayllar ro'yxati
+router.get('/excel-files', async (req, res) => {
+  try {
+    if (!fs.existsSync(BACKUP_DIR)) {
+      return res.json({ files: [] });
+    }
+    const files = fs.readdirSync(BACKUP_DIR)
+      .filter(f => f.endsWith('.xlsx'))
+      .map(filename => {
+        const filePath = path.join(BACKUP_DIR, filename);
+        const stat = fs.statSync(filePath);
+        const dateMatch = filename.match(/hisobot_(\d{4}-\d{2}-\d{2})/);
+        return {
+          filename,
+          date: dateMatch ? dateMatch[1] : null,
+          size: stat.size,
+          sizeFormatted: formatFileSize(stat.size),
+          createdAt: stat.mtime.toISOString(),
+        };
+      })
+      .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+    res.json({ files });
+  } catch (error) {
+    console.error('Excel files list error:', error);
+    res.status(500).json({ error: 'Fayllar ro\'yxatini yuklashda xatolik' });
+  }
+});
+
+// GET /reports/excel-files/download/:filename — faylni yuklab olish
+router.get('/excel-files/download/:filename', async (req, res) => {
+  try {
+    const { filename } = req.params;
+    if (!/^hisobot_\d{4}-\d{2}-\d{2}\.xlsx$/.test(filename)) {
+      return res.status(400).json({ error: 'Noto\'g\'ri fayl nomi' });
+    }
+    const filePath = path.join(BACKUP_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Fayl topilmadi' });
+    }
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    fs.createReadStream(filePath).pipe(res);
+  } catch (error) {
+    console.error('Excel download error:', error);
+    res.status(500).json({ error: 'Faylni yuklashda xatolik' });
+  }
+});
+
+// POST /reports/excel-files/generate-now — bugun uchun yangi hisobot yaratish
+router.post('/excel-files/generate-now', async (req, res) => {
+  try {
+    const { buffer, filename } = await generateDailyExcelBackup();
+    res.json({ ok: true, filename, size: buffer.length, sizeFormatted: formatFileSize(buffer.length) });
+  } catch (error: any) {
+    console.error('Generate Excel error:', error);
+    res.status(500).json({ error: error.message || 'Hisobot yaratishda xatolik' });
+  }
+});
+
+// POST /reports/excel-files/send-bot/:filename — faylni Telegram bot orqali yuborish
+router.post('/excel-files/send-bot/:filename', async (req, res) => {
+  try {
+    const { filename } = req.params;
+    if (!/^hisobot_\d{4}-\d{2}-\d{2}\.xlsx$/.test(filename)) {
+      return res.status(400).json({ error: 'Noto\'g\'ri fayl nomi' });
+    }
+    const filePath = path.join(BACKUP_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Fayl topilmadi' });
+    }
+    const buffer = fs.readFileSync(filePath);
+    await sendBufferToAdmins(buffer, filename, `📊 Admin saytidan yuborildi: *${filename}*`);
+    res.json({ ok: true });
+  } catch (error: any) {
+    console.error('Send bot error:', error);
+    res.status(500).json({ error: error.message || 'Yuborishda xatolik' });
+  }
+});
 
 export default router;

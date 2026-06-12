@@ -566,7 +566,7 @@ export default function CustomersModern() {
       </div>
 
       {/* Stat cards: premium white */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5">
         {loading
           ? Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[104px] animate-pulse" />
@@ -599,7 +599,7 @@ export default function CustomersModern() {
 
       {/* Search / filter card */}
       <div className="bg-white rounded-2xl border border-slate-200/70 p-4">
-        <div className="flex flex-col lg:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           {/* Search */}
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 pointer-events-none" />

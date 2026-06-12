@@ -72,19 +72,24 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 bg-gradient-mesh p-4 relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 bg-dots-pattern opacity-30"></div>
-      <div className="absolute top-20 left-20 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl animate-float"></div>
-      <div
-        className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-float animate-float-delay-2s"
-      ></div>
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-3xl animate-pulse-glow"></div>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4" style={{ background: '#070d1e' }}>
+      {/* Glow orbs */}
+      <div className="absolute -top-40 -right-40 w-[700px] h-[700px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.28) 0%, transparent 65%)' }} />
+      <div className="absolute -bottom-40 -left-40 w-[700px] h-[700px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.22) 0%, transparent 65%)' }} />
+      <div className="absolute top-[30%] left-[20%] w-[350px] h-[350px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)' }} />
+
+      {/* Fine grid */}
+      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(rgba(148,163,184,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.07) 1px, transparent 1px)', backgroundSize: '80px 80px' }} />
+
+      {/* Edge vignette */}
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 110% 110% at 50% 50%, transparent 45%, rgba(4,6,20,0.65) 100%)' }} />
 
       <div className={`w-full max-w-[420px] relative z-10 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
         {/* Main Card */}
-        <div className="glass-card rounded-3xl shadow-premium overflow-hidden hover-lift">
-          <div className="p-8">
+        <div className="bg-white rounded-3xl overflow-hidden" style={{ boxShadow: '0 40px 100px -20px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.06)' }}>
+          {/* Top accent bar */}
+          <div className="h-[3px] bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+          <div className="p-5 sm:p-8">
             {/* Logo Section */}
             <div className="flex flex-col items-center mb-8">
               <div className="w-20 h-20 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mb-4 shadow-glow ring-4 ring-white/20 transition-all duration-500 hover:scale-110">
@@ -211,6 +216,11 @@ export default function Login() {
             </form>
           </div>
         </div>
+
+        {/* Footer */}
+        <p className="mt-5 text-center text-xs text-white/30 select-none tracking-wide">
+          LUX PET PLAST ERP &copy; {new Date().getFullYear()}
+        </p>
       </div>
     </div>
   );

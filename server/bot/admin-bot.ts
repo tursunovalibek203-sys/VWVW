@@ -10,23 +10,33 @@ function getAdminChatIds(): number[] {
 }
 
 let dailySchedulerTimer: NodeJS.Timeout | null = null;
+let lastSentDate = '';   // YYYY-MM-DD — bir kunda faqat bir marta yuborish
 
 function startDailyScheduler() {
-  if (dailySchedulerTimer) clearTimeout(dailySchedulerTimer);
-  function scheduleNext() {
-    const now = new Date();
-    const next = new Date();
-    next.setHours(19, 0, 0, 0);
-    if (next <= now) next.setDate(next.getDate() + 1);
-    const delay = next.getTime() - now.getTime();
-    dailySchedulerTimer = setTimeout(async () => {
+  if (dailySchedulerTimer) clearInterval(dailySchedulerTimer);
+
+  // Har daqiqa tekshiramiz — server restart bo'lsa ham o'tkazib yubormaymiz
+  dailySchedulerTimer = setInterval(async () => {
+    const now  = new Date();
+    const h    = now.getHours();
+    const m    = now.getMinutes();
+    const date = now.toISOString().slice(0, 10);   // YYYY-MM-DD
+
+    // 19:00 – 19:04 oralig'ida va bugun hali yuborilmagan bo'lsa
+    if (h === 19 && m < 5 && date !== lastSentDate) {
+      lastSentDate = date;
+      console.log(`⏰ Kunlik hisobot yuborilmoqda (${now.toLocaleTimeString('uz-UZ')})…`);
       try { await sendExcelBackupToAdmins('🕖 Kunlik avtomatik hisobot (19:00)'); }
       catch (err) { console.error('❌ Kunlik hisobot xatolik:', err); }
-      scheduleNext();
-    }, delay);
-    console.log(`⏰ Kunlik hisobot scheduler: ${Math.round(delay / 60000)} daqiqadan keyin`);
-  }
-  scheduleNext();
+    }
+  }, 60_000);   // har 60 soniyada
+
+  // Qancha vaqt qolganini konsolda ko'rsatamiz
+  const now  = new Date();
+  const next = new Date(); next.setHours(19, 0, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  const mins = Math.round((next.getTime() - now.getTime()) / 60_000);
+  console.log(`⏰ Kunlik hisobot scheduler ishga tushdi — keyingi yuborish ~${mins} daqiqadan keyin (19:00)`);
 }
 
 export async function sendExcelBackupToAdmins(caption = '📊 Kunlik hisobot') {
@@ -43,6 +53,19 @@ export async function sendExcelBackupToAdmins(caption = '📊 Kunlik hisobot') {
     } catch (err: any) {
       console.error(`❌ ${chatId} ga yuborishda xatolik:`, err.message);
     }
+  }
+}
+
+export async function sendBufferToAdmins(buffer: Buffer, filename: string, caption = '📊 Hisobot') {
+  const adminIds = getAdminChatIds();
+  if (!adminIds.length) throw new Error('TELEGRAM_ADMIN_CHAT_ID topilmadi');
+  if (!adminBot) throw new Error('Admin bot ishga tushmagan');
+  for (const chatId of adminIds) {
+    await adminBot.sendDocument(
+      chatId, buffer,
+      { caption, parse_mode: 'Markdown' },
+      { filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+    );
   }
 }
 

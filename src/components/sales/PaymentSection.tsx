@@ -119,7 +119,7 @@ export const PaymentSection = ({
                 value={form.paidUZS}
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^0-9]/g, '');
-                  onUpdateForm({ paidUZS: val, paidCLICK: '' });
+                  onUpdateForm({ paidUZS: val });
                 }}
                 className="w-full h-11 px-3 text-sm font-medium text-slate-900 tabular-nums rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
               />
@@ -149,7 +149,7 @@ export const PaymentSection = ({
                 value={form.paidCLICK}
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^0-9.]/g, '').replace(/\.(?=.*\.)/g, '');
-                  onUpdateForm({ paidCLICK: val, paidUZS: '' });
+                  onUpdateForm({ paidCLICK: val });
                 }}
                 className="w-full h-11 px-3 text-sm font-medium text-slate-900 tabular-nums rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
               />

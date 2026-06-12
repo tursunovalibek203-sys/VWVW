@@ -688,7 +688,7 @@ export default function AddSaleClean() {
         </div>
 
         {/* Zone 1: Product picker (left) + Cart (right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           {/* Products */}
           <ProductSection
             filteredProducts={filteredProducts}
