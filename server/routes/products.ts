@@ -587,7 +587,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/:id/adjust-units', authorize('ADMIN', 'WAREHOUSE_MANAGER'), async (req: AuthRequest, res) => {
+router.post('/:id/adjust-units', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'CASHIER', 'SELLER'), async (req: AuthRequest, res) => {
   try {
     const { units, type, reason, notes } = req.body;
     const productId = req.params.id;
@@ -677,7 +677,7 @@ router.post('/:id/adjust-units', authorize('ADMIN', 'WAREHOUSE_MANAGER'), async 
   }
 });
 
-router.post('/:id/adjust-bags', authorize('ADMIN', 'WAREHOUSE_MANAGER'), async (req: AuthRequest, res) => {
+router.post('/:id/adjust-bags', authorize('ADMIN', 'WAREHOUSE_MANAGER', 'CASHIER', 'SELLER'), async (req: AuthRequest, res) => {
   try {
     const { bags, type, reason, notes } = req.body;
     const productId = req.params.id;

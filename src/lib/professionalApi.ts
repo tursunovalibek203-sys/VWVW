@@ -82,10 +82,18 @@ class ProfessionalApi {
     // Request Interceptor
     this.instance.interceptors.request.use(
       (config) => {
-        // Add auth token
-        const token = this.getAuthToken();
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+        // Auth endpointlariga token qo'shmaymiz (login paytida eski token kerak emas)
+        const requestUrl = config.url || '';
+        const isAuthEndpoint =
+          requestUrl.includes('/auth/login') ||
+          requestUrl.includes('/auth/cashier-login') ||
+          requestUrl.includes('/auth/register');
+
+        if (!isAuthEndpoint) {
+          const token = this.getAuthToken();
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
         }
 
         // Add request ID for tracking
@@ -112,7 +120,16 @@ class ProfessionalApi {
         // Handle 401 Unauthorized — faqat avval token bo'lgan bo'lsa
         if (error.response?.status === 401 && !originalRequest._retry) {
           const existingToken = this.getAuthToken();
-          if (existingToken) {
+          // Auth endpointlari uchun handleUnauthorized chaqirmaymiz
+          // (login/cashier-login 401 = noto'g'ri parol, token eskirishi emas)
+          const requestUrl = originalRequest.url || '';
+          const isAuthEndpoint =
+            requestUrl.includes('/auth/login') ||
+            requestUrl.includes('/auth/cashier-login') ||
+            requestUrl.includes('/auth/register') ||
+            requestUrl.includes('/auth/refresh-token');
+
+          if (existingToken && !isAuthEndpoint) {
             await this.handleUnauthorized();
           }
           return Promise.reject(this.enhanceError(error));
@@ -122,10 +139,10 @@ class ProfessionalApi {
         if (this.shouldRetry(error) && originalRequest._retryCount < this.config.retryAttempts) {
           originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
           originalRequest._retry = true;
-          
+
           const delay = this.config.retryDelay * Math.pow(2, originalRequest._retryCount - 1);
           await this.sleep(delay);
-          
+
           return this.instance(originalRequest);
         }
 
@@ -135,13 +152,16 @@ class ProfessionalApi {
   }
 
   private getAuthToken(): string | null {
+    // Avval Zustand store dan o'qiymiz (always up-to-date, setAuth dan keyin darhol yangilanadi)
     try {
+      // Dynamic require emas — module-level import mavjud bo'lmaydi shu yerda
+      // Shuning uchun localStorage dan o'qiymiz, lekin Zustand persist formatini to'g'ri parse qilamiz
       const storage = localStorage.getItem('auth-storage');
       if (storage) {
         const parsed = JSON.parse(storage);
         return parsed.state?.token || null;
       }
-    } catch (error) {
+    } catch {
       // Failed to get auth token
     }
     return null;

@@ -55,7 +55,10 @@ export default function Login() {
       }
 
       setAuth(data.token, data.user);
-      
+
+      // localStorage ga yozilishi uchun bir tick kutamiz
+      await new Promise(resolve => setTimeout(resolve, 50));
+
       const role = data.user.role?.toUpperCase();
       if (role === 'CASHIER' || role === 'SELLER') {
         navigate('/cashier/sales');

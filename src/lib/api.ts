@@ -11,15 +11,24 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const storage = localStorage.getItem('auth-storage');
-  if (storage) {
-    try {
-      const parsed = JSON.parse(storage);
-      if (parsed.state?.token) {
-        config.headers.Authorization = `Bearer ${parsed.state.token}`;
+  // Auth endpointlariga token qo'shmaymiz
+  const requestUrl = config.url || '';
+  const isAuthEndpoint =
+    requestUrl.includes('/auth/login') ||
+    requestUrl.includes('/auth/cashier-login') ||
+    requestUrl.includes('/auth/register');
+
+  if (!isAuthEndpoint) {
+    const storage = localStorage.getItem('auth-storage');
+    if (storage) {
+      try {
+        const parsed = JSON.parse(storage);
+        if (parsed.state?.token) {
+          config.headers.Authorization = `Bearer ${parsed.state.token}`;
+        }
+      } catch (e) {
+        console.error('Failed to parse auth-storage:', e);
       }
-    } catch (e) {
-      console.error('Failed to parse auth-storage:', e);
     }
   }
   return config;
@@ -27,7 +36,7 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     // Xatolikni log qilish
     if (error.response) {
       console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}:`, {
@@ -39,30 +48,41 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
-      // Faqat avval token bo'lgan bo'lsa logout qilamiz
-      // (Login endpoint'i ham 401 qaytaradi — u holda logout kerak emas)
       const storage = localStorage.getItem('auth-storage');
       let hadToken = false;
       try {
         hadToken = !!JSON.parse(storage || '{}')?.state?.token;
       } catch { /* ignore */ }
 
-      if (hadToken) {
-        localStorage.removeItem('auth-storage');
+      // Auth endpointlari uchun logout qilmaymiz
+      const requestUrl = error.config?.url || '';
+      const isAuthEndpoint =
+        requestUrl.includes('/auth/login') ||
+        requestUrl.includes('/auth/cashier-login') ||
+        requestUrl.includes('/auth/register');
+
+      if (hadToken && !isAuthEndpoint) {
+        // Zustand store orqali logout (localStorage ham tozalanadi)
+        try {
+          const { useAuthStore } = await import('../store/authStore');
+          useAuthStore.getState().logout();
+        } catch {
+          localStorage.removeItem('auth-storage');
+        }
         const path = window.location.pathname;
         if (path !== '/' && path !== '/login' && path !== '/cashier/login') {
           window.location.href = '/login';
         }
       }
     }
-    
+
     // Xato obyektini boyitish
     const enhancedError = {
       ...error,
       userMessage: error.response?.data?.error || error.message || 'Xatolik yuz berdi',
       statusCode: error.response?.status,
     };
-    
+
     return Promise.reject(enhancedError);
   }
 );
