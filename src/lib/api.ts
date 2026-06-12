@@ -39,10 +39,20 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
-      localStorage.removeItem('auth-storage');
-      // Login ga yo'naltirish (faqat login sahifasida bo'lmasa)
-      if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
-        window.location.href = '/';
+      // Faqat avval token bo'lgan bo'lsa logout qilamiz
+      // (Login endpoint'i ham 401 qaytaradi — u holda logout kerak emas)
+      const storage = localStorage.getItem('auth-storage');
+      let hadToken = false;
+      try {
+        hadToken = !!JSON.parse(storage || '{}')?.state?.token;
+      } catch { /* ignore */ }
+
+      if (hadToken) {
+        localStorage.removeItem('auth-storage');
+        const path = window.location.pathname;
+        if (path !== '/' && path !== '/login' && path !== '/cashier/login') {
+          window.location.href = '/login';
+        }
       }
     }
     

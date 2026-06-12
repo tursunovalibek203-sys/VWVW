@@ -112,9 +112,12 @@ class ProfessionalApi {
       async (error) => {
         const originalRequest = error.config;
 
-        // Handle 401 Unauthorized
+        // Handle 401 Unauthorized — faqat avval token bo'lgan bo'lsa
         if (error.response?.status === 401 && !originalRequest._retry) {
-          await this.handleUnauthorized();
+          const existingToken = this.getAuthToken();
+          if (existingToken) {
+            await this.handleUnauthorized();
+          }
           return Promise.reject(this.enhanceError(error));
         }
 
