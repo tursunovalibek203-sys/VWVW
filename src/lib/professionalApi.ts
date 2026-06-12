@@ -206,10 +206,10 @@ class ProfessionalApi {
     const { useAuthStore } = await import('../store/authStore');
     useAuthStore.getState().logout();
 
-    // Faqat protected sahifada bo'lsa redirect
+    // Kassir sahifasidan chiqsak — kassir loginiga yo'naltiramiz
     const path = window.location.pathname;
     if (path !== '/' && path !== '/login' && path !== '/cashier/login') {
-      window.location.href = '/login';
+      window.location.href = path.startsWith('/cashier') ? '/cashier/login' : '/login';
     }
   }
 

@@ -261,6 +261,7 @@ export default function CustomerProfile() {
 
             <div className="flex flex-wrap items-center justify-end gap-2">
               <button
+                type="button"
                 onClick={handleRefresh}
                 disabled={refreshing}
                 className="inline-flex items-center gap-2 px-3 py-2 bg-white/15 hover:bg-white/25 disabled:opacity-60 rounded-xl text-sm font-semibold text-white backdrop-blur-sm transition-all duration-200 active:scale-95"
@@ -270,6 +271,7 @@ export default function CustomerProfile() {
                 <span className="hidden lg:inline">{latinToCyrillic('Yangilash')}</span>
               </button>
               <button
+                type="button"
                 onClick={handleExportExcel}
                 className="inline-flex items-center gap-2 px-3 py-2 bg-white/15 hover:bg-white/25 rounded-xl text-sm font-semibold text-white backdrop-blur-sm transition-all duration-200 active:scale-95"
                 title="Excel"
@@ -278,6 +280,7 @@ export default function CustomerProfile() {
                 <span className="hidden lg:inline">Excel</span>
               </button>
               <button
+                type="button"
                 onClick={handleExportCashSales}
                 className="inline-flex items-center gap-2 px-3 py-2 bg-white/15 hover:bg-white/25 rounded-xl text-sm font-semibold text-white backdrop-blur-sm transition-all duration-200 active:scale-95"
                 title={latinToCyrillic('Naqd savdolar')}
@@ -286,6 +289,7 @@ export default function CustomerProfile() {
                 <span className="hidden lg:inline">{latinToCyrillic('Naqd savdolar')}</span>
               </button>
               <button
+                type="button"
                 onClick={() => setShowPaymentModal(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-white text-indigo-700 rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
               >

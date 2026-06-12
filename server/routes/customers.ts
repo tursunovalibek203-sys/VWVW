@@ -809,15 +809,10 @@ router.post('/:id/payment', async (req, res) => {
       };
       
       if (currency === 'UZS') {
-        // Qarzni qoplash (agar qarz bor bo'lsa)
         if (customer.debtUZS && customer.debtUZS > 0) {
-          // ✅ DECIMAL FIX: Use DecimalHelper for min calculation
           const debtToDeduct = DecimalHelper.min(amount, customer.debtUZS);
           updateData.debtUZS = { decrement: debtToDeduct };
-          // Balansni ham oshirish (manfiy balansni kamaytirish)
-          updateData.balanceUZS = { increment: debtToDeduct };
-          // Qoplangandan keyingi qoldiq balansga qo'shiladi
-          // ✅ DECIMAL FIX: Use DecimalHelper for subtraction
+          // Faqat ortiqcha to'lov (overpayment) balansga qo'shiladi
           const remainingAmount = DecimalHelper.subtract(amount, debtToDeduct);
           if (remainingAmount > 0) {
             updateData.balanceUZS = { increment: remainingAmount };
@@ -827,15 +822,10 @@ router.post('/:id/payment', async (req, res) => {
           updateData.balanceUZS = { increment: amount };
         }
       } else if (currency === 'USD') {
-        // Qarzni qoplash (agar qarz bor bo'lsa)
         if (customer.debtUSD && customer.debtUSD > 0) {
-          // ✅ DECIMAL FIX: Use DecimalHelper for min calculation
           const debtToDeduct = DecimalHelper.min(amount, customer.debtUSD);
           updateData.debtUSD = { decrement: debtToDeduct };
-          // Balansni ham oshirish (manfiy balansni kamaytirish)
-          updateData.balanceUSD = { increment: debtToDeduct };
-          // Qoplangandan keyingi qoldiq balansga qo'shiladi
-          // ✅ DECIMAL FIX: Use DecimalHelper for subtraction
+          // Faqat ortiqcha to'lov (overpayment) balansga qo'shiladi
           const remainingAmount = DecimalHelper.subtract(amount, debtToDeduct);
           if (remainingAmount > 0) {
             updateData.balanceUSD = { increment: remainingAmount };

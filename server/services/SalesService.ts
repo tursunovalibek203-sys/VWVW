@@ -148,262 +148,298 @@ export class SalesService {
     }
 
     // 🔒 TRANSACTION with ReadCommitted isolation (better performance)
+    console.log('[createSale] input fields:', { userId, userName, totalAmount, paidAmount, currency, paymentMethod, isKocha, customerId });
     const result = await prisma.$transaction(async (tx) => {
-      // 1. FETCH PRODUCTS - Inside transaction for consistency
-      const productIds = items.map(i => i.productId);
-      const products = await tx.product.findMany({
-        where: { id: { in: productIds } },
-      });
-
-      const productMap = new Map(products.map(p => [p.id, p]));
-
-      // 2. STOCK VALIDATION REMOVED - Will be done atomically during update
-
-      // 3. ATOMIC RECEIPT NUMBER — MAX + 1 inside transaction prevents gaps/duplicates
-      const maxResult = await tx.sale.aggregate({ _max: { receiptNumber: true } });
-      const nextReceiptNumber = (maxResult._max.receiptNumber ?? 0) + 1;
-
-      // 4. CREATE SALE
-      const sale = await tx.sale.create({
-        data: {
-          receiptNumber: nextReceiptNumber,
-          customerId: isKocha ? null : customerId,
-          userId,
-          driverId: driverId || null,
-          quantity: items.reduce((sum, i) => DecimalHelper.add(sum, i.quantity), 0),
-          pricePerBag: 0,
-          totalAmount,
-          paidAmount,
-          currency,
-          paymentMethod: paymentMethod || 'CASH',
-          paymentStatus: calculatedPaymentStatus,
-          paymentDetails: paymentDetails ? JSON.stringify(paymentDetails) : null,
-          isKocha: !!isKocha,
-          manualCustomerName: manualCustomerName || null,
-          manualCustomerPhone: manualCustomerPhone || null,
-        },
-      });
-
-      // 5. CREATE SALE ITEMS — createMany() has SQLite issues, use sequential create()
-      for (const item of items) {
-        await tx.saleItem.create({
-          data: {
-            saleId: sale.id,
-            productId: item.productId,
-            quantity: item.quantity,
-            pricePerBag: item.pricePerBag,
-            subtotal: DecimalHelper.multiply(item.quantity, item.pricePerBag),
-          }
-        });
-      }
-
-      // 5. ATOMIC STOCK UPDATE — sequential to avoid SQLite concurrent write errors
-      for (const item of items) {
-        const product = productMap.get(item.productId);
-        if (!product) {
-          throw new Error(`Mahsulot topilmadi: ${item.productId}`);
-        }
-
-        const isPieceSale = item.saleType === 'piece';
-
-        const unitsPerBag = product.unitsPerBag || 1;
-        if (unitsPerBag <= 0) {
-          throw new Error(`${product.name} uchun unitsPerBag noto'g'ri`);
-        }
-
-        const bagsToDeduct = isPieceSale
-          ? DecimalHelper.divide(item.quantity, unitsPerBag)
-          : item.quantity;
-        const unitsToDeduct = isPieceSale
-          ? item.quantity
-          : DecimalHelper.multiply(item.quantity, unitsPerBag);
-
-        // SQLite: datetime('now') — NOT NOW() which is MySQL/PostgreSQL only
-        const updateResult = await tx.$executeRaw`
-          UPDATE "Product"
-          SET
-            "currentStock" = "currentStock" - ${bagsToDeduct},
-            "currentUnits" = "currentUnits" - ${unitsToDeduct},
-            "updatedAt" = datetime('now')
-          WHERE
-            "id" = ${item.productId}
-            AND "currentStock" >= ${bagsToDeduct}
-            AND "currentUnits" >= ${unitsToDeduct}
-        `;
-
-        if (updateResult === 0) {
-          throw new Error(`${product.name} uchun omborda yetarli mahsulot yo'q`);
-        }
-
-        const updatedProduct = await tx.product.findUnique({
-          where: { id: item.productId },
-          select: { currentStock: true, currentUnits: true },
+      try {
+        console.log('[createSale] Inside transaction');
+        // 1. FETCH PRODUCTS - Inside transaction for consistency
+        console.log('[createSale] step 1: fetching products');
+        const productIds = items.map(i => i.productId);
+        console.log('productIds:', productIds);
+        const products = await tx.product.findMany({
+          where: { id: { in: productIds } },
         });
 
-        // StockMovement.quantity/units are Int in schema — must round floats
-        await tx.stockMovement.create({
+        console.log('products fetched:', products.length);
+        const productMap = new Map(products.map(p => [p.id, p]));
+
+        // 2. STOCK VALIDATION REMOVED - Will be done atomically during update
+
+        // 3. ATOMIC RECEIPT NUMBER — MAX + 1 inside transaction prevents gaps/duplicates
+        console.log('[createSale] step 3: getting receipt number');
+        const maxResult = await tx.sale.aggregate({ _max: { receiptNumber: true } });
+        const nextReceiptNumber = (maxResult._max.receiptNumber ?? 0) + 1;
+        console.log('nextReceiptNumber:', nextReceiptNumber);
+
+        // 4. CREATE SALE
+        console.log('[createSale] step4: creating sale');
+        const sale = await tx.sale.create({
           data: {
-            productId: item.productId,
-            type: 'SALE',
-            quantity: -Math.round(bagsToDeduct),
-            units: -Math.round(unitsToDeduct),
-            previousStock: Math.round(product.currentStock),
-            previousUnits: Math.round(product.currentUnits),
-            newStock: Math.round(updatedProduct?.currentStock ?? 0),
-            newUnits: Math.round(updatedProduct?.currentUnits ?? 0),
+            receiptNumber: nextReceiptNumber,
+            customerId: isKocha ? null : customerId,
             userId,
-            userName,
-            reason: `Sotuv: ${sale.id}`,
+            driverId: driverId || null,
+            quantity: items.reduce((sum, i) => DecimalHelper.add(sum, i.quantity), 0),
+            pricePerBag: 0,
+            bagType: 'SMALL',
+            totalAmount,
+            paidAmount,
+            currency,
+            paymentMethod: paymentMethod || 'CASH',
+            paymentStatus: calculatedPaymentStatus,
+            paymentDetails: paymentDetails ? JSON.stringify(paymentDetails) : null,
+            isKocha: !!isKocha,
+            manualCustomerName: manualCustomerName || null,
+            manualCustomerPhone: manualCustomerPhone || null,
           },
         });
-      }
+        console.log('sale created:', sale.id);
 
-      // 6. CASHBOX TRANSACTIONS - ENABLED
-      const method = paymentMethod || 'CASH';
-      const cashboxPromises: Promise<any>[] = [];
-      
-      if (paymentDetails) {
-        if (paymentDetails.uzs && paymentDetails.uzs > 0) {
-          const paymentType = method === 'CLICK' ? 'Click' : (method === 'CARD' ? 'Karta' : 'Naqd');
-          cashboxPromises.push(tx.cashboxTransaction.create({
+        // 5. CREATE SALE ITEMS — createMany() has SQLite issues, use sequential create()
+        console.log('[createSale] step5: creating sale items');
+        for (const item of items) {
+          console.log('creating sale item for product:', item.productId);
+          await tx.saleItem.create({
             data: {
-              type: 'INCOME',
-              amount: paymentDetails.uzs,
-              currency: 'UZS',
-              category: 'SALE',
-              paymentMethod: method,
-              description: `Sotuv: ${paymentType} UZS`,
-              userId,
-              userName,
-              reference: sale.id,
+              saleId: sale.id,
+              productId: item.productId,
+              quantity: item.quantity,
+              pricePerBag: item.pricePerBag,
+              subtotal: DecimalHelper.multiply(item.quantity, item.pricePerBag),
             }
-          }));
-        }
-        
-        if (paymentDetails.usd && paymentDetails.usd > 0) {
-          const paymentType = method === 'CLICK' ? 'Click' : (method === 'CARD' ? 'Karta' : 'Naqd');
-          cashboxPromises.push(tx.cashboxTransaction.create({
-            data: {
-              type: 'INCOME',
-              amount: paymentDetails.usd,
-              currency: 'USD',
-              category: 'SALE',
-              paymentMethod: method,
-              description: `Sotuv: ${paymentType} USD`,
-              userId,
-              userName,
-              reference: sale.id,
-            }
-          }));
-        }
-        
-        if (paymentDetails.click && paymentDetails.click > 0) {
-          cashboxPromises.push(tx.cashboxTransaction.create({
-            data: {
-              type: 'INCOME',
-              amount: paymentDetails.click,
-              currency: 'UZS',
-              category: 'SALE',
-              paymentMethod: 'CLICK',
-              description: `Sotuv: Click UZS`,
-              userId,
-              userName,
-              reference: sale.id,
-            }
-          }));
-        }
-      } else if (paidAmount > 0) {
-        const paymentType = method === 'CLICK' ? 'Click' : (method === 'CARD' ? 'Karta' : 'Naqd');
-        cashboxPromises.push(tx.cashboxTransaction.create({
-          data: {
-            type: 'INCOME',
-            amount: paidAmount,
-            currency: currency,
-            category: 'SALE',
-            paymentMethod: method,
-            description: `Sotuv: ${paymentType} ${currency}`,
-            userId,
-            userName,
-            reference: sale.id,
-          }
-        }));
-      }
-      
-      if (cashboxPromises.length > 0) {
-        await Promise.all(cashboxPromises);
-      }
-
-      // 7. UPDATE CUSTOMER DEBT/BALANCE (if not Ko'cha) - FIXED
-      if (!isKocha && customerId) {
-        const debtAmount = DecimalHelper.subtract(totalAmount, paidAmount);
-        
-        // Use DecimalHelper for comparisons
-        if (DecimalHelper.isGreaterThan(debtAmount, 0.01)) {
-          // Customer owes money - add to debt
-          if (currency === 'UZS') {
-            const roundedDebt = DecimalHelper.round(debtAmount, 0);
-            await tx.customer.update({
-              where: { id: customerId },
-              data: {
-                debtUZS: { increment: roundedDebt },
-                debt: { increment: DecimalHelper.divide(roundedDebt, parseInt(process.env.USD_TO_UZS_RATE || '12500', 10)) }, // Legacy USD
-                lastPurchase: new Date()
-              }
-            });
-          } else {
-            const roundedDebt = DecimalHelper.round(debtAmount, 2);
-            await tx.customer.update({
-              where: { id: customerId },
-              data: {
-                debtUSD: { increment: roundedDebt },
-                debt: { increment: roundedDebt }, // Legacy USD
-                lastPurchase: new Date()
-              }
-            });
-          }
-        } else if (DecimalHelper.isLessThan(debtAmount, -0.01)) {
-          // Overpayment - add to balance
-          const overpayment = new Decimal(debtAmount).abs().toNumber();
-          if (currency === 'UZS') {
-            const roundedBalance = DecimalHelper.round(overpayment, 0);
-            await tx.customer.update({
-              where: { id: customerId },
-              data: {
-                balanceUZS: { increment: roundedBalance },
-                balance: { increment: DecimalHelper.divide(roundedBalance, parseInt(process.env.USD_TO_UZS_RATE || '12500', 10)) }, // Legacy USD
-                lastPurchase: new Date()
-              }
-            });
-          } else {
-            const roundedBalance = DecimalHelper.round(overpayment, 2);
-            await tx.customer.update({
-              where: { id: customerId },
-              data: {
-                balanceUSD: { increment: roundedBalance },
-                balance: { increment: roundedBalance }, // Legacy USD
-                lastPurchase: new Date()
-              }
-            });
-          }
-        } else {
-          // Exact payment - just update lastPurchase
-          await tx.customer.update({
-            where: { id: customerId },
-            data: { lastPurchase: new Date() }
           });
+          console.log('sale item created');
         }
-      }
 
-      return { sale };
+        // 5. ATOMIC STOCK UPDATE — sequential to avoid SQLite concurrent write errors
+        console.log('[createSale] step6: updating stock');
+        for (const item of items) {
+          console.log('updating product stock:', item.productId);
+          const product = productMap.get(item.productId);
+          if (!product) {
+            throw new Error(`Mahsulot topilmadi: ${item.productId}`);
+          }
+
+          const isPieceSale = item.saleType === 'piece';
+
+          const unitsPerBag = product.unitsPerBag || 1;
+          if (unitsPerBag <= 0) {
+            throw new Error(`${product.name} uchun unitsPerBag noto'g'ri`);
+          }
+
+          const bagsToDeduct = isPieceSale
+            ? DecimalHelper.divide(item.quantity, unitsPerBag)
+            : item.quantity;
+          const unitsToDeduct = isPieceSale
+            ? item.quantity
+            : DecimalHelper.multiply(item.quantity, unitsPerBag);
+          console.log('bagsToDeduct:', bagsToDeduct, 'unitsToDeduct:', unitsToDeduct);
+
+          // SQLite: datetime('now') — NOT NOW() which is MySQL/PostgreSQL only
+          const updateResult = await tx.$executeRaw`
+            UPDATE "Product"
+            SET
+              "currentStock" = "currentStock" - ${bagsToDeduct},
+              "currentUnits" = "currentUnits" - ${unitsToDeduct},
+              "updatedAt" = datetime('now')
+            WHERE
+              "id" = ${item.productId}
+              AND "currentStock" >= ${bagsToDeduct}
+              AND "currentUnits" >= ${unitsToDeduct}
+          `;
+
+          console.log('updateResult:', updateResult);
+          if (updateResult === 0) {
+            throw new Error(`${product.name} uchun omborda yetarli mahsulot yo'q`);
+          }
+
+          console.log('fetching updated product');
+          const updatedProduct = await tx.product.findUnique({
+            where: { id: item.productId },
+            select: { currentStock: true, currentUnits: true },
+          });
+          console.log('updatedProduct:', updatedProduct);
+
+          // StockMovement.quantity/units are Int in schema — must round floats
+          console.log('creating stock movement');
+          await tx.stockMovement.create({
+            data: {
+              productId: item.productId,
+              type: 'SALE',
+              quantity: -Math.round(bagsToDeduct),
+              units: -Math.round(unitsToDeduct),
+              previousStock: Math.round(product.currentStock),
+              previousUnits: Math.round(product.currentUnits),
+              newStock: Math.round(updatedProduct?.currentStock ?? 0),
+              newUnits: Math.round(updatedProduct?.currentUnits ?? 0),
+              userId,
+              userName,
+              reason: `Sotuv: ${sale.id}`,
+            },
+          });
+          console.log('stock movement created');
+        }
+
+        // 6. CASHBOX TRANSACTIONS - ENABLED
+        console.log('[createSale] step7: cashbox transactions');
+        const method = paymentMethod || 'CASH';
+        const cashboxPromises: Promise<any>[] = [];
+        
+        if (paymentDetails) {
+          if (paymentDetails.uzs && paymentDetails.uzs > 0) {
+            const paymentType = method === 'CLICK' ? 'Click' : (method === 'CARD' ? 'Karta' : 'Naqd');
+            cashboxPromises.push(tx.cashboxTransaction.create({
+              data: {
+                type: 'INCOME',
+                amount: paymentDetails.uzs,
+                currency: 'UZS',
+                category: 'SALE',
+                paymentMethod: method,
+                description: `Sotuv: ${paymentType} UZS`,
+                userId,
+                userName,
+                reference: sale.id,
+              }
+            }));
+          }
+          
+          if (paymentDetails.usd && paymentDetails.usd > 0) {
+            const paymentType = method === 'CLICK' ? 'Click' : (method === 'CARD' ? 'Karta' : 'Naqd');
+            cashboxPromises.push(tx.cashboxTransaction.create({
+              data: {
+                type: 'INCOME',
+                amount: paymentDetails.usd,
+                currency: 'USD',
+                category: 'SALE',
+                paymentMethod: method,
+                description: `Sotuv: ${paymentType} USD`,
+                userId,
+                userName,
+                reference: sale.id,
+              }
+            }));
+          }
+          
+          if (paymentDetails.click && paymentDetails.click > 0) {
+            cashboxPromises.push(tx.cashboxTransaction.create({
+              data: {
+                type: 'INCOME',
+                amount: paymentDetails.click,
+                currency: 'UZS',
+                category: 'SALE',
+                paymentMethod: 'CLICK',
+                description: `Sotuv: Click UZS`,
+                userId,
+                userName,
+                reference: sale.id,
+              }
+            }));
+          }
+        } else if (paidAmount > 0) {
+          console.log('creating cashbox transaction for paidAmount:', paidAmount);
+          const paymentType = method === 'CLICK' ? 'Click' : (method === 'CARD' ? 'Karta' : 'Naqd');
+          cashboxPromises.push(tx.cashboxTransaction.create({
+            data: {
+              type: 'INCOME',
+              amount: paidAmount,
+              currency: currency,
+              category: 'SALE',
+              paymentMethod: method,
+              description: `Sotuv: ${paymentType} ${currency}`,
+              userId,
+              userName,
+              reference: sale.id,
+            }
+          }));
+        }
+        
+        if (cashboxPromises.length > 0) {
+          console.log('awaiting cashbox promises:', cashboxPromises.length);
+          await Promise.all(cashboxPromises);
+        }
+        console.log('cashbox transactions done');
+
+        // 7. UPDATE CUSTOMER DEBT/BALANCE (if not Ko'cha) - FIXED
+        console.log('[createSale] step8: updating customer');
+        if (!isKocha && customerId) {
+          console.log('customerId:', customerId);
+          const debtAmount = DecimalHelper.subtract(totalAmount, paidAmount);
+          
+          // Use DecimalHelper for comparisons
+          if (DecimalHelper.isGreaterThan(debtAmount, 0.01)) {
+            // Customer owes money - add to debt
+            if (currency === 'UZS') {
+              const roundedDebt = DecimalHelper.round(debtAmount, 0);
+              await tx.customer.update({
+                where: { id: customerId },
+                data: {
+                  debtUZS: { increment: roundedDebt },
+                  debt: { increment: DecimalHelper.divide(roundedDebt, parseInt(process.env.USD_TO_UZS_RATE || '12500', 10)) }, // Legacy USD
+                  lastPurchase: new Date()
+                }
+              });
+            } else {
+              const roundedDebt = DecimalHelper.round(debtAmount, 2);
+              await tx.customer.update({
+                where: { id: customerId },
+                data: {
+                  debtUSD: { increment: roundedDebt },
+                  debt: { increment: roundedDebt }, // Legacy USD
+                  lastPurchase: new Date()
+                }
+              });
+            }
+          } else if (DecimalHelper.isLessThan(debtAmount, -0.01)) {
+            // Overpayment - add to balance
+            const overpayment = new Decimal(debtAmount).abs().toNumber();
+            if (currency === 'UZS') {
+              const roundedBalance = DecimalHelper.round(overpayment, 0);
+              await tx.customer.update({
+                where: { id: customerId },
+                data: {
+                  balanceUZS: { increment: roundedBalance },
+                  balance: { increment: DecimalHelper.divide(roundedBalance, parseInt(process.env.USD_TO_UZS_RATE || '12500', 10)) }, // Legacy USD
+                  lastPurchase: new Date()
+                }
+              });
+            } else {
+              const roundedBalance = DecimalHelper.round(overpayment, 2);
+              await tx.customer.update({
+                where: { id: customerId },
+                data: {
+                  balanceUSD: { increment: roundedBalance },
+                  balance: { increment: roundedBalance }, // Legacy USD
+                  lastPurchase: new Date()
+                }
+              });
+            }
+          } else {
+            // Exact payment - just update lastPurchase
+            await tx.customer.update({
+              where: { id: customerId },
+              data: { lastPurchase: new Date() }
+            });
+          }
+        }
+        console.log('customer update done');
+
+        console.log('returning sale');
+        return { saleId: sale.id };
+      } catch (e) {
+        console.error('❌ Error inside transaction:', e);
+        if (e instanceof Error) {
+          console.error('Stack:', e.stack);
+        }
+        throw e;
+      }
     }, {
-      isolationLevel: 'ReadCommitted', // Better performance than Serializable
       maxWait: 30000,  // 30 seconds
       timeout: 60000,  // 60 seconds
     });
 
     // Fetch complete sale with relations
     const completeSale = await prisma.sale.findUnique({
-      where: { id: result.sale.id },
+      where: { id: result.saleId },
       include: {
         customer: true,
         items: { include: { product: true } }

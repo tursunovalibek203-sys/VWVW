@@ -71,7 +71,7 @@ api.interceptors.response.use(
         }
         const path = window.location.pathname;
         if (path !== '/' && path !== '/login' && path !== '/cashier/login') {
-          window.location.href = '/login';
+          window.location.href = path.startsWith('/cashier') ? '/cashier/login' : '/login';
         }
       }
     }
