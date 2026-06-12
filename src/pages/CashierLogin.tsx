@@ -46,24 +46,20 @@ export default function CashierLogin() {
     try {
       // Kassir logini - login orqali
       const { data } = await api.post('/auth/cashier-login', { login, password });
-      setAuth(data.token, data.user);
 
-      // Kassir roli tekshiruvi
-      if (data.user.role?.toLowerCase() !== 'cashier') {
+      // Kassir roli tekshiruvi — setAuth DAN OLDIN
+      const role = data.user?.role?.toLowerCase();
+      if (role !== 'cashier' && role !== 'seller') {
         setError(latinToCyrillic('Faqat kassirlar uchun login!'));
         return;
       }
 
-      // Sessiyani tozalash va avvalgi sahifaga yo'naltirish
+      setAuth(data.token, data.user);
+
+      // Sessiyani tozalash
       sessionStorage.removeItem('lastSession');
 
-      // Agar avvalgi sahifa saqlangan bo'lsa, o'sha sahifaga yo'naltirish
-      const session = restoreLastSession();
-      if (session && session.path !== '/login' && session.path !== '/') {
-        navigate(session.path);
-      } else {
-        navigate('/sales');
-      }
+      navigate('/cashier/sales');
     } catch (error: any) {
       const errorMsg =
         error.response?.data?.error ||

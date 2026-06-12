@@ -1,8 +1,10 @@
 import axios from 'axios';
 
-// professionalApi.ts bilan bir xil env-var (config-drift oldini olish)
+// Localhost'da to'g'ridan-to'g'ri, production'da Vercel proxy (/api → Render)
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api';
+  typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5004/api')
+    : '/api';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

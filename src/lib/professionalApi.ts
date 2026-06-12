@@ -153,25 +153,29 @@ class ProfessionalApi {
 
   private shouldRetry(error: AxiosError): boolean {
     if (!error.config) return false;
-    
+
     const status = error.response?.status;
     const method = error.config.method?.toLowerCase();
-    
+    const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+
+    // Timeout bo'lsa — POST ham retry (Render cold start uchun)
+    if (isTimeout) return true;
+
     // Don't retry on network errors (offline mode)
     if (status === undefined && error.code === 'NETWORK_ERROR') {
       console.warn('🌐 Network error - possibly offline');
       return false;
     }
-    
+
     // Retry on 5xx server errors
     if (status !== undefined && status >= 500) return true;
-    
+
     // Don't retry on 4xx client errors (except 429 Too Many Requests)
     if (status !== undefined && status >= 400 && status < 500 && status !== 429) return false;
-    
+
     // Don't retry on POST/PUT/DELETE requests by default
     if (method === 'post' || method === 'put' || method === 'delete') return false;
-    
+
     return true;
   }
 
@@ -397,9 +401,15 @@ class ProfessionalApi {
 }
 
 // Create singleton instance
+// Localhost'da to'g'ridan-to'g'ri, production'da Vercel proxy (/api → Render)
+const _apiBase =
+  typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5004/api')
+    : '/api';
+
 export const api = new ProfessionalApi({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 30000,
+  baseURL: _apiBase,
+  timeout: 60000,
   retryAttempts: 3,
   retryDelay: 1000,
 });

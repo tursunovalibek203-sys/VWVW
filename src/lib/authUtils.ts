@@ -37,14 +37,21 @@ const refreshToken = async () => {
   if (!authStorage) throw new Error('Token topilmadi');
 
   const { state } = JSON.parse(authStorage);
-  
+
+  // Proxy orqali ishlaydi — Vercel /api → Render
+  const apiBase =
+    typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      ? (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5004/api')
+      : '/api';
+
   try {
-    const response = await fetch('/api/auth/refresh', {
+    const response = await fetch(`${apiBase}/auth/refresh-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${state.token}`
-      }
+      },
+      body: JSON.stringify({ token: state.token }),
     });
 
     if (!response.ok) {
