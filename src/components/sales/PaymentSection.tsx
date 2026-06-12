@@ -108,7 +108,7 @@ export const PaymentSection = ({
           </div>
 
           {/* Payment Inputs */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label htmlFor="paidUZS" className="block text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5">UZS</label>
               <input
@@ -137,6 +137,21 @@ export const PaymentSection = ({
                   onUpdateForm({ paidUSD: val });
                 }}
                 className="w-full h-11 px-3 text-sm font-medium text-slate-900 tabular-nums rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+              />
+            </div>
+            <div>
+              <label htmlFor="paidKARTA" className="block text-xs font-medium uppercase tracking-wide text-blue-400 mb-1.5">{latinToCyrillic('Karta')}</label>
+              <input
+                id="paidKARTA"
+                type="text"
+                inputMode="decimal"
+                placeholder="0"
+                value={form.paidKARTA}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, '');
+                  onUpdateForm({ paidKARTA: val });
+                }}
+                className="w-full h-11 px-3 text-sm font-medium text-slate-900 tabular-nums rounded-xl border border-blue-200 bg-blue-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
               />
             </div>
             <div>

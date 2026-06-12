@@ -406,6 +406,7 @@ export interface SaleFormData {
   paidUZS: string;
   paidUSD: string;
   paidCLICK: string;
+  paidKARTA: string;
   paymentType: 'cash' | 'debt' | 'partial';
   currency: 'UZS' | 'USD';
   isKocha: boolean;
@@ -431,6 +432,7 @@ export interface PaymentDetails {
   uzs: number;
   usd: number;
   click: number;
+  karta: number;
 }
 
 export interface SaleData {

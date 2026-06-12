@@ -31,6 +31,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     paidUZS: editSale?.paidUZS || '',
     paidUSD: editSale?.paidUSD || '',
     paidCLICK: editSale?.paidCLICK || '',
+    paidKARTA: editSale?.paidKARTA || '',
     paymentType: editSale?.paymentType || 'cash',
     currency: editSale?.currency || 'USD',
     isKocha: editSale?.isKocha || false,
@@ -78,9 +79,9 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
 
   const totalAmount = useMemo(() => calculateTotal(form.items), [form.items]);
 
-  const paidAmount = useMemo(() => 
-    calculatePaidAmount(form.paidUZS, form.paidUSD, form.paidCLICK, exchangeRateNum, form.currency),
-    [form.paidUZS, form.paidUSD, form.paidCLICK, exchangeRateNum, form.currency]
+  const paidAmount = useMemo(() =>
+    calculatePaidAmount(form.paidUZS, form.paidUSD, form.paidCLICK, exchangeRateNum, form.currency, form.paidKARTA),
+    [form.paidUZS, form.paidUSD, form.paidCLICK, form.paidKARTA, exchangeRateNum, form.currency]
   );
 
   const debtAmount = useMemo(() => calculateDebt(totalAmount, paidAmount), [totalAmount, paidAmount]);
@@ -323,6 +324,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
       paidUZS: '',
       paidUSD: '',
       paidCLICK: '',
+      paidKARTA: '',
       paymentType: 'cash',
       currency: form.currency,
       isKocha: false,
@@ -369,6 +371,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
           uzs: parseFloat(form.paidUZS || '0'),
           usd: parseFloat(form.paidUSD || '0'),
           click: parseFloat(form.paidCLICK || '0'),
+          karta: parseFloat(form.paidKARTA || '0'),
         },
         paymentMethod: form.paymentType?.toUpperCase() || 'CASH', // ✅ Backend nomiga mos
         currency: form.currency,
@@ -381,8 +384,15 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
         status: debtAmount > 0 ? 'partial' : 'completed',
       };
 
+      // #region debug-point D:sale-submit
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"auth-sale-realtime",runId:"pre-fix",hypothesisId:"D",location:"src/hooks/useSaleForm.ts:384",msg:"[DEBUG] sale submit",data:{customerId:saleData.customerId,isKocha:saleData.isKocha,currency:saleData.currency,paymentMethod:saleData.paymentMethod,itemsCount:saleData.items.length,totalAmount:saleData.totalAmount,paidAmount:saleData.paidAmount,itemPreview:saleData.items.map(item=>({productId:item.productId,quantity:item.quantity,pricePerBag:item.pricePerBag,saleType:item.saleType})).slice(0,3)},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       console.log('📤 Sending sale data:', JSON.stringify(saleData, null, 2));
       const response = await api.post('/sales', saleData);
+
+      // #region debug-point D:sale-success
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"auth-sale-realtime",runId:"pre-fix",hypothesisId:"D",location:"src/hooks/useSaleForm.ts:388",msg:"[DEBUG] sale success",data:{status:(response as any)?.status,hasData:!!response,dataKeys:Object.keys((response as any)?.data||{})},ts:Date.now()})}).catch(()=>{});
+      // #endregion
 
       // Note: Stock update and customer balance/debt updates are handled server-side 
       // in the POST /sales endpoint to prevent race conditions
@@ -454,6 +464,9 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
       const isCashierRoute = window.location.pathname.startsWith('/cashier');
       navigate(isCashierRoute ? '/cashier/sales' : '/sales');
     } catch (error) {
+      // #region debug-point D:sale-error
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"auth-sale-realtime",runId:"pre-fix",hypothesisId:"D",location:"src/hooks/useSaleForm.ts:461",msg:"[DEBUG] sale error",data:{status:(error as any)?.response?.status,error:(error as any)?.response?.data?.error||(error as any)?.message,responseData:(error as any)?.response?.data},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       errorHandler.handleError(error, { action: 'saveSale' });
       throw error;
     } finally {

@@ -16,7 +16,7 @@ export interface CreateSaleInput {
   paidAmount: number;
   currency: string;
   paymentMethod?: 'CASH' | 'CARD' | 'CLICK';
-  paymentDetails?: { uzs?: number; usd?: number; click?: number };
+  paymentDetails?: { uzs?: number; usd?: number; click?: number; karta?: number };
   driverId?: string;
   isKocha?: boolean;
   manualCustomerName?: string;
@@ -329,6 +329,22 @@ export class SalesService {
                 category: 'SALE',
                 paymentMethod: 'CLICK',
                 description: `Sotuv: Click UZS`,
+                userId,
+                userName,
+                reference: sale.id,
+              }
+            }));
+          }
+
+          if (paymentDetails.karta && paymentDetails.karta > 0) {
+            cashboxPromises.push(tx.cashboxTransaction.create({
+              data: {
+                type: 'INCOME',
+                amount: paymentDetails.karta,
+                currency: 'UZS',
+                category: 'SALE',
+                paymentMethod: 'CARD',
+                description: `Sotuv: Karta UZS`,
                 userId,
                 userName,
                 reference: sale.id,

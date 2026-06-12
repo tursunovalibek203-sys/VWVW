@@ -51,19 +51,21 @@ export const calculatePaidAmount = (
   paidUSD: string,
   paidCLICK: string,
   exchangeRate: number,
-  currency: string
+  currency: string,
+  paidKARTA?: string
 ): number => {
   const uzs = parseFloat(paidUZS) || 0;
   const usd = parseFloat(paidUSD) || 0;
   const click = parseFloat(paidCLICK) || 0;
+  const karta = parseFloat(paidKARTA || '0') || 0;
 
-  console.log('💰 calculatePaidAmount:', { paidUZS, paidUSD, paidCLICK, uzs, usd, click, currency, exchangeRate });
+  console.log('💰 calculatePaidAmount:', { paidUZS, paidUSD, paidCLICK, paidKARTA, uzs, usd, click, karta, currency, exchangeRate });
 
   let result: number;
   if (currency === 'UZS') {
-    result = uzs + (usd * exchangeRate) + click;
+    result = uzs + (usd * exchangeRate) + click + karta;
   } else {
-    result = uzs / exchangeRate + usd + (click / exchangeRate);
+    result = uzs / exchangeRate + usd + (click / exchangeRate) + (karta / exchangeRate);
   }
 
   console.log('💰 calculated result:', result);

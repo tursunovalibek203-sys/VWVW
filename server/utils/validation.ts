@@ -38,6 +38,7 @@ export const SaleCreateSchema = z.object({
     uzs: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
     usd: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
     click: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
+    karta: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
   }).optional(),
   driverId: z.string().optional(),
   factoryShare: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
@@ -73,6 +74,7 @@ export const SaleUpdateSchema = z.object({
     uzs: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
     usd: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
     click: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
+    karta: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
   }).optional(),
   driverId: z.string().optional(),
   factoryShare: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
@@ -112,6 +114,7 @@ export const OrderPaymentSchema = z.object({
     uzs: z.union([z.string(), z.number()]).transform(parseMoney).default(0),
     usd: z.union([z.string(), z.number()]).transform(parseMoney).default(0),
     click: z.union([z.string(), z.number()]).transform(parseMoney).default(0),
+    karta: z.union([z.string(), z.number()]).transform(parseMoney).default(0),
   }),
   dueDate: z.string().optional(),
 });
