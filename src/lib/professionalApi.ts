@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
-import { checkAndRefreshToken, saveSessionBeforeLogout } from './authUtils';
+import { saveSessionBeforeLogout } from './authUtils';
 
 // API Configuration Types
 export interface ApiConfig {
@@ -81,10 +81,7 @@ class ProfessionalApi {
   private setupInterceptors() {
     // Request Interceptor
     this.instance.interceptors.request.use(
-      async (config) => {
-        // Tokenni tekshirish va yangilash
-        await checkAndRefreshToken();
-        
+      (config) => {
         // Add auth token
         const token = this.getAuthToken();
         if (token) {

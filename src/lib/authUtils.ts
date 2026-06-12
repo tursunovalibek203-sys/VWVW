@@ -12,16 +12,17 @@ export const checkAndRefreshToken = async () => {
     const { state } = JSON.parse(authStorage);
     if (!state.token) return false;
 
-    // Token payload ni olish
-    const payload = JSON.parse(atob(state.token.split('.')[1]));
+    // Token payload ni olish — base64url → base64 conversion (JWT standard)
+    const b64 = state.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+    const payload = JSON.parse(atob(padded));
     const now = Date.now();
     const expiresAt = payload.exp * 1000;
 
-    // Agar token tez orada eskirsa, yangilash
-    if (expiresAt - now < TOKEN_REFRESH_THRESHOLD) {
+    // Agar token eskirgan yoki tez orada eskirsa va exp mantiqiy bo'lsa
+    if (expiresAt > now && expiresAt - now < TOKEN_REFRESH_THRESHOLD) {
       console.log('🔄 Token yangilanmoqda...');
       await refreshToken();
-      return true;
     }
 
     return true;
@@ -66,8 +67,8 @@ const refreshToken = async () => {
     console.log('✅ Token muvaffaqiyatli yangilandi');
   } catch (error) {
     console.error('❌ Token yangilash xatoligi:', error);
-    // Agar yangilash bo'lmasa, logout qilish
-    useAuthStore.getState().logout();
+    // Logout qilmaymiz — joriy token bilan davom etamiz
+    // Server 401 qaytarsa, u holda logout bo'ladi
     throw error;
   }
 };
@@ -81,7 +82,9 @@ export const isTokenValid = () => {
     const { state } = JSON.parse(authStorage);
     if (!state.token) return false;
 
-    const payload = JSON.parse(atob(state.token.split('.')[1]));
+    const b64 = state.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+    const payload = JSON.parse(atob(padded));
     const now = Date.now();
     const expiresAt = payload.exp * 1000;
 
