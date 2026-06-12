@@ -151,8 +151,9 @@ export class SalesService {
     const safeCurrency = (currency === 'UZS' || currency === 'USD') ? currency : 'USD';
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Mahsulotlarni olish
-      const productIds = items.map(i => i.productId);
+      try {
+        // 1. Mahsulotlarni olish
+        const productIds = items.map(i => i.productId);
       const products = await tx.product.findMany({ where: { id: { in: productIds } } });
       const productMap = new Map(products.map(p => [p.id, p]));
 

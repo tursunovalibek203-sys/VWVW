@@ -53,9 +53,9 @@ class ProfessionalApi {
 
   constructor(config: Partial<ApiConfig> = {}) {
     // Use absolute URL for backend API if not in production
-    const backendUrl = process.env.REACT_APP_API_URL || 
-                       (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-                         ? 'http://localhost:5004/api' 
+    const backendUrl = (import.meta as any).env?.VITE_API_BASE_URL ||
+                       (typeof window !== 'undefined' && window.location.hostname === 'localhost'
+                         ? 'http://localhost:5003/api'
                          : '/api');
     
     this.config = {
