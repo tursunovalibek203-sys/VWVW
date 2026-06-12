@@ -384,15 +384,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
         status: debtAmount > 0 ? 'partial' : 'completed',
       };
 
-      // #region debug-point D:sale-submit
-      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"auth-sale-realtime",runId:"pre-fix",hypothesisId:"D",location:"src/hooks/useSaleForm.ts:384",msg:"[DEBUG] sale submit",data:{customerId:saleData.customerId,isKocha:saleData.isKocha,currency:saleData.currency,paymentMethod:saleData.paymentMethod,itemsCount:saleData.items.length,totalAmount:saleData.totalAmount,paidAmount:saleData.paidAmount,itemPreview:saleData.items.map(item=>({productId:item.productId,quantity:item.quantity,pricePerBag:item.pricePerBag,saleType:item.saleType})).slice(0,3)},ts:Date.now()})}).catch(()=>{});
-      // #endregion
-      console.log('📤 Sending sale data:', JSON.stringify(saleData, null, 2));
       const response = await api.post('/sales', saleData);
-
-      // #region debug-point D:sale-success
-      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"auth-sale-realtime",runId:"pre-fix",hypothesisId:"D",location:"src/hooks/useSaleForm.ts:388",msg:"[DEBUG] sale success",data:{status:(response as any)?.status,hasData:!!response,dataKeys:Object.keys((response as any)?.data||{})},ts:Date.now()})}).catch(()=>{});
-      // #endregion
 
       // Note: Stock update and customer balance/debt updates are handled server-side 
       // in the POST /sales endpoint to prevent race conditions
@@ -435,10 +427,8 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
           exchangeRateNum
         );
 
-        console.log('🖨️ Chek chiqarilmoqda...', receiptData);
         printReceipt(receiptData);
       } catch (printError) {
-        console.error('❌ Chek chiqarishda xatolik:', printError);
         // Chek chiqarish xatosi sotuvni to'xtatmasin
       }
 
@@ -447,14 +437,11 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
         const refreshResponse = await api.get('/products');
         // ✅ Handle standardized API response format
         const productsData = extractArray<Product>(refreshResponse, []);
-        console.log('🔄 Products refresh data:', productsData);
         if (productsData.length > 0) {
           setProducts(productsData);
-        } else {
-          console.warn('⚠️ Products refresh returned empty data');
         }
-      } catch (refreshError) {
-        console.error('❌ Products refresh failed:', refreshError);
+      } catch {
+        // silent — non-critical
       }
 
       alert('✅ Sotuv muvaffaqiyatli saqlandi! Chek chiqarildi.');
@@ -464,9 +451,6 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
       const isCashierRoute = window.location.pathname.startsWith('/cashier');
       navigate(isCashierRoute ? '/cashier/sales' : '/sales');
     } catch (error) {
-      // #region debug-point D:sale-error
-      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"auth-sale-realtime",runId:"pre-fix",hypothesisId:"D",location:"src/hooks/useSaleForm.ts:461",msg:"[DEBUG] sale error",data:{status:(error as any)?.response?.status,error:(error as any)?.response?.data?.error||(error as any)?.message,responseData:(error as any)?.response?.data},ts:Date.now()})}).catch(()=>{});
-      // #endregion
       errorHandler.handleError(error, { action: 'saveSale' });
       throw error;
     } finally {

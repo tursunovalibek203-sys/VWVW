@@ -33,7 +33,17 @@ export const SaleCreateSchema = z.object({
   paidAmount: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
   debtAmount: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
   currency: z.enum(['USD', 'UZS']).default('USD'),
-  paymentMethod: z.enum(['CASH', 'CARD', 'CLICK']).default('CASH'),
+  paymentMethod: z.preprocess(
+    (val) => {
+      if (typeof val === 'string') {
+        const upper = val.toUpperCase();
+        if (upper === 'CASH' || upper === 'CARD' || upper === 'CLICK') return upper;
+        return 'CASH'; // DEBT, PARTIAL, debt, partial → CASH
+      }
+      return val;
+    },
+    z.enum(['CASH', 'CARD', 'CLICK']).default('CASH')
+  ),
   paymentDetails: z.object({
     uzs: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
     usd: z.union([z.string(), z.number()]).transform(parseMoney).optional(),

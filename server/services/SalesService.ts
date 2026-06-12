@@ -126,20 +126,20 @@ export class SalesService {
     }) as unknown as Promise<SaleWithRelations | null>;
   }
 
-  // Sotuv yaratish (transaction bilan - FULLY SAFE)
+  // Sotuv yaratish (transaction bilan)
   async createSale(input: CreateSaleInput): Promise<SaleWithRelations> {
     const {
-      items, totalAmount, paidAmount, currency, paymentMethod, paymentDetails,
+      items, totalAmount, currency, paymentMethod, paymentDetails,
       customerId, driverId, userId, userName, isKocha,
       manualCustomerName, manualCustomerPhone
     } = input;
 
-    // Basic validatsiya (faqat input tekshiruvi)
-    if (!items?.length) {
-      throw new Error('Kamida bitta mahsulot tanlash kerak');
-    }
+    // paidAmount undefined bo'lmasligi uchun (Zod .optional() bo'lgani sababli)
+    const paidAmount = typeof input.paidAmount === 'number' ? input.paidAmount : 0;
 
-    // To'lov statusini hisoblash (using DecimalHelper for comparisons)
+    if (!items?.length) throw new Error('Kamida bitta mahsulot tanlash kerak');
+
+    // To'lov statusini hisoblash
     let calculatedPaymentStatus: 'PAID' | 'PARTIAL' | 'UNPAID' = 'UNPAID';
     if (DecimalHelper.isGreaterThanOrEqual(paidAmount, totalAmount) && totalAmount > 0) {
       calculatedPaymentStatus = 'PAID';
@@ -147,36 +147,24 @@ export class SalesService {
       calculatedPaymentStatus = 'PARTIAL';
     }
 
-    // 🔒 TRANSACTION with ReadCommitted isolation (better performance)
-    console.log('[createSale] input fields:', { userId, userName, totalAmount, paidAmount, currency, paymentMethod, isKocha, customerId });
+    const safePaymentMethod = (paymentMethod === 'CARD' || paymentMethod === 'CLICK') ? paymentMethod : 'CASH';
+    const safeCurrency = (currency === 'UZS' || currency === 'USD') ? currency : 'USD';
+
     const result = await prisma.$transaction(async (tx) => {
-      try {
-        console.log('[createSale] Inside transaction');
-        // 1. FETCH PRODUCTS - Inside transaction for consistency
-        console.log('[createSale] step 1: fetching products');
-        const productIds = items.map(i => i.productId);
-        console.log('productIds:', productIds);
-        const products = await tx.product.findMany({
-          where: { id: { in: productIds } },
-        });
+      // 1. Mahsulotlarni olish
+      const productIds = items.map(i => i.productId);
+      const products = await tx.product.findMany({ where: { id: { in: productIds } } });
+      const productMap = new Map(products.map(p => [p.id, p]));
 
-        console.log('products fetched:', products.length);
-        const productMap = new Map(products.map(p => [p.id, p]));
+      // 2. Chek raqamini hisoblash
+      const maxResult = await tx.sale.aggregate({ _max: { receiptNumber: true } });
+      const nextReceiptNumber = (maxResult._max.receiptNumber ?? 0) + 1;
 
-        // 2. STOCK VALIDATION REMOVED - Will be done atomically during update
-
-        // 3. ATOMIC RECEIPT NUMBER — MAX + 1 inside transaction prevents gaps/duplicates
-        console.log('[createSale] step 3: getting receipt number');
-        const maxResult = await tx.sale.aggregate({ _max: { receiptNumber: true } });
-        const nextReceiptNumber = (maxResult._max.receiptNumber ?? 0) + 1;
-        console.log('nextReceiptNumber:', nextReceiptNumber);
-
-        // 4. CREATE SALE
-        console.log('[createSale] step4: creating sale');
-        const sale = await tx.sale.create({
+      // 3. Sotuv yaratish
+      const sale = await tx.sale.create({
           data: {
             receiptNumber: nextReceiptNumber,
-            customerId: isKocha ? null : customerId,
+            customerId: isKocha ? null : (customerId || null),
             userId,
             driverId: driverId || null,
             quantity: items.reduce((sum, i) => DecimalHelper.add(sum, i.quantity), 0),
@@ -184,8 +172,8 @@ export class SalesService {
             bagType: 'SMALL',
             totalAmount,
             paidAmount,
-            currency,
-            paymentMethod: paymentMethod || 'CASH',
+            currency: safeCurrency,
+            paymentMethod: safePaymentMethod,
             paymentStatus: calculatedPaymentStatus,
             paymentDetails: paymentDetails ? JSON.stringify(paymentDetails) : null,
             isKocha: !!isKocha,
@@ -193,12 +181,9 @@ export class SalesService {
             manualCustomerPhone: manualCustomerPhone || null,
           },
         });
-        console.log('sale created:', sale.id);
 
         // 5. CREATE SALE ITEMS — createMany() has SQLite issues, use sequential create()
-        console.log('[createSale] step5: creating sale items');
         for (const item of items) {
-          console.log('creating sale item for product:', item.productId);
           await tx.saleItem.create({
             data: {
               saleId: sale.id,
@@ -208,13 +193,10 @@ export class SalesService {
               subtotal: DecimalHelper.multiply(item.quantity, item.pricePerBag),
             }
           });
-          console.log('sale item created');
         }
 
-        // 5. ATOMIC STOCK UPDATE — sequential to avoid SQLite concurrent write errors
-        console.log('[createSale] step6: updating stock');
+        // 6. ATOMIC STOCK UPDATE — sequential to avoid SQLite concurrent write errors
         for (const item of items) {
-          console.log('updating product stock:', item.productId);
           const product = productMap.get(item.productId);
           if (!product) {
             throw new Error(`Mahsulot topilmadi: ${item.productId}`);
@@ -233,7 +215,6 @@ export class SalesService {
           const unitsToDeduct = isPieceSale
             ? item.quantity
             : DecimalHelper.multiply(item.quantity, unitsPerBag);
-          console.log('bagsToDeduct:', bagsToDeduct, 'unitsToDeduct:', unitsToDeduct);
 
           // SQLite: datetime('now') — NOT NOW() which is MySQL/PostgreSQL only
           const updateResult = await tx.$executeRaw`
@@ -248,20 +229,16 @@ export class SalesService {
               AND "currentUnits" >= ${unitsToDeduct}
           `;
 
-          console.log('updateResult:', updateResult);
           if (updateResult === 0) {
             throw new Error(`${product.name} uchun omborda yetarli mahsulot yo'q`);
           }
 
-          console.log('fetching updated product');
           const updatedProduct = await tx.product.findUnique({
             where: { id: item.productId },
             select: { currentStock: true, currentUnits: true },
           });
-          console.log('updatedProduct:', updatedProduct);
 
           // StockMovement.quantity/units are Int in schema — must round floats
-          console.log('creating stock movement');
           await tx.stockMovement.create({
             data: {
               productId: item.productId,
@@ -277,51 +254,42 @@ export class SalesService {
               reason: `Sotuv: ${sale.id}`,
             },
           });
-          console.log('stock movement created');
         }
 
-        // 6. CASHBOX TRANSACTIONS - ENABLED
-        console.log('[createSale] step7: cashbox transactions');
-        const method = paymentMethod || 'CASH';
-        const cashboxPromises: Promise<any>[] = [];
-        
+        // 7. CASHBOX TRANSACTIONS — sequential to avoid SQLite lock
         if (paymentDetails) {
           if (paymentDetails.uzs && paymentDetails.uzs > 0) {
-            const paymentType = method === 'CLICK' ? 'Click' : (method === 'CARD' ? 'Karta' : 'Naqd');
-            cashboxPromises.push(tx.cashboxTransaction.create({
+            await tx.cashboxTransaction.create({
               data: {
                 type: 'INCOME',
                 amount: paymentDetails.uzs,
                 currency: 'UZS',
                 category: 'SALE',
-                paymentMethod: method,
-                description: `Sotuv: ${paymentType} UZS`,
+                paymentMethod: safePaymentMethod,
+                description: `Sotuv: Naqd UZS`,
                 userId,
                 userName,
                 reference: sale.id,
               }
-            }));
+            });
           }
-          
           if (paymentDetails.usd && paymentDetails.usd > 0) {
-            const paymentType = method === 'CLICK' ? 'Click' : (method === 'CARD' ? 'Karta' : 'Naqd');
-            cashboxPromises.push(tx.cashboxTransaction.create({
+            await tx.cashboxTransaction.create({
               data: {
                 type: 'INCOME',
                 amount: paymentDetails.usd,
                 currency: 'USD',
                 category: 'SALE',
-                paymentMethod: method,
-                description: `Sotuv: ${paymentType} USD`,
+                paymentMethod: safePaymentMethod,
+                description: `Sotuv: Naqd USD`,
                 userId,
                 userName,
                 reference: sale.id,
               }
-            }));
+            });
           }
-          
           if (paymentDetails.click && paymentDetails.click > 0) {
-            cashboxPromises.push(tx.cashboxTransaction.create({
+            await tx.cashboxTransaction.create({
               data: {
                 type: 'INCOME',
                 amount: paymentDetails.click,
@@ -333,11 +301,10 @@ export class SalesService {
                 userName,
                 reference: sale.id,
               }
-            }));
+            });
           }
-
           if (paymentDetails.karta && paymentDetails.karta > 0) {
-            cashboxPromises.push(tx.cashboxTransaction.create({
+            await tx.cashboxTransaction.create({
               data: {
                 type: 'INCOME',
                 amount: paymentDetails.karta,
@@ -349,36 +316,27 @@ export class SalesService {
                 userName,
                 reference: sale.id,
               }
-            }));
+            });
           }
         } else if (paidAmount > 0) {
-          console.log('creating cashbox transaction for paidAmount:', paidAmount);
-          const paymentType = method === 'CLICK' ? 'Click' : (method === 'CARD' ? 'Karta' : 'Naqd');
-          cashboxPromises.push(tx.cashboxTransaction.create({
+          const paymentType = safePaymentMethod === 'CLICK' ? 'Click' : (safePaymentMethod === 'CARD' ? 'Karta' : 'Naqd');
+          await tx.cashboxTransaction.create({
             data: {
               type: 'INCOME',
               amount: paidAmount,
-              currency: currency,
+              currency: safeCurrency,
               category: 'SALE',
-              paymentMethod: method,
-              description: `Sotuv: ${paymentType} ${currency}`,
+              paymentMethod: safePaymentMethod,
+              description: `Sotuv: ${paymentType} ${safeCurrency}`,
               userId,
               userName,
               reference: sale.id,
             }
-          }));
+          });
         }
-        
-        if (cashboxPromises.length > 0) {
-          console.log('awaiting cashbox promises:', cashboxPromises.length);
-          await Promise.all(cashboxPromises);
-        }
-        console.log('cashbox transactions done');
 
-        // 7. UPDATE CUSTOMER DEBT/BALANCE (if not Ko'cha) - FIXED
-        console.log('[createSale] step8: updating customer');
+        // 8. UPDATE CUSTOMER DEBT/BALANCE (if not Ko'cha) - FIXED
         if (!isKocha && customerId) {
-          console.log('customerId:', customerId);
           const debtAmount = DecimalHelper.subtract(totalAmount, paidAmount);
           
           // Use DecimalHelper for comparisons
@@ -437,15 +395,8 @@ export class SalesService {
             });
           }
         }
-        console.log('customer update done');
-
-        console.log('returning sale');
         return { saleId: sale.id };
       } catch (e) {
-        console.error('❌ Error inside transaction:', e);
-        if (e instanceof Error) {
-          console.error('Stack:', e.stack);
-        }
         throw e;
       }
     }, {

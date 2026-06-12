@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { prisma } from '../utils/prisma';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { notifyCustomerSale, notifyLowStock } from '../utils/telegram-notifications';
@@ -197,7 +197,7 @@ router.post('/',
     try {
       const userId = req.user?.id;
       const userName = (req.user as any)?.name || req.user?.email || 'Unknown';
-      
+
       if (!userId) {
         return res.status(401).json(errorResponse('Foydalanuvchi aniqlanmadi'));
       }
@@ -254,6 +254,9 @@ router.post('/',
       // âœ… STANDARD RESPONSE FORMAT
       res.json(successResponse(sale));
     } catch (error: any) {
+      // #region debug-point D:sales-route-error
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"auth-sale-realtime",runId:"pre-fix",hypothesisId:"D",location:"server/routes/sales.ts:257",msg:"[DEBUG] sales route error",data:{message:error?.message,name:error?.name,code:error?.code,stackTop:error?.stack?.split('\n').slice(0,4).join('\n')},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       logger.error({ error }, 'Create sale error');
       res.status(500).json(errorResponse(error.message));
     }

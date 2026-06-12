@@ -59,8 +59,6 @@ export const calculatePaidAmount = (
   const click = parseFloat(paidCLICK) || 0;
   const karta = parseFloat(paidKARTA || '0') || 0;
 
-  console.log('💰 calculatePaidAmount:', { paidUZS, paidUSD, paidCLICK, paidKARTA, uzs, usd, click, karta, currency, exchangeRate });
-
   let result: number;
   if (currency === 'UZS') {
     result = uzs + (usd * exchangeRate) + click + karta;
@@ -68,7 +66,6 @@ export const calculatePaidAmount = (
     result = uzs / exchangeRate + usd + (click / exchangeRate) + (karta / exchangeRate);
   }
 
-  console.log('💰 calculated result:', result);
   return result;
 };
 
@@ -177,15 +174,12 @@ export const getDefaultUnitsPerBag = (productName: string): number | null => {
 // Get piece price for komplekt mode
 export const getPiecePrice = (productName: string): number | null => {
   const name = productName?.toLowerCase() || '';
-  console.log('🔧 getPiecePrice tekshirilmoqda:', productName, '→ lowercase:', name);
 
   // 48 krishka
   const has48 = /\b48\b/.test(name);
   const hasKrishka = name.includes('krishka') || name.includes('qopqoq') || name.includes('cap') || name.includes('кришка') || name.includes('Кришка');
-  console.log('   Pattern test:', { has48, hasKrishka });
-  
+
   if (has48 && hasKrishka) {
-    console.log('   ✅ 48 krishka topildi, returning 0.012');
     return 0.012;
   }
 
@@ -232,40 +226,28 @@ export const getKomplektTargets = (preformName: string): { krishkaGram: number |
   // Gram match - gr/g/гр/г bilan yoki ularsiz
   const gramMatch = preformName?.match(/(\d+)\s*(gr|g|гр|г)?\b/i);
   const gramSize = gramMatch ? parseInt(gramMatch[1]) : null;
-  console.log('🔧 getKomplektTargets:', preformName, '| gramMatch:', gramMatch, '| gramSize:', gramSize);
 
   // Kapsula uchun - 28 krishka (faqat krishka)
   if (name.includes('kapsula') || name.includes('capsule') || name.includes('капсула')) {
     return { krishkaGram: 28, ruchkaGram: null, needsRuchka: false };
   }
 
-  // Rules:
-  // 15, 21, 26, 30 → 28 krishka (only krishka)
-  // 36 → 28 krishka + 28 ruchka
-  // 52, 70 → 38 krishka + ruchka
-  // 75, 80, 85, 86, 135 → 48 krishka + ruchka
-
   if ([15, 21, 26, 30].includes(gramSize || 0)) {
-    console.log('   ✅ Rule 1: [15, 21, 26, 30] → 28 krishka');
     return { krishkaGram: 28, ruchkaGram: null, needsRuchka: false };
   }
 
   if (gramSize === 36) {
-    console.log('   ✅ Rule 2: 36 → 28 krishka + 28 ruchka');
     return { krishkaGram: 28, ruchkaGram: 28, needsRuchka: true };
   }
 
   if ([52, 70].includes(gramSize || 0)) {
-    console.log('   ✅ Rule 3: [52, 70] → 38 krishka + ruchka');
     return { krishkaGram: 38, ruchkaGram: 38, needsRuchka: true };
   }
 
   if ([75, 80, 85, 86, 135].includes(gramSize || 0)) {
-    console.log('   ✅ Rule 4: [75, 80, 85, 86, 135] → 48 krishka + ruchka');
     return { krishkaGram: 48, ruchkaGram: 48, needsRuchka: true };
   }
 
-  console.log('   ❌ No rule matched, returning null');
   return { krishkaGram: null, ruchkaGram: null, needsRuchka: false };
 };
 
@@ -328,18 +310,13 @@ export const groupPreformsByGram = (products: Product[]) => {
 
 // Validate sale form
 export const validateSaleForm = (items: SaleItemForm[], customerId: string, manualCustomerName: string, isKocha?: boolean): string | null => {
-  console.log('🔍 validateSaleForm:', { itemsLength: items.length, customerId, manualCustomerName, isKocha });
-  
   if (items.length === 0) {
     return 'Kamida bitta mahsulot qoshish kerak';
   }
 
-  // Ko'chaga sotish uchun faqat ism kifoya, aks holda mijoz tanlash kerak
   if (!isKocha && !customerId && !manualCustomerName) {
-    console.log('❌ Validation failed: need customer or kocha mode');
     return 'Mijoz tanlash yoki yangi mijoz qoshish kerak';
   }
 
-  console.log('✅ Validation passed');
   return null;
 };
