@@ -473,16 +473,64 @@ export default function Cashbox() {
   };
 
   const handleExport = () => {
-    const rows = filteredTx.map(tx => ({
-      [t('Sana')]:        new Date(tx.createdAt).toLocaleString('uz-UZ'),
-      [t('Tur')]:         tx.type === 'INCOME' ? t('Kirim') : t('Chiqim'),
-      [t('Summa')]:       tx.amount,
-      [t('Valyuta')]:     tx.currency || 'UZS',
-      [t('Tolov usuli')]: tx.paymentMethod || 'CASH',
-      [t('Kategoriya')]:  tx.category || '',
-      [t('Tavsif')]:      tx.description || '',
-    }));
-    exportToExcel(rows, { fileName: t('Kassa tarixi'), sheetName: t('Tarix') });
+    // Barcha tranzaksiyalarni sanaga qarab tartiblash (eskidan yangi)
+    const sorted = [...transactions].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+
+    // Har bir tranzaksiya uchun balansni hisoblash
+    const balanceMap = new Map<string, { before: number; after: number }>();
+    let runningUZS = 0;
+    for (const tx of sorted) {
+      const sign   = tx.type === 'INCOME' ? 1 : -1;
+      const method = (tx.paymentMethod || 'CASH').toUpperCase();
+      const curr   = (tx.currency || 'UZS').toUpperCase();
+      const amtUZS = curr === 'USD' ? tx.amount * exchangeRate : tx.amount;
+      // Faqat kassa hisobi (naqd + karta) uchun balans
+      const before = runningUZS;
+      runningUZS  += sign * amtUZS;
+      balanceMap.set(tx.id, { before, after: runningUZS });
+    }
+
+    const categoryLabel = (cat: string) => {
+      const map: Record<string, string> = {
+        SALE: t('Sotuv'), PURCHASE: t('Xarid'), SALARY: t('Maosh'),
+        EXPENSE: t('Xarajat'), INCOME: t('Kirim'), TRANSFER: t('Transfer'),
+        EXCHANGE: t('Almashtirish'), REVERSAL: t('Bekor'), DEBT: t('Qarz'),
+        DEBT_PAYMENT: t('Qarz tolov'), LOAN: t('Qarz berish'),
+      };
+      return map[cat] || cat || '—';
+    };
+
+    const methodLabel = (m: string) => {
+      if (m === 'CARD') return t('Karta');
+      if (m === 'CASH') return t('Naqd');
+      return m || t('Naqd');
+    };
+
+    const rows = filteredTx.map(tx => {
+      const dt      = new Date(tx.createdAt);
+      const curr    = (tx.currency || 'UZS').toUpperCase();
+      const method  = (tx.paymentMethod || 'CASH').toUpperCase();
+      const amt     = tx.amount || 0;
+      const bal     = balanceMap.get(tx.id) || { before: 0, after: 0 };
+      const sign    = tx.type === 'INCOME' ? 1 : -1;
+
+      return {
+        [t('Turi')]:              tx.type === 'INCOME' ? t('Kirim') : t('Chiqim'),
+        [t('Sababi')]:            categoryLabel(tx.category || ''),
+        [t('Qayerdan / Tavsif')]: tx.description || '—',
+        [t('Sana')]:              dt.toLocaleDateString('uz-UZ'),
+        [t('Vaqt')]:              dt.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }),
+        [t('UZS (naqd)')]:        curr === 'UZS' && method === 'CASH' ? sign * amt : 0,
+        [t('USD ($)')]:           curr === 'USD'                       ? sign * amt : 0,
+        [t('Karta (UZS)')]:       method === 'CARD'                    ? sign * amt : 0,
+        [t('Oldin kassada (UZS)')]:  Math.round(bal.before),
+        [t('Keyin kassada (UZS)')]:  Math.round(bal.after),
+      };
+    });
+
+    exportToExcel(rows, { fileName: t('Kassa hisoboti'), sheetName: t('Tranzaksiyalar') });
   };
 
   const inp = 'w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all';
