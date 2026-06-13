@@ -14,9 +14,12 @@ import {
   Boxes,
   DollarSign,
   PackageX,
-  Download
+  Download,
+  Loader2,
+  BarChart3,
 } from 'lucide-react';
 import api from '../lib/professionalApi';
+import { exportToExcel } from '../lib/excelUtils';
 import { latinToCyrillic } from '../lib/transliterator';
 import { useNavigate } from 'react-router-dom';
 import { errorHandler } from '../lib/professionalErrorHandler';
@@ -66,6 +69,7 @@ export default function SimplifiedInventory() {
   const [showAddModal, setShowAddModal] = useState(false);
   // Narxlari jadvali modal uchun state
   const [showPriceTableModal, setShowPriceTableModal] = useState(false);
+  const [isExportingMatrix, setIsExportingMatrix] = useState(false);
   const [priceTableSearch, setPriceTableSearch] = useState('');
   // Narxlari jadvali uchun tahrir state
   const [editingPriceRow, setEditingPriceRow] = useState<string | null>(null);
@@ -598,6 +602,82 @@ export default function SimplifiedInventory() {
     }
   };
 
+  // ─── Ombor matritsa: mahsulot × ishlab chiqarish × sotuvlar ────────────────
+  const exportInventoryMatrix = async () => {
+    setIsExportingMatrix(true);
+    try {
+      const l = latinToCyrillic;
+      const [prodRes, salesRes] = await Promise.all([
+        api.get('/production/orders'),
+        api.get('/sales?limit=1000'),
+      ]);
+
+      // Ishlab chiqarish yozuvlari (sanaga qarab tartiblangan)
+      const productions: any[] = (prodRes.data || [])
+        .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+      // Sotuvlar (items bo'lganlar)
+      const rawSales = salesRes.data?.data || (Array.isArray(salesRes.data) ? salesRes.data : []);
+      const sales: any[] = rawSales
+        .filter((s: any) => s.items && s.items.length > 0)
+        .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+      const fmtDate = (d: string) => new Date(d).toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: '2-digit' });
+      const fmtTime = (d: string) => new Date(d).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+
+      // Ishlab chiqarish ustunlari
+      const prodCols = productions.map((p: any) => ({
+        header: `${l('Ishlab (+)')} ${fmtDate(p.createdAt)} ${fmtTime(p.createdAt)}`,
+        productId: p.productId,
+        qty: p.actualQuantity ?? p.targetQuantity ?? 0,
+      }));
+
+      // Sotuv ustunlari — har bir sotuv alohida ustun
+      const saleCols = sales.map((s: any) => {
+        const cust = s.customer?.name || s.manualCustomerName || l("Ko'cha");
+        return {
+          header: `${l('Sotuv')}: ${cust} ${fmtDate(s.createdAt)}`,
+          saleId: s.id,
+          items: s.items as Array<{ product?: { id: string }; quantity: number }>,
+        };
+      });
+
+      // Har bir mahsulot uchun qator
+      const rows = products.map(product => {
+        const row: Record<string, string | number> = {
+          [l('Mahsulot')]:  product.name,
+          [l('Tur')]:       product.warehouse || l('Boshqa'),
+        };
+
+        // Ishlab chiqarish ustunlari
+        for (const col of prodCols) {
+          row[col.header] = col.productId === product.id ? col.qty : '';
+        }
+
+        // Sotuv ustunlari
+        for (const col of saleCols) {
+          const item = col.items.find(i => i.product?.id === product.id);
+          row[col.header] = item ? item.quantity : '';
+        }
+
+        row[l('Qolgan (qop)')] = product.currentStock ?? 0;
+        return row;
+      });
+
+      const today = new Date().toISOString().split('T')[0];
+      exportToExcel(rows, {
+        fileName: `Ombor_Matritsa_${today}`,
+        sheetName: l('Ombor'),
+      });
+
+      addToast(toast.success(l('Muvaffaqiyatli'), l('Ombor matritsasi yuklab olindi!')));
+    } catch (err: any) {
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Matritsa yuklab olishda xatolik')));
+    } finally {
+      setIsExportingMatrix(false);
+    }
+  };
+
   const hasActiveFilters = !!searchQuery || activeCategory !== 'all';
 
   // Bitta mahsulot uchun amallar (jadval va karta uchun umumiy)
@@ -680,7 +760,20 @@ export default function SimplifiedInventory() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+        <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+          {/* Ombor matritsa Excel export */}
+          <button
+            type="button"
+            onClick={exportInventoryMatrix}
+            disabled={isExportingMatrix}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
+            title={latinToCyrillic('Ishlab chiqarish + sotuvlar matritsasi')}
+          >
+            {isExportingMatrix
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <BarChart3 className="w-4 h-4" />}
+            <span className="hidden sm:inline">{latinToCyrillic('Ombor hisobot')}</span>
+          </button>
           <button
             type="button"
             onClick={() => setShowPriceTableModal(true)}
