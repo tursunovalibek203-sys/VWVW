@@ -155,12 +155,13 @@ export default function CustomerProfileModern() {
       return;
     }
 
+    const exchangeRate = parseFloat(paymentForm.kurs) || 12700;
     setIsSubmitting(true);
     try {
       const calls = [];
-      if (uzs > 0)   calls.push(api.post(`/customers/${id}/payment`, { amount: uzs,   currency: 'UZS', type: 'CASH', notes: paymentForm.notes }));
-      if (usd > 0)   calls.push(api.post(`/customers/${id}/payment`, { amount: usd,   currency: 'USD', type: 'CASH', notes: paymentForm.notes }));
-      if (karta > 0) calls.push(api.post(`/customers/${id}/payment`, { amount: karta, currency: 'UZS', type: 'CARD', notes: paymentForm.notes }));
+      if (uzs > 0)   calls.push(api.post(`/customers/${id}/payment`, { amount: uzs,   currency: 'UZS', type: 'CASH',  notes: paymentForm.notes, exchangeRate }));
+      if (usd > 0)   calls.push(api.post(`/customers/${id}/payment`, { amount: usd,   currency: 'USD', type: 'CASH',  notes: paymentForm.notes, exchangeRate }));
+      if (karta > 0) calls.push(api.post(`/customers/${id}/payment`, { amount: karta, currency: 'UZS', type: 'CARD',  notes: paymentForm.notes, exchangeRate }));
       await Promise.all(calls);
 
       addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic("To'lov amalga oshirildi va kassaga qo'shildi!")));

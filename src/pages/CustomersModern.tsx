@@ -140,7 +140,7 @@ export default function CustomersModern() {
   const matchRule = (c: Customer, rule: ColorRule): boolean => {
     const get = (field: ColorRule['conditions'][0]['field']): number => {
       if (field === 'debtUSD') return c.debtUSD || 0;
-      if (field === 'debtUZS') return c.debtUZS || c.debt || 0;
+      if (field === 'debtUZS') return c.debtUZS || 0;
       if (field === 'monthlySales') return c.monthlySales || 0;
       if (field === 'debtPeriod') return c.debtPeriod || 0;
       return 0;
@@ -215,7 +215,7 @@ export default function CustomersModern() {
 
         const balanceUZS = c.balanceUZS || c.balance || 0;
         const balanceUSD = c.balanceUSD || 0;
-        const debtUZS    = c.debtUZS || c.debt || 0;
+        const debtUZS    = c.debtUZS || 0;
         const debtUSD    = c.debtUSD || 0;
 
         let debtPeriod = 0;
@@ -318,8 +318,8 @@ export default function CustomersModern() {
           balance: createdCustomer.balanceUZS || createdCustomer.balance || 0,
           balanceUZS: createdCustomer.balanceUZS || createdCustomer.balance || 0,
           balanceUSD: createdCustomer.balanceUSD || 0,
-          debt: createdCustomer.debtUZS || createdCustomer.debt || 0,
-          debtUZS: createdCustomer.debtUZS || createdCustomer.debt || 0,
+          debt: createdCustomer.debtUZS || 0,
+          debtUZS: createdCustomer.debtUZS || 0,
           debtUSD: createdCustomer.debtUSD || 0,
           createdAt: createdCustomer.createdAt
         };
@@ -401,7 +401,7 @@ export default function CustomersModern() {
   };
 
   const hasActiveFilters = !!searchTerm || selectedCategory !== 'all';
-  const totalDebtUZS = customers.reduce((sum, c) => sum + (c.debtUZS || c.debt || 0), 0);
+  const totalDebtUZS = customers.reduce((sum, c) => sum + (c.debtUZS || 0), 0);
   const totalDebtUSD = customers.reduce((sum, c) => sum + (c.debtUSD || 0), 0);
   const totalDebtInUSD = totalDebtUSD + (usdRate > 0 ? totalDebtUZS / usdRate : 0);
   const vipCount = customers.filter(c => c.category === 'VIP').length;
