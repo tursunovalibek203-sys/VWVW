@@ -464,4 +464,78 @@ router.post('/check-or-create', async (req, res) => {
   }
 });
 
+// ── Haydovchi pul topshirdi (debtToCompany kamayadi, kassa to'ladi) ──────────
+router.post('/:id/payment', authorize('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, currency = 'UZS', notes } = req.body;
+    const userId = req.user?.id;
+    const userName = req.user?.name || req.user?.login || 'Admin';
+
+    if (!amount || parseFloat(amount) <= 0) {
+      return res.status(400).json({ error: 'Summa 0 dan katta bo\'lishi kerak' });
+    }
+
+    const amountNum = parseFloat(amount);
+
+    const driver = await prisma.driver.findUnique({ where: { id } });
+    if (!driver) return res.status(404).json({ error: 'Haydovchi topilmadi' });
+
+    // Haydovchi qarzini kamaytir
+    const newDebt = Math.max(0, (driver.debtToCompany || 0) - amountNum);
+    await (prisma.driver as any).update({
+      where: { id },
+      data: { debtToCompany: newDebt },
+    });
+
+    // Kassaga kirim
+    await prisma.cashboxTransaction.create({
+      data: {
+        type: 'INCOME',
+        amount: amountNum,
+        currency: currency.toUpperCase(),
+        category: 'INCOME',
+        paymentMethod: 'CASH',
+        description: `Haydovchi to'lovi: ${driver.name} (${notes || ''})`,
+        userId: userId || '',
+        userName,
+        reference: id,
+      }
+    });
+
+    res.json({
+      success: true,
+      driverName: driver.name,
+      paid: amountNum,
+      remainingDebt: newDebt,
+    });
+  } catch (error: any) {
+    console.error('Driver payment error:', error);
+    res.status(500).json({ error: 'Haydovchi to\'lovida xatolik: ' + error.message });
+  }
+});
+
+// ── Haydovchi sotuv qarzlari (debtToCompany va sotuvlar) ─────────────────────
+router.get('/:id/debt-summary', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const driver = await prisma.driver.findUnique({
+      where: { id },
+      select: { id: true, name: true, phone: true, debtToCompany: true } as any,
+    });
+    if (!driver) return res.status(404).json({ error: 'Haydovchi topilmadi' });
+
+    const pendingSales = await prisma.sale.findMany({
+      where: { driverId: id, driverPaymentStatus: 'COLLECTED' },
+      select: { id: true, createdAt: true, driverCollectedAmount: true, currency: true,
+        customer: { select: { name: true } }, manualCustomerName: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ driver, pendingSales });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

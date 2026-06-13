@@ -152,6 +152,8 @@ model Sale {
   driverCollectedAmount Float @default(0) // Haydovchi tomonidan yig'ilgan pul
   factoryShare    Float    @default(0) // Zavod to'laydigan summa
   customerShare   Float    @default(0) // Mijoz to'laydigan summa
+  deliveryFee     Float    @default(0) // Yetkazib berish narxi
+  deliveryFeePaidBy String @default("COMPANY") // CUSTOMER | COMPANY
   isKocha        Boolean  @default(false)
   manualCustomerName  String?
   manualCustomerPhone String?
@@ -372,6 +374,7 @@ model Driver {
   totalDeliveries Int      @default(0)
   currentLocation String?  // Joriy joylashuv
   notes           String?
+  debtToCompany   Float    @default(0) // Yig'ib, hali topshirmagan pul (kompaniyaga qarzi)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

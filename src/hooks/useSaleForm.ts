@@ -36,6 +36,11 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     isKocha: editSale?.isKocha || false,
     manualCustomerName: '',
     manualCustomerPhone: '',
+    driverId: '',
+    driverCollectsAll: true,
+    driverCollectsAmount: '',
+    deliveryFee: '',
+    deliveryFeePaidBy: 'COMPANY' as const,
   });
 
   // New item form state
@@ -310,6 +315,11 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
       isKocha: false,
       manualCustomerName: '',
       manualCustomerPhone: '',
+      driverId: '',
+      driverCollectsAll: true,
+      driverCollectsAmount: '',
+      deliveryFee: '',
+      deliveryFeePaidBy: 'COMPANY' as const,
     });
     setNewItem({
       productId: '',
@@ -352,9 +362,15 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
           usd: parseFloat(form.paidUSD || '0'),
           karta: parseFloat(form.paidKARTA || '0'),
         },
-        paymentMethod: form.paymentType?.toUpperCase() || 'CASH', // ✅ Backend nomiga mos
+        paymentMethod: form.paymentType?.toUpperCase() || 'CASH',
         currency: form.currency,
         isKocha: form.isKocha,
+        driverId: form.driverId || undefined,
+        driverCollectedAmount: form.driverId
+          ? (form.driverCollectsAll ? totalAmount : parseFloat(form.driverCollectsAmount || '0'))
+          : 0,
+        deliveryFee: parseFloat(form.deliveryFee || '0'),
+        deliveryFeePaidBy: form.deliveryFeePaidBy || 'COMPANY',
         totalAmount: totalAmount,
         paidAmount: paidAmount,
         debtAmount: debtAmount,

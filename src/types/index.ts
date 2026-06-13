@@ -411,6 +411,12 @@ export interface SaleFormData {
   isKocha: boolean;
   manualCustomerName: string;
   manualCustomerPhone: string;
+  // Haydovchi yetkazish
+  driverId: string;
+  driverCollectsAll: boolean;        // true = to'liq summa, false = aniq summa
+  driverCollectsAmount: string;      // aniq summa (UZS)
+  deliveryFee: string;               // yetkazib berish narxi (UZS)
+  deliveryFeePaidBy: 'CUSTOMER' | 'COMPANY';
 }
 
 export interface NewItemForm {

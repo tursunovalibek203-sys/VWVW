@@ -18,11 +18,15 @@ export interface CreateSaleInput {
   paymentMethod?: 'CASH' | 'CARD';
   paymentDetails?: { uzs?: number; usd?: number; karta?: number };
   driverId?: string;
+  driverCollectedAmount?: number;   // Haydovchi mijozdan yig'adigan summa
+  deliveryFee?: number;             // Yetkazib berish narxi
+  deliveryFeePaidBy?: 'CUSTOMER' | 'COMPANY'; // Kim to'laydi
   isKocha?: boolean;
   manualCustomerName?: string;
   manualCustomerPhone?: string;
   userId: string;
   userName: string;
+  exchangeRate?: number;
 }
 
 export interface UpdateSaleInput {
@@ -131,7 +135,11 @@ export class SalesService {
     const {
       items, totalAmount, currency, paymentMethod, paymentDetails,
       customerId, driverId, userId, userName, isKocha,
-      manualCustomerName, manualCustomerPhone
+      manualCustomerName, manualCustomerPhone,
+      driverCollectedAmount = 0,
+      deliveryFee = 0,
+      deliveryFeePaidBy = 'COMPANY',
+      exchangeRate = 12700,
     } = input;
 
     // paidAmount undefined bo'lmasligi uchun (Zod .optional() bo'lgani sababli)
@@ -177,6 +185,10 @@ export class SalesService {
             paymentMethod: safePaymentMethod,
             paymentStatus: calculatedPaymentStatus,
             paymentDetails: paymentDetails ? JSON.stringify(paymentDetails) : null,
+            driverCollectedAmount: driverCollectedAmount || 0,
+            driverPaymentStatus: driverCollectedAmount > 0 ? 'COLLECTED' : 'PENDING',
+            deliveryFee: deliveryFee || 0,
+            deliveryFeePaidBy: deliveryFeePaidBy || 'COMPANY',
             isKocha: !!isKocha,
             manualCustomerName: manualCustomerName || null,
             manualCustomerPhone: manualCustomerPhone || null,
@@ -374,6 +386,44 @@ export class SalesService {
             });
           }
         }
+        // 9. DRIVER DEBT — haydovchi mijozdan pul yig'sa, kompaniyaga qarzdor bo'ladi
+        if (driverId && driverCollectedAmount > 0) {
+          await tx.$executeRaw`
+            UPDATE "Driver"
+            SET "debtToCompany" = "debtToCompany" + ${driverCollectedAmount},
+                "updatedAt" = datetime('now')
+            WHERE "id" = ${driverId}
+          `;
+        }
+
+        // 10. DELIVERY FEE — yetkazib berish narxi
+        if (deliveryFee > 0) {
+          if (deliveryFeePaidBy === 'CUSTOMER' && !isKocha && customerId) {
+            // Mijoz to'laydi: mijoz qarziga qo'shamiz
+            const feeInCustomerCurrency = currency === 'UZS' ? deliveryFee : deliveryFee / exchangeRate;
+            if (currency === 'UZS') {
+              await tx.customer.update({ where: { id: customerId }, data: { debtUZS: { increment: Math.round(feeInCustomerCurrency) } } });
+            } else {
+              await tx.customer.update({ where: { id: customerId }, data: { debtUSD: { increment: parseFloat(feeInCustomerCurrency.toFixed(2)) } } });
+            }
+          } else if (deliveryFeePaidBy === 'COMPANY') {
+            // Kompaniya to'laydi: kassa xarajat
+            await tx.cashboxTransaction.create({
+              data: {
+                type: 'EXPENSE',
+                amount: deliveryFee,
+                currency: 'UZS',
+                category: 'EXPENSE',
+                paymentMethod: 'CASH',
+                description: `Yetkazib berish: ${driverId ? 'Haydovchi' : 'Sotuv'} ${sale.id}`,
+                userId,
+                userName,
+                reference: sale.id,
+              }
+            });
+          }
+        }
+
         return { saleId: sale.id };
       } catch (e) {
         throw e;

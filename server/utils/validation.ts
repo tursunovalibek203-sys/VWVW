@@ -62,12 +62,13 @@ export const SaleCreateSchema = z.object({
   exchangeRate: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
   createdAt: z.string().or(z.date()).optional(),
   status: z.string().optional(),
+  driverCollectedAmount: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
+  deliveryFee: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
+  deliveryFeePaidBy: z.enum(['CUSTOMER', 'COMPANY']).default('COMPANY').optional(),
 }).refine((data) => {
-  // Agar isKocha true bo'lsa, customerId talab qilinmaydi
-  if (data.isKocha) {
-    return true;
-  }
-  // Aks holda customerId bo'lishi shart
+  // Ko'cha, yangi mijoz (manualCustomerName), yoki mavjud mijoz (customerId) — birortasi bo'lsa o'tadi
+  if (data.isKocha) return true;
+  if (data.manualCustomerName && data.manualCustomerName.trim().length > 0) return true;
   return !!data.customerId && data.customerId.length > 0;
 }, {
   message: 'Mijoz tanlanishi shart yoki Ko\'chaga sotishni tanlang',

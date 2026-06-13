@@ -41,6 +41,7 @@ interface Driver {
   rating: number;
   totalDeliveries: number;
   currentLocation?: string;
+  debtToCompany?: number;
   active: boolean;
   createdAt: string;
   user?: {
@@ -86,6 +87,11 @@ export function Drivers() {
   const [sendLoading, setSendLoading] = useState(false);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentDriver, setPaymentDriver] = useState<Driver | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   const [newDriver, setNewDriver] = useState({
     name: '',
@@ -250,6 +256,33 @@ export function Drivers() {
     }
   };
 
+  const openPaymentModal = (driver: Driver) => {
+    setPaymentDriver(driver);
+    setPaymentAmount('');
+    setPaymentNotes('');
+    setShowPaymentModal(true);
+  };
+
+  const handleDriverPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paymentDriver || !paymentAmount || parseFloat(paymentAmount) <= 0) return;
+    setPaymentLoading(true);
+    try {
+      await api.post(`/drivers/${paymentDriver.id}/payment`, {
+        amount: parseFloat(paymentAmount),
+        currency: 'UZS',
+        notes: paymentNotes,
+      });
+      setShowPaymentModal(false);
+      fetchDrivers();
+      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic(`${paymentDriver.name} haydovchidan ${parseFloat(paymentAmount).toLocaleString()} UZS qabul qilindi`)));
+    } catch (error: any) {
+      addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || latinToCyrillic("To'lovda xatolik yuz berdi")));
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
   const getStatusVariant = (status: string): 'success' | 'warning' | 'error' | 'info' | 'neutral' => {
     switch (status) {
       case 'AVAILABLE': return 'success';
@@ -288,6 +321,8 @@ export function Drivers() {
   const availableCount = drivers.filter(d => d.status === 'AVAILABLE').length;
   const busyCount = drivers.filter(d => d.status === 'BUSY').length;
 
+  const totalDebt = drivers.reduce((sum, d) => sum + (d.debtToCompany || 0), 0);
+
   const stats = [
     {
       label: latinToCyrillic('Jami haydovchilar'),
@@ -302,10 +337,10 @@ export function Drivers() {
       tint: 'bg-emerald-50 text-emerald-600',
     },
     {
-      label: latinToCyrillic('Band'),
-      value: busyCount.toLocaleString('en-US'),
+      label: latinToCyrillic('Jami qarz (UZS)'),
+      value: Math.round(totalDebt).toLocaleString('en-US'),
       icon: Clock,
-      tint: 'bg-amber-50 text-amber-600',
+      tint: totalDebt > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-400',
     },
   ];
 
@@ -439,7 +474,7 @@ export function Drivers() {
                   <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Haydovchi')}</th>
                   <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Aloqa')}</th>
                   <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Guvohnoma / Mashina')}</th>
-                  <th className="text-center text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Reyting')}</th>
+                  <th className="text-center text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Qarz (UZS)')}</th>
                   <th className="text-center text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Status')}</th>
                   <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Amallar')}</th>
                 </tr>
@@ -486,11 +521,14 @@ export function Drivers() {
                         </p>
                       </div>
                     </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center justify-center gap-1 text-amber-500">
-                        <Star className="w-4 h-4 fill-current" />
-                        <span className="text-sm font-bold text-slate-900 tabular-nums">{driver.rating ?? 0}</span>
-                      </div>
+                    <td className="px-5 py-4 text-center">
+                      {(driver.debtToCompany || 0) > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-sm font-bold text-amber-600 tabular-nums">
+                          {Math.round(driver.debtToCompany!).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 text-sm">—</span>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-center">
                       <Badge variant={getStatusVariant(driver.status)}>
@@ -499,6 +537,17 @@ export function Drivers() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-1.5">
+                        {(driver.debtToCompany || 0) > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => openPaymentModal(driver)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+                            title={latinToCyrillic('Pul topshirdi')}
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            {latinToCyrillic('Pul topshirdi')}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => {
@@ -588,15 +637,14 @@ export function Drivers() {
 
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400 flex items-center gap-1">
-                    <Star className="w-3 h-3 text-amber-500 fill-current" />
-                    {latinToCyrillic('Reyting')}
-                  </p>
-                  <p className="mt-0.5 text-sm font-bold text-slate-900 tabular-nums">{driver.rating ?? 0}</p>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic('Yetkazishlar')}</p>
                   <p className="mt-0.5 text-sm font-bold text-slate-900 tabular-nums">{driver.totalDeliveries}</p>
+                </div>
+                <div className={`rounded-xl p-3 ${(driver.debtToCompany || 0) > 0 ? 'bg-amber-50' : 'bg-slate-50'}`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${(driver.debtToCompany || 0) > 0 ? 'text-amber-500' : 'text-slate-400'}`}>{latinToCyrillic('Qarz (UZS)')}</p>
+                  <p className={`mt-0.5 text-sm font-bold tabular-nums ${(driver.debtToCompany || 0) > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
+                    {(driver.debtToCompany || 0) > 0 ? Math.round(driver.debtToCompany!).toLocaleString() : '—'}
+                  </p>
                 </div>
               </div>
 
@@ -611,7 +659,17 @@ export function Drivers() {
                 </span>
               </div>
 
-              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-end gap-1">
+              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-end gap-1 flex-wrap">
+                {(driver.debtToCompany || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => openPaymentModal(driver)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+                  >
+                    <Send className="w-4 h-4" />
+                    {latinToCyrillic('Pul topshirdi')}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -912,6 +970,93 @@ export function Drivers() {
                   aria-label={latinToCyrillic('Xabar yuborish')}
                 >
                   {sendLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && paymentDriver && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl">
+            <div className="px-6 py-4 border-b border-slate-200/70 flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0 text-emerald-600">
+                  <Send className="w-[18px] h-[18px]" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-slate-900">{latinToCyrillic('Pul topshirdi')}</h3>
+                  <p className="text-xs text-slate-400 truncate">{paymentDriver.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleDriverPayment} className="p-6 space-y-4">
+              {/* Current debt */}
+              <div className="flex items-center justify-between bg-amber-50 rounded-xl px-4 py-3">
+                <span className="text-sm font-medium text-amber-700">{latinToCyrillic('Joriy qarz')}</span>
+                <span className="text-sm font-bold text-amber-800 tabular-nums">
+                  {Math.round(paymentDriver.debtToCompany || 0).toLocaleString()} UZS
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-600">
+                  {latinToCyrillic('Topshirilgan summa (UZS)')} <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  max={paymentDriver.debtToCompany || undefined}
+                  placeholder="0"
+                  value={paymentAmount}
+                  onChange={e => setPaymentAmount(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all tabular-nums"
+                />
+                {paymentAmount && parseFloat(paymentAmount) > 0 && (
+                  <p className="text-xs text-slate-400">
+                    {latinToCyrillic('Qolgan qarz')}: {Math.max(0, Math.round((paymentDriver.debtToCompany || 0) - parseFloat(paymentAmount))).toLocaleString()} UZS
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-600">
+                  {latinToCyrillic('Izoh')} <span className="text-slate-300 font-normal">({latinToCyrillic('ixtiyoriy')})</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder={latinToCyrillic('Masalan: naqd pul')}
+                  value={paymentNotes}
+                  onChange={e => setPaymentNotes(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentModal(false)}
+                  className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-colors"
+                >
+                  {latinToCyrillic('Bekor')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={paymentLoading || !paymentAmount || parseFloat(paymentAmount) <= 0}
+                  className="flex-[2] inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {paymentLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {latinToCyrillic('Tasdiqlash')}
                 </button>
               </div>
             </form>
