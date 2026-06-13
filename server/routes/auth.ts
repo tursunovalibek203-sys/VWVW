@@ -27,7 +27,6 @@ if (process.env.NODE_ENV === 'production') {
 router.post('/login', async (req, res) => {
   try {
     const { login, password } = req.body;
-    
     if (!login || !password) {
       return res.status(400).json({ error: 'Login va parol kiritilishi shart' });
     }
@@ -35,7 +34,7 @@ router.post('/login', async (req, res) => {
     const user = await prisma.user.findUnique({ where: { login } });
 
     if (!user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Login yoki parol xato'
       });
     }
@@ -76,19 +75,18 @@ router.post('/login', async (req, res) => {
 router.post('/cashier-login', async (req, res) => {
   try {
     const { login, password } = req.body;
-    
     if (!login || !password) {
       return res.status(400).json({ error: 'Login va parol kiritilishi shart' });
     }
-    
+
     const user = await prisma.user.findUnique({ where: { login } });
 
     if (!user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Login yoki parol xato'
       });
     }
-    
+
     if (!user.active) {
       return res.status(401).json({ error: 'Foydalanuvchi faol emas' });
     }

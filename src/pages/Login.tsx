@@ -47,9 +47,9 @@ export default function Login() {
         endpoint = '/auth/cashier-login';
         requestData = { login, password };
       }
-      
+
       const { data } = await api.post(endpoint, requestData);
-      
+
       if (!data.token || !data.user) {
         throw new Error('Serverdan noto\'g\'ri ma\'lumot keldi');
       }
@@ -66,7 +66,6 @@ export default function Login() {
         navigate('/dashboard');
       }
     } catch (error: any) {
-      console.error('❌ Login error:', error);
       const errorMsg = error.details?.error || error.response?.data?.error || error.message || 'Кириш муваффақиятсиз. Фойдаланувчи номи ёки парол хато.';
       setError(errorMsg);
     } finally {

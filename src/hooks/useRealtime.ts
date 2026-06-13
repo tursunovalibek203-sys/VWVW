@@ -36,7 +36,6 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
 
   const connect = useCallback(() => {
     if (!token) {
-      console.log('[Realtime] No token available, skipping connection');
       return;
     }
 
@@ -55,7 +54,6 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
       es.onopen = () => {
         reconnectAttemptsRef.current = 0;
         options.onConnected?.();
-        console.log('[Realtime] Connected successfully');
       };
 
       es.onmessage = (event) => {
@@ -96,7 +94,6 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
       };
 
       es.onerror = (error) => {
-        console.warn('[Realtime] Connection error, closing');
         options.onError?.(error);
         
         // Close current connection immediately
@@ -117,8 +114,8 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
           console.log('[Realtime] Max reconnection attempts reached, giving up');
         }
       };
-    } catch (error) {
-      console.error('[Realtime] Failed to create EventSource:', error);
+    } catch {
+      // silent — EventSource creation failed
     }
   }, [token, options]);
 

@@ -66,6 +66,7 @@ export default function SimplifiedInventory() {
   const [showAddModal, setShowAddModal] = useState(false);
   // Narxlari jadvali modal uchun state
   const [showPriceTableModal, setShowPriceTableModal] = useState(false);
+  const [priceTableSearch, setPriceTableSearch] = useState('');
   // Narxlari jadvali uchun tahrir state
   const [editingPriceRow, setEditingPriceRow] = useState<string | null>(null);
   const [editPriceBag, setEditPriceBag] = useState('');
@@ -1106,13 +1107,37 @@ export default function SimplifiedInventory() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowPriceTableModal(false)}
+                  onClick={() => { setShowPriceTableModal(false); setPriceTableSearch(''); }}
                   aria-label={latinToCyrillic('Yopish')}
                   title={latinToCyrillic('Yopish')}
                   className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white transition-all"
                 >
                   <X className="w-6 h-6" />
                 </button>
+              </div>
+            </div>
+
+            {/* Qidiruv */}
+            <div className="px-6 pt-4 pb-2 border-b border-gray-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={priceTableSearch}
+                  onChange={(e) => setPriceTableSearch(e.target.value)}
+                  placeholder={latinToCyrillic('Mahsulot nomini qidiring...')}
+                  className="w-full pl-9 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition-all"
+                  autoFocus
+                />
+                {priceTableSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setPriceTableSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center transition-all"
+                  >
+                    <X className="w-3 h-3 text-gray-500" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1139,9 +1164,9 @@ export default function SimplifiedInventory() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Preformlar */}
+                  {/* Preformlar / Kapsula */}
                   {products
-                    .filter(p => p.warehouse === 'preform' || p.name.toLowerCase().includes('preform') || /\d+\s*(gr|g|гр|г)/i.test(p.name))
+                    .filter(p => (p.warehouse === 'preform' || p.warehouse === 'kapsula' || p.name.toLowerCase().includes('preform') || /\d+\s*(gr|g|гр|г)/i.test(p.name)) && (!priceTableSearch || p.name.toLowerCase().includes(priceTableSearch.toLowerCase())))
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map((product, index) => {
                       const isEditingRow = editingPriceRow === product.id;
@@ -1236,7 +1261,7 @@ export default function SimplifiedInventory() {
 
                   {/* Krishkalar */}
                   {products
-                    .filter(p => p.warehouse === 'krishka' || p.name.toLowerCase().includes('krishka') || p.name.toLowerCase().includes('qopqoq'))
+                    .filter(p => (p.warehouse === 'krishka' || p.name.toLowerCase().includes('krishka') || p.name.toLowerCase().includes('qopqoq')) && (!priceTableSearch || p.name.toLowerCase().includes(priceTableSearch.toLowerCase())))
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map((product, index) => {
                       const isEditingRow = editingPriceRow === product.id;
@@ -1331,7 +1356,7 @@ export default function SimplifiedInventory() {
 
                   {/* Ruchkalar */}
                   {products
-                    .filter(p => p.warehouse === 'ruchka' || p.name.toLowerCase().includes('ruchka') || p.name.toLowerCase().includes('handle'))
+                    .filter(p => (p.warehouse === 'ruchka' || p.name.toLowerCase().includes('ruchka') || p.name.toLowerCase().includes('handle')) && (!priceTableSearch || p.name.toLowerCase().includes(priceTableSearch.toLowerCase())))
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map((product, index) => {
                       const isEditingRow = editingPriceRow === product.id;
@@ -1536,7 +1561,7 @@ export default function SimplifiedInventory() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => setShowPriceTableModal(false)}
+                  onClick={() => { setShowPriceTableModal(false); setPriceTableSearch(''); }}
                   className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold transition-all"
                 >
                   {latinToCyrillic('Yopish')}

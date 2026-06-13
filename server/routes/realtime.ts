@@ -13,12 +13,10 @@ const authenticateSSE = (req: Request, res: Response, next: Function) => {
     const authHeader = req.headers.authorization;
     const queryToken = req.query.token as string;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : queryToken;
-    
     if (!token) {
       return res.status(401).json({ error: 'No token provided' });
     }
 
-    // Yagona, validatsiyalangan secret (fail-closed). Hardcoded fallback YO'Q.
     const decoded = jwt.verify(token, VALIDATED_JWT_SECRET) as any;
     (req as any).user = decoded;
     next();
