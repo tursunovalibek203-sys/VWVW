@@ -308,10 +308,35 @@ if (process.env.NODE_ENV !== 'production') {
 // Global error handler - must be last (BEFORE app.listen)
 app.use(errorHandler);
 
+// One-time migration: kapsula → preform (gramga qarab bagType)
+async function migrateKapsulaToPreform() {
+  try {
+    const kapsulas = await prisma.product.findMany({
+      where: { warehouse: 'kapsula' },
+      select: { id: true, name: true }
+    });
+    if (kapsulas.length === 0) return;
+
+    let count = 0;
+    for (const p of kapsulas) {
+      const m = p.name.match(/(\d+)\s*(?:гр|г|gr)/i);
+      if (!m) continue;
+      const gram = m[1] + 'гр';
+      await prisma.product.update({ where: { id: p.id }, data: { warehouse: 'preform', bagType: gram } });
+      count++;
+    }
+    if (count > 0) logger.info(`Migration: ${count} ta kapsula → preform qilindi`);
+  } catch (e: any) {
+    logger.warn('migrateKapsulaToPreform xatolik: ' + e.message);
+  }
+}
+
 app.listen(PORT, async () => {
   logger.info('Server started successfully');
   logger.info(`API available at http://localhost:${PORT}/api`);
   logger.info(`Health check at http://localhost:${PORT}/api/health`);
+
+  await migrateKapsulaToPreform();
 
   // Admin bot — kunlik 19:00 hisobot va backup tugmasi
   try {
