@@ -228,18 +228,6 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     const quantity = parseFloat(newItem.quantity) || 0;
     if (quantity <= 0) return;
 
-    // Stock tekshiruvi
-    const availableStock = product.currentStock || 0;
-    // Savatdagi mavjud miqdorni hisobga olish
-    const existingItem = form.items.find(item => item.productId === newItem.productId);
-    const existingQuantity = existingItem ? (typeof existingItem.quantity === 'number' ? existingItem.quantity : parseFloat(existingItem.quantity || '0')) : 0;
-    const totalRequested = quantity + existingQuantity;
-
-    if (totalRequested > availableStock) {
-      alert(`⚠️ ${product.name} uchun yetarli mahsulot yo'q!\nMavjud: ${availableStock} qop\nSo'ralgan: ${totalRequested} qop`);
-      return;
-    }
-
     const existingIndex = form.items.findIndex((item) => item.productId === newItem.productId);
 
     const pricePerBag = parseFloat(newItem.pricePerBag || '0') || product.pricePerBag || 0;
