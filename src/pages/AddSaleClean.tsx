@@ -349,7 +349,7 @@ export default function AddSaleClean() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [drivers, setDrivers] = useState<{ id: string; name: string; phone?: string; debtToCompany?: number }[]>([]);
-  const [driverDropdownOpen, setDriverDropdownOpen] = useState(false);
+  const [driverSearch, setDriverSearch] = useState('');
 
   // Real-time product sync
   const handleProductUpdate = useCallback((updatedProduct: Product) => {
@@ -804,52 +804,71 @@ export default function AddSaleClean() {
             </div>
           </div>
           <div className="p-4 sm:p-5 space-y-4">
-            {/* Driver selector */}
-            <div className="relative">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+            {/* Driver selector — mijoz qidiruviga o'xshash */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">
                 {latinToCyrillic('Haydovchi')}
               </label>
-              <button
-                type="button"
-                onClick={() => setDriverDropdownOpen(v => !v)}
-                className="w-full flex items-center justify-between gap-2 h-11 px-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white text-sm font-medium text-slate-900 transition-all outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-              >
-                <span className={saleForm.form.driverId ? 'text-slate-900' : 'text-slate-400'}>
-                  {saleForm.form.driverId
-                    ? (drivers.find(d => d.id === saleForm.form.driverId)?.name || latinToCyrillic('Haydovchi'))
-                    : latinToCyrillic("Haydovchi tanlanmagan")}
-                </span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${driverDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {driverDropdownOpen && (
-                <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+              {saleForm.form.driverId ? (
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-sm font-semibold text-slate-900">
+                      {drivers.find(d => d.id === saleForm.form.driverId)?.name}
+                    </span>
+                    {drivers.find(d => d.id === saleForm.form.driverId)?.phone && (
+                      <span className="ml-2 text-xs text-slate-400">
+                        {drivers.find(d => d.id === saleForm.form.driverId)?.phone}
+                      </span>
+                    )}
+                    {(drivers.find(d => d.id === saleForm.form.driverId)?.debtToCompany || 0) > 0 && (
+                      <span className="ml-2 text-xs text-amber-600 font-semibold">
+                        {latinToCyrillic('Qarzi')}: {Math.round(drivers.find(d => d.id === saleForm.form.driverId)!.debtToCompany!).toLocaleString()} UZS
+                      </span>
+                    )}
+                  </div>
                   <button
                     type="button"
-                    onClick={() => { saleForm.updateFormField('driverId', ''); setDriverDropdownOpen(false); }}
-                    className="w-full text-left px-3.5 py-2.5 text-sm text-slate-400 hover:bg-slate-50 transition-colors border-b border-slate-100"
+                    onClick={() => { saleForm.updateFormField('driverId', ''); setDriverSearch(''); }}
+                    className="text-xs text-indigo-500 hover:text-indigo-700 font-medium flex-shrink-0"
                   >
-                    {latinToCyrillic('Haydovchi yo\'q')}
+                    {latinToCyrillic("O'zgartirish")}
                   </button>
-                  {drivers.map(d => (
-                    <button
-                      type="button"
-                      key={d.id}
-                      onClick={() => { saleForm.updateFormField('driverId', d.id); setDriverDropdownOpen(false); }}
-                      className="w-full text-left px-3.5 py-2.5 text-sm hover:bg-slate-50 transition-colors"
-                    >
-                      <span className="font-medium text-slate-900">{d.name}</span>
-                      {d.phone && <span className="text-slate-400 ml-2 text-xs">{d.phone}</span>}
-                      {(d.debtToCompany || 0) > 0 && (
-                        <span className="ml-2 text-xs text-amber-600 font-semibold">
-                          {latinToCyrillic('Qarzi')}: {Math.round(d.debtToCompany!).toLocaleString()} UZS
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                  {drivers.length === 0 && (
-                    <p className="px-3.5 py-3 text-sm text-slate-400">{latinToCyrillic('Haydovchilar topilmadi')}</p>
-                  )}
                 </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={driverSearch}
+                    onChange={e => setDriverSearch(e.target.value)}
+                    placeholder={latinToCyrillic('Haydovchini qidiring...')}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none"
+                  />
+                  {driverSearch && (
+                    <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
+                      {drivers
+                        .filter(d => d.name.toLowerCase().includes(driverSearch.toLowerCase()) || (d.phone || '').includes(driverSearch))
+                        .map(d => (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => { saleForm.updateFormField('driverId', d.id); setDriverSearch(''); }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors"
+                          >
+                            <span className="font-medium text-slate-900">{d.name}</span>
+                            {d.phone && <span className="text-slate-400 ml-2 text-xs">{d.phone}</span>}
+                            {(d.debtToCompany || 0) > 0 && (
+                              <span className="ml-2 text-xs text-amber-600 font-semibold">
+                                {latinToCyrillic('Qarzi')}: {Math.round(d.debtToCompany!).toLocaleString()} UZS
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      {drivers.filter(d => d.name.toLowerCase().includes(driverSearch.toLowerCase()) || (d.phone || '').includes(driverSearch)).length === 0 && (
+                        <p className="px-3 py-2.5 text-sm text-slate-400">{latinToCyrillic('Haydovchi topilmadi')}</p>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
