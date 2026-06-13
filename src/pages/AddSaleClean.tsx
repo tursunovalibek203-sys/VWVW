@@ -665,6 +665,14 @@ export default function AddSaleClean() {
                 <span className="text-sm font-medium text-slate-700">{latinToCyrillic("Ko'cha savdosi")}</span>
                 <button type="button" onClick={() => { saleForm.updateFormField('isKocha', false); saleForm.updateFormField('customerId', ''); }} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">{latinToCyrillic("O'zgartirish")}</button>
               </div>
+            ) : saleForm.form.manualCustomerName ? (
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <span className="text-sm font-semibold text-slate-900">{saleForm.form.manualCustomerName}</span>
+                  <span className="ml-2 text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">{latinToCyrillic('Yangi')}</span>
+                </div>
+                <button type="button" onClick={() => { saleForm.updateFormField('manualCustomerName', ''); saleForm.updateFormField('customerId', ''); }} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">{latinToCyrillic("O'zgartirish")}</button>
+              </div>
             ) : saleForm.form.customerId ? (
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-semibold text-slate-900">
@@ -696,7 +704,19 @@ export default function AddSaleClean() {
                         </button>
                       ))}
                     {saleForm.customers.filter(c => c.name.toLowerCase().includes(saleForm.customerSearch.toLowerCase())).length === 0 && (
-                      <p className="px-3 py-2 text-sm text-slate-400">{latinToCyrillic('Topilmadi')}</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          saleForm.updateFormField('manualCustomerName', saleForm.customerSearch);
+                          saleForm.updateFormField('isKocha', false);
+                          saleForm.updateFormField('customerId', '');
+                          saleForm.setCustomerSearch('');
+                        }}
+                        className="w-full text-left px-3 py-2.5 text-sm hover:bg-indigo-50 transition-colors"
+                      >
+                        <span className="text-slate-400">{latinToCyrillic('Topilmadi')} — </span>
+                        <span className="text-indigo-600 font-medium">+ "{saleForm.customerSearch}" {latinToCyrillic('nomida yangi mijoz')}</span>
+                      </button>
                     )}
                   </div>
                 )}

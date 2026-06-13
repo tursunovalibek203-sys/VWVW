@@ -33,14 +33,7 @@ export const CartItem = ({
     }
 
     const bagQuantity = parseFloat(cleanVal) || 0;
-    
-    // Stock tekshiruvi
-    const availableStock = cartProduct?.currentStock || 0;
-    if (bagQuantity > availableStock) {
-      console.log(`⚠️ ${item.productName} uchun yetarli mahsulot yo'q!\nMavjud: ${availableStock} qop\nSo'ralgan: ${bagQuantity} qop`);
-      return;
-    }
-    
+
     // unitsPerBag calculation - agar bo'sh bo'lsa 2000 ishlatiladi
     const unitsPerBagValue = item.unitsPerBag?.toString() || '';
     const unitsPerBag = unitsPerBagValue === '' ? 2000 : parseFloat(unitsPerBagValue) || 2000;
