@@ -30,7 +30,10 @@ import {
   Layers,
   Calendar,
   User,
-  Receipt
+  Receipt,
+  ArrowUpDown,
+  TrendingDown,
+  PackagePlus,
 } from 'lucide-react';
 
 // Stock-level UI helper (display only — never touches API/data).
@@ -62,6 +65,7 @@ export default function ProductDetail() {
     salesCount: 0,
   });
   const [salesHistory, setSalesHistory] = useState<any[]>([]);
+  const [stockMovements, setStockMovements] = useState<any[]>([]);
 
   const [adjustForm, setAdjustForm] = useState({
     value: '',
@@ -156,6 +160,15 @@ export default function ProductDetail() {
         pricePerBag: (data.pricePerBag || 0).toString(),
         pricePerPiece: (data.pricePerPiece || 0).toString(),
       });
+
+      // Stock harakat tarixi
+      try {
+        const movResp = await api.get(`/products/${id}/movements`);
+        const movArr = Array.isArray(movResp) ? movResp : extractArray<any>(movResp, []);
+        setStockMovements(movArr);
+      } catch {
+        // silent
+      }
 
       // Sotuv statistikasini yuklash
       try {
@@ -677,6 +690,75 @@ export default function ProductDetail() {
               })}
             </div>
           </>
+        )}
+      </div>
+
+      {/* Stock harakat tarixi */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-5 sm:px-6 py-4 border-b border-gray-100">
+          <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center">
+            <ArrowUpDown className="w-4 h-4 text-violet-600" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-gray-900">{latinToCyrillic('Ombor harakatlari')}</h2>
+            <p className="text-xs text-gray-400">{stockMovements.length} {latinToCyrillic('ta yozuv')}</p>
+          </div>
+        </div>
+
+        {stockMovements.length === 0 ? (
+          <EmptyState
+            icon={ArrowUpDown}
+            title={latinToCyrillic('Harakat tarixi yo\'q')}
+            description={latinToCyrillic('Mahsulot sotilganda yoki qo\'shilganda shu yerda ko\'rinadi')}
+          />
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {stockMovements.map((m: any) => {
+              const isAdd = m.type === 'ADD' || m.type === 'PRODUCTION';
+              const isSale = m.type === 'SALE';
+              const dateStr = m.createdAt ? new Date(m.createdAt).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+              const qtySign = isAdd ? '+' : '-';
+              const qtyColor = isAdd ? 'text-emerald-600' : isSale ? 'text-rose-600' : 'text-amber-600';
+              const bgColor = isAdd ? 'bg-emerald-50' : isSale ? 'bg-rose-50' : 'bg-amber-50';
+              const iconColor = isAdd ? 'text-emerald-600' : isSale ? 'text-rose-600' : 'text-amber-600';
+              const TypeIcon = isAdd ? PackagePlus : isSale ? TrendingDown : ArrowUpDown;
+              const typeLabel = isAdd
+                ? latinToCyrillic('Qo\'shildi')
+                : isSale
+                  ? latinToCyrillic('Sotildi')
+                  : m.type === 'REMOVE'
+                    ? latinToCyrillic('Ayirildi')
+                    : latinToCyrillic('Tuzatildi');
+
+              return (
+                <div key={m.id} className="flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-gray-50/60 transition-colors">
+                  <div className={`w-9 h-9 rounded-xl ${bgColor} flex items-center justify-center flex-shrink-0`}>
+                    <TypeIcon className={`w-4 h-4 ${iconColor}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${bgColor} ${iconColor}`}>{typeLabel}</span>
+                      {m.reason && <span className="text-xs text-gray-500 truncate">{m.reason}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
+                      <Calendar className="w-3 h-3" />
+                      <span>{dateStr}</span>
+                      {m.userName && <><span>·</span><span>{m.userName}</span></>}
+                    </div>
+                    {m.notes && <p className="text-xs text-gray-400 mt-0.5 truncate">{m.notes}</p>}
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className={`text-sm font-bold tabular-nums ${qtyColor}`}>
+                      {qtySign}{m.quantity} {latinToCyrillic('qop')}
+                    </p>
+                    <p className="text-xs text-gray-400 tabular-nums">
+                      {m.newStock} {latinToCyrillic('qoldi')}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
