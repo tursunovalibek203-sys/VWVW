@@ -859,8 +859,10 @@ export default function SimplifiedInventory() {
                       <Package className="w-5 h-5 text-indigo-600" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="text-sm font-bold text-slate-900 truncate">{groupKey}</h3>
-                      <p className="text-xs text-slate-400">{groupProds.length} {latinToCyrillic('ta rang')}</p>
+                      <h3 className="text-sm font-bold text-slate-900 truncate">
+                        {/^\d+G$/.test(groupKey) ? `${parseInt(groupKey)} гр` : groupKey}
+                      </h3>
+                      <p className="text-xs text-slate-400">{groupProds.length} {latinToCyrillic('ta variant')}</p>
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
