@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { SaleFormData, NewItemForm, SaleItemForm, Product, Customer } from '../types';
 import {
   DEFAULT_EXCHANGE_RATE,
@@ -12,14 +11,66 @@ import {
 import api from '../lib/professionalApi';
 import { errorHandler } from '../lib/professionalErrorHandler';
 import { extractData, extractArray } from '../lib/apiHelpers';
-import { printReceipt, prepareSaleReceipt } from '../lib/receiptPrinter';
+import { prepareSaleReceipt, type ReceiptData } from '../lib/receiptPrinter';
 
 export interface UseSaleFormOptions {
   editSale?: any;
   orderData?: any;
 }  
+// Preform qo'shilganda avtomatik qo'shiladigan krishka/ruchkalarni qaytaradi
+function getKomplektAdditions(
+  product: Product,
+  quantity: number,
+  allProducts: Product[]
+): SaleItemForm[] {
+  const warehouse = (product.warehouse || '').toLowerCase();
+  if (warehouse !== 'kapsula' && warehouse !== 'preform') return [];
+
+  const name = (product.name || '').toLowerCase();
+  const gramMatch = name.match(/(\d+)\s*(?:гр|г|gr|g)/i);
+  if (!gramMatch) return [];
+  const gram = parseInt(gramMatch[1]);
+
+  let toAdd: { size: number; type: 'krishka' | 'ruchka' }[] = [];
+  if ([15, 21, 30].includes(gram)) {
+    toAdd = [{ size: 28, type: 'krishka' }];
+  } else if (gram === 26) {
+    toAdd = [{ size: 28, type: 'krishka' }, { size: 28, type: 'ruchka' }];
+  } else if ([52, 70].includes(gram)) {
+    toAdd = [{ size: 38, type: 'krishka' }, { size: 38, type: 'ruchka' }];
+  } else if ([75, 80, 85, 86, 135].includes(gram)) {
+    toAdd = [{ size: 48, type: 'krishka' }, { size: 48, type: 'ruchka' }];
+  }
+  // 36gr va boshqalar: avtomatik qo'shilmaydi
+
+  const result: SaleItemForm[] = [];
+  for (const rule of toAdd) {
+    const match = allProducts.find((p) => {
+      const pName = (p.name || '').toLowerCase();
+      const pWH = (p.warehouse || '').toLowerCase();
+      return pWH === rule.type && pName.includes(String(rule.size));
+    });
+    if (match) {
+      const upb = match.unitsPerBag || 2000;
+      const ppb = parseFloat(match.pricePerBag?.toString() || '0') || 0;
+      result.push({
+        productId: match.id,
+        productName: match.name,
+        quantity: quantity.toString(),
+        bagDisplayValue: quantity.toString(),
+        pricePerBag: ppb,
+        pricePerPiece: ppb / upb,
+        unitsPerBag: upb,
+        subtotal: quantity * ppb,
+        warehouse: match.warehouse || rule.type,
+        saleType: 'bag',
+      });
+    }
+  }
+  return result;
+}
+
 export const useSaleForm = (options: UseSaleFormOptions = {}) => {
-  const navigate = useNavigate();
   const { editSale, orderData: initialOrderData } = options;
   const isEditMode = !!editSale;
 
@@ -232,32 +283,32 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     const quantity = parseFloat(newItem.quantity) || 0;
     if (quantity <= 0) return;
 
-    const existingIndex = form.items.findIndex((item) => item.productId === newItem.productId);
-
     const pricePerBag = parseFloat(newItem.pricePerBag || '0') || product.pricePerBag || 0;
     const unitsPerBag = parseFloat(newItem.unitsPerBag || '0') || product.unitsPerBag || 2000;
     const pricePerPiece = pricePerBag / unitsPerBag;
     const isPieceSale = newItem.saleType === 'piece';
     const subtotal = isPieceSale ? quantity * pricePerPiece : quantity * pricePerBag;
 
-    if (existingIndex >= 0) {
-      const existingItem = form.items[existingIndex];
-      const newQuantity = (typeof existingItem.quantity === 'number' ? existingItem.quantity : parseFloat(existingItem.quantity || '0')) + quantity;
+    const komplektItems = getKomplektAdditions(product, quantity, products);
 
-      const updatedItems = [...form.items];
-      updatedItems[existingIndex] = {
-        ...existingItem,
-        quantity: newQuantity.toString(),
-        bagDisplayValue: newQuantity.toString(),
-        pricePerBag,
-        pricePerPiece,
-        subtotal: newQuantity * pricePerBag,
-      };
-      setForm((prev) => ({ ...prev, items: updatedItems }));
-    } else {
-      setForm((prev) => ({
-        ...prev,
-        items: [...prev.items, {
+    setForm((prev) => {
+      const items = [...prev.items];
+
+      // Asosiy mahsulot
+      const existingIndex = items.findIndex((item) => item.productId === newItem.productId);
+      if (existingIndex >= 0) {
+        const existing = items[existingIndex];
+        const newQty = (typeof existing.quantity === 'number' ? existing.quantity : parseFloat(existing.quantity || '0')) + quantity;
+        items[existingIndex] = {
+          ...existing,
+          quantity: newQty.toString(),
+          bagDisplayValue: newQty.toString(),
+          pricePerBag,
+          pricePerPiece,
+          subtotal: newQty * pricePerBag,
+        };
+      } else {
+        items.push({
           productId: newItem.productId,
           productName: product.name,
           quantity: newItem.quantity,
@@ -268,11 +319,29 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
           subtotal,
           warehouse: product.warehouse || 'other',
           saleType: newItem.saleType,
-        }],
-      }));
-    }
+        });
+      }
 
-    // Reset new item
+      // Komplekt: krishka va ruchka avtomatik
+      for (const kItem of komplektItems) {
+        const kIdx = items.findIndex((i) => i.productId === kItem.productId);
+        if (kIdx >= 0) {
+          const existing = items[kIdx];
+          const newQty = (typeof existing.quantity === 'number' ? existing.quantity : parseFloat(existing.quantity || '0')) + quantity;
+          items[kIdx] = {
+            ...existing,
+            quantity: newQty.toString(),
+            bagDisplayValue: newQty.toString(),
+            subtotal: newQty * existing.pricePerBag,
+          };
+        } else {
+          items.push(kItem);
+        }
+      }
+
+      return { ...prev, items };
+    });
+
     setNewItem({
       productId: '',
       productName: '',
@@ -282,7 +351,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
       unitsPerBag: '',
       saleType: 'bag',
     });
-  }, [newItem, products, form.items]);
+  }, [newItem, products]);
 
   const updateItem = useCallback((index: number, updates: Partial<SaleItemForm>) => {
     setForm((prev) => {
@@ -332,7 +401,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     });
   }, [form.currency]);
 
-  const submitSale = useCallback(async () => {
+  const submitSale = useCallback(async (): Promise<ReceiptData> => {
     const validationError = validateSaleForm(form.items, form.customerId, form.manualCustomerName, form.isKocha);
     if (validationError) {
       alert('Xatolik: ' + validationError);
@@ -393,44 +462,34 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
         });
       }
 
-      // 🖨️ CHEK CHIQARISH
-      try {
-        // ✅ Extract data from standardized API response
-        const saleResult = extractData<any>(response, null);
-        const customerData = selectedCustomer || {
-          name: form.manualCustomerName || "Ko'chaga",
-          phone: form.manualCustomerPhone,
-        };
-
-        // Chek ma'lumotlarini tayyorlash va chiqarish
-        const receiptData = prepareSaleReceipt(
-          {
-            ...saleResult,
-            items: saleData.items,
-            totalAmount: totalAmount,
-            paidAmount: paidAmount,
-            debtAmount: debtAmount,
-            currency: form.currency,
-            paymentDetails: saleData.paymentDetails,
-            isKocha: form.isKocha,
-            manualCustomerName: form.manualCustomerName,
-            manualCustomerPhone: form.manualCustomerPhone,
-          },
-          customerData,
-          { name: 'Kassir' }, // Hozircha kassir nomi sifatida
-          undefined, // driver
-          exchangeRateNum
-        );
-
-        printReceipt(receiptData);
-      } catch (printError) {
-        // Chek chiqarish xatosi sotuvni to'xtatmasin
-      }
+      // Chek ma'lumotlarini tayyorlash
+      const saleResult = extractData<any>(response, null);
+      const customerData = selectedCustomer || {
+        name: form.manualCustomerName || "Ko'chaga",
+        phone: form.manualCustomerPhone,
+      };
+      const receiptData = prepareSaleReceipt(
+        {
+          ...saleResult,
+          items: saleData.items,
+          totalAmount: totalAmount,
+          paidAmount: paidAmount,
+          debtAmount: debtAmount,
+          currency: form.currency,
+          paymentDetails: saleData.paymentDetails,
+          isKocha: form.isKocha,
+          manualCustomerName: form.manualCustomerName,
+          manualCustomerPhone: form.manualCustomerPhone,
+        },
+        customerData,
+        { name: 'Kassir' },
+        undefined,
+        exchangeRateNum
+      );
 
       // Mahsulotlarni qayta yuklash (yangi stock bilan)
       try {
         const refreshResponse = await api.get('/products');
-        // ✅ Handle standardized API response format
         const productsData = extractArray<Product>(refreshResponse, []);
         if (productsData.length > 0) {
           setProducts(productsData);
@@ -439,19 +498,14 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
         // silent — non-critical
       }
 
-      alert('✅ Sotuv muvaffaqiyatli saqlandi! Chek chiqarildi.');
-      // Backend'da ma'lumot saqlanishini kutish (1 soniya)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      // Navigate based on current route context
-      const isCashierRoute = window.location.pathname.startsWith('/cashier');
-      navigate(isCashierRoute ? '/cashier/sales' : '/sales');
+      return receiptData;
     } catch (error) {
       errorHandler.handleError(error, { action: 'saveSale' });
       throw error;
     } finally {
       setIsSubmitting(false);
     }
-  }, [form, totalAmount, paidAmount, debtAmount, exchangeRateNum, navigate]);
+  }, [form, totalAmount, paidAmount, debtAmount, exchangeRateNum]);
 
   return {
     // State

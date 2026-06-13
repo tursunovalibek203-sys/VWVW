@@ -16,8 +16,10 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Package, ShoppingCart, User, WifiOff, AlertCircle, RefreshCw, Search, Trash2, Truck, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Package, ShoppingCart, User, WifiOff, AlertCircle, RefreshCw, Search, Trash2, Truck } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { ReceiptModal } from '../components/ReceiptModal';
+import type { ReceiptData } from '../lib/receiptPrinter';
 import { latinToCyrillic } from '../lib/transliterator';
 import { useSaleForm } from '../hooks/useSaleForm';
 import { ProductTypeCard, CartItem, PaymentSection } from '../components/sales';
@@ -350,6 +352,7 @@ export default function AddSaleClean() {
   const [error, setError] = useState<string | null>(null);
   const [drivers, setDrivers] = useState<{ id: string; name: string; phone?: string; debtToCompany?: number }[]>([]);
   const [driverSearch, setDriverSearch] = useState('');
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
 
   // Real-time product sync
   const handleProductUpdate = useCallback((updatedProduct: Product) => {
@@ -511,10 +514,10 @@ export default function AddSaleClean() {
   const handleSubmit = useCallback(async () => {
     if (saleForm.isSubmitting) return;
     try {
-      await saleForm.submitSale();
+      const receipt = await saleForm.submitSale();
+      setReceiptData(receipt);
     } catch (error: any) {
       console.error('❌ Sotuv yaratishda xatolik:', error);
-      // Extract detailed error message from server response
       let errorMessage = latinToCyrillic('Sotuv yaratib bo\'lmadi');
       if (error.response?.data?.error?.message) {
         errorMessage = error.response.data.error.message;
@@ -531,6 +534,12 @@ export default function AddSaleClean() {
     }
   }, [saleForm, addToast]);
 
+  const handleReceiptClose = useCallback(() => {
+    setReceiptData(null);
+    const isCashierRoute = window.location.pathname.startsWith('/cashier');
+    navigate(isCashierRoute ? '/cashier/sales' : '/sales');
+  }, [navigate]);
+
   // Handle retry
   const handleRetry = useCallback(() => {
     loadData();
@@ -543,6 +552,10 @@ export default function AddSaleClean() {
   const itemCount = saleForm.form.items.length;
 
   return (
+    <>
+    {receiptData && (
+      <ReceiptModal data={receiptData} onClose={handleReceiptClose} />
+    )}
     <div className="min-h-screen bg-slate-50/60 pb-24">
       <div className="space-y-6">
         {/* Offline Warning Banner */}
@@ -643,384 +656,317 @@ export default function AddSaleClean() {
           </div>
         </div>
 
-        {/* Zone 1: Product picker (left) + Cart (right) */}
+        {/* 2 ustunli grid: Chap=Mahsulotlar+Savat | O'ng=Mijoz+Haydovchi+To'lov */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-          {/* Products */}
-          <ProductSection
-            filteredProducts={filteredProducts}
-            currency={saleForm.form.currency}
-            activeCategory={saleForm.activeCategory}
-            productSearch={saleForm.productSearch}
-            latinToCyrillic={latinToCyrillic}
-            onCategoryChange={(cat) => saleForm.setActiveCategory(cat as any)}
-            onSearchChange={saleForm.setProductSearch}
-            onSelectProduct={handleSelectProduct}
-            onQuickAdd={handleQuickAdd}
-          />
 
-          {/* Cart + Customer (right column, sticky) */}
-          <div className="flex flex-col gap-4 lg:sticky lg:top-6">
+          {/* ── USTUN 1: Mahsulotlar + Savat ── */}
+          <div className="flex flex-col gap-4">
+            <ProductSection
+              filteredProducts={filteredProducts}
+              currency={saleForm.form.currency}
+              activeCategory={saleForm.activeCategory}
+              productSearch={saleForm.productSearch}
+              latinToCyrillic={latinToCyrillic}
+              onCategoryChange={(cat) => saleForm.setActiveCategory(cat as any)}
+              onSearchChange={saleForm.setProductSearch}
+              onSelectProduct={handleSelectProduct}
+              onQuickAdd={handleQuickAdd}
+            />
 
-          {/* ─── Compact Customer Quick-Select (always visible) ─── */}
-          <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] p-4 sm:p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <User className="w-4 h-4 text-indigo-500 flex-shrink-0" />
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{latinToCyrillic('Mijoz')}</p>
-            </div>
-            {saleForm.form.isKocha ? (
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-slate-700">{latinToCyrillic("Ko'cha savdosi")}</span>
-                <button type="button" onClick={() => { saleForm.updateFormField('isKocha', false); saleForm.updateFormField('customerId', ''); }} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">{latinToCyrillic("O'zgartirish")}</button>
-              </div>
-            ) : saleForm.form.manualCustomerName ? (
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <span className="text-sm font-semibold text-slate-900">{saleForm.form.manualCustomerName}</span>
-                  <span className="ml-2 text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">{latinToCyrillic('Yangi')}</span>
-                </div>
-                <button type="button" onClick={() => { saleForm.updateFormField('manualCustomerName', ''); saleForm.updateFormField('customerId', ''); }} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">{latinToCyrillic("O'zgartirish")}</button>
-              </div>
-            ) : saleForm.form.customerId ? (
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-slate-900">
-                  {saleForm.customers.find(c => c.id === saleForm.form.customerId)?.name || latinToCyrillic('Noma\'lum')}
-                </span>
-                <button type="button" onClick={() => saleForm.updateFormField('customerId', '')} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">{latinToCyrillic("O'zgartirish")}</button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={saleForm.customerSearch}
-                  onChange={e => saleForm.setCustomerSearch(e.target.value)}
-                  placeholder={latinToCyrillic('Mijozni qidiring...')}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none"
-                />
-                {saleForm.customerSearch && (
-                  <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
-                    {saleForm.customers
-                      .filter(c => c.name.toLowerCase().includes(saleForm.customerSearch.toLowerCase()))
-                      .slice(0, 6)
-                      .map(c => (
-                        <button key={c.id} type="button"
-                          onClick={() => { saleForm.updateFormField('customerId', c.id); saleForm.updateFormField('isKocha', false); saleForm.setCustomerSearch(''); }}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors"
-                        >
-                          <span className="font-medium text-slate-900">{c.name}</span>
-                          {c.phone && <span className="text-slate-400 ml-2 text-xs">{c.phone}</span>}
-                        </button>
-                      ))}
-                    {saleForm.customers.filter(c => c.name.toLowerCase().includes(saleForm.customerSearch.toLowerCase())).length === 0 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          saleForm.updateFormField('manualCustomerName', saleForm.customerSearch);
-                          saleForm.updateFormField('isKocha', false);
-                          saleForm.updateFormField('customerId', '');
-                          saleForm.setCustomerSearch('');
-                        }}
-                        className="w-full text-left px-3 py-2.5 text-sm hover:bg-indigo-50 transition-colors"
-                      >
-                        <span className="text-slate-400">{latinToCyrillic('Topilmadi')} — </span>
-                        <span className="text-indigo-600 font-medium">+ "{saleForm.customerSearch}" {latinToCyrillic('nomida yangi mijoz')}</span>
-                      </button>
-                    )}
+            {/* Savat */}
+            <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden">
+              <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-slate-200/70">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                    <ShoppingCart className="w-[18px] h-[18px]" />
                   </div>
-                )}
-                <button type="button" onClick={() => { saleForm.updateFormField('isKocha', true); saleForm.updateFormField('customerId', ''); saleForm.setCustomerSearch(''); }}
-                  className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 border border-dashed border-slate-200 rounded-xl hover:border-slate-300 transition-colors"
-                >
-                  {latinToCyrillic("Ko'cha savdosi")}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Cart */}
-          <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden">
-            {/* Cart header */}
-            <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-slate-200/70">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                  <ShoppingCart className="w-[18px] h-[18px]" />
-                </div>
-                <div>
-                  <h2 className="text-base font-semibold text-slate-900 tracking-tight">{latinToCyrillic('Savat')}</h2>
-                  <p className="text-xs text-slate-400 tabular-nums">{itemCount} {latinToCyrillic('ta mahsulot')}</p>
-                </div>
-              </div>
-              {itemCount > 0 && (
-                <button
-                  type="button"
-                  onClick={saleForm.clearItems}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors active:scale-[0.97]"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  {latinToCyrillic('Tozalash')}
-                </button>
-              )}
-            </div>
-
-            {itemCount > 0 ? (
-              <div className="p-4 sm:p-5 space-y-2 max-h-[55vh] overflow-y-auto">
-                {saleForm.form.items.map((item, index) => (
-                  <CartItem
-                    key={index}
-                    item={item}
-                    index={index}
-                    isEditing={editingItemIndex === index}
-                    products={saleForm.products}
-                    currency={saleForm.form.currency}
-                    latinToCyrillic={latinToCyrillic}
-                    onUpdate={(idx, updates) => {
-                      saleForm.updateItem(idx, updates);
-                      setEditingItemIndex(idx);
-                    }}
-                    onRemove={saleForm.removeItem}
-                  />
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon={ShoppingCart}
-                title={latinToCyrillic('Savat bo\'sh')}
-                description={latinToCyrillic('Chapdagi ro\'yxatdan mahsulot tanlab savatga qo\'shing')}
-              />
-            )}
-          </div>
-
-          </div>{/* end sticky right column wrapper */}
-        </div>{/* end 2-col grid */}
-
-        {/* ─── Haydovchi va Yetkazib berish (to'liq kenglik) ─── */}
-        <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden">
-          <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-slate-200/70">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
-              <Truck className="w-[18px] h-[18px]" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-slate-900 tracking-tight">{latinToCyrillic('Yetkazib berish')}</h2>
-              <p className="text-xs text-slate-400">{latinToCyrillic('Ixtiyoriy — haydovchi tayinlang')}</p>
-            </div>
-          </div>
-          <div className="p-4 sm:p-5 space-y-4">
-            {/* Driver selector — mijoz qidiruviga o'xshash */}
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                {latinToCyrillic('Haydovchi')}
-              </label>
-              {saleForm.form.driverId ? (
-                <div className="flex items-center justify-between gap-2">
                   <div>
-                    <span className="text-sm font-semibold text-slate-900">
-                      {drivers.find(d => d.id === saleForm.form.driverId)?.name}
-                    </span>
-                    {drivers.find(d => d.id === saleForm.form.driverId)?.phone && (
-                      <span className="ml-2 text-xs text-slate-400">
-                        {drivers.find(d => d.id === saleForm.form.driverId)?.phone}
-                      </span>
-                    )}
-                    {(drivers.find(d => d.id === saleForm.form.driverId)?.debtToCompany || 0) > 0 && (
-                      <span className="ml-2 text-xs text-amber-600 font-semibold">
-                        {latinToCyrillic('Qarzi')}: {Math.round(drivers.find(d => d.id === saleForm.form.driverId)!.debtToCompany!).toLocaleString()} UZS
-                      </span>
-                    )}
+                    <h2 className="text-base font-semibold text-slate-900 tracking-tight">{latinToCyrillic('Savat')}</h2>
+                    <p className="text-xs text-slate-400 tabular-nums">{itemCount} {latinToCyrillic('ta mahsulot')}</p>
                   </div>
+                </div>
+                {itemCount > 0 && (
                   <button
                     type="button"
-                    onClick={() => { saleForm.updateFormField('driverId', ''); setDriverSearch(''); }}
-                    className="text-xs text-indigo-500 hover:text-indigo-700 font-medium flex-shrink-0"
+                    onClick={saleForm.clearItems}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors active:scale-[0.97]"
                   >
-                    {latinToCyrillic("O'zgartirish")}
+                    <Trash2 className="w-4 h-4" />
+                    {latinToCyrillic('Tozalash')}
                   </button>
+                )}
+              </div>
+              {itemCount > 0 ? (
+                <div className="p-4 sm:p-5 space-y-2 max-h-[55vh] overflow-y-auto">
+                  {saleForm.form.items.map((item, index) => (
+                    <CartItem
+                      key={index}
+                      item={item}
+                      index={index}
+                      isEditing={editingItemIndex === index}
+                      products={saleForm.products}
+                      currency={saleForm.form.currency}
+                      latinToCyrillic={latinToCyrillic}
+                      onUpdate={(idx, updates) => {
+                        saleForm.updateItem(idx, updates);
+                        setEditingItemIndex(idx);
+                      }}
+                      onRemove={saleForm.removeItem}
+                    />
+                  ))}
                 </div>
               ) : (
-                <>
+                <EmptyState
+                  icon={ShoppingCart}
+                  title={latinToCyrillic('Savat bo\'sh')}
+                  description={latinToCyrillic('Chapdagi ro\'yxatdan mahsulot tanlang')}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* ── USTUN 2: Mijoz + Haydovchi + To'lov (sticky) ── */}
+          <div className="flex flex-col gap-4 lg:sticky lg:top-6">
+
+            {/* Mijoz */}
+            <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] p-4 sm:p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <User className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{latinToCyrillic('Mijoz')}</p>
+              </div>
+              {saleForm.form.isKocha ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-slate-700">{latinToCyrillic("Ko'cha savdosi")}</span>
+                  <button type="button" onClick={() => { saleForm.updateFormField('isKocha', false); saleForm.updateFormField('customerId', ''); }} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">{latinToCyrillic("O'zgartirish")}</button>
+                </div>
+              ) : saleForm.form.manualCustomerName ? (
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-sm font-semibold text-slate-900">{saleForm.form.manualCustomerName}</span>
+                    <span className="ml-2 text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">{latinToCyrillic('Yangi')}</span>
+                  </div>
+                  <button type="button" onClick={() => { saleForm.updateFormField('manualCustomerName', ''); saleForm.updateFormField('customerId', ''); }} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">{latinToCyrillic("O'zgartirish")}</button>
+                </div>
+              ) : saleForm.form.customerId ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-slate-900">
+                    {saleForm.customers.find(c => c.id === saleForm.form.customerId)?.name || latinToCyrillic('Noma\'lum')}
+                  </span>
+                  <button type="button" onClick={() => saleForm.updateFormField('customerId', '')} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">{latinToCyrillic("O'zgartirish")}</button>
+                </div>
+              ) : (
+                <div className="space-y-2">
                   <input
                     type="text"
-                    value={driverSearch}
-                    onChange={e => setDriverSearch(e.target.value)}
-                    placeholder={latinToCyrillic('Haydovchini qidiring...')}
+                    value={saleForm.customerSearch}
+                    onChange={e => saleForm.setCustomerSearch(e.target.value)}
+                    placeholder={latinToCyrillic('Mijozni qidiring...')}
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none"
                   />
-                  {driverSearch && (
-                    <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
-                      {drivers
-                        .filter(d => d.name.toLowerCase().includes(driverSearch.toLowerCase()) || (d.phone || '').includes(driverSearch))
-                        .map(d => (
-                          <button
-                            key={d.id}
-                            type="button"
-                            onClick={() => { saleForm.updateFormField('driverId', d.id); setDriverSearch(''); }}
+                  {saleForm.customerSearch && (
+                    <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
+                      {saleForm.customers
+                        .filter(c => c.name.toLowerCase().includes(saleForm.customerSearch.toLowerCase()))
+                        .slice(0, 6)
+                        .map(c => (
+                          <button key={c.id} type="button"
+                            onClick={() => { saleForm.updateFormField('customerId', c.id); saleForm.updateFormField('isKocha', false); saleForm.setCustomerSearch(''); }}
                             className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors"
                           >
-                            <span className="font-medium text-slate-900">{d.name}</span>
-                            {d.phone && <span className="text-slate-400 ml-2 text-xs">{d.phone}</span>}
-                            {(d.debtToCompany || 0) > 0 && (
-                              <span className="ml-2 text-xs text-amber-600 font-semibold">
-                                {latinToCyrillic('Qarzi')}: {Math.round(d.debtToCompany!).toLocaleString()} UZS
-                              </span>
-                            )}
+                            <span className="font-medium text-slate-900">{c.name}</span>
+                            {c.phone && <span className="text-slate-400 ml-2 text-xs">{c.phone}</span>}
                           </button>
                         ))}
-                      {drivers.filter(d => d.name.toLowerCase().includes(driverSearch.toLowerCase()) || (d.phone || '').includes(driverSearch)).length === 0 && (
-                        <p className="px-3 py-2.5 text-sm text-slate-400">{latinToCyrillic('Haydovchi topilmadi')}</p>
+                      {saleForm.customers.filter(c => c.name.toLowerCase().includes(saleForm.customerSearch.toLowerCase())).length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            saleForm.updateFormField('manualCustomerName', saleForm.customerSearch);
+                            saleForm.updateFormField('isKocha', false);
+                            saleForm.updateFormField('customerId', '');
+                            saleForm.setCustomerSearch('');
+                          }}
+                          className="w-full text-left px-3 py-2.5 text-sm hover:bg-indigo-50 transition-colors"
+                        >
+                          <span className="text-slate-400">{latinToCyrillic('Topilmadi')} — </span>
+                          <span className="text-indigo-600 font-medium">+ "{saleForm.customerSearch}" {latinToCyrillic('nomida yangi mijoz')}</span>
+                        </button>
                       )}
                     </div>
                   )}
-                </>
+                  <button type="button" onClick={() => { saleForm.updateFormField('isKocha', true); saleForm.updateFormField('customerId', ''); saleForm.setCustomerSearch(''); }}
+                    className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 border border-dashed border-slate-200 rounded-xl hover:border-slate-300 transition-colors"
+                  >
+                    {latinToCyrillic("Ko'cha savdosi")}
+                  </button>
+                </div>
               )}
             </div>
 
-            {/* Driver payment options — only when driver selected */}
-            {saleForm.form.driverId && (
-              <div className="space-y-3 pt-1">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-                    {latinToCyrillic('Pul olish usuli')}
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => saleForm.updateFormField('driverCollectsAll', false)}
-                      className={`py-2.5 rounded-xl text-sm font-semibold border transition-all ${
-                        !saleForm.form.driverCollectsAll
-                          ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      {latinToCyrillic("Kompaniya o'zi")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => saleForm.updateFormField('driverCollectsAll', true)}
-                      className={`py-2.5 rounded-xl text-sm font-semibold border transition-all ${
-                        saleForm.form.driverCollectsAll
-                          ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      {latinToCyrillic('Haydovchi yig\'adi')}
-                    </button>
-                  </div>
+            {/* Haydovchi / Yetkazib berish */}
+            <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden">
+              <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-slate-200/70">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+                  <Truck className="w-[18px] h-[18px]" />
                 </div>
-
-                {saleForm.form.driverCollectsAll && (
-                  <div className="space-y-2">
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                      {latinToCyrillic('Yig\'adigan summa')}
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => { saleForm.updateFormField('driverCollectsAll', true); saleForm.updateFormField('driverCollectsAmount', ''); }}
-                        className={`py-2.5 rounded-xl text-sm font-semibold border transition-all ${
-                          !saleForm.form.driverCollectsAmount
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        {latinToCyrillic("To'liq summa")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => saleForm.updateFormField('driverCollectsAmount', ' ')}
-                        className={`py-2.5 rounded-xl text-sm font-semibold border transition-all ${
-                          saleForm.form.driverCollectsAmount?.trim()
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        {latinToCyrillic('Aniq summa')}
-                      </button>
-                    </div>
-                    {saleForm.form.driverCollectsAmount?.trim() !== undefined && saleForm.form.driverCollectsAmount !== '' && (
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder={latinToCyrillic('Summa (UZS)')}
-                        value={saleForm.form.driverCollectsAmount?.trim() || ''}
-                        onChange={e => saleForm.updateFormField('driverCollectsAmount', e.target.value)}
-                        className="w-full sm:max-w-xs h-11 px-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
-                      />
-                    )}
-                  </div>
-                )}
-
-                {/* Delivery fee */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-                    {latinToCyrillic('Yetkazib berish narxi')} <span className="text-slate-300 normal-case font-normal">{latinToCyrillic('(ixtiyoriy)')}</span>
-                  </label>
-                  <div className="flex gap-2 sm:max-w-sm">
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      value={saleForm.form.deliveryFee}
-                      onChange={e => saleForm.updateFormField('deliveryFee', e.target.value)}
-                      className="flex-1 h-11 px-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
-                    />
-                    <div className="flex rounded-xl border border-slate-200 overflow-hidden bg-slate-50 flex-shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => saleForm.updateFormField('deliveryFeePaidBy', 'COMPANY')}
-                        className={`px-3 py-2 text-xs font-semibold transition-all ${
-                          saleForm.form.deliveryFeePaidBy === 'COMPANY'
-                            ? 'bg-slate-900 text-white'
-                            : 'text-slate-500 hover:text-slate-900'
-                        }`}
-                      >
-                        {latinToCyrillic('Kompaniya')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => saleForm.updateFormField('deliveryFeePaidBy', 'CUSTOMER')}
-                        className={`px-3 py-2 text-xs font-semibold transition-all border-l border-slate-200 ${
-                          saleForm.form.deliveryFeePaidBy === 'CUSTOMER'
-                            ? 'bg-slate-900 text-white'
-                            : 'text-slate-500 hover:text-slate-900'
-                        }`}
-                      >
-                        {latinToCyrillic('Mijoz')}
-                      </button>
-                    </div>
-                  </div>
-                  {saleForm.form.deliveryFee && parseFloat(saleForm.form.deliveryFee) > 0 && (
-                    <p className="mt-1.5 text-xs text-slate-400">
-                      {saleForm.form.deliveryFeePaidBy === 'CUSTOMER'
-                        ? latinToCyrillic("Mijoz to'laydi — mijozning qarzi ortadi")
-                        : latinToCyrillic("Kompaniya to'laydi — kassadan chiqim bo'ladi")}
-                    </p>
-                  )}
+                  <h2 className="text-base font-semibold text-slate-900 tracking-tight">{latinToCyrillic('Yetkazib berish')}</h2>
+                  <p className="text-xs text-slate-400">{latinToCyrillic('Ixtiyoriy — haydovchi tayinlang')}</p>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
+              <div className="p-4 sm:p-5 space-y-4">
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    {latinToCyrillic('Haydovchi')}
+                  </label>
+                  {saleForm.form.driverId ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <span className="text-sm font-semibold text-slate-900">
+                          {drivers.find(d => d.id === saleForm.form.driverId)?.name}
+                        </span>
+                        {drivers.find(d => d.id === saleForm.form.driverId)?.phone && (
+                          <span className="ml-2 text-xs text-slate-400">{drivers.find(d => d.id === saleForm.form.driverId)?.phone}</span>
+                        )}
+                        {(drivers.find(d => d.id === saleForm.form.driverId)?.debtToCompany || 0) > 0 && (
+                          <span className="ml-2 text-xs text-amber-600 font-semibold">
+                            {latinToCyrillic('Qarzi')}: {Math.round(drivers.find(d => d.id === saleForm.form.driverId)!.debtToCompany!).toLocaleString()} UZS
+                          </span>
+                        )}
+                      </div>
+                      <button type="button" onClick={() => { saleForm.updateFormField('driverId', ''); setDriverSearch(''); }} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium flex-shrink-0">
+                        {latinToCyrillic("O'zgartirish")}
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        value={driverSearch}
+                        onChange={e => setDriverSearch(e.target.value)}
+                        placeholder={latinToCyrillic('Haydovchini qidiring...')}
+                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none"
+                      />
+                      {driverSearch && (
+                        <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
+                          {drivers
+                            .filter(d => d.name.toLowerCase().includes(driverSearch.toLowerCase()) || (d.phone || '').includes(driverSearch))
+                            .map(d => (
+                              <button key={d.id} type="button"
+                                onClick={() => { saleForm.updateFormField('driverId', d.id); setDriverSearch(''); }}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors"
+                              >
+                                <span className="font-medium text-slate-900">{d.name}</span>
+                                {d.phone && <span className="text-slate-400 ml-2 text-xs">{d.phone}</span>}
+                                {(d.debtToCompany || 0) > 0 && (
+                                  <span className="ml-2 text-xs text-amber-600 font-semibold">
+                                    {latinToCyrillic('Qarzi')}: {Math.round(d.debtToCompany!).toLocaleString()} UZS
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          {drivers.filter(d => d.name.toLowerCase().includes(driverSearch.toLowerCase()) || (d.phone || '').includes(driverSearch)).length === 0 && (
+                            <p className="px-3 py-2.5 text-sm text-slate-400">{latinToCyrillic('Haydovchi topilmadi')}</p>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
 
-        {/* Payment Section */}
-        <PaymentSection
-          form={saleForm.form}
-          totalAmount={saleForm.totalAmount}
-          paidAmount={saleForm.paidAmount}
-          debtAmount={saleForm.debtAmount}
-          exchangeRate={saleForm.exchangeRate}
-          currency={saleForm.form.currency}
-          isSubmitting={saleForm.isSubmitting}
-          isEditMode={saleForm.isEditMode}
-          latinToCyrillic={latinToCyrillic}
-          onUpdateForm={(updates) => {
-            Object.entries(updates).forEach(([key, value]) => {
-              saleForm.updateFormField(key as any, value);
-            });
-          }}
-          onExchangeRateChange={saleForm.setExchangeRate}
-          onSubmit={handleSubmit}
-          onCancel={() => navigate(-1)}
-          onReset={saleForm.resetForm}
-        />
+                {saleForm.form.driverId && (
+                  <div className="space-y-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                        {latinToCyrillic('Pul olish usuli')}
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => saleForm.updateFormField('driverCollectsAll', false)}
+                          className={`py-2.5 rounded-xl text-sm font-semibold border transition-all ${!saleForm.form.driverCollectsAll ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                          {latinToCyrillic("Kompaniya o'zi")}
+                        </button>
+                        <button type="button" onClick={() => saleForm.updateFormField('driverCollectsAll', true)}
+                          className={`py-2.5 rounded-xl text-sm font-semibold border transition-all ${saleForm.form.driverCollectsAll ? 'bg-amber-500 text-white border-amber-500 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                          {latinToCyrillic('Haydovchi yig\'adi')}
+                        </button>
+                      </div>
+                    </div>
+                    {saleForm.form.driverCollectsAll && (
+                      <div className="space-y-2">
+                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                          {latinToCyrillic('Yig\'adigan summa')}
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button type="button" onClick={() => { saleForm.updateFormField('driverCollectsAll', true); saleForm.updateFormField('driverCollectsAmount', ''); }}
+                            className={`py-2.5 rounded-xl text-sm font-semibold border transition-all ${!saleForm.form.driverCollectsAmount ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                            {latinToCyrillic("To'liq summa")}
+                          </button>
+                          <button type="button" onClick={() => saleForm.updateFormField('driverCollectsAmount', ' ')}
+                            className={`py-2.5 rounded-xl text-sm font-semibold border transition-all ${saleForm.form.driverCollectsAmount?.trim() ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                            {latinToCyrillic('Aniq summa')}
+                          </button>
+                        </div>
+                        {saleForm.form.driverCollectsAmount?.trim() && (
+                          <input type="number" min="0" placeholder={latinToCyrillic('Summa (UZS)')}
+                            value={saleForm.form.driverCollectsAmount?.trim() || ''}
+                            onChange={e => saleForm.updateFormField('driverCollectsAmount', e.target.value)}
+                            className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                          />
+                        )}
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                        {latinToCyrillic('Yetkazib berish narxi')} <span className="text-slate-300 normal-case font-normal">{latinToCyrillic('(ixtiyoriy)')}</span>
+                      </label>
+                      <div className="flex gap-2">
+                        <input type="number" min="0" placeholder="0" value={saleForm.form.deliveryFee}
+                          onChange={e => saleForm.updateFormField('deliveryFee', e.target.value)}
+                          className="flex-1 h-11 px-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                        />
+                        <div className="flex rounded-xl border border-slate-200 overflow-hidden bg-slate-50 flex-shrink-0">
+                          <button type="button" onClick={() => saleForm.updateFormField('deliveryFeePaidBy', 'COMPANY')}
+                            className={`px-3 py-2 text-xs font-semibold transition-all ${saleForm.form.deliveryFeePaidBy === 'COMPANY' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-900'}`}>
+                            {latinToCyrillic('Komp.')}
+                          </button>
+                          <button type="button" onClick={() => saleForm.updateFormField('deliveryFeePaidBy', 'CUSTOMER')}
+                            className={`px-3 py-2 text-xs font-semibold transition-all border-l border-slate-200 ${saleForm.form.deliveryFeePaidBy === 'CUSTOMER' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-900'}`}>
+                            {latinToCyrillic('Mijoz')}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* To'lov */}
+            <PaymentSection
+              form={saleForm.form}
+              totalAmount={saleForm.totalAmount}
+              paidAmount={saleForm.paidAmount}
+              debtAmount={saleForm.debtAmount}
+              exchangeRate={saleForm.exchangeRate}
+              currency={saleForm.form.currency}
+              isSubmitting={saleForm.isSubmitting}
+              isEditMode={saleForm.isEditMode}
+              latinToCyrillic={latinToCyrillic}
+              onUpdateForm={(updates) => {
+                Object.entries(updates).forEach(([key, value]) => {
+                  saleForm.updateFormField(key as any, value);
+                });
+              }}
+              onExchangeRateChange={saleForm.setExchangeRate}
+              onSubmit={handleSubmit}
+              onCancel={() => navigate(-1)}
+              onReset={saleForm.resetForm}
+            />
+
+          </div>{/* end right column */}
+        </div>{/* end 2-col grid */}
       </div>
     </div>
+    </>
   );
 }

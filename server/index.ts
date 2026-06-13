@@ -56,6 +56,7 @@ import realtimeRoutes from './routes/realtime';
 import employeeLoansRoutes from './routes/employee-loans';
 import exchangeRatesRoutes from './routes/exchange-rates';
 import ledgerRoutes from './routes/ledger';
+import warehouseRoutes from './routes/warehouse';
 
 const app = express();
 const PORT = process.env.PORT || 5003;
@@ -224,6 +225,7 @@ app.use('/api/realtime', realtimeRoutes);
 app.use('/api/employee-loans', employeeLoansRoutes);
 app.use('/api/exchange-rates', exchangeRatesRoutes);
 app.use('/api/ledger', ledgerRoutes);
+app.use('/api/warehouse', warehouseRoutes);
 
 // Enhanced health check with DB connectivity
 app.get('/api/health', async (req, res) => {
@@ -308,6 +310,146 @@ if (process.env.NODE_ENV !== 'production') {
 // Global error handler - must be last (BEFORE app.listen)
 app.use(errorHandler);
 
+// Startup seed: 102 ta mahsulot yo'q bo'lsa qo'shiladi
+async function seedProducts() {
+  try {
+    const count = await prisma.product.count();
+    if (count >= 20) return; // Allaqachon ma'lumot bor
+
+    const products = [
+      { name: 'Kapsula 15gr praerach', bagType: '15gr', warehouse: 'preform', unitsPerBag: 20000, pricePerPiece: 0.285, pricePerBag: 5700, currentStock: 18 },
+      { name: 'Kapsula 15gr gidro', bagType: '15gr', warehouse: 'preform', unitsPerBag: 20000, pricePerPiece: 0.285, pricePerBag: 5700, currentStock: 1 },
+      { name: 'Kapsula 15gr siniy', bagType: '15gr', warehouse: 'preform', unitsPerBag: 20000, pricePerPiece: 0.285, pricePerBag: 5700, currentStock: 19 },
+      { name: 'Kapsula 15gr sprite', bagType: '15gr', warehouse: 'preform', unitsPerBag: 20000, pricePerPiece: 0.285, pricePerBag: 5700, currentStock: 17 },
+      { name: 'Kapsula 15gr qizil', bagType: '15gr', warehouse: 'preform', unitsPerBag: 20000, pricePerPiece: 0.285, pricePerBag: 5700, currentStock: 0 },
+      { name: 'Kapsula 15gr qora', bagType: '15gr', warehouse: 'preform', unitsPerBag: 20000, pricePerPiece: 0.285, pricePerBag: 5700, currentStock: 0 },
+      { name: 'Kapsula 21gr praerach', bagType: '21gr', warehouse: 'preform', unitsPerBag: 15000, pricePerPiece: 0.04, pricePerBag: 600, currentStock: 4 },
+      { name: 'Kapsula 21gr gidro', bagType: '21gr', warehouse: 'preform', unitsPerBag: 15000, pricePerPiece: 0.04, pricePerBag: 600, currentStock: 15 },
+      { name: 'Kapsula 21gr gd Oktosh', bagType: '21gr', warehouse: 'preform', unitsPerBag: 15000, pricePerPiece: 0.04, pricePerBag: 600, currentStock: 0 },
+      { name: 'Kapsula 21gr siniy', bagType: '21gr', warehouse: 'preform', unitsPerBag: 15000, pricePerPiece: 0.04, pricePerBag: 600, currentStock: 11 },
+      { name: 'Kapsula 21gr sprite', bagType: '21gr', warehouse: 'preform', unitsPerBag: 15000, pricePerPiece: 0.04, pricePerBag: 600, currentStock: 1 },
+      { name: 'Kapsula 21gr yod', bagType: '21gr', warehouse: 'preform', unitsPerBag: 15000, pricePerPiece: 0.04, pricePerBag: 600, currentStock: 0 },
+      { name: 'Kapsula 21gr oq', bagType: '21gr', warehouse: 'preform', unitsPerBag: 15000, pricePerPiece: 0.04, pricePerBag: 600, currentStock: 0 },
+      { name: 'Kapsula 26gr yog', bagType: '26gr', warehouse: 'preform', unitsPerBag: 12000, pricePerPiece: 0.0494, pricePerBag: 593, currentStock: 22 },
+      { name: 'Kapsula 30gr praerach', bagType: '30gr', warehouse: 'preform', unitsPerBag: 10000, pricePerPiece: 0.057, pricePerBag: 570, currentStock: 18 },
+      { name: 'Kapsula 30gr gidro', bagType: '30gr', warehouse: 'preform', unitsPerBag: 10000, pricePerPiece: 0.057, pricePerBag: 570, currentStock: 22 },
+      { name: 'Kapsula 30gr gd Oktosh', bagType: '30gr', warehouse: 'preform', unitsPerBag: 10000, pricePerPiece: 0.057, pricePerBag: 570, currentStock: 0 },
+      { name: 'Kapsula 30gr sprite', bagType: '30gr', warehouse: 'preform', unitsPerBag: 10000, pricePerPiece: 0.057, pricePerBag: 570, currentStock: 3 },
+      { name: 'Kapsula 30gr siniy', bagType: '30gr', warehouse: 'preform', unitsPerBag: 10000, pricePerPiece: 0.057, pricePerBag: 570, currentStock: 17 },
+      { name: 'Kapsula 36gr yog', bagType: '36gr', warehouse: 'preform', unitsPerBag: 10000, pricePerPiece: 0.0685, pricePerBag: 685, currentStock: 30 },
+      { name: 'Kapsula 52gr praerach', bagType: '52gr', warehouse: 'preform', unitsPerBag: 6000, pricePerPiece: 0.0988, pricePerBag: 593, currentStock: 14 },
+      { name: 'Kapsula 52gr oq', bagType: '52gr', warehouse: 'preform', unitsPerBag: 6000, pricePerPiece: 0.0988, pricePerBag: 593, currentStock: 7 },
+      { name: 'Kapsula 70gr praerach', bagType: '70gr', warehouse: 'preform', unitsPerBag: 4500, pricePerPiece: 0.133, pricePerBag: 600, currentStock: 0 },
+      { name: 'Kapsula 70gr gidro', bagType: '70gr', warehouse: 'preform', unitsPerBag: 4500, pricePerPiece: 0.133, pricePerBag: 600, currentStock: 0 },
+      { name: 'Kapsula 70gr sayxun', bagType: '70gr', warehouse: 'preform', unitsPerBag: 4500, pricePerPiece: 0.133, pricePerBag: 600, currentStock: 1 },
+      { name: 'Kapsula 70gr siniy', bagType: '70gr', warehouse: 'preform', unitsPerBag: 4500, pricePerPiece: 0.133, pricePerBag: 600, currentStock: 0 },
+      { name: 'Kapsula 75gr praerach', bagType: '75gr', warehouse: 'preform', unitsPerBag: 4000, pricePerPiece: 0.1425, pricePerBag: 570, currentStock: 18 },
+      { name: 'Kapsula 75gr sayxun', bagType: '75gr', warehouse: 'preform', unitsPerBag: 4000, pricePerPiece: 0.1425, pricePerBag: 570, currentStock: 2 },
+      { name: 'Kapsula 75gr gidro 4000', bagType: '75gr', warehouse: 'preform', unitsPerBag: 4000, pricePerPiece: 0.1425, pricePerBag: 570, currentStock: 0 },
+      { name: 'Kapsula 75gr gidro 3000', bagType: '75gr', warehouse: 'preform', unitsPerBag: 3000, pricePerPiece: 0.1425, pricePerBag: 427.5, currentStock: 0 },
+      { name: 'Kapsula 75gr siniy 4000', bagType: '75gr', warehouse: 'preform', unitsPerBag: 4000, pricePerPiece: 0.1425, pricePerBag: 570, currentStock: 29 },
+      { name: 'Kapsula 75gr siniy 3000', bagType: '75gr', warehouse: 'preform', unitsPerBag: 3000, pricePerPiece: 0.1425, pricePerBag: 427.5, currentStock: 0 },
+      { name: 'Kapsula 80gr praerach 4000', bagType: '80gr', warehouse: 'preform', unitsPerBag: 4000, pricePerPiece: 0.152, pricePerBag: 608, currentStock: 47 },
+      { name: 'Kapsula 80gr praerach 3000', bagType: '80gr', warehouse: 'preform', unitsPerBag: 3000, pricePerPiece: 0.152, pricePerBag: 456, currentStock: 3 },
+      { name: 'Kapsula 80gr gidro 4000', bagType: '80gr', warehouse: 'preform', unitsPerBag: 4000, pricePerPiece: 0.152, pricePerBag: 608, currentStock: 0 },
+      { name: 'Kapsula 80gr gidro 3000', bagType: '80gr', warehouse: 'preform', unitsPerBag: 3000, pricePerPiece: 0.152, pricePerBag: 456, currentStock: 0 },
+      { name: 'Kapsula 80gr sayxun 4000', bagType: '80gr', warehouse: 'preform', unitsPerBag: 4000, pricePerPiece: 0.152, pricePerBag: 608, currentStock: 0 },
+      { name: 'Kapsula 80gr sayxun 3000', bagType: '80gr', warehouse: 'preform', unitsPerBag: 3000, pricePerPiece: 0.152, pricePerBag: 456, currentStock: 0 },
+      { name: 'Kapsula 80gr siniy 4000', bagType: '80gr', warehouse: 'preform', unitsPerBag: 4000, pricePerPiece: 0.152, pricePerBag: 608, currentStock: 1 },
+      { name: 'Kapsula 80gr siniy 3000', bagType: '80gr', warehouse: 'preform', unitsPerBag: 3000, pricePerPiece: 0.152, pricePerBag: 456, currentStock: 0 },
+      { name: 'Kapsula 85gr praerach 3000', bagType: '85gr', warehouse: 'preform', unitsPerBag: 3000, pricePerPiece: 0.1615, pricePerBag: 484.5, currentStock: 0 },
+      { name: 'Kapsula 85gr praerach 4000', bagType: '85gr', warehouse: 'preform', unitsPerBag: 4000, pricePerPiece: 0.1615, pricePerBag: 646, currentStock: 2 },
+      { name: 'Kapsula 86gr praerach A', bagType: '86gr', warehouse: 'preform', unitsPerBag: 3000, pricePerPiece: 0.1634, pricePerBag: 490.2, currentStock: 0 },
+      { name: 'Kapsula 86gr praerach B', bagType: '86gr', warehouse: 'preform', unitsPerBag: 3000, pricePerPiece: 0.1634, pricePerBag: 490.2, currentStock: 1 },
+      { name: 'Kapsula 135gr praerach 2500', bagType: '135gr', warehouse: 'preform', unitsPerBag: 2500, pricePerPiece: 0.2565, pricePerBag: 641.25, currentStock: 0 },
+      { name: 'Kapsula 135gr praerach 2000', bagType: '135gr', warehouse: 'preform', unitsPerBag: 2000, pricePerPiece: 0.2565, pricePerBag: 513, currentStock: 0 },
+      { name: 'Kapsula 135gr gidro 2500', bagType: '135gr', warehouse: 'preform', unitsPerBag: 2500, pricePerPiece: 0.2565, pricePerBag: 641.25, currentStock: 16 },
+      { name: 'Kapsula 135gr gidro 2000', bagType: '135gr', warehouse: 'preform', unitsPerBag: 2000, pricePerPiece: 0.2565, pricePerBag: 513, currentStock: 0 },
+      { name: 'Kapsula 135gr sayxun', bagType: '135gr', warehouse: 'preform', unitsPerBag: 2500, pricePerPiece: 0.2565, pricePerBag: 641.25, currentStock: 1 },
+      { name: 'Kapsula 135gr sayxun+', bagType: '135gr', warehouse: 'preform', unitsPerBag: 2500, pricePerPiece: 0.2565, pricePerBag: 641.25, currentStock: 0 },
+      { name: 'Kapsula 135gr siniy 2500', bagType: '135gr', warehouse: 'preform', unitsPerBag: 2500, pricePerPiece: 0.2565, pricePerBag: 641.25, currentStock: 29 },
+      { name: 'Kapsula 135gr siniy 2000', bagType: '135gr', warehouse: 'preform', unitsPerBag: 2000, pricePerPiece: 0.2565, pricePerBag: 513, currentStock: 0 },
+      { name: 'Kapsula 250gr nestle', bagType: '250gr', warehouse: 'preform', unitsPerBag: 2000, pricePerPiece: 0, pricePerBag: 0, currentStock: 0 },
+      { name: 'Kapsula 250gr siniy', bagType: '250gr', warehouse: 'preform', unitsPerBag: 2000, pricePerPiece: 0, pricePerBag: 0, currentStock: 0 },
+      { name: 'Krishka 28 gaz kok', bagType: 'Kichik qop', warehouse: 'krishka', unitsPerBag: 6000, pricePerPiece: 0.007, pricePerBag: 42, currentStock: 0 },
+      { name: 'Krishka 28 gaz galuboy', bagType: 'Kichik qop', warehouse: 'krishka', unitsPerBag: 6000, pricePerPiece: 0.007, pricePerBag: 42, currentStock: 0 },
+      { name: 'Krishka 28 gaz sariq', bagType: 'Kichik qop', warehouse: 'krishka', unitsPerBag: 6000, pricePerPiece: 0.007, pricePerBag: 42, currentStock: 0 },
+      { name: 'Krishka 28 gaz yashil', bagType: 'Kichik qop', warehouse: 'krishka', unitsPerBag: 6000, pricePerPiece: 0.007, pricePerBag: 42, currentStock: 0 },
+      { name: 'Krishka 28 gaz qizil', bagType: 'Kichik qop', warehouse: 'krishka', unitsPerBag: 6000, pricePerPiece: 0.007, pricePerBag: 42, currentStock: 0 },
+      { name: 'Krishka 28 oq', bagType: 'Kichik qop', warehouse: 'krishka', unitsPerBag: 6000, pricePerPiece: 0.007, pricePerBag: 42, currentStock: 0 },
+      { name: 'Krishka 28 gaz qora', bagType: 'Kichik qop', warehouse: 'krishka', unitsPerBag: 6000, pricePerPiece: 0.007, pricePerBag: 42, currentStock: 0 },
+      { name: 'Krishka 28 DKM sariq', bagType: 'Kichik qop', warehouse: 'krishka', unitsPerBag: 4000, pricePerPiece: 0.013, pricePerBag: 52, currentStock: 0 },
+      { name: 'Krishka 28 DKM kok 10000', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 10000, pricePerPiece: 0.013, pricePerBag: 130, currentStock: 0 },
+      { name: 'Krishka 28 DKM kok 6000', bagType: 'Kichik qop', warehouse: 'krishka', unitsPerBag: 6000, pricePerPiece: 0.013, pricePerBag: 78, currentStock: 0 },
+      { name: 'Krishka 28 DKM yashil', bagType: 'Kichik qop', warehouse: 'krishka', unitsPerBag: 4000, pricePerPiece: 0.013, pricePerBag: 52, currentStock: 0 },
+      { name: 'Ruchka 28 sariq 1500', bagType: 'Kichik qop', warehouse: 'ruchka', unitsPerBag: 1500, pricePerPiece: 0.009, pricePerBag: 13.5, currentStock: 0 },
+      { name: 'Ruchka 28 sariq 2500', bagType: 'O\'rta qop', warehouse: 'ruchka', unitsPerBag: 2500, pricePerPiece: 0.009, pricePerBag: 22.5, currentStock: 0 },
+      { name: 'Krishka 38 kok', bagType: 'O\'rta qop', warehouse: 'krishka', unitsPerBag: 3000, pricePerPiece: 0.010, pricePerBag: 30, currentStock: 88 },
+      { name: 'Krishka 38 galuboy', bagType: 'O\'rta qop', warehouse: 'krishka', unitsPerBag: 3000, pricePerPiece: 0.010, pricePerBag: 30, currentStock: 0 },
+      { name: 'Krishka 38 sariq', bagType: 'O\'rta qop', warehouse: 'krishka', unitsPerBag: 3000, pricePerPiece: 0.010, pricePerBag: 30, currentStock: 90 },
+      { name: 'Krishka 38 yashil', bagType: 'O\'rta qop', warehouse: 'krishka', unitsPerBag: 3000, pricePerPiece: 0.010, pricePerBag: 30, currentStock: 9 },
+      { name: 'Krishka 38 sayxun', bagType: 'O\'rta qop', warehouse: 'krishka', unitsPerBag: 3000, pricePerPiece: 0.010, pricePerBag: 30, currentStock: 34 },
+      { name: 'Krishka 38 qizil', bagType: 'O\'rta qop', warehouse: 'krishka', unitsPerBag: 3000, pricePerPiece: 0.010, pricePerBag: 30, currentStock: 50 },
+      { name: 'Krishka 38 oq', bagType: 'O\'rta qop', warehouse: 'krishka', unitsPerBag: 3000, pricePerPiece: 0.010, pricePerBag: 30, currentStock: 40 },
+      { name: 'Ruchka 38 kok', bagType: 'O\'rta qop', warehouse: 'ruchka', unitsPerBag: 2000, pricePerPiece: 0.015, pricePerBag: 30, currentStock: 167 },
+      { name: 'Ruchka 38 galuboy', bagType: 'O\'rta qop', warehouse: 'ruchka', unitsPerBag: 2000, pricePerPiece: 0.015, pricePerBag: 30, currentStock: 0 },
+      { name: 'Ruchka 38 sariq', bagType: 'O\'rta qop', warehouse: 'ruchka', unitsPerBag: 2000, pricePerPiece: 0.015, pricePerBag: 30, currentStock: 44 },
+      { name: 'Ruchka 38 yashil', bagType: 'O\'rta qop', warehouse: 'ruchka', unitsPerBag: 2000, pricePerPiece: 0.015, pricePerBag: 30, currentStock: 23 },
+      { name: 'Ruchka 38 sayxun', bagType: 'O\'rta qop', warehouse: 'ruchka', unitsPerBag: 2000, pricePerPiece: 0.015, pricePerBag: 30, currentStock: 30 },
+      { name: 'Ruchka 38 qizil', bagType: 'O\'rta qop', warehouse: 'ruchka', unitsPerBag: 2000, pricePerPiece: 0.015, pricePerBag: 30, currentStock: 25 },
+      { name: 'Ruchka 38 oq', bagType: 'O\'rta qop', warehouse: 'ruchka', unitsPerBag: 2000, pricePerPiece: 0.015, pricePerBag: 30, currentStock: 35 },
+      { name: 'Krishka 48 kok', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 2000, pricePerPiece: 0.018, pricePerBag: 36, currentStock: 70 },
+      { name: 'Krishka 48 galuboy', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 2000, pricePerPiece: 0.018, pricePerBag: 36, currentStock: 8 },
+      { name: 'Krishka 48 sariq', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 2000, pricePerPiece: 0.018, pricePerBag: 36, currentStock: 75 },
+      { name: 'Krishka 48 Donya', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 2000, pricePerPiece: 0.018, pricePerBag: 36, currentStock: 44 },
+      { name: 'Krishka 48 Bekajon', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 2000, pricePerPiece: 0.018, pricePerBag: 36, currentStock: 0 },
+      { name: 'Krishka 48 yashil', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 2000, pricePerPiece: 0.018, pricePerBag: 36, currentStock: 89 },
+      { name: 'Krishka 48 apelsin', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 2000, pricePerPiece: 0.018, pricePerBag: 36, currentStock: 144 },
+      { name: 'Krishka 48 qizil', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 2000, pricePerPiece: 0.018, pricePerBag: 36, currentStock: 38 },
+      { name: 'Krishka 48 sayxun', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 2000, pricePerPiece: 0.018, pricePerBag: 36, currentStock: 0 },
+      { name: 'Krishka 48 salat', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 2000, pricePerPiece: 0.018, pricePerBag: 36, currentStock: 5 },
+      { name: 'Krishka 48 oq', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 2000, pricePerPiece: 0.018, pricePerBag: 36, currentStock: 86 },
+      { name: 'Ruchka 48 kok', bagType: 'Katta qop', warehouse: 'ruchka', unitsPerBag: 1000, pricePerPiece: 0.012, pricePerBag: 12, currentStock: 22 },
+      { name: 'Ruchka 48 galuboy', bagType: 'Katta qop', warehouse: 'ruchka', unitsPerBag: 1000, pricePerPiece: 0.012, pricePerBag: 12, currentStock: 24 },
+      { name: 'Ruchka 48 sariq', bagType: 'Katta qop', warehouse: 'ruchka', unitsPerBag: 1000, pricePerPiece: 0.012, pricePerBag: 12, currentStock: 91 },
+      { name: 'Ruchka 48 apelsin', bagType: 'Katta qop', warehouse: 'ruchka', unitsPerBag: 1000, pricePerPiece: 0.012, pricePerBag: 12, currentStock: 0 },
+      { name: 'Ruchka 48 yashil', bagType: 'Katta qop', warehouse: 'ruchka', unitsPerBag: 1000, pricePerPiece: 0.012, pricePerBag: 12, currentStock: 98 },
+      { name: 'Ruchka 48 sayxun', bagType: 'Katta qop', warehouse: 'ruchka', unitsPerBag: 1000, pricePerPiece: 0.012, pricePerBag: 12, currentStock: 13 },
+      { name: 'Ruchka 48 qizil', bagType: 'Katta qop', warehouse: 'ruchka', unitsPerBag: 1000, pricePerPiece: 0.012, pricePerBag: 12, currentStock: 50 },
+      { name: 'Ruchka 48 oq', bagType: 'Katta qop', warehouse: 'ruchka', unitsPerBag: 1000, pricePerPiece: 0.012, pricePerBag: 12, currentStock: 116 },
+      { name: 'Krishka 55 kok', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 1000, pricePerPiece: 0, pricePerBag: 0, currentStock: 0 },
+      { name: 'Krishka 55 oq', bagType: 'Katta qop', warehouse: 'krishka', unitsPerBag: 1000, pricePerPiece: 0, pricePerBag: 0, currentStock: 0 },
+    ];
+
+    let added = 0;
+    for (const p of products) {
+      const exists = await prisma.product.findFirst({ where: { name: p.name } });
+      if (!exists) {
+        await prisma.product.create({
+          data: {
+            name: p.name,
+            bagType: p.bagType,
+            warehouse: p.warehouse,
+            unitsPerBag: p.unitsPerBag,
+            pricePerPiece: p.pricePerPiece,
+            pricePerBag: p.pricePerBag,
+            currentStock: p.currentStock,
+            currentUnits: p.currentStock * p.unitsPerBag,
+            minStockLimit: 5,
+            optimalStock: 20,
+            maxCapacity: 200,
+            active: true,
+          }
+        });
+        added++;
+      }
+    }
+    if (added > 0) logger.info(`Seed: ${added} ta yangi mahsulot qo'shildi`);
+  } catch (e: any) {
+    logger.warn('seedProducts xatolik: ' + e.message);
+  }
+}
+
 // One-time migration: kapsula → preform (gramga qarab bagType)
 async function migrateKapsulaToPreform() {
   try {
@@ -336,6 +478,7 @@ app.listen(PORT, async () => {
   logger.info(`API available at http://localhost:${PORT}/api`);
   logger.info(`Health check at http://localhost:${PORT}/api/health`);
 
+  await seedProducts();
   await migrateKapsulaToPreform();
 
   // Admin bot — kunlik 19:00 hisobot va backup tugmasi
