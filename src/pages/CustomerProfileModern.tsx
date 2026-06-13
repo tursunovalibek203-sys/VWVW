@@ -83,7 +83,7 @@ export default function CustomerProfileModern() {
   const [refreshing, setRefreshing] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [paymentForm, setPaymentForm] = useState({ uzs: '', usd: '', karta: '', kurs: '12700', notes: '' });
+  const [paymentForm, setPaymentForm] = useState({ uzs: '', usd: '', karta: '', kurs: '12700', notes: '', debtTarget: 'UZS' as 'UZS' | 'USD' });
 
   const loadCustomerData = async () => {
     try {
@@ -139,6 +139,8 @@ export default function CustomerProfileModern() {
   };
 
   const handlePayment = () => {
+    const defaultTarget = (customer?.debtUZS || 0) > 0 ? 'UZS' : 'USD';
+    setPaymentForm(prev => ({ ...prev, debtTarget: defaultTarget as 'UZS' | 'USD' }));
     setShowPaymentModal(true);
   };
 
@@ -156,17 +158,19 @@ export default function CustomerProfileModern() {
     }
 
     const exchangeRate = parseFloat(paymentForm.kurs) || 12700;
+    const hasBothDebts = (customer?.debtUZS || 0) > 0 && (customer?.debtUSD || 0) > 0;
+    const debtTarget = hasBothDebts ? paymentForm.debtTarget : undefined;
     setIsSubmitting(true);
     try {
       const calls = [];
-      if (uzs > 0)   calls.push(api.post(`/customers/${id}/payment`, { amount: uzs,   currency: 'UZS', type: 'CASH',  notes: paymentForm.notes, exchangeRate }));
-      if (usd > 0)   calls.push(api.post(`/customers/${id}/payment`, { amount: usd,   currency: 'USD', type: 'CASH',  notes: paymentForm.notes, exchangeRate }));
-      if (karta > 0) calls.push(api.post(`/customers/${id}/payment`, { amount: karta, currency: 'UZS', type: 'CARD',  notes: paymentForm.notes, exchangeRate }));
+      if (uzs > 0)   calls.push(api.post(`/customers/${id}/payment`, { amount: uzs,   currency: 'UZS', type: 'CASH',  notes: paymentForm.notes, exchangeRate, debtTarget }));
+      if (usd > 0)   calls.push(api.post(`/customers/${id}/payment`, { amount: usd,   currency: 'USD', type: 'CASH',  notes: paymentForm.notes, exchangeRate, debtTarget }));
+      if (karta > 0) calls.push(api.post(`/customers/${id}/payment`, { amount: karta, currency: 'UZS', type: 'CARD',  notes: paymentForm.notes, exchangeRate, debtTarget }));
       await Promise.all(calls);
 
       addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic("To'lov amalga oshirildi va kassaga qo'shildi!")));
       setShowPaymentModal(false);
-      setPaymentForm({ uzs: '', usd: '', karta: '', kurs: '12700', notes: '' });
+      setPaymentForm({ uzs: '', usd: '', karta: '', kurs: '12700', notes: '', debtTarget: 'UZS' });
       loadCustomerData();
     } catch (error: any) {
       addToast(toast.error(latinToCyrillic('Xatolik'), error?.details?.error || error?.message || latinToCyrillic("To'lovda xatolik yuz berdi")));
@@ -659,6 +663,41 @@ export default function CustomerProfileModern() {
                     </div>
                   </div>
                 </div>
+
+                {/* Qaysi qarzni yopish (faqat ikkala valyutada qarz bo'lganda) */}
+                {(customer.debtUZS || 0) > 0 && (customer.debtUSD || 0) > 0 && (
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                      {latinToCyrillic('Qaysi qarzni yopish?')}
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentForm({ ...paymentForm, debtTarget: 'UZS' })}
+                        className={`flex flex-col items-center gap-1 py-3 px-4 rounded-xl border-2 transition-all font-semibold text-sm ${
+                          paymentForm.debtTarget === 'UZS'
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-500 hover:border-emerald-300 hover:bg-emerald-50/50'
+                        }`}
+                      >
+                        <span className="text-base">{latinToCyrillic("So'm qarzini")}</span>
+                        <span className="text-xs font-bold text-rose-500">{Math.round(customer.debtUZS || 0).toLocaleString()} {latinToCyrillic("so'm")}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentForm({ ...paymentForm, debtTarget: 'USD' })}
+                        className={`flex flex-col items-center gap-1 py-3 px-4 rounded-xl border-2 transition-all font-semibold text-sm ${
+                          paymentForm.debtTarget === 'USD'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:bg-blue-50/50'
+                        }`}
+                      >
+                        <span className="text-base">{latinToCyrillic("$ qarzini")}</span>
+                        <span className="text-xs font-bold text-rose-500">${(customer.debtUSD || 0).toFixed(2)}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Kurs */}
                 <div>

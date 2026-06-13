@@ -747,7 +747,7 @@ router.post('/:id/payment', async (req, res) => {
 
     const { id } = req.params;
 
-    const { amount, currency = 'UZS', type = 'CASH', notes, exchangeRate = 12700 } = req.body;
+    const { amount, currency = 'UZS', type = 'CASH', notes, exchangeRate = 12700, debtTarget } = req.body;
     const rate = parseFloat(exchangeRate) || 12700;
 
 
@@ -804,53 +804,62 @@ router.post('/:id/payment', async (req, res) => {
 
 
 
-      // Mijoz balansini yangilash - cross-currency qo'llab-quvvatlash bilan
+      // Mijoz balansini yangilash - debtTarget va cross-currency qo'llab-quvvatlash bilan
       const updateData: any = {
         lastPayment: new Date()
       };
 
-      if (currency === 'UZS') {
+      if (debtTarget === 'UZS') {
+        // Foydalanuvchi so'm qarzini yopishni tanlagan — barcha to'lovni so'mga o'girish
+        const amountInUZS = currency === 'USD' ? amount * rate : amount;
         if (customer.debtUZS && customer.debtUZS > 0) {
-          // To'g'ridan-to'g'ri UZS qarzini kamaytirish
+          const debtToDeduct = DecimalHelper.min(amountInUZS, customer.debtUZS);
+          updateData.debtUZS = { decrement: debtToDeduct };
+          const remaining = DecimalHelper.subtract(amountInUZS, debtToDeduct);
+          if (remaining > 0) updateData.balanceUZS = { increment: remaining };
+        } else {
+          updateData.balanceUZS = { increment: amountInUZS };
+        }
+      } else if (debtTarget === 'USD') {
+        // Foydalanuvchi dollar qarzini yopishni tanlagan — barcha to'lovni dollarga o'girish
+        const amountInUSD = currency === 'UZS' ? amount / rate : amount;
+        if (customer.debtUSD && customer.debtUSD > 0) {
+          const debtToDeduct = DecimalHelper.min(amountInUSD, customer.debtUSD);
+          updateData.debtUSD = { decrement: debtToDeduct };
+          const remaining = DecimalHelper.subtract(amountInUSD, debtToDeduct);
+          if (remaining > 0) updateData.balanceUSD = { increment: remaining };
+        } else {
+          updateData.balanceUSD = { increment: amountInUSD };
+        }
+      } else if (currency === 'UZS') {
+        // Auto: to'lov valyutasiga mos qarzni kamaytiramiz
+        if (customer.debtUZS && customer.debtUZS > 0) {
           const debtToDeduct = DecimalHelper.min(amount, customer.debtUZS);
           updateData.debtUZS = { decrement: debtToDeduct };
           const remaining = DecimalHelper.subtract(amount, debtToDeduct);
-          if (remaining > 0) {
-            updateData.balanceUZS = { increment: remaining };
-          }
+          if (remaining > 0) updateData.balanceUZS = { increment: remaining };
         } else if (customer.debtUSD && customer.debtUSD > 0) {
-          // Kross-valyuta: UZS ni USD ga o'tkazib, USD qarzini kamaytirish
           const amountInUSD = amount / rate;
           const debtToDeduct = DecimalHelper.min(amountInUSD, customer.debtUSD);
           updateData.debtUSD = { decrement: debtToDeduct };
           const remainingUSD = DecimalHelper.subtract(amountInUSD, debtToDeduct);
-          if (remainingUSD > 0) {
-            updateData.balanceUSD = { increment: remainingUSD };
-          }
+          if (remainingUSD > 0) updateData.balanceUSD = { increment: remainingUSD };
         } else {
-          // Qarz yo'q - hammasi balansga qo'shiladi
           updateData.balanceUZS = { increment: amount };
         }
       } else if (currency === 'USD') {
         if (customer.debtUSD && customer.debtUSD > 0) {
-          // To'g'ridan-to'g'ri USD qarzini kamaytirish
           const debtToDeduct = DecimalHelper.min(amount, customer.debtUSD);
           updateData.debtUSD = { decrement: debtToDeduct };
           const remaining = DecimalHelper.subtract(amount, debtToDeduct);
-          if (remaining > 0) {
-            updateData.balanceUSD = { increment: remaining };
-          }
+          if (remaining > 0) updateData.balanceUSD = { increment: remaining };
         } else if (customer.debtUZS && customer.debtUZS > 0) {
-          // Kross-valyuta: USD ni UZS ga o'tkazib, UZS qarzini kamaytirish
           const amountInUZS = amount * rate;
           const debtToDeduct = DecimalHelper.min(amountInUZS, customer.debtUZS);
           updateData.debtUZS = { decrement: debtToDeduct };
           const remainingUZS = DecimalHelper.subtract(amountInUZS, debtToDeduct);
-          if (remainingUZS > 0) {
-            updateData.balanceUZS = { increment: remainingUZS };
-          }
+          if (remainingUZS > 0) updateData.balanceUZS = { increment: remainingUZS };
         } else {
-          // Qarz yo'q - hammasi balansga qo'shiladi
           updateData.balanceUSD = { increment: amount };
         }
       }
