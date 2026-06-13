@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAuthStore } from '../store/authStore';
 import { useParams, useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -48,7 +49,9 @@ export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { user } = useAuthStore();
   const isCashier = window.location.pathname.startsWith('/cashier');
+  const isAdmin = ['ADMIN', 'WAREHOUSE_MANAGER'].includes((user?.role || '').toUpperCase());
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showPriceModal, setShowPriceModal] = useState(false);
@@ -204,12 +207,11 @@ export default function ProductDetail() {
         latinToCyrillic('Mahsulot o\'chirildi!')
       ));
       navigate(isCashier ? '/cashier/products' : '/products');
-    } catch (error) {
-      console.error('Mahsulotni o\'chirishda xatolik:', error);
-      addToast(toast.error(
-        latinToCyrillic('Xatolik'),
-        latinToCyrillic('Mahsulotni o\'chirishda xatolik yuz berdi')
-      ));
+    } catch (error: any) {
+      const msg = error?.response?.status === 403
+        ? latinToCyrillic('Ruxsat yo\'q — faqat ADMIN o\'chira oladi')
+        : (error?.response?.data?.error || latinToCyrillic('Mahsulotni o\'chirishda xatolik yuz berdi'));
+      addToast(toast.error(latinToCyrillic('Xatolik'), msg));
     }
   };
 
@@ -841,20 +843,22 @@ export default function ProductDetail() {
             </Button>
           </div>
 
-          <div className="pt-4 border-t">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                if (confirm(latinToCyrillic(`Rostdan ham "${product.name}" mahsulotni o'chirmoqchimisiz? Bu amal bekor qilinmaydi!`))) {
-                  deleteProduct();
-                }
-              }}
-              className="w-full bg-red-50 text-red-600 border-red-100 hover:bg-red-600 hover:text-white"
-            >
-              {latinToCyrillic('Mahsulotni butunlay o\'chirish')}
-            </Button>
-          </div>
+          {isAdmin && (
+            <div className="pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (confirm(latinToCyrillic(`Rostdan ham "${product.name}" mahsulotni o'chirmoqchimisiz? Bu amal bekor qilinmaydi!`))) {
+                    deleteProduct();
+                  }
+                }}
+                className="w-full bg-red-50 text-red-600 border-red-100 hover:bg-red-600 hover:text-white"
+              >
+                {latinToCyrillic('Mahsulotni butunlay o\'chirish')}
+              </Button>
+            </div>
+          )}
         </form>
       </Modal>
 
