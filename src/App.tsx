@@ -48,7 +48,7 @@ const Activity = lazy(() => import('./pages/Activity'));
 
 // Management
 const CashierManagement = lazy(() => import('./pages/CashierManagement'));
-const Drivers = lazy(() => import('./pages/Drivers'));
+const Drivers = lazy(() => import('./pages/Drivers').then(m => ({ default: m.Drivers })));
 const Suppliers = lazy(() => import('./pages/Suppliers'));
 const Production = lazy(() => import('./pages/Production'));
 const Quality = lazy(() => import('./pages/Quality'));
