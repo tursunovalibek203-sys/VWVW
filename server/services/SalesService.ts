@@ -217,22 +217,15 @@ export class SalesService {
             ? item.quantity
             : DecimalHelper.multiply(item.quantity, unitsPerBag);
 
-          // SQLite: datetime('now') — NOT NOW() which is MySQL/PostgreSQL only
-          const updateResult = await tx.$executeRaw`
+          // Minus stockka ruxsat — ishlab chiqarish keyinroq qo'shilganda to'g'rilanadi
+          await tx.$executeRaw`
             UPDATE "Product"
             SET
               "currentStock" = "currentStock" - ${bagsToDeduct},
               "currentUnits" = "currentUnits" - ${unitsToDeduct},
               "updatedAt" = datetime('now')
-            WHERE
-              "id" = ${item.productId}
-              AND "currentStock" >= ${bagsToDeduct}
-              AND "currentUnits" >= ${unitsToDeduct}
+            WHERE "id" = ${item.productId}
           `;
-
-          if (updateResult === 0) {
-            throw new Error(`${product.name} uchun omborda yetarli mahsulot yo'q`);
-          }
 
           const updatedProduct = await tx.product.findUnique({
             where: { id: item.productId },
@@ -524,22 +517,15 @@ export class SalesService {
             ? item.quantity 
             : DecimalHelper.multiply(item.quantity, unitsPerBag);
 
-          // Atomic conditional update — same pattern as createSale to prevent negative stock
-          const updateResult = await tx.$executeRaw`
+          // Minus stockka ruxsat — ishlab chiqarish keyinroq qo'shilganda to'g'rilanadi
+          await tx.$executeRaw`
             UPDATE "Product"
             SET
               "currentStock" = "currentStock" - ${bagsToDeduct},
               "currentUnits" = "currentUnits" - ${unitsToDeduct},
-              "updatedAt" = NOW()
-            WHERE
-              "id" = ${item.productId}
-              AND "currentStock" >= ${bagsToDeduct}
-              AND "currentUnits" >= ${unitsToDeduct}
+              "updatedAt" = datetime('now')
+            WHERE "id" = ${item.productId}
           `;
-
-          if (updateResult === 0) {
-            throw new Error(`${product.name} uchun omborda yetarli mahsulot yo'q`);
-          }
         }
       }
 

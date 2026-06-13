@@ -180,12 +180,6 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
   }, []);
 
   const selectProduct = useCallback((product: Product, _allProducts: Product[], selectedCustomer: Customer | undefined, customerPrices: Record<string, string>) => {
-    // Stock tekshiruvi - mahalliy ma'lumotlardan (API chaqiruvini olib tashladik - tezlashtirish)
-    const currentStock = product.currentStock || 0;
-    if (currentStock <= 0) {
-      alert(`⚠️ ${product.name} - omborda yetarli mahsulot yo'q! (Qoldiq: ${currentStock})`);
-    }
-    
     let updatedProduct = product;
 
     let basePrice = parseFloat(updatedProduct.pricePerBag?.toString() || '0') || 0;
