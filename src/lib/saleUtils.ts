@@ -49,21 +49,19 @@ export const calculateTotal = (items: SaleItemForm[]): number => {
 export const calculatePaidAmount = (
   paidUZS: string,
   paidUSD: string,
-  paidCLICK: string,
   exchangeRate: number,
   currency: string,
   paidKARTA?: string
 ): number => {
   const uzs = parseFloat(paidUZS) || 0;
   const usd = parseFloat(paidUSD) || 0;
-  const click = parseFloat(paidCLICK) || 0;
   const karta = parseFloat(paidKARTA || '0') || 0;
 
   let result: number;
   if (currency === 'UZS') {
-    result = uzs + (usd * exchangeRate) + click + karta;
+    result = uzs + (usd * exchangeRate) + karta;
   } else {
-    result = uzs / exchangeRate + usd + (click / exchangeRate) + (karta / exchangeRate);
+    result = uzs / exchangeRate + usd + (karta / exchangeRate);
   }
 
   return result;

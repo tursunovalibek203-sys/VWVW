@@ -15,8 +15,8 @@ export interface CreateSaleInput {
   totalAmount: number;
   paidAmount: number;
   currency: string;
-  paymentMethod?: 'CASH' | 'CARD' | 'CLICK';
-  paymentDetails?: { uzs?: number; usd?: number; click?: number; karta?: number };
+  paymentMethod?: 'CASH' | 'CARD';
+  paymentDetails?: { uzs?: number; usd?: number; karta?: number };
   driverId?: string;
   isKocha?: boolean;
   manualCustomerName?: string;
@@ -147,7 +147,7 @@ export class SalesService {
       calculatedPaymentStatus = 'PARTIAL';
     }
 
-    const safePaymentMethod = (paymentMethod === 'CARD' || paymentMethod === 'CLICK') ? paymentMethod : 'CASH';
+    const safePaymentMethod = paymentMethod === 'CARD' ? 'CARD' : 'CASH';
     const safeCurrency = (currency === 'UZS' || currency === 'USD') ? currency : 'USD';
 
     const result = await prisma.$transaction(async (tx) => {
@@ -282,21 +282,6 @@ export class SalesService {
               }
             });
           }
-          if (paymentDetails.click && paymentDetails.click > 0) {
-            await tx.cashboxTransaction.create({
-              data: {
-                type: 'INCOME',
-                amount: paymentDetails.click,
-                currency: 'UZS',
-                category: 'SALE',
-                paymentMethod: 'CLICK',
-                description: `Sotuv: Click UZS`,
-                userId,
-                userName,
-                reference: sale.id,
-              }
-            });
-          }
           if (paymentDetails.karta && paymentDetails.karta > 0) {
             await tx.cashboxTransaction.create({
               data: {
@@ -313,7 +298,7 @@ export class SalesService {
             });
           }
         } else if (paidAmount > 0) {
-          const paymentType = safePaymentMethod === 'CLICK' ? 'Click' : (safePaymentMethod === 'CARD' ? 'Karta' : 'Naqd');
+          const paymentType = safePaymentMethod === 'CARD' ? 'Karta' : 'Naqd';
           await tx.cashboxTransaction.create({
             data: {
               type: 'INCOME',

@@ -7,7 +7,7 @@ import {
   Smartphone, ArrowLeftRight, Receipt, Users, Zap, Truck, Wrench,
   Building2, ShoppingCart, MoreHorizontal, RefreshCw, Plus, Loader2, X,
   History, UserCheck, ArrowUpRight, ArrowDownRight, Download, Clock,
-  AlertTriangle, CheckCircle2, BarChart2, Scale,
+  AlertTriangle, CheckCircle2, BarChart2, Scale, ChevronLeft,
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -65,6 +65,13 @@ const EXPENSE_CATS = [
 const OTHER_CAT = EXPENSE_CATS.find(c => c.id === 'OTHER')!;
 const getCat = (id: string) => EXPENSE_CATS.find(c => c.id === id) ?? OTHER_CAT;
 
+const ICON_MAP: Record<string, any> = {
+  Users, Zap, Truck, Wrench, Building2, ShoppingCart, MoreHorizontal,
+  Receipt, DollarSign, CreditCard, Banknote, BarChart2, Scale, UserCheck,
+  Smartphone, Clock, CheckCircle2,
+};
+const CAT_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316','#84cc16','#14b8a6','#6b7280','#6366f1'];
+
 const BUCKET_COLORS = ['#10b981', '#3b82f6', '#6366f1', '#8b5cf6'];
 type TabType = 'overview' | 'history' | 'expenses' | 'loans' | 'advances' | 'budget';
 
@@ -102,10 +109,9 @@ function MethodPicker({ value, onChange }: { value: string; onChange: (v: string
   const M = [
     { id: 'CASH',  label: t('Naqd'),  Icon: Banknote,   clr: '#10b981' },
     { id: 'CARD',  label: t('Karta'), Icon: CreditCard, clr: '#3b82f6' },
-    { id: 'CLICK', label: 'Click',    Icon: Smartphone, clr: '#8b5cf6' },
   ];
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-2 gap-2">
       {M.map(m => {
         const active = value === m.id;
         return (
@@ -183,6 +189,13 @@ export default function Cashbox() {
   const [expForm,  setExpForm]  = useState({ amount: '', currency: 'UZS', category: 'SALARY', paymentMethod: 'CASH', description: '' });
   const [loanForm, setLoanForm] = useState({ employeeName: '', amount: '', currency: 'UZS', purpose: '', dueDate: '', notes: '' });
   const [advForm,  setAdvForm]  = useState({ employeeName: '', amount: '', currency: 'UZS', purpose: '', notes: '' });
+
+  const [customCats, setCustomCats] = useState<{id:string;label:string;icon:string;color:string}[]>(() => {
+    try { return JSON.parse(localStorage.getItem('customExpenseCats') || '[]'); } catch { return []; }
+  });
+  const [selectedCat, setSelectedCat] = useState<string|null>(null);
+  const [showAddCat,  setShowAddCat]  = useState(false);
+  const [addCatForm,  setAddCatForm]  = useState({ label:'', icon:'ShoppingCart', color:'#3b82f6' });
 
   const [hf, setHf] = useState({ type: 'ALL', paymentMethod: 'ALL', startDate: '', endDate: '' });
 
@@ -269,12 +282,17 @@ export default function Cashbox() {
   const histIncome  = useMemo(() => filteredTx.filter(t => t.type === 'INCOME' ).reduce((s,t)=>s+toUZS(t.amount,t.currency||'UZS'),0), [filteredTx, exchangeRate]);
   const histExpense = useMemo(() => filteredTx.filter(t => t.type === 'EXPENSE').reduce((s,t)=>s+toUZS(t.amount,t.currency||'UZS'),0), [filteredTx, exchangeRate]);
 
+  const allCats = useMemo(() => [
+    ...EXPENSE_CATS,
+    ...customCats.map(c => ({ ...c, icon: ICON_MAP[c.icon] || MoreHorizontal })),
+  ], [customCats]);
+
   const expCatData = useMemo(() => {
     const map: Record<string,number> = {};
     expenses.forEach(e => { map[e.category] = (map[e.category]||0) + toUZS(e.amount, e.currency||'UZS'); });
-    return Object.entries(map).map(([cat,val])=>({ cat, val: Math.round(val), label: t(getCat(cat).label) }))
+    return Object.entries(map).map(([cat,val])=>({ cat, val: Math.round(val), label: t((allCats.find(c=>c.id===cat)??OTHER_CAT).label) }))
       .sort((a,b)=>b.val-a.val).slice(0,8);
-  }, [expenses, exchangeRate]);
+  }, [expenses, exchangeRate, allCats]);
 
   const dailyFlow = useMemo(() => {
     const today = new Date(); today.setHours(0,0,0,0);
@@ -297,6 +315,14 @@ export default function Cashbox() {
 
   const loanList    = loans.filter(l => l.repaymentType !== 'ADVANCE');
   const advanceList = loans.filter(l => l.repaymentType === 'ADVANCE');
+
+  const catDetailExpenses = useMemo(() =>
+    selectedCat ? expenses.filter(e => e.category === selectedCat)
+      .sort((a,b) => new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime()) : [],
+    [selectedCat, expenses]
+  );
+  const catDetailTotal = catDetailExpenses.reduce((s,e) => s + toUZS(e.amount, e.currency||'UZS'), 0);
+  const selectedCatObj = selectedCat ? (allCats.find(c => c.id === selectedCat) ?? OTHER_CAT) : null;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const doPost = async (url: string, body: any, msg: string, onDone: ()=>void) => {
@@ -429,6 +455,23 @@ export default function Cashbox() {
     } finally { setSubmitting(false); }
   };
 
+  const handleAddCat = () => {
+    if (!addCatForm.label.trim()) return;
+    const newCat = { id:'CUSTOM_'+Date.now(), label:addCatForm.label.trim(), icon:addCatForm.icon, color:addCatForm.color };
+    const updated = [...customCats, newCat];
+    setCustomCats(updated);
+    localStorage.setItem('customExpenseCats', JSON.stringify(updated));
+    setShowAddCat(false);
+    setAddCatForm({ label:'', icon:'ShoppingCart', color:'#3b82f6' });
+    addToast({ type:'success', title: t('Kategoriya qoshildi') });
+  };
+  const handleDeleteCat = (id: string) => {
+    const updated = customCats.filter(c => c.id !== id);
+    setCustomCats(updated);
+    localStorage.setItem('customExpenseCats', JSON.stringify(updated));
+    if (selectedCat === id) setSelectedCat(null);
+  };
+
   const handleExport = () => {
     const rows = filteredTx.map(tx => ({
       [t('Sana')]:        new Date(tx.createdAt).toLocaleString('uz-UZ'),
@@ -545,11 +588,6 @@ export default function Cashbox() {
             <p className="text-indigo-100 font-semibold tabular-nums text-sm">
               {Math.round(totalUZS).toLocaleString('en-US')} so'm
             </p>
-            {clickUZS > 0 && (
-              <p className="text-indigo-300 text-xs mt-1">
-                <Smartphone className="w-3 h-3 inline mr-0.5"/>Click: {Math.round(clickUZS).toLocaleString()} so'm
-              </p>
-            )}
           </div>
         </div>
       </div>
@@ -585,18 +623,6 @@ export default function Cashbox() {
                 <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
               </span>
             </div>
-            {todayIncomeClickUZS > 0 && (
-              <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <Smartphone className="w-3.5 h-3.5 text-violet-500"/>
-                  <span className="text-sm text-slate-600">Click</span>
-                </div>
-                <span className="text-sm font-bold text-slate-900 tabular-nums">
-                  {Math.round(todayIncomeClickUZS).toLocaleString('en-US')}
-                  <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
-                </span>
-              </div>
-            )}
             <div className="flex items-center justify-between py-2">
               <div className="flex items-center gap-2">
                 <DollarSign className="w-3.5 h-3.5 text-amber-500"/>
@@ -611,12 +637,12 @@ export default function Cashbox() {
               <span className="text-xs text-slate-400">{t('Jami')}</span>
               <div className="text-right">
                 <span className="text-base font-bold text-emerald-600 tabular-nums">
-                  +{Math.round(todayIncomeCashUZS + todayIncomeCardUZS + todayIncomeClickUZS + todayIncomeCashUSD * exchangeRate).toLocaleString('en-US')}
+                  +{Math.round(todayIncomeCashUZS + todayIncomeCardUZS + todayIncomeCashUSD * exchangeRate).toLocaleString('en-US')}
                   <span className="text-xs font-normal ml-1">so'm</span>
                 </span>
                 {todayIncomeCashUSD > 0 && (
                   <p className="text-xs text-emerald-500 tabular-nums">
-                    +{(todayIncomeCashUSD + (todayIncomeCashUZS + todayIncomeCardUZS + todayIncomeClickUZS) / exchangeRate).toFixed(2)} $
+                    +{(todayIncomeCashUSD + (todayIncomeCashUZS + todayIncomeCardUZS) / exchangeRate).toFixed(2)} $
                   </p>
                 )}
               </div>
@@ -653,18 +679,6 @@ export default function Cashbox() {
                 <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
               </span>
             </div>
-            {todayExpenseClickUZS > 0 && (
-              <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <Smartphone className="w-3.5 h-3.5 text-violet-500"/>
-                  <span className="text-sm text-slate-600">Click</span>
-                </div>
-                <span className="text-sm font-bold text-slate-900 tabular-nums">
-                  {Math.round(todayExpenseClickUZS).toLocaleString('en-US')}
-                  <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
-                </span>
-              </div>
-            )}
             <div className="flex items-center justify-between py-2">
               <div className="flex items-center gap-2">
                 <DollarSign className="w-3.5 h-3.5 text-amber-500"/>
@@ -679,12 +693,12 @@ export default function Cashbox() {
               <span className="text-xs text-slate-400">{t('Jami')}</span>
               <div className="text-right">
                 <span className="text-base font-bold text-rose-600 tabular-nums">
-                  -{Math.round(todayExpenseCashUZS + todayExpenseCardUZS + todayExpenseClickUZS + todayExpenseCashUSD * exchangeRate).toLocaleString('en-US')}
+                  -{Math.round(todayExpenseCashUZS + todayExpenseCardUZS + todayExpenseCashUSD * exchangeRate).toLocaleString('en-US')}
                   <span className="text-xs font-normal ml-1">so'm</span>
                 </span>
                 {todayExpenseCashUSD > 0 && (
                   <p className="text-xs text-rose-500 tabular-nums">
-                    -{(todayExpenseCashUSD + (todayExpenseCashUZS + todayExpenseCardUZS + todayExpenseClickUZS) / exchangeRate).toFixed(2)} $
+                    -{(todayExpenseCashUSD + (todayExpenseCashUZS + todayExpenseCardUZS) / exchangeRate).toFixed(2)} $
                   </p>
                 )}
               </div>
@@ -717,18 +731,6 @@ export default function Cashbox() {
                 </span>
               </div>
             ))}
-            {monthIncomeClickUZS > 0 && (
-              <div className="flex justify-between items-center text-sm">
-                <div className="flex items-center gap-1.5">
-                  <Smartphone className="w-3.5 h-3.5 text-violet-500"/>
-                  <span className="text-slate-500">Click</span>
-                </div>
-                <span className="font-semibold text-slate-800 tabular-nums">
-                  {Math.round(monthIncomeClickUZS).toLocaleString('en-US')}
-                  <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
-                </span>
-              </div>
-            )}
           </div>
         </div>
 
@@ -754,18 +756,6 @@ export default function Cashbox() {
                 </span>
               </div>
             ))}
-            {monthExpenseClickUZS > 0 && (
-              <div className="flex justify-between items-center text-sm">
-                <div className="flex items-center gap-1.5">
-                  <Smartphone className="w-3.5 h-3.5 text-violet-500"/>
-                  <span className="text-slate-500">Click</span>
-                </div>
-                <span className="font-semibold text-slate-800 tabular-nums">
-                  {Math.round(monthExpenseClickUZS).toLocaleString('en-US')}
-                  <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
-                </span>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -946,7 +936,7 @@ export default function Cashbox() {
                 <div>
                   <Lbl>{t('Usul')}</Lbl>
                   <div className="flex gap-1">
-                    {[['ALL',t('Barchasi')],['CASH',t('Naqd')],['CARD',t('Karta')],['CLICK','Click']].map(([v,l])=>(
+                    {[['ALL',t('Barchasi')],['CASH',t('Naqd')],['CARD',t('Karta')]].map(([v,l])=>(
                       <Pill key={v} active={hf.paymentMethod===v} onClick={()=>setHf({...hf,paymentMethod:v})} label={l}/>
                     ))}
                   </div>
@@ -1025,7 +1015,7 @@ export default function Cashbox() {
                             <td className="px-4 py-3 text-xs text-slate-500">
                               {tx.paymentMethod==='CASH'  ? <span className="flex items-center gap-1"><Banknote  className="w-3.5 h-3.5 text-emerald-500"/>{t('Naqd')}</span>
                               :tx.paymentMethod==='CARD'  ? <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5 text-blue-500"/>{t('Karta')}</span>
-                              :tx.paymentMethod==='CLICK' ? <span className="flex items-center gap-1"><Smartphone className="w-3.5 h-3.5 text-violet-500"/>Click</span>
+                              :tx.paymentMethod==='CLICK' ? <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5 text-blue-500"/>{t('Karta')}</span>
                               : tx.paymentMethod||'—'}
                             </td>
                             <td className={`px-4 py-3 text-right font-bold tabular-nums ${isReversal?'text-slate-400 line-through':tx.type==='INCOME'?'text-emerald-600':'text-rose-600'}`}>
@@ -1055,72 +1045,173 @@ export default function Cashbox() {
           {/* ══ EXPENSES ══ */}
           {activeTab === 'expenses' && (
             <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-700">
-                  {t('Jami')}: {Math.round(expenses.reduce((s,e)=>s+toUZS(e.amount,e.currency||'UZS'),0)).toLocaleString()} so'm
-                  <span className="text-slate-400 font-normal ml-1">({expenses.length} {t('ta')})</span>
-                </p>
-                <button onClick={()=>setShowExpense(true)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors">
-                  <Plus className="w-4 h-4"/> {t('Yangi xarajat')}
-                </button>
-              </div>
 
-              {expCatData.length > 0 && (
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{t('Kategoriyalar boyicha (UZS)')}</p>
-                  <ResponsiveContainer width="100%" height={Math.max(120, expCatData.length * 30)}>
-                    <BarChart data={expCatData} layout="vertical" margin={{left:0,right:10,top:0,bottom:0}}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false}/>
-                      <XAxis type="number" tick={{fontSize:10}} tickFormatter={v=>(v/1000).toFixed(0)+'k'}/>
-                      <YAxis dataKey="label" type="category" width={85} tick={{fontSize:11}}/>
-                      <Tooltip formatter={(v:any)=>[Math.round(v).toLocaleString()+" so'm"]}/>
-                      <Bar dataKey="val" fill="#6366f1" radius={[0,6,6,0]} maxBarSize={18}/>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
+              {/* ── Kategoriya grid ko'rinishi ── */}
+              {selectedCat === null ? (
+                <>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <p className="text-sm font-semibold text-slate-700">
+                      {t('Jami')}: {Math.round(expenses.reduce((s,e)=>s+toUZS(e.amount,e.currency||'UZS'),0)).toLocaleString()} so'm
+                      <span className="text-slate-400 font-normal ml-1">({expenses.length} {t('ta')})</span>
+                    </p>
+                    <div className="flex gap-2 flex-wrap">
+                      <button onClick={()=>setShowAddCat(true)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold transition-colors">
+                        <Plus className="w-4 h-4 text-indigo-500"/> {t('Kategoriya')}
+                      </button>
+                      <button onClick={()=>setShowExpense(true)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors">
+                        <Plus className="w-4 h-4"/> {t('Yangi xarajat')}
+                      </button>
+                    </div>
+                  </div>
 
-              <div className="overflow-x-auto rounded-xl border border-slate-200">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
-                      {[t('Sana'),t('Kategoriya'),t('Tavsif'),t('Summa')].map((h,i)=>(
-                        <th key={h} className={`px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide ${i===3?'text-right':'text-left'}`}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {expenses.length === 0
-                      ? <tr><td colSpan={4} className="text-center py-10 text-slate-400 text-sm">{t('Xarajatlar yoq')}</td></tr>
-                      : expenses.map(e => {
-                        const cat = getCat(e.category);
-                        const Icon = cat.icon;
-                        return (
-                          <tr key={e.id} className="hover:bg-slate-50/60 transition-colors">
-                            <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap tabular-nums">
-                              {new Date(e.createdAt).toLocaleDateString('uz-UZ')}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor:cat.color+'20'}}>
-                                  <Icon className="w-3.5 h-3.5" style={{color:cat.color}}/>
-                                </div>
-                                <span className="text-sm font-medium text-slate-700">{t(cat.label)}</span>
+                  {expCatData.length > 0 && (
+                    <div className="bg-slate-50 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{t('Kategoriyalar boyicha (UZS)')}</p>
+                      <ResponsiveContainer width="100%" height={Math.max(120, expCatData.length * 30)}>
+                        <BarChart data={expCatData} layout="vertical" margin={{left:0,right:10,top:0,bottom:0}}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false}/>
+                          <XAxis type="number" tick={{fontSize:10}} tickFormatter={v=>(v/1000).toFixed(0)+'k'}/>
+                          <YAxis dataKey="label" type="category" width={90} tick={{fontSize:11}}/>
+                          <Tooltip formatter={(v:any)=>[Math.round(v).toLocaleString()+" so'm"]}/>
+                          <Bar dataKey="val" fill="#6366f1" radius={[0,6,6,0]} maxBarSize={18}/>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{t('Kategoriyalar')}</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {allCats
+                        .filter(cat => !['LOAN_REPAYMENT','ADJUSTMENT','REVERSAL'].includes(cat.id))
+                        .map(cat => {
+                          const Icon = cat.icon;
+                          const catExpenses = expenses.filter(e => e.category === cat.id);
+                          const total = catExpenses.reduce((s,e)=>s+toUZS(e.amount,e.currency||'UZS'),0);
+                          const isCustom = customCats.some(c => c.id === cat.id);
+                          if (catExpenses.length === 0 && !isCustom) return null;
+                          return (
+                            <button key={cat.id} onClick={()=>setSelectedCat(cat.id)}
+                              className="bg-white rounded-2xl border border-slate-200/70 p-4 text-left hover:shadow-md hover:border-slate-300 transition-all group relative">
+                              {isCustom && (
+                                <button
+                                  onClick={e=>{ e.stopPropagation(); handleDeleteCat(cat.id); }}
+                                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-all">
+                                  <X className="w-3.5 h-3.5"/>
+                                </button>
+                              )}
+                              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{backgroundColor:cat.color+'20'}}>
+                                <Icon className="w-5 h-5" style={{color:cat.color}}/>
                               </div>
-                            </td>
-                            <td className="px-4 py-3 text-slate-500 text-sm max-w-xs truncate">{fixDesc(e.description)||'—'}</td>
-                            <td className="px-4 py-3 text-right text-rose-600 font-bold tabular-nums">
-                              -{e.amount.toLocaleString('en-US')}
-                              <span className="text-xs font-normal ml-0.5 text-slate-400">{e.currency||'UZS'}</span>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    }
-                  </tbody>
-                </table>
-              </div>
+                              <p className="text-sm font-semibold text-slate-700 truncate">{t(cat.label)}</p>
+                              <p className="text-xs text-slate-400 mt-0.5">{catExpenses.length} {t('ta yozuv')}</p>
+                              <p className="text-base font-bold text-slate-900 tabular-nums mt-2">
+                                {Math.round(total).toLocaleString()}
+                                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+                              </p>
+                            </button>
+                          );
+                        })
+                        .filter(Boolean)
+                      }
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* ── Kategoriya detail ko'rinishi ── */
+                (() => {
+                  const cat = selectedCatObj!;
+                  const Icon = cat.icon;
+                  return (
+                    <>
+                      {/* Header */}
+                      <div className="flex items-center gap-3">
+                        <button onClick={()=>setSelectedCat(null)}
+                          className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors flex-shrink-0">
+                          <ChevronLeft className="w-5 h-5"/>
+                        </button>
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{backgroundColor:cat.color+'20'}}>
+                          <Icon className="w-5 h-5" style={{color:cat.color}}/>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-slate-900">{t(cat.label)}</h3>
+                          <p className="text-xs text-slate-400">{catDetailExpenses.length} {t('ta yozuv')}</p>
+                        </div>
+                        <button onClick={()=>{ setExpForm(f=>({...f,category:selectedCat!})); setShowExpense(true); }}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors flex-shrink-0">
+                          <Plus className="w-4 h-4"/> {t('Xarajat qoshish')}
+                        </button>
+                      </div>
+
+                      {/* Jami karta */}
+                      <div className="rounded-2xl p-5 text-white" style={{background:`linear-gradient(135deg, ${cat.color}ee, ${cat.color}99)`}}>
+                        <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1">{t('Jami xarajat')}</p>
+                        <p className="text-3xl font-bold tabular-nums">
+                          {Math.round(catDetailTotal).toLocaleString()}
+                          <span className="text-xl font-normal text-white/70 ml-2">so'm</span>
+                        </p>
+                        <p className="text-white/60 text-xs mt-1">{catDetailExpenses.length} {t('ta tranzaksiya')}</p>
+                      </div>
+
+                      {/* Yozuvlar jadvali */}
+                      {catDetailExpenses.length === 0 ? (
+                        <div className="text-center py-16 text-slate-400">
+                          <Receipt className="w-12 h-12 mx-auto mb-3 opacity-20"/>
+                          <p className="text-sm font-medium">{t('Bu kategoriyada xarajatlar yoq')}</p>
+                          <p className="text-xs mt-1">{t('Yuqoridagi tugmani bosib xarajat qoshing')}</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-slate-200">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-slate-50 border-b border-slate-200">
+                                <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide text-left">{t('Sana')}</th>
+                                <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide text-left">{t('Tavsif')}</th>
+                                <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide text-left">{t('Usul')}</th>
+                                <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide text-right">{t('Summa')}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {catDetailExpenses.map(e => (
+                                <tr key={e.id} className="hover:bg-slate-50/60 transition-colors">
+                                  <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap tabular-nums">
+                                    {new Date(e.createdAt).toLocaleDateString('uz-UZ',{day:'2-digit',month:'2-digit',year:'numeric'})}
+                                    <span className="text-slate-300 ml-1.5">
+                                      {new Date(e.createdAt).toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'})}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-700 max-w-xs truncate">{fixDesc(e.description)||'—'}</td>
+                                  <td className="px-4 py-3 text-xs text-slate-500">
+                                    {e.paymentMethod==='CASH'  ? <span className="flex items-center gap-1"><Banknote  className="w-3 h-3 text-emerald-500"/>{t('Naqd')}</span>
+                                    :e.paymentMethod==='CARD'  ? <span className="flex items-center gap-1"><CreditCard className="w-3 h-3 text-blue-500"/>{t('Karta')}</span>
+                                    :e.paymentMethod==='CLICK' ? <span className="flex items-center gap-1"><CreditCard className="w-3 h-3 text-blue-500"/>{t('Karta')}</span>
+                                    : e.paymentMethod||'—'}
+                                  </td>
+                                  <td className="px-4 py-3 text-right font-bold tabular-nums text-rose-600">
+                                    -{e.amount.toLocaleString('en-US')}
+                                    <span className="text-xs font-normal ml-0.5 text-slate-400">{e.currency||'UZS'}</span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot>
+                              <tr className="bg-rose-50 border-t-2 border-rose-100">
+                                <td colSpan={3} className="px-4 py-3 text-sm font-bold text-slate-700">{t('Jami')}</td>
+                                <td className="px-4 py-3 text-right font-bold text-rose-600 tabular-nums text-base">
+                                  -{Math.round(catDetailTotal).toLocaleString()}
+                                  <span className="text-xs font-normal ml-0.5 text-slate-400">so'm</span>
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()
+              )}
             </div>
           )}
 
@@ -1420,12 +1511,12 @@ export default function Cashbox() {
         <div className="grid grid-cols-2 gap-3">
           <div><Lbl>{t('Dan (tur)')}</Lbl>
             <select value={exchForm.fromType} onChange={e=>setExchForm({...exchForm,fromType:e.target.value})} className={inp}>
-              <option value="CASH">{t('Naqd')}</option><option value="CARD">{t('Karta')}</option><option value="CLICK">Click</option>
+              <option value="CASH">{t('Naqd')}</option><option value="CARD">{t('Karta')}</option>
             </select>
           </div>
           <div><Lbl>{t('Ga (tur)')}</Lbl>
             <select value={exchForm.toType} onChange={e=>setExchForm({...exchForm,toType:e.target.value})} className={inp}>
-              <option value="CASH">{t('Naqd')}</option><option value="CARD">{t('Karta')}</option><option value="CLICK">Click</option>
+              <option value="CASH">{t('Naqd')}</option><option value="CARD">{t('Karta')}</option>
             </select>
           </div>
         </div>
@@ -1441,19 +1532,20 @@ export default function Cashbox() {
         </>}>
         <div>
           <Lbl>{t('Kategoriya')}</Lbl>
-          <div className="grid grid-cols-4 gap-1.5">
-            {EXPENSE_CATS.map(c => {
-              const Icon = c.icon;
-              const active = expForm.category === c.id;
-              return (
-                <button key={c.id} type="button" onClick={()=>setExpForm({...expForm,category:c.id})}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all
-                    ${active?'border-indigo-500 bg-indigo-50':'border-slate-200 hover:border-slate-300'}`}>
-                  <Icon className={`w-4 h-4 ${active?'text-indigo-600':'text-slate-400'}`}/>
-                  <span className={`text-[9px] font-semibold text-center leading-tight ${active?'text-indigo-700':'text-slate-500'}`}>{t(c.label)}</span>
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap gap-1.5">
+            {allCats
+              .filter(c => !['LOAN_REPAYMENT','ADJUSTMENT','REVERSAL'].includes(c.id))
+              .map(c => {
+                const active = expForm.category === c.id;
+                return (
+                  <button key={c.id} type="button" onClick={()=>setExpForm({...expForm,category:c.id})}
+                    className={`px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all
+                      ${active?'border-indigo-500 bg-indigo-50 text-indigo-700':'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}>
+                    {t(c.label)}
+                  </button>
+                );
+              })
+            }
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -1635,6 +1727,51 @@ export default function Cashbox() {
         </div>
       </CModal>
 
+      {/* Add Category */}
+      <CModal open={showAddCat} onClose={()=>setShowAddCat(false)} title={t('Yangi kategoriya')}
+        footer={<>
+          <button onClick={()=>setShowAddCat(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold">{t('Bekor')}</button>
+          <button onClick={handleAddCat} disabled={!addCatForm.label.trim()} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold">
+            {t('Qoshish')}
+          </button>
+        </>}>
+        <div>
+          <Lbl>{t('Kategoriya nomi')}</Lbl>
+          <input value={addCatForm.label} onChange={e=>setAddCatForm({...addCatForm,label:e.target.value})}
+            placeholder={t('Masalan: Ozoq-ovqat...')} className={inp}/>
+        </div>
+        <div>
+          <Lbl>{t('Rang tanlash')}</Lbl>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {CAT_COLORS.map(color=>(
+              <button key={color} type="button" onClick={()=>setAddCatForm({...addCatForm,color})}
+                className={`w-8 h-8 rounded-full transition-all ${addCatForm.color===color?'ring-2 ring-offset-2 ring-slate-400 scale-110':''}`}
+                style={{backgroundColor:color}}/>
+            ))}
+          </div>
+        </div>
+        <div>
+          <Lbl>{t('Belgi (icon)')}</Lbl>
+          <div className="grid grid-cols-6 gap-2 mt-1">
+            {Object.entries(ICON_MAP).map(([name, Icon])=>(
+              <button key={name} type="button" onClick={()=>setAddCatForm({...addCatForm,icon:name})}
+                className={`flex items-center justify-center w-10 h-10 rounded-xl border-2 transition-all
+                  ${addCatForm.icon===name?'border-indigo-500 bg-indigo-50':'border-slate-200 hover:border-slate-300'}`}>
+                <Icon className={`w-5 h-5 ${addCatForm.icon===name?'text-indigo-600':'text-slate-400'}`}/>
+              </button>
+            ))}
+          </div>
+        </div>
+        {addCatForm.label.trim() && (
+          <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{backgroundColor:addCatForm.color+'20'}}>
+              {(() => { const Icon = ICON_MAP[addCatForm.icon]; return <Icon className="w-5 h-5" style={{color:addCatForm.color}}/>; })()}
+            </div>
+            <span className="text-sm font-semibold text-slate-700">{addCatForm.label}</span>
+          </div>
+        )}
+      </CModal>
+
       {/* New Budget */}
       <CModal open={showNewBudget} onClose={()=>setShowNewBudget(false)} title={t('Yangi budjet')}
         footer={<>
@@ -1646,7 +1783,7 @@ export default function Cashbox() {
         <div>
           <Lbl>{t('Kategoriya')}</Lbl>
           <select value={budgetForm.category} onChange={e=>setBudgetForm({...budgetForm,category:e.target.value})} className={inp}>
-            {EXPENSE_CATS.filter(c=>!['LOAN_REPAYMENT','ADJUSTMENT','REVERSAL'].includes(c.id)).map(c=>(
+            {allCats.filter(c=>!['LOAN_REPAYMENT','ADJUSTMENT','REVERSAL'].includes(c.id)).map(c=>(
               <option key={c.id} value={c.id}>{t(c.label)}</option>
             ))}
           </select>

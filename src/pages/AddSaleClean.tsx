@@ -68,24 +68,23 @@ const ProductSection = ({
     return warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|гр|г)/.test(name);
   });
 
-  // Preformlarni gram bo'yicha dinamik guruhlash - ma'lumotdan avtomatik olish
+  // Preformlarni gram bo'yicha dinamik guruhlash
   const gramSizeMap = new Map<number, Product[]>();
 
   allPreforms.forEach((p) => {
     const name = p.name?.toLowerCase() || '';
-    // Gramajni nomdan olish (96g, 96gr, 96 g, va h.k.)
-    const gramMatch = name.match(/(\d+)\s*(gr|g|гр|г)\b/i);
+    const bagType = p.bagType?.toLowerCase() || '';
+    // Kirill гр / Latin gr — \b ishlamaydi Kirill uchun, shuning uchun olib tashlandi
+    const gramMatch = (bagType + ' ' + name).match(/(\d+)\s*(?:гр|г|gr|g)/i);
     if (gramMatch) {
       const gramSize = parseInt(gramMatch[1]);
-      if (!gramSizeMap.has(gramSize)) {
-        gramSizeMap.set(gramSize, []);
-      }
+      if (!gramSizeMap.has(gramSize)) gramSizeMap.set(gramSize, []);
       gramSizeMap.get(gramSize)!.push(p);
     }
   });
 
-  // Gram o'lchamlarini tartiblash va guruhlarni yaratish
   const sortedGramSizes = Array.from(gramSizeMap.keys()).sort((a, b) => a - b);
+  const groupedPreformIds = new Set(sortedGramSizes.flatMap(g => gramSizeMap.get(g)!.map(p => p.id)));
   const preformGroups: { key: string; title: string; products: Product[] }[] = [];
 
   sortedGramSizes.forEach((gram) => {
@@ -93,23 +92,15 @@ const ProductSection = ({
     if (groupProducts.length > 0) {
       preformGroups.push({
         key: `${gram}gr`,
-        title: `${gram} gr Preformlar`,
+        title: `${gram} гр`,
         products: groupProducts,
       });
     }
   });
 
-  // Gramaj aniqlanmagan preformlar uchun alohida guruh
-  const undefinedGramPreforms = allPreforms.filter((p) => {
-    const name = p.name?.toLowerCase() || '';
-    return !/\d+\s*(gr|g|гр|г)\b/i.test(name);
-  });
+  const undefinedGramPreforms = allPreforms.filter(p => !groupedPreformIds.has(p.id));
   if (undefinedGramPreforms.length > 0) {
-    preformGroups.push({
-      key: 'nomsiz',
-      title: 'Boshqa Preformlar',
-      products: undefinedGramPreforms,
-    });
+    preformGroups.push({ key: 'nomsiz', title: 'Boshqa Preformlar', products: undefinedGramPreforms });
   }
 
   // Krishkalarni o'lchami (mm) bo'yicha guruhlash
@@ -123,52 +114,31 @@ const ProductSection = ({
 
   allKrishka.forEach((p) => {
     const name = p.name?.toLowerCase() || '';
-    // O'lchamni nomdan olish (28mm, 28 mm, 28-mm, va h.k.)
-    let sizeMatch = name.match(/(\d+)\s*(mm|ml|мм|мл)/i);
-    if (!sizeMatch) {
-      // Agar mm yo'q bo'lsa, krishka yoki qopqoq dan keyingi/o'ndingi raqamni qidirish
-      sizeMatch = name.match(/(?:krishka|qopqoq|cap).*?(\d{2})|(\d{2}).*?(?:krishka|qopqoq|cap)/i);
-    }
+    // Nomdan birinchi 2-3 raqamli sonni olish: "Кришка 28 кук" → 28
+    const sizeMatch = name.match(/(\d{2,3})/);
     if (sizeMatch) {
-      const size = parseInt(sizeMatch[1] || sizeMatch[2]);
-      // Krishka o'lchamlari: 28, 30, 38, 48, 52
-      if ([28, 30, 38, 48, 52].includes(size)) {
-        if (!krishkaSizeMap.has(size)) {
-          krishkaSizeMap.set(size, []);
-        }
+      const size = parseInt(sizeMatch[1]);
+      if ([28, 38, 48, 55].includes(size)) {
+        if (!krishkaSizeMap.has(size)) krishkaSizeMap.set(size, []);
         krishkaSizeMap.get(size)!.push(p);
       }
     }
   });
 
-  // O'lchamlarni tartiblash va guruhlarni yaratish
   const sortedKrishkaSizes = Array.from(krishkaSizeMap.keys()).sort((a, b) => a - b);
+  const groupedKrishkaIds = new Set(sortedKrishkaSizes.flatMap(s => krishkaSizeMap.get(s)!.map(p => p.id)));
   const krishkaGroups: { key: string; title: string; products: Product[] }[] = [];
 
   sortedKrishkaSizes.forEach((size) => {
     const groupProducts = krishkaSizeMap.get(size)!;
     if (groupProducts.length > 0) {
-      krishkaGroups.push({
-        key: `${size}mm`,
-        title: `${size}mm Krishkalar`,
-        products: groupProducts,
-      });
+      krishkaGroups.push({ key: `${size}mm`, title: `${size}mm Krishka`, products: groupProducts });
     }
   });
 
-  // O'lcham aniqlanmagan krishkalar uchun alohida guruh
-  const undefinedSizeKrishka = allKrishka.filter((p) => {
-    const name = p.name?.toLowerCase() || '';
-    const hasSize = /(\d+)\s*(mm|ml|мм|мл)/i.test(name) ||
-                    /(?:krishka|qopqoq|cap).*?(\d{2})|(\d{2}).*?(?:krishka|qopqoq|cap)/i.test(name);
-    return !hasSize;
-  });
+  const undefinedSizeKrishka = allKrishka.filter(p => !groupedKrishkaIds.has(p.id));
   if (undefinedSizeKrishka.length > 0) {
-    krishkaGroups.push({
-      key: 'nomsiz-krishka',
-      title: 'Boshqa Krishkalar',
-      products: undefinedSizeKrishka,
-    });
+    krishkaGroups.push({ key: 'nomsiz-krishka', title: 'Boshqa Krishkalar', products: undefinedSizeKrishka });
   }
 
   // Ruchkalarni o'lchami (mm) bo'yicha guruhlash
@@ -182,52 +152,31 @@ const ProductSection = ({
 
   allRuchka.forEach((p) => {
     const name = p.name?.toLowerCase() || '';
-    // O'lchamni nomdan olish (28mm, 28 mm, 28-mm, va h.k.)
-    let sizeMatch = name.match(/(\d+)\s*(mm|ml|мм|мл)/i);
-    if (!sizeMatch) {
-      // Agar mm yo'q bo'lsa, ruchka yoki handle dan keyingi/o'ndingi raqamni qidirish
-      sizeMatch = name.match(/(?:ruchka|handle).*?(\d{2})|(\d{2}).*?(?:ruchka|handle)/i);
-    }
+    // "Ручка 28 сарик 1500" → birinchi 2-3 raqamli son = 28
+    const sizeMatch = name.match(/(\d{2,3})/);
     if (sizeMatch) {
-      const size = parseInt(sizeMatch[1] || sizeMatch[2]);
-      // Ruchka o'lchamlari: 28, 30, 38, 48, 52
-      if ([28, 30, 38, 48, 52].includes(size)) {
-        if (!ruchkaSizeMap.has(size)) {
-          ruchkaSizeMap.set(size, []);
-        }
+      const size = parseInt(sizeMatch[1]);
+      if ([28, 38, 48].includes(size)) {
+        if (!ruchkaSizeMap.has(size)) ruchkaSizeMap.set(size, []);
         ruchkaSizeMap.get(size)!.push(p);
       }
     }
   });
 
-  // O'lchamlarni tartiblash va guruhlarni yaratish
   const sortedRuchkaSizes = Array.from(ruchkaSizeMap.keys()).sort((a, b) => a - b);
+  const groupedRuchkaIds = new Set(sortedRuchkaSizes.flatMap(s => ruchkaSizeMap.get(s)!.map(p => p.id)));
   const ruchkaGroups: { key: string; title: string; products: Product[] }[] = [];
 
   sortedRuchkaSizes.forEach((size) => {
     const groupProducts = ruchkaSizeMap.get(size)!;
     if (groupProducts.length > 0) {
-      ruchkaGroups.push({
-        key: `${size}mm-ruchka`,
-        title: `${size}mm Ruchkalar`,
-        products: groupProducts,
-      });
+      ruchkaGroups.push({ key: `${size}mm-ruchka`, title: `${size}mm Ruchka`, products: groupProducts });
     }
   });
 
-  // O'lcham aniqlanmagan ruchkalar uchun alohida guruh
-  const undefinedSizeRuchka = allRuchka.filter((p) => {
-    const name = p.name?.toLowerCase() || '';
-    const hasSize = /(\d+)\s*(mm|ml|мм|мл)/i.test(name) ||
-                    /(?:ruchka|handle).*?(\d{2})|(\d{2}).*?(?:ruchka|handle)/i.test(name);
-    return !hasSize;
-  });
+  const undefinedSizeRuchka = allRuchka.filter(p => !groupedRuchkaIds.has(p.id));
   if (undefinedSizeRuchka.length > 0) {
-    ruchkaGroups.push({
-      key: 'nomsiz-ruchka',
-      title: 'Boshqa Ruchkalar',
-      products: undefinedSizeRuchka,
-    });
+    ruchkaGroups.push({ key: 'nomsiz-ruchka', title: 'Boshqa Ruchkalar', products: undefinedSizeRuchka });
   }
 
   // Custom turlarni alohida guruhlash (custom- boshlangan warehouse ID lar)

@@ -405,7 +405,6 @@ export interface SaleFormData {
   items: SaleItemForm[];
   paidUZS: string;
   paidUSD: string;
-  paidCLICK: string;
   paidKARTA: string;
   paymentType: 'cash' | 'debt' | 'partial';
   currency: 'UZS' | 'USD';

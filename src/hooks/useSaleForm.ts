@@ -30,7 +30,6 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     items: editSale?.items || [],
     paidUZS: editSale?.paidUZS || '',
     paidUSD: editSale?.paidUSD || '',
-    paidCLICK: editSale?.paidCLICK || '',
     paidKARTA: editSale?.paidKARTA || '',
     paymentType: editSale?.paymentType || 'cash',
     currency: editSale?.currency || 'USD',
@@ -80,8 +79,8 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
   const totalAmount = useMemo(() => calculateTotal(form.items), [form.items]);
 
   const paidAmount = useMemo(() =>
-    calculatePaidAmount(form.paidUZS, form.paidUSD, form.paidCLICK, exchangeRateNum, form.currency, form.paidKARTA),
-    [form.paidUZS, form.paidUSD, form.paidCLICK, form.paidKARTA, exchangeRateNum, form.currency]
+    calculatePaidAmount(form.paidUZS, form.paidUSD, exchangeRateNum, form.currency, form.paidKARTA),
+    [form.paidUZS, form.paidUSD, form.paidKARTA, exchangeRateNum, form.currency]
   );
 
   const debtAmount = useMemo(() => calculateDebt(totalAmount, paidAmount), [totalAmount, paidAmount]);
@@ -305,7 +304,6 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
       items: [],
       paidUZS: '',
       paidUSD: '',
-      paidCLICK: '',
       paidKARTA: '',
       paymentType: 'cash',
       currency: form.currency,
@@ -352,7 +350,6 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
         paymentDetails: {
           uzs: parseFloat(form.paidUZS || '0'),
           usd: parseFloat(form.paidUSD || '0'),
-          click: parseFloat(form.paidCLICK || '0'),
           karta: parseFloat(form.paidKARTA || '0'),
         },
         paymentMethod: form.paymentType?.toUpperCase() || 'CASH', // ✅ Backend nomiga mos
