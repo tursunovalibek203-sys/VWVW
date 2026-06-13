@@ -215,6 +215,13 @@ export default function Cashbox() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  // Sahifa focus yoki ko'rinib qolganda avtomatik yangilash
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') loadAll(true); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [loadAll]);
+
   // ── Computed ─────────────────────────────────────────────────────────────
   // Naqt qo'ldagi pul (NET balans: kirim - chiqim)
   const cashUZS  = cashbox?.byCurrency?.cashUZS  || 0;
