@@ -10,6 +10,7 @@ import {
   Plus,
   MessageCircle,
   Shield,
+  Truck,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
@@ -42,7 +43,7 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
     { path: '/cashier/products', icon: Package, label: 'Ombor' },
     { path: '/cashier/customers', icon: Users, label: 'Mijozlar' },
     { path: '/cashier/cashbox', icon: Calculator, label: 'Kassa' },
-
+    { path: '/cashier/drivers', icon: Truck, label: 'Haydovchi' },
     { path: '/cashier/chat', icon: MessageCircle, label: 'Chat' },
   ];
 

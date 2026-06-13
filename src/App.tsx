@@ -48,6 +48,7 @@ const Activity = lazy(() => import('./pages/Activity'));
 
 // Management
 const CashierManagement = lazy(() => import('./pages/CashierManagement'));
+const Drivers = lazy(() => import('./pages/Drivers'));
 const Suppliers = lazy(() => import('./pages/Suppliers'));
 const Production = lazy(() => import('./pages/Production'));
 const Quality = lazy(() => import('./pages/Quality'));
@@ -125,6 +126,7 @@ function AppRoutes() {
                 <Route path="cashbox" element={<Cashbox />} />
                 <Route path="chat" element={<ModernChat />} />
                 <Route path="expenses" element={<Expenses />} />
+                <Route path="drivers" element={<Drivers />} />
                 <Route path="*" element={<Navigate to="/cashier/sales" />} />
               </Routes>
             </CashierLayout>
