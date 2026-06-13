@@ -768,10 +768,9 @@ export function Drivers() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label htmlFor="driver-phone" className="block text-xs font-semibold text-slate-600">{latinToCyrillic('Telefon')} <span className="text-rose-500">*</span></label>
+                  <label htmlFor="driver-phone" className="block text-xs font-semibold text-slate-600">{latinToCyrillic('Telefon')}</label>
                   <input
                     id="driver-phone"
-                    required
                     placeholder="+998901234567"
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
                     value={newDriver.phone}
@@ -779,20 +778,18 @@ export function Drivers() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label htmlFor="driver-license" className="block text-xs font-semibold text-slate-600">{latinToCyrillic('Guvohnoma raqami')} <span className="text-rose-500">*</span></label>
+                  <label htmlFor="driver-license" className="block text-xs font-semibold text-slate-600">{latinToCyrillic('Guvohnoma raqami')}</label>
                   <input
                     id="driver-license"
-                    required
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
                     value={newDriver.licenseNumber}
                     onChange={(e) => setNewDriver({ ...newDriver, licenseNumber: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label htmlFor="driver-vehicle" className="block text-xs font-semibold text-slate-600">{latinToCyrillic('Mashina raqami')} <span className="text-rose-500">*</span></label>
+                  <label htmlFor="driver-vehicle" className="block text-xs font-semibold text-slate-600">{latinToCyrillic('Mashina raqami')}</label>
                   <input
                     id="driver-vehicle"
-                    required
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
                     value={newDriver.vehicleNumber}
                     onChange={(e) => setNewDriver({ ...newDriver, vehicleNumber: e.target.value })}
