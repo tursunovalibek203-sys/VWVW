@@ -464,54 +464,86 @@ router.post('/check-or-create', async (req, res) => {
   }
 });
 
-// ── Haydovchi pul topshirdi (debtToCompany kamayadi, kassa to'ladi) ──────────
+// ── Haydovchi pul topshirdi: USD + UZS + Karta bir vaqtda ──────────────────
 router.post('/:id/payment', authorize('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { amount, currency = 'UZS', notes } = req.body;
+    const { amountUSD = 0, amountUZS = 0, amountKarta = 0, exchangeRate = 12700, notes } = req.body;
     const userId = req.user?.id;
     const userName = req.user?.name || req.user?.login || 'Admin';
 
-    if (!amount || parseFloat(amount) <= 0) {
-      return res.status(400).json({ error: 'Summa 0 dan katta bo\'lishi kerak' });
-    }
+    const usd   = parseFloat(amountUSD)   || 0;
+    const uzs   = parseFloat(amountUZS)   || 0;
+    const karta = parseFloat(amountKarta) || 0;
+    const rate  = parseFloat(exchangeRate) || 12700;
 
-    const amountNum = parseFloat(amount);
+    if (usd <= 0 && uzs <= 0 && karta <= 0) {
+      return res.status(400).json({ error: 'Kamida bitta summa kiritilishi kerak' });
+    }
 
     const driver = await prisma.driver.findUnique({ where: { id } });
     if (!driver) return res.status(404).json({ error: 'Haydovchi topilmadi' });
 
-    // Haydovchi qarzini kamaytir
-    const newDebt = Math.max(0, (driver.debtToCompany || 0) - amountNum);
-    await (prisma.driver as any).update({
-      where: { id },
-      data: { debtToCompany: newDebt },
-    });
+    // Jami UZS ekvivalenti (qarz kamaytirish uchun)
+    const totalInUZS = (usd * rate) + uzs + karta;
+    const newDebt = Math.max(0, (driver.debtToCompany || 0) - totalInUZS);
+    await (prisma.driver as any).update({ where: { id }, data: { debtToCompany: newDebt } });
 
-    // Kassaga kirim
-    await prisma.cashboxTransaction.create({
-      data: {
-        type: 'INCOME',
-        amount: amountNum,
-        currency: currency.toUpperCase(),
-        category: 'INCOME',
-        paymentMethod: 'CASH',
-        description: `Haydovchi to'lovi: ${driver.name} (${notes || ''})`,
-        userId: userId || '',
-        userName,
-        reference: id,
-      }
-    });
+    const desc = `Haydovchi to'lovi: ${driver.name}${notes ? ' (' + notes + ')' : ''}`;
 
-    res.json({
-      success: true,
-      driverName: driver.name,
-      paid: amountNum,
-      remainingDebt: newDebt,
-    });
+    // Kassaga kirim — har valyuta alohida
+    if (usd > 0) {
+      await prisma.cashboxTransaction.create({ data: {
+        type: 'INCOME', amount: usd, currency: 'USD', category: 'INCOME',
+        paymentMethod: 'CASH', description: desc, userId: userId || '', userName, reference: id,
+      }});
+    }
+    if (uzs > 0) {
+      await prisma.cashboxTransaction.create({ data: {
+        type: 'INCOME', amount: uzs, currency: 'UZS', category: 'INCOME',
+        paymentMethod: 'CASH', description: desc, userId: userId || '', userName, reference: id,
+      }});
+    }
+    if (karta > 0) {
+      await prisma.cashboxTransaction.create({ data: {
+        type: 'INCOME', amount: karta, currency: 'UZS', category: 'INCOME',
+        paymentMethod: 'CARD', description: desc, userId: userId || '', userName, reference: id,
+      }});
+    }
+
+    res.json({ success: true, driverName: driver.name, totalInUZS, remainingDebt: newDebt });
   } catch (error: any) {
     console.error('Driver payment error:', error);
     res.status(500).json({ error: 'Haydovchi to\'lovida xatolik: ' + error.message });
+  }
+});
+
+// ── Haydovchi qarzini bekor qilish (kassaga pul tushmaydi) ────────────────
+router.post('/:id/cancel-debt', authorize('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { note = '' } = req.body;
+    const userId = req.user?.id;
+    const userName = req.user?.name || req.user?.login || 'Admin';
+
+    const driver = await prisma.driver.findUnique({ where: { id } });
+    if (!driver) return res.status(404).json({ error: 'Haydovchi topilmadi' });
+
+    const cancelledAmount = driver.debtToCompany || 0;
+    await (prisma.driver as any).update({ where: { id }, data: { debtToCompany: 0 } });
+
+    // Faqat loglash — kassaga pul tushmaydi
+    await prisma.cashboxTransaction.create({ data: {
+      type: 'EXPENSE', amount: 0.01, currency: 'UZS', category: 'ADJUSTMENT',
+      paymentMethod: 'CASH',
+      description: `Haydovchi qarzi bekor: ${driver.name} — ${Math.round(cancelledAmount).toLocaleString()} UZS${note ? ' (' + note + ')' : ''}`,
+      userId: userId || '', userName, reference: id,
+    }});
+
+    res.json({ success: true, cancelledAmount, driverName: driver.name });
+  } catch (error: any) {
+    console.error('Driver cancel-debt error:', error);
+    res.status(500).json({ error: 'Qarzni bekor qilishda xatolik: ' + error.message });
   }
 });
 

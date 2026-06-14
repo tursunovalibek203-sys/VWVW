@@ -89,9 +89,15 @@ export function Drivers() {
   const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentDriver, setPaymentDriver] = useState<Driver | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentUSD, setPaymentUSD] = useState('');
+  const [paymentUZS, setPaymentUZS] = useState('');
+  const [paymentKarta, setPaymentKarta] = useState('');
+  const [paymentExchangeRate, setPaymentExchangeRate] = useState('12700');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [showCancelDebt, setShowCancelDebt] = useState(false);
+  const [cancelDebtNote, setCancelDebtNote] = useState('');
+  const [cancelDebtLoading, setCancelDebtLoading] = useState(false);
 
   const [newDriver, setNewDriver] = useState({
     name: '',
@@ -258,28 +264,58 @@ export function Drivers() {
 
   const openPaymentModal = (driver: Driver) => {
     setPaymentDriver(driver);
-    setPaymentAmount('');
+    setPaymentUSD('');
+    setPaymentUZS('');
+    setPaymentKarta('');
+    setPaymentExchangeRate('12700');
     setPaymentNotes('');
+    setShowCancelDebt(false);
+    setCancelDebtNote('');
     setShowPaymentModal(true);
   };
 
   const handleDriverPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!paymentDriver || !paymentAmount || parseFloat(paymentAmount) <= 0) return;
+    if (!paymentDriver) return;
+    const usd = parseFloat(paymentUSD) || 0;
+    const uzs = parseFloat(paymentUZS) || 0;
+    const karta = parseFloat(paymentKarta) || 0;
+    if (usd <= 0 && uzs <= 0 && karta <= 0) return;
     setPaymentLoading(true);
     try {
       await api.post(`/drivers/${paymentDriver.id}/payment`, {
-        amount: parseFloat(paymentAmount),
-        currency: 'UZS',
+        amountUSD: usd,
+        amountUZS: uzs,
+        amountKarta: karta,
+        exchangeRate: parseFloat(paymentExchangeRate) || 12700,
         notes: paymentNotes,
       });
       setShowPaymentModal(false);
       fetchDrivers();
-      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic(`${paymentDriver.name} haydovchidan ${parseFloat(paymentAmount).toLocaleString()} UZS qabul qilindi`)));
+      const parts = [];
+      if (usd > 0)   parts.push(`$${usd.toLocaleString()}`);
+      if (uzs > 0)   parts.push(`${uzs.toLocaleString()} UZS`);
+      if (karta > 0) parts.push(`${karta.toLocaleString()} UZS (${latinToCyrillic('karta')})`);
+      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), `${paymentDriver.name}: ${parts.join(' + ')} ${latinToCyrillic('qabul qilindi')}`));
     } catch (error: any) {
       addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || latinToCyrillic("To'lovda xatolik yuz berdi")));
     } finally {
       setPaymentLoading(false);
+    }
+  };
+
+  const handleCancelDebt = async () => {
+    if (!paymentDriver) return;
+    setCancelDebtLoading(true);
+    try {
+      await api.post(`/drivers/${paymentDriver.id}/cancel-debt`, { note: cancelDebtNote });
+      setShowPaymentModal(false);
+      fetchDrivers();
+      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), `${paymentDriver.name} ${latinToCyrillic('qarzi bekor qilindi')}`));
+    } catch (error: any) {
+      addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || latinToCyrillic('Xatolik yuz berdi')));
+    } finally {
+      setCancelDebtLoading(false);
     }
   };
 
@@ -997,7 +1033,7 @@ export function Drivers() {
             </div>
 
             <form onSubmit={handleDriverPayment} className="p-6 space-y-4">
-              {/* Current debt */}
+              {/* Joriy qarz */}
               <div className="flex items-center justify-between bg-amber-50 rounded-xl px-4 py-3">
                 <span className="text-sm font-medium text-amber-700">{latinToCyrillic('Joriy qarz')}</span>
                 <span className="text-sm font-bold text-amber-800 tabular-nums">
@@ -1005,38 +1041,116 @@ export function Drivers() {
                 </span>
               </div>
 
+              {/* Kurs */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-slate-600">
-                  {latinToCyrillic('Topshirilgan summa (UZS)')} <span className="text-rose-500">*</span>
+                  {latinToCyrillic('Kurs')} (1 USD = ? UZS)
                 </label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  max={paymentDriver.debtToCompany || undefined}
-                  placeholder="0"
-                  value={paymentAmount}
-                  onChange={e => setPaymentAmount(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all tabular-nums"
+                <input type="number" min="1" placeholder="12700"
+                  value={paymentExchangeRate}
+                  onChange={e => setPaymentExchangeRate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all"
                 />
-                {paymentAmount && parseFloat(paymentAmount) > 0 && (
-                  <p className="text-xs text-slate-400">
-                    {latinToCyrillic('Qolgan qarz')}: {Math.max(0, Math.round((paymentDriver.debtToCompany || 0) - parseFloat(paymentAmount))).toLocaleString()} UZS
-                  </p>
-                )}
               </div>
+
+              {/* 3 ta input */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">{latinToCyrillic('Topshirilgan summalar')}</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-emerald-600 w-20 flex-shrink-0">💵 USD ($)</span>
+                  <input type="number" min="0" placeholder="0"
+                    value={paymentUSD}
+                    onChange={e => setPaymentUSD(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all"
+                  />
+                  {paymentUSD && parseFloat(paymentUSD) > 0 && (
+                    <span className="text-xs text-slate-400 w-24 text-right flex-shrink-0">
+                      ≈ {Math.round(parseFloat(paymentUSD) * (parseFloat(paymentExchangeRate)||12700)).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-blue-600 w-20 flex-shrink-0">💴 {latinToCyrillic('Naqd')}</span>
+                  <input type="number" min="0" placeholder="0"
+                    value={paymentUZS}
+                    onChange={e => setPaymentUZS(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all"
+                  />
+                  {paymentUZS && parseFloat(paymentUZS) > 0 && (
+                    <span className="text-xs text-slate-400 w-24 text-right flex-shrink-0">UZS</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-purple-600 w-20 flex-shrink-0">💳 {latinToCyrillic('Karta')}</span>
+                  <input type="number" min="0" placeholder="0"
+                    value={paymentKarta}
+                    onChange={e => setPaymentKarta(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all"
+                  />
+                  {paymentKarta && parseFloat(paymentKarta) > 0 && (
+                    <span className="text-xs text-slate-400 w-24 text-right flex-shrink-0">UZS</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Jami va qolgan qarz */}
+              {(() => {
+                const usd = parseFloat(paymentUSD) || 0;
+                const uzs = parseFloat(paymentUZS) || 0;
+                const karta = parseFloat(paymentKarta) || 0;
+                const rate = parseFloat(paymentExchangeRate) || 12700;
+                const totalUZS = usd * rate + uzs + karta;
+                if (totalUZS <= 0) return null;
+                const remaining = Math.max(0, Math.round((paymentDriver.debtToCompany || 0) - totalUZS));
+                return (
+                  <div className="bg-emerald-50 rounded-xl px-4 py-3 space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-emerald-700 font-medium">{latinToCyrillic('Jami (UZS)')}</span>
+                      <span className="font-bold text-emerald-800 tabular-nums">{Math.round(totalUZS).toLocaleString()} UZS</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-500">{latinToCyrillic('Qolgan qarz')}</span>
+                      <span className={`font-semibold tabular-nums ${remaining === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {remaining.toLocaleString()} UZS
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-slate-600">
                   {latinToCyrillic('Izoh')} <span className="text-slate-300 font-normal">({latinToCyrillic('ixtiyoriy')})</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder={latinToCyrillic('Masalan: naqd pul')}
+                <input type="text" placeholder={latinToCyrillic('Ixtiyoriy...')}
                   value={paymentNotes}
                   onChange={e => setPaymentNotes(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all"
                 />
+              </div>
+
+              {/* Qarzni bekor qilish */}
+              <div className="border-t border-slate-100 pt-3">
+                <button type="button" onClick={() => setShowCancelDebt(v => !v)}
+                  className="text-xs font-semibold text-rose-500 hover:text-rose-700 transition-colors">
+                  {showCancelDebt ? '▲' : '▼'} {latinToCyrillic('Qarzni bekor qilish (kassaga tushmaydi)')}
+                </button>
+                {showCancelDebt && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs text-slate-500">
+                      {latinToCyrillic('Haydovchi pul keltirmadi — qarz bekor qilinadi, kassaga pul tushmaydi.')}
+                    </p>
+                    <input type="text" placeholder={latinToCyrillic('Sabab (ixtiyoriy)')}
+                      value={cancelDebtNote}
+                      onChange={e => setCancelDebtNote(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-rose-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-300 focus:bg-white transition-all"
+                    />
+                    <button type="button" onClick={handleCancelDebt} disabled={cancelDebtLoading}
+                      className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-sm font-semibold border border-rose-200 transition-colors disabled:opacity-60">
+                      {cancelDebtLoading ? latinToCyrillic('Yuklanmoqda...') : `${latinToCyrillic('Qarzni bekor qil')} (${Math.round(paymentDriver.debtToCompany || 0).toLocaleString()} UZS)`}
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 pt-1">
@@ -1049,7 +1163,7 @@ export function Drivers() {
                 </button>
                 <button
                   type="submit"
-                  disabled={paymentLoading || !paymentAmount || parseFloat(paymentAmount) <= 0}
+                  disabled={paymentLoading || ((parseFloat(paymentUSD) || 0) <= 0 && (parseFloat(paymentUZS) || 0) <= 0 && (parseFloat(paymentKarta) || 0) <= 0)}
                   className="flex-[2] inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {paymentLoading && <Loader2 className="w-4 h-4 animate-spin" />}

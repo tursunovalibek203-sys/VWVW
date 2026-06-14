@@ -147,11 +147,20 @@ export class SalesService {
 
     if (!items?.length) throw new Error('Kamida bitta mahsulot tanlash kerak');
 
-    // To'lov statusini hisoblash
+    // Haydovchi tayinlangan bo'lsa, qolgan summani u yig'adi deb hisoblaymiz.
+    // Bu mijozni qarz ko'rsatmaslik uchun kerak — haydovchi mas'ul.
+    const remaining = Math.max(0, totalAmount - paidAmount);
+    const actualDriverCollected = driverId
+      ? Math.max(driverCollectedAmount || 0, remaining)
+      : (driverCollectedAmount || 0);
+
+    // To'lov statusini hisoblash — haydovchi summasi ham hisobga olinadi
+    const totalCovered = DecimalHelper.add(paidAmount, actualDriverCollected);
     let calculatedPaymentStatus: 'PAID' | 'PARTIAL' | 'UNPAID' = 'UNPAID';
-    if (DecimalHelper.isGreaterThanOrEqual(paidAmount, totalAmount) && totalAmount > 0) {
+    if (DecimalHelper.isGreaterThanOrEqual(totalCovered, totalAmount) && totalAmount > 0) {
+      // Haydovchi yoki mijoz to'liq to'ladi
       calculatedPaymentStatus = 'PAID';
-    } else if (DecimalHelper.isGreaterThan(paidAmount, 0) && DecimalHelper.isLessThan(paidAmount, totalAmount)) {
+    } else if (DecimalHelper.isGreaterThan(totalCovered, 0)) {
       calculatedPaymentStatus = 'PARTIAL';
     }
 
@@ -185,8 +194,8 @@ export class SalesService {
             paymentMethod: safePaymentMethod,
             paymentStatus: calculatedPaymentStatus,
             paymentDetails: paymentDetails ? JSON.stringify(paymentDetails) : null,
-            driverCollectedAmount: driverCollectedAmount || 0,
-            driverPaymentStatus: driverCollectedAmount > 0 ? 'COLLECTED' : 'PENDING',
+            driverCollectedAmount: actualDriverCollected,
+            driverPaymentStatus: 'PENDING',
             deliveryFee: deliveryFee || 0,
             deliveryFeePaidBy: deliveryFeePaidBy || 'COMPANY',
             isKocha: !!isKocha,
@@ -326,9 +335,11 @@ export class SalesService {
           });
         }
 
-        // 8. UPDATE CUSTOMER DEBT/BALANCE (if not Ko'cha) - FIXED
+        // 8. UPDATE CUSTOMER DEBT/BALANCE (if not Ko'cha)
+        // actualDriverCollected hisobga olinadi — haydovchi tayinlansa mijoz qarz ko'rinmaydi
         if (!isKocha && customerId) {
-          const debtAmount = DecimalHelper.subtract(totalAmount, paidAmount);
+          const effectivePaid = DecimalHelper.add(paidAmount, actualDriverCollected);
+          const debtAmount = DecimalHelper.subtract(totalAmount, effectivePaid);
           
           // Use DecimalHelper for comparisons
           if (DecimalHelper.isGreaterThan(debtAmount, 0.01)) {
@@ -387,10 +398,14 @@ export class SalesService {
           }
         }
         // 9. DRIVER DEBT — haydovchi mijozdan pul yig'sa, kompaniyaga qarzdor bo'ladi
-        if (driverId && driverCollectedAmount > 0) {
+        // debtToCompany har doim UZS da saqlanadi — USD bo'lsa kursga ko'paytiramiz
+        if (driverId && actualDriverCollected > 0) {
+          const debtInUZS = safeCurrency === 'USD'
+            ? actualDriverCollected * exchangeRate
+            : actualDriverCollected;
           await tx.$executeRaw`
             UPDATE "Driver"
-            SET "debtToCompany" = "debtToCompany" + ${driverCollectedAmount},
+            SET "debtToCompany" = "debtToCompany" + ${debtInUZS},
                 "updatedAt" = datetime('now')
             WHERE "id" = ${driverId}
           `;

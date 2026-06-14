@@ -27,75 +27,167 @@ function todayRange() {
   return { start, end };
 }
 
-/** Sheet 1: Ombor — sana | maxsulot | kun boshida | ishlab chiqarildi | sotildi | kun oxirida qoldi */
-async function buildOmborSheet(date: Date) {
+// Shift 1: 00:00–08:00 | Shift 2: 08:00–12:00 | Shift 3: 12:00–18:00
+function getShift(d: Date): 1 | 2 | 3 {
+  const h = d.getHours();
+  if (h < 8) return 1;
+  if (h < 12) return 2;
+  return 3;
+}
+
+const EXPENSE_LABELS: Record<string, string> = {
+  SALARY: 'Ish haqi',
+  ELECTRICITY: 'Elektr',
+  RAW_MATERIALS: 'Xom ashyo',
+  TRANSPORT: 'Transport',
+  TAX: 'Soliq',
+  OTHER: 'Boshqa',
+};
+
+/**
+ * Sheet 1: Ombor — pivot style
+ * Columns: Mahsulot | Kun boshida | 8:00gacha | 8:00-12:00 | 12:00-18:00 | Jami ishlab chiqarildi | Kun oxirida | [SaleCol per sale...]
+ */
+async function buildOmborSheet(_date: Date) {
   const { start, end } = todayRange();
 
   const products = await prisma.product.findMany({ orderBy: { name: 'asc' } });
 
-  // Bugun sotilgan (SaleItem orqali)
-  const salesByProduct = await prisma.saleItem.groupBy({
-    by: ['productId'],
-    _sum: { quantity: true },
-    where: { sale: { createdAt: { gte: start, lte: end } } },
+  // ── Sales: build one column per sale ─────────────────────────────────────
+  const sales = await prisma.sale.findMany({
+    where: { createdAt: { gte: start, lte: end } },
+    select: {
+      id: true,
+      receiptNumber: true,
+      createdAt: true,
+      quantity: true,
+      productId: true,
+      manualCustomerName: true,
+      customer: { select: { name: true } },
+      items: { select: { quantity: true, productId: true } },
+    },
+    orderBy: { createdAt: 'asc' },
   });
-  const soldMap = new Map<string, number>();
-  for (const s of salesByProduct) {
-    if (s.productId) soldMap.set(s.productId, s._sum.quantity ?? 0);
+
+  // Count occurrences of each customer label (for deduplication)
+  const baseLabelCount = new Map<string, number>();
+  for (const s of sales) {
+    const name = s.customer?.name ?? s.manualCustomerName ?? "Noma'lum";
+    const base = `${name}ga savdo`;
+    baseLabelCount.set(base, (baseLabelCount.get(base) ?? 0) + 1);
   }
-  // To'g'ridan-to'g'ri Sale (SaleItem bo'lmagan)
-  const directSales = await prisma.sale.groupBy({
-    by: ['productId'], _sum: { quantity: true },
-    where: { productId: { not: null }, createdAt: { gte: start, lte: end } },
-  });
-  for (const s of directSales) {
-    if (s.productId && !(soldMap.get(s.productId) ?? 0)) {
-      soldMap.set(s.productId, s._sum.quantity ?? 0);
+
+  const baseLabelCounter = new Map<string, number>();
+  const saleColumns: Array<{ label: string; itemMap: Map<string, number> }> = [];
+
+  for (const s of sales) {
+    const name = s.customer?.name ?? s.manualCustomerName ?? "Noma'lum";
+    const base = `${name}ga savdo`;
+    const total = baseLabelCount.get(base) ?? 1;
+
+    let label: string;
+    if (total > 1) {
+      const n = (baseLabelCounter.get(base) ?? 0) + 1;
+      baseLabelCounter.set(base, n);
+      label = `${base} ${n}`;
+    } else {
+      label = base;
+    }
+
+    const itemMap = new Map<string, number>();
+    if (s.items && s.items.length > 0) {
+      for (const it of s.items) {
+        if (it.productId) {
+          itemMap.set(it.productId, (itemMap.get(it.productId) ?? 0) + it.quantity);
+        }
+      }
+    } else if (s.productId) {
+      itemMap.set(s.productId, s.quantity ?? 0);
+    }
+
+    saleColumns.push({ label, itemMap });
+  }
+
+  // Total sold per product
+  const soldMap = new Map<string, number>();
+  for (const col of saleColumns) {
+    for (const [pid, qty] of col.itemMap) {
+      soldMap.set(pid, (soldMap.get(pid) ?? 0) + qty);
     }
   }
 
-  // Bugun ishlab chiqarilgan (Batch modeli)
-  const batchByProduct = await prisma.batch.groupBy({
-    by: ['productId'], _sum: { quantity: true },
+  // ── Production: 3 sources → split by shift ───────────────────────────────
+  const prodShift: Record<1 | 2 | 3, Map<string, number>> = {
+    1: new Map(),
+    2: new Map(),
+    3: new Map(),
+  };
+
+  // Source 1: Batch records (scheduled production)
+  const batches = await prisma.batch.findMany({
     where: { productionDate: { gte: start, lte: end } },
   });
-  const prodMap = new Map<string, number>();
-  for (const b of batchByProduct) {
-    prodMap.set(b.productId, b._sum.quantity ?? 0);
+  const batchKeys = new Set<string>();
+  for (const b of batches) {
+    const shift = getShift(new Date(b.productionDate));
+    prodShift[shift].set(b.productId, (prodShift[shift].get(b.productId) ?? 0) + b.quantity);
+    batchKeys.add(`${b.productId}_${new Date(b.productionDate).toISOString().slice(0, 16)}`);
   }
 
-  // StockMovement type=PRODUCTION (qo'shimcha manba)
-  const smProd = await prisma.stockMovement.groupBy({
-    by: ['productId'], _sum: { quantity: true },
+  // Source 2: StockMovement type=PRODUCTION (skip if already in Batch)
+  const smProd = await prisma.stockMovement.findMany({
     where: { type: 'PRODUCTION', createdAt: { gte: start, lte: end } },
   });
-  for (const s of smProd) {
-    const existing = prodMap.get(s.productId) ?? 0;
-    if (!existing) prodMap.set(s.productId, s._sum.quantity ?? 0);
+  for (const sm of smProd) {
+    const key = `${sm.productId}_${new Date(sm.createdAt).toISOString().slice(0, 16)}`;
+    if (!batchKeys.has(key)) {
+      const shift = getShift(new Date(sm.createdAt));
+      prodShift[shift].set(sm.productId, (prodShift[shift].get(sm.productId) ?? 0) + sm.quantity);
+    }
   }
 
+  // Source 3: StockMovement type=ADD (warehouse add-bag — this is the fix for the 0 bug)
+  const smAdd = await prisma.stockMovement.findMany({
+    where: { type: 'ADD', createdAt: { gte: start, lte: end } },
+  });
+  for (const sm of smAdd) {
+    const shift = getShift(new Date(sm.createdAt));
+    prodShift[shift].set(sm.productId, (prodShift[shift].get(sm.productId) ?? 0) + sm.quantity);
+  }
+
+  // ── Build rows ────────────────────────────────────────────────────────────
   const rows = products.map((p) => {
+    const s1 = prodShift[1].get(p.id) ?? 0;
+    const s2 = prodShift[2].get(p.id) ?? 0;
+    const s3 = prodShift[3].get(p.id) ?? 0;
+    const totalProd = s1 + s2 + s3;
     const sotildi = soldMap.get(p.id) ?? 0;
-    const ishlabChiqarildi = prodMap.get(p.id) ?? 0;
     const kunOxirida = p.currentStock;
-    // kun_boshida = kun_oxirida + sotildi - ishlab_chiqarildi
-    const kunBoshida = Math.max(0, kunOxirida + sotildi - ishlabChiqarildi);
-    return {
-      'Sana': formatDate(date),
-      'Maxsulot': p.name,
+    const kunBoshida = Math.max(0, kunOxirida + sotildi - totalProd);
+
+    const row: Record<string, any> = {
+      'Mahsulot': p.name,
       'Kun boshida (qop)': kunBoshida,
-      'Ishlab chiqarildi (qop)': ishlabChiqarildi,
-      'Sotildi (qop)': sotildi,
+      '8:00 gacha ishlab chiqarildi': s1 || '',
+      '8:00-12:00 ishlab chiqarildi': s2 || '',
+      '12:00-18:00 ishlab chiqarildi': s3 || '',
+      'Jami ishlab chiqarildi (qop)': totalProd || '',
       'Kun oxirida qoldi (qop)': kunOxirida,
-      'Tekshirish (boshi+ish-sotil)': kunBoshida + ishlabChiqarildi - sotildi,
     };
+
+    for (const col of saleColumns) {
+      const qty = col.itemMap.get(p.id);
+      row[col.label] = qty != null && qty > 0 ? qty : '';
+    }
+
+    return row;
   });
 
   return rows;
 }
 
 /** Sheet 2: Sotuv — chek raqami | sana | vaqt | kim oldi | nima oldi | qancha | jami | tuladi | qarz | olib ketdi */
-async function buildSotuvSheet(date: Date) {
+async function buildSotuvSheet(_date: Date) {
   const { start, end } = todayRange();
 
   const sales = await prisma.sale.findMany({
@@ -119,24 +211,18 @@ async function buildSotuvSheet(date: Date) {
     orderBy: { createdAt: 'asc' },
   });
 
-  const rows = sales.map((s) => {
-    // Build product name string
+  return sales.map((s) => {
     let nimaSotildi = '';
     if (s.items && s.items.length > 0) {
       nimaSotildi = s.items
-        .map((it) => it.product?.name ?? it.variant?.variantName ?? 'Noma\'lum')
+        .map((it) => it.product?.name ?? it.variant?.variantName ?? "Noma'lum")
         .join(', ');
     } else {
-      nimaSotildi = s.product?.name ?? 'Noma\'lum';
+      nimaSotildi = s.product?.name ?? "Noma'lum";
     }
 
-    const kimOldi =
-      s.customer?.name ??
-      s.manualCustomerName ??
-      'Noma\'lum';
-
+    const kimOldi = s.customer?.name ?? s.manualCustomerName ?? "Noma'lum";
     const qarz = Math.max(0, s.totalAmount - s.paidAmount);
-    const olib_ketdi = s.driver ? `${s.driver.name}` : '';
 
     return {
       'Chek raqami': s.receiptNumber ?? '',
@@ -148,16 +234,14 @@ async function buildSotuvSheet(date: Date) {
       'Jami qiymati': s.totalAmount,
       'Qancha tuladi': s.paidAmount,
       'Qarz': qarz,
-      'Kim olib ketdi': olib_ketdi,
+      'Kim olib ketdi': s.driver?.name ?? '',
       'Valyuta': s.currency,
       'Sotuvchi': s.user?.name ?? '',
     };
   });
-
-  return rows;
 }
 
-/** Sheet 3a: Mijozlar umumiy — mijoz | so'nggi savdo | balans */
+/** Sheet 3a: Mijozlar umumiy */
 async function buildMijozlarUmumiySheet() {
   const customers = await prisma.customer.findMany({
     orderBy: { name: 'asc' },
@@ -173,7 +257,7 @@ async function buildMijozlarUmumiySheet() {
   return customers.map((c) => ({
     'Mijoz': c.name,
     'Telefon': c.phone,
-    'So\'nggi savdo': c.lastPurchase ? formatDate(new Date(c.lastPurchase)) : '',
+    "So'nggi savdo": c.lastPurchase ? formatDate(new Date(c.lastPurchase)) : '',
     'Balans (USD)': c.balanceUSD,
     'Balans (UZS)': c.balanceUZS,
     'Qarz (USD)': c.debtUSD,
@@ -182,7 +266,7 @@ async function buildMijozlarUmumiySheet() {
   }));
 }
 
-/** Sheet 3b: Individual customer sheet rows — mixed savdo/tulov lines */
+/** Sheet 3b: Individual customer rows */
 async function buildMijozShaxsiyRows(customerId: string) {
   const [sales, payments] = await Promise.all([
     prisma.sale.findMany({
@@ -208,32 +292,31 @@ async function buildMijozShaxsiyRows(customerId: string) {
     }),
   ]);
 
-  // Merge and sort chronologically
   type Row =
-    | { type: 'savdo'; date: Date; saleId: string; data: any }
-    | { type: 'tulov'; date: Date; paymentId: string; data: any };
+    | { type: 'savdo'; date: Date; data: typeof sales[0] }
+    | { type: 'tulov'; date: Date; data: typeof payments[0] };
 
   const events: Row[] = [
-    ...sales.map((s) => ({ type: 'savdo' as const, date: new Date(s.createdAt), saleId: s.id, data: s })),
-    ...payments.map((p) => ({ type: 'tulov' as const, date: new Date(p.createdAt), paymentId: p.id, data: p })),
+    ...sales.map((s) => ({ type: 'savdo' as const, date: new Date(s.createdAt), data: s })),
+    ...payments.map((p) => ({ type: 'tulov' as const, date: new Date(p.createdAt), data: p })),
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
-  // Calculate running balance (USD)
   let balance = 0;
   const rows: any[] = [];
 
   for (const ev of events) {
     if (ev.type === 'savdo') {
-      const s = ev.data;
+      const s = ev.data as typeof sales[0];
       let nimaSotildi = '';
       if (s.items?.length > 0) {
-        nimaSotildi = s.items.map((it: any) => it.product?.name ?? it.variant?.variantName ?? 'Noma\'lum').join(', ');
+        nimaSotildi = s.items
+          .map((it: any) => it.product?.name ?? it.variant?.variantName ?? "Noma'lum")
+          .join(', ');
       } else {
-        nimaSotildi = s.product?.name ?? 'Noma\'lum';
+        nimaSotildi = s.product?.name ?? "Noma'lum";
       }
       const oldingiBalans = balance;
       const qarz = Math.max(0, s.totalAmount - s.paidAmount);
-      // After sale: balance decreases by debt (customer owes more)
       balance = balance - qarz;
       rows.push({
         'Turi': 'Savdo',
@@ -246,14 +329,14 @@ async function buildMijozShaxsiyRows(customerId: string) {
         'Qarz': qarz,
         'Oldingi balans': oldingiBalans,
         'Keyingi balans': balance,
-        'To\'lov summasi': '',
+        "To'lov summasi": '',
       });
     } else {
-      const p = ev.data;
+      const p = ev.data as typeof payments[0];
       const oldingiBalans = balance;
       balance = balance + p.amount;
       rows.push({
-        'Turi': 'To\'lov',
+        'Turi': "To'lov",
         'Sana': formatDate(ev.date),
         'Vaqt': formatTime(ev.date),
         'Nima oldi': '',
@@ -263,7 +346,7 @@ async function buildMijozShaxsiyRows(customerId: string) {
         'Qarz': '',
         'Oldingi balans': oldingiBalans,
         'Keyingi balans': balance,
-        'To\'lov summasi': p.amount,
+        "To'lov summasi": p.amount,
       });
     }
   }
@@ -271,31 +354,34 @@ async function buildMijozShaxsiyRows(customerId: string) {
   return rows;
 }
 
-/** Sheet 4: Kassa — turi | sababi | qayerdan | sana | vaqt | oldin kassada | keyin kassada */
-async function buildKassaSheet(date: Date) {
+/**
+ * Kassa ma'lumotlarini tayyorlash — barcha sheetlar uchun
+ * Yangi ustunlar: UZS | $ | Karta | Kassada bo'ldi UZS | Kassada bo'ldi $ | Kassada bo'ldi Karta
+ */
+async function buildKassaData(date: Date) {
   const { start, end } = todayRange();
 
-  // Get today's cash shift for opening balance
   const shift = await prisma.cashierShift.findFirst({
     where: { startTime: { gte: start, lte: end } },
     orderBy: { startTime: 'asc' },
-    select: { openingBalance: true, closingBalance: true },
+    select: { openingBalance: true },
   });
 
-  const openingBalance = shift?.openingBalance ?? 0;
+  // UZS opening balance from shift, USD and Card start at 0
+  const openingUZS = shift?.openingBalance ?? 0;
 
-  // Incoming: sale payments (paidAmount > 0)
   const sales = await prisma.sale.findMany({
     where: { createdAt: { gte: start, lte: end }, paidAmount: { gt: 0 } },
     select: {
-      id: true, receiptNumber: true, createdAt: true, paidAmount: true,
+      id: true, receiptNumber: true, createdAt: true,
+      paidAmount: true, currency: true, paymentMethod: true,
+      paymentDetails: true,
       manualCustomerName: true,
       customer: { select: { name: true } },
     },
     orderBy: { createdAt: 'asc' },
   });
 
-  // Outgoing: expenses
   const expenses = await prisma.expense.findMany({
     where: { createdAt: { gte: start, lte: end } },
     select: {
@@ -305,64 +391,151 @@ async function buildKassaSheet(date: Date) {
     orderBy: { createdAt: 'asc' },
   });
 
-  // Merge and sort chronologically
-  type KassaEvent =
-    | { type: 'kirim'; date: Date; amount: number; sabab: string; qayerdan: string }
-    | { type: 'chiqim'; date: Date; amount: number; sabab: string; qayerdan: string };
+  // Determine how much of a sale was in UZS / USD / Card
+  function parseSaleAmounts(s: typeof sales[0]): { uzs: number; usd: number; card: number } {
+    const method = (s.paymentMethod ?? 'CASH').toUpperCase();
 
-  const events: KassaEvent[] = [
-    ...sales.map((s) => ({
-      type: 'kirim' as const,
-      date: new Date(s.createdAt),
-      amount: s.paidAmount,
-      sabab: `Sotuv #${s.receiptNumber ?? s.id.slice(0, 8)}`,
-      qayerdan: s.customer?.name ?? s.manualCustomerName ?? 'Naqd mijoz',
-    })),
-    ...expenses.map((e) => ({
-      type: 'chiqim' as const,
-      date: new Date(e.createdAt),
-      amount: e.amount,
-      sabab: e.description,
-      qayerdan: e.category,
-    })),
-  ].sort((a, b) => a.date.getTime() - b.date.getTime());
-
-  let kassaBalance = openingBalance;
-  const rows: any[] = [];
-
-  // Add opening balance row
-  rows.push({
-    'Turi': 'Kun boshi qoldig\'i',
-    'Sababi': 'Kun boshlanganda kassadagi pul',
-    'Qayerdan / Mijoz': '',
-    'Sana': formatDate(date),
-    'Vaqt': '00:00:00',
-    'Bundan oldin kassada': 0,
-    'Bundan keyin kassada': kassaBalance,
-    'Valyuta': 'UZS',
-  });
-
-  for (const ev of events) {
-    const oldin = kassaBalance;
-    if (ev.type === 'kirim') {
-      kassaBalance += ev.amount;
-    } else {
-      kassaBalance -= ev.amount;
+    // Card / Click → all goes to Karta
+    if (method === 'CARD' || method === 'CLICK') {
+      return { uzs: 0, usd: 0, card: s.paidAmount };
     }
-    rows.push({
-      'Turi': ev.type === 'kirim' ? 'Kirim' : 'Chiqim',
-      'Sababi': ev.sabab,
-      'Qayerdan / Mijoz': ev.qayerdan,
-      'Sana': formatDate(ev.date),
-      'Vaqt': formatTime(ev.date),
-      'Bundan oldin kassada': oldin,
-      'Bundan keyin kassada': kassaBalance,
-      'Valyuta': 'UZS',
-    });
+
+    // Try paymentDetails JSON breakdown first
+    if (s.paymentDetails) {
+      try {
+        const pd = JSON.parse(s.paymentDetails);
+        const uzs = Number(pd.uzs) || 0;
+        const usd = Number(pd.usd) || 0;
+        if (uzs > 0 || usd > 0) return { uzs, usd, card: 0 };
+      } catch {
+        // ignore parse error
+      }
+    }
+
+    // Fall back to currency field
+    if ((s.currency ?? '').toUpperCase() === 'UZS') {
+      return { uzs: s.paidAmount, usd: 0, card: 0 };
+    }
+    return { uzs: 0, usd: s.paidAmount, card: 0 };
   }
 
-  return rows;
+  type KassaEvent = {
+    isKirim: boolean;
+    date: Date;
+    turi: string;
+    sabab: string;
+    qayerdan: string;
+    uzs: number;
+    usd: number;
+    card: number;
+    category: string; // for grouping expense sheets
+  };
+
+  const events: KassaEvent[] = [
+    ...sales.map((s) => {
+      const { uzs, usd, card } = parseSaleAmounts(s);
+      return {
+        isKirim: true,
+        date: new Date(s.createdAt),
+        turi: 'Sotuv',
+        sabab: `Sotuv #${s.receiptNumber ?? s.id.slice(0, 8)}`,
+        qayerdan: s.customer?.name ?? s.manualCustomerName ?? 'Naqd mijoz',
+        uzs, usd, card,
+        category: 'SALE',
+      };
+    }),
+    ...expenses.map((e) => {
+      const curr = (e.currency ?? 'UZS').toUpperCase();
+      return {
+        isKirim: false,
+        date: new Date(e.createdAt),
+        turi: EXPENSE_LABELS[e.category] ?? e.category,
+        sabab: e.description,
+        qayerdan: EXPENSE_LABELS[e.category] ?? e.category,
+        uzs: curr === 'UZS' ? e.amount : 0,
+        usd: curr === 'USD' ? e.amount : 0,
+        card: 0,
+        category: e.category,
+      };
+    }),
+  ].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  type KassaRow = Record<string, any>;
+
+  function makeRow(
+    turi: string, sabab: string, qayerdan: string,
+    rowDate: Date, rowTime: Date,
+    direction: string,
+    uzs: number | string, usd: number | string, card: number | string,
+    balUZS: number, balUSD: number, balCard: number,
+  ): KassaRow {
+    return {
+      'Turi': turi,
+      'Sababi': sabab,
+      'Qayerdan / Kimdan': qayerdan,
+      'Sana': formatDate(rowDate),
+      'Vaqt': formatTime(rowTime),
+      'Kirgan yoki chiqgan': direction,
+      'UZS': uzs,
+      '$': usd,
+      'Karta': card,
+      "Kassada bo'ldi UZS": balUZS,
+      "Kassada bo'ldi $": balUSD,
+      "Kassada bo'ldi Karta": balCard,
+    };
+  }
+
+  let balUZS = openingUZS;
+  let balUSD = 0;
+  let balCard = 0;
+
+  // Opening row
+  const openingRow = makeRow(
+    "Kun boshi qoldig'i", 'Kun boshlanganda kassadagi pul', '',
+    date, new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0),
+    '-', '', '', '',
+    balUZS, balUSD, balCard,
+  );
+
+  const allRows: KassaRow[] = [openingRow];
+  const kirimRows: KassaRow[] = [];
+  const chiqimRows: KassaRow[] = [];
+  const categoryMap = new Map<string, KassaRow[]>();
+
+  for (const ev of events) {
+    if (ev.isKirim) {
+      balUZS += ev.uzs;
+      balUSD += ev.usd;
+      balCard += ev.card;
+    } else {
+      balUZS -= ev.uzs;
+      balUSD -= ev.usd;
+      balCard -= ev.card;
+    }
+
+    const row = makeRow(
+      ev.turi, ev.sabab, ev.qayerdan,
+      ev.date, ev.date,
+      ev.isKirim ? 'Kirdi ▲' : 'Chiqdi ▼',
+      ev.uzs || '', ev.usd || '', ev.card || '',
+      balUZS, balUSD, balCard,
+    );
+
+    allRows.push(row);
+
+    if (ev.isKirim) {
+      kirimRows.push(row);
+    } else {
+      chiqimRows.push(row);
+      if (!categoryMap.has(ev.category)) categoryMap.set(ev.category, []);
+      categoryMap.get(ev.category)!.push(row);
+    }
+  }
+
+  return { allRows, kirimRows, chiqimRows, categoryMap };
 }
+
+// ── Excel helpers ─────────────────────────────────────────────────────────────
 
 function autoWidth(ws: XLSX.WorkSheet, data: any[]) {
   if (!data.length) return;
@@ -370,9 +543,9 @@ function autoWidth(ws: XLSX.WorkSheet, data: any[]) {
   ws['!cols'] = cols.map((key) => {
     const maxLen = Math.max(
       key.length,
-      ...data.map((row) => String(row[key] ?? '').length)
+      ...data.map((row) => String(row[key] ?? '').length),
     );
-    return { wch: Math.min(maxLen + 2, 40) };
+    return { wch: Math.min(maxLen + 2, 45) };
   });
 }
 
@@ -391,17 +564,21 @@ function headerStyle(): XLSX.CellStyle {
 }
 
 function applyHeaderStyles(ws: XLSX.WorkSheet, headers: string[]) {
-  headers.forEach((h, i) => {
+  headers.forEach((_, i) => {
     const cellAddr = XLSX.utils.encode_cell({ r: 0, c: i });
-    if (ws[cellAddr]) {
-      ws[cellAddr].s = headerStyle();
-    }
+    if (ws[cellAddr]) ws[cellAddr].s = headerStyle();
   });
 }
 
 function safeSheetName(name: string): string {
-  // Excel sheet names: max 31 chars, no [\] /? * :
   return name.replace(/[\\\/:*?[\]]/g, '_').slice(0, 31);
+}
+
+function makeSheet(data: any[]): XLSX.WorkSheet {
+  const ws = XLSX.utils.json_to_sheet(data.length ? data : [{}]);
+  autoWidth(ws, data);
+  if (data.length) applyHeaderStyles(ws, Object.keys(data[0]));
+  return ws;
 }
 
 /** Main function: generate full Excel backup workbook */
@@ -411,28 +588,19 @@ export async function generateDailyExcelBackup(): Promise<{ buffer: Buffer; file
   const now = new Date();
   const wb = XLSX.utils.book_new();
 
-  // ── Sheet 1: Ombor ──────────────────────────────────────────────────────────
+  // ── Sheet 1: Ombor (pivot: mahsulot × smena + savdo ustunlari) ─────────────
   const omborData = await buildOmborSheet(now);
-  const wsOmbor = XLSX.utils.json_to_sheet(omborData.length ? omborData : [{}]);
-  autoWidth(wsOmbor, omborData);
-  if (omborData.length) applyHeaderStyles(wsOmbor, Object.keys(omborData[0]));
-  XLSX.utils.book_append_sheet(wb, wsOmbor, 'Ombor');
+  XLSX.utils.book_append_sheet(wb, makeSheet(omborData), 'Ombor');
 
-  // ── Sheet 2: Sotuv ──────────────────────────────────────────────────────────
+  // ── Sheet 2: Sotuv ─────────────────────────────────────────────────────────
   const sotuvData = await buildSotuvSheet(now);
-  const wsSotuv = XLSX.utils.json_to_sheet(sotuvData.length ? sotuvData : [{}]);
-  autoWidth(wsSotuv, sotuvData);
-  if (sotuvData.length) applyHeaderStyles(wsSotuv, Object.keys(sotuvData[0]));
-  XLSX.utils.book_append_sheet(wb, wsSotuv, 'Sotuv');
+  XLSX.utils.book_append_sheet(wb, makeSheet(sotuvData), 'Sotuv');
 
-  // ── Sheet 3: Mijozlar umumiy ────────────────────────────────────────────────
+  // ── Sheet 3: Mijozlar umumiy ───────────────────────────────────────────────
   const mijozUmumiyData = await buildMijozlarUmumiySheet();
-  const wsMijozlar = XLSX.utils.json_to_sheet(mijozUmumiyData.length ? mijozUmumiyData : [{}]);
-  autoWidth(wsMijozlar, mijozUmumiyData);
-  if (mijozUmumiyData.length) applyHeaderStyles(wsMijozlar, Object.keys(mijozUmumiyData[0]));
-  XLSX.utils.book_append_sheet(wb, wsMijozlar, 'Mijozlar');
+  XLSX.utils.book_append_sheet(wb, makeSheet(mijozUmumiyData), 'Mijozlar');
 
-  // ── Sheet 3+N: Individual customer sheets ───────────────────────────────────
+  // ── Sheets 3+N: Individual customer sheets ─────────────────────────────────
   const customers = await prisma.customer.findMany({
     orderBy: { name: 'asc' },
     select: { id: true, name: true },
@@ -441,11 +609,7 @@ export async function generateDailyExcelBackup(): Promise<{ buffer: Buffer; file
     const rows = await buildMijozShaxsiyRows(cust.id);
     if (rows.length === 0) continue;
 
-    const sheetName = safeSheetName(cust.name);
-
-    // Add customer name as title row
     const ws = XLSX.utils.aoa_to_sheet([[`Mijoz: ${cust.name}`]]);
-    // Merge A1 across all columns
     ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: Object.keys(rows[0]).length - 1 } }];
     if (ws['A1']) {
       ws['A1'].s = {
@@ -453,14 +617,11 @@ export async function generateDailyExcelBackup(): Promise<{ buffer: Buffer; file
         alignment: { horizontal: 'center' },
       } as any;
     }
-
-    // Append data starting from row 2
     XLSX.utils.sheet_add_json(ws, rows, { origin: 'A2' });
     autoWidth(ws, rows);
     applyHeaderStyles(ws, Object.keys(rows[0]));
 
-    // Ensure sheet name is unique (Excel doesn't allow duplicates)
-    let finalName = sheetName;
+    let finalName = safeSheetName(cust.name);
     let suffix = 2;
     while (wb.SheetNames.includes(finalName)) {
       finalName = safeSheetName(cust.name).slice(0, 28) + `_${suffix++}`;
@@ -468,27 +629,51 @@ export async function generateDailyExcelBackup(): Promise<{ buffer: Buffer; file
     XLSX.utils.book_append_sheet(wb, ws, finalName);
   }
 
-  // ── Sheet 4: Kassa ──────────────────────────────────────────────────────────
-  const kassaData = await buildKassaSheet(now);
-  const wsKassa = XLSX.utils.json_to_sheet(kassaData.length ? kassaData : [{}]);
-  autoWidth(wsKassa, kassaData);
-  if (kassaData.length) applyHeaderStyles(wsKassa, Object.keys(kassaData[0]));
-  XLSX.utils.book_append_sheet(wb, wsKassa, 'Kassa');
+  // ── Kassa sheets (all / kirim / chiqim / per-category) ────────────────────
+  const kassaResult = await buildKassaData(now);
 
-  // Write to buffer
+  // All transactions
+  XLSX.utils.book_append_sheet(wb, makeSheet(kassaResult.allRows), 'Kassa');
+
+  // Income only
+  XLSX.utils.book_append_sheet(
+    wb,
+    makeSheet(kassaResult.kirimRows.length ? kassaResult.kirimRows : [{}]),
+    'Kassa - Kirim',
+  );
+
+  // Expense only
+  XLSX.utils.book_append_sheet(
+    wb,
+    makeSheet(kassaResult.chiqimRows.length ? kassaResult.chiqimRows : [{}]),
+    'Kassa - Chiqim',
+  );
+
+  // Per expense category
+  for (const [cat, rows] of kassaResult.categoryMap) {
+    const label = EXPENSE_LABELS[cat] ?? cat;
+    const sheetName = safeSheetName(`Harajat - ${label}`);
+    let finalName = sheetName;
+    let sfx = 2;
+    while (wb.SheetNames.includes(finalName)) {
+      finalName = sheetName.slice(0, 28) + `_${sfx++}`;
+    }
+    XLSX.utils.book_append_sheet(wb, makeSheet(rows), finalName);
+  }
+
+  // ── Write buffer ───────────────────────────────────────────────────────────
   const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', bookSST: false }) as Buffer;
 
   const dateStr = now.toISOString().slice(0, 10);
   const filename = `hisobot_${dateStr}.xlsx`;
 
-  // Save to disk (real-time update: overwrite same-day file)
   const filePath = path.join(BACKUP_DIR, filename);
   fs.writeFileSync(filePath, buffer);
 
   return { buffer, filename };
 }
 
-/** Returns path to today's saved backup file (for sending later) */
+/** Returns path to today's saved backup file */
 export function getTodayBackupPath(): string | null {
   const dateStr = new Date().toISOString().slice(0, 10);
   const filePath = path.join(BACKUP_DIR, `hisobot_${dateStr}.xlsx`);
