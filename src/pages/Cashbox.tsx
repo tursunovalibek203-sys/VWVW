@@ -322,6 +322,8 @@ export default function Cashbox() {
     [selectedCat, expenses]
   );
   const catDetailTotal = catDetailExpenses.reduce((s,e) => s + toUZS(e.amount, e.currency||'UZS'), 0);
+  const catDetailUSD   = catDetailExpenses.filter(e=>(e.currency||'UZS')==='USD').reduce((s,e)=>s+e.amount,0);
+  const catDetailUZS   = catDetailExpenses.filter(e=>(e.currency||'UZS')==='UZS').reduce((s,e)=>s+e.amount,0);
   const selectedCatObj = selectedCat ? (allCats.find(c => c.id === selectedCat) ?? OTHER_CAT) : null;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -1137,7 +1139,8 @@ export default function Cashbox() {
                         .map(cat => {
                           const Icon = cat.icon;
                           const catExpenses = expenses.filter(e => e.category === cat.id);
-                          const total = catExpenses.reduce((s,e)=>s+toUZS(e.amount,e.currency||'UZS'),0);
+                          const catUSD = catExpenses.filter(e=>(e.currency||'UZS')==='USD').reduce((s,e)=>s+e.amount,0);
+                          const catUZS = catExpenses.filter(e=>(e.currency||'UZS')==='UZS').reduce((s,e)=>s+e.amount,0);
                           const isCustom = customCats.some(c => c.id === cat.id);
                           if (catExpenses.length === 0 && !isCustom) return null;
                           return (
@@ -1155,10 +1158,23 @@ export default function Cashbox() {
                               </div>
                               <p className="text-sm font-semibold text-slate-700 truncate">{t(cat.label)}</p>
                               <p className="text-xs text-slate-400 mt-0.5">{catExpenses.length} {t('ta yozuv')}</p>
-                              <p className="text-base font-bold text-slate-900 tabular-nums mt-2">
-                                {Math.round(total).toLocaleString()}
-                                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
-                              </p>
+                              <div className="mt-2 space-y-0.5">
+                                {catUSD > 0 && (
+                                  <p className="text-base font-bold text-slate-900 tabular-nums">
+                                    {catUSD.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2})}
+                                    <span className="text-xs font-normal text-emerald-500 ml-1">USD</span>
+                                  </p>
+                                )}
+                                {catUZS > 0 && (
+                                  <p className={`font-bold tabular-nums ${catUSD > 0 ? 'text-sm text-slate-600' : 'text-base text-slate-900'}`}>
+                                    {Math.round(catUZS).toLocaleString()}
+                                    <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+                                  </p>
+                                )}
+                                {catUSD === 0 && catUZS === 0 && (
+                                  <p className="text-base font-bold text-slate-900">0 <span className="text-xs font-normal text-slate-400">so'm</span></p>
+                                )}
+                              </div>
                             </button>
                           );
                         })
@@ -1195,12 +1211,23 @@ export default function Cashbox() {
 
                       {/* Jami karta */}
                       <div className="rounded-2xl p-5 text-white" style={{background:`linear-gradient(135deg, ${cat.color}ee, ${cat.color}99)`}}>
-                        <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1">{t('Jami xarajat')}</p>
-                        <p className="text-3xl font-bold tabular-nums">
-                          {Math.round(catDetailTotal).toLocaleString()}
-                          <span className="text-xl font-normal text-white/70 ml-2">so'm</span>
-                        </p>
-                        <p className="text-white/60 text-xs mt-1">{catDetailExpenses.length} {t('ta tranzaksiya')}</p>
+                        <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-2">{t('Jami xarajat')}</p>
+                        {catDetailUSD > 0 && (
+                          <p className="text-3xl font-bold tabular-nums">
+                            {catDetailUSD.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2})}
+                            <span className="text-xl font-normal text-white/70 ml-2">USD</span>
+                          </p>
+                        )}
+                        {catDetailUZS > 0 && (
+                          <p className={`font-bold tabular-nums ${catDetailUSD > 0 ? 'text-xl mt-1' : 'text-3xl'}`}>
+                            {Math.round(catDetailUZS).toLocaleString()}
+                            <span className={`font-normal text-white/70 ml-2 ${catDetailUSD > 0 ? 'text-base' : 'text-xl'}`}>so'm</span>
+                          </p>
+                        )}
+                        {catDetailUSD === 0 && catDetailUZS === 0 && (
+                          <p className="text-3xl font-bold tabular-nums">0 <span className="text-xl font-normal text-white/70">so'm</span></p>
+                        )}
+                        <p className="text-white/60 text-xs mt-2">{catDetailExpenses.length} {t('ta tranzaksiya')}</p>
                       </div>
 
                       {/* Yozuvlar jadvali */}
@@ -1499,7 +1526,7 @@ export default function Cashbox() {
         </div>
         <div><Lbl>{t('Tolov usuli')}</Lbl>
           <MethodPicker value={kirimForm.paymentMethod}
-            onChange={v=>setKirimForm({...kirimForm,paymentMethod:v,currency:v==='CARD'?'UZS':kirimForm.currency})}/>
+            onChange={v=>setKirimForm(prev=>({...prev,paymentMethod:v,currency:v==='CARD'?'UZS':prev.currency}))}/>
         </div>
         <div><Lbl>{t('Izoh')}</Lbl><input value={kirimForm.description} onChange={e=>setKirimForm({...kirimForm,description:e.target.value})} placeholder={t('Ixtiyoriy...')} className={inp}/></div>
       </CModal>
@@ -1520,7 +1547,7 @@ export default function Cashbox() {
         </div>
         <div><Lbl>{t('Tolov usuli')}</Lbl>
           <MethodPicker value={chiqimForm.paymentMethod}
-            onChange={v=>setChiqimForm({...chiqimForm,paymentMethod:v,currency:v==='CARD'?'UZS':chiqimForm.currency})}/>
+            onChange={v=>setChiqimForm(prev=>({...prev,paymentMethod:v,currency:v==='CARD'?'UZS':prev.currency}))}/>
         </div>
         <div><Lbl>{t('Izoh')}</Lbl><input value={chiqimForm.description} onChange={e=>setChiqimForm({...chiqimForm,description:e.target.value})} placeholder={t('Ixtiyoriy...')} className={inp}/></div>
       </CModal>
@@ -1606,7 +1633,7 @@ export default function Cashbox() {
         </div>
         <div><Lbl>{t('Tolov usuli')}</Lbl>
           <MethodPicker value={expForm.paymentMethod}
-            onChange={v=>setExpForm({...expForm,paymentMethod:v,currency:v==='CARD'?'UZS':expForm.currency})}/>
+            onChange={v=>setExpForm(prev=>({...prev,paymentMethod:v,currency:v==='CARD'?'UZS':prev.currency}))}/>
         </div>
         <div><Lbl>{t('Tavsif')}</Lbl><input value={expForm.description} onChange={e=>setExpForm({...expForm,description:e.target.value})} placeholder={t('Ixtiyoriy...')} className={inp}/></div>
       </CModal>

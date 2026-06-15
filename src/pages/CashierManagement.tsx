@@ -44,7 +44,7 @@ interface Cashier {
 
 export default function CashierManagement() {
   const navigate = useNavigate();
-  const { hasPermission } = useAuthStore();
+  const { isAdmin } = useAuthStore();
   const [cashiers, setCashiers] = useState<Cashier[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -70,7 +70,7 @@ export default function CashierManagement() {
 
   // Faqat adminlar kirishi mumkin
   useEffect(() => {
-    if (!hasPermission('admin')) {
+    if (!isAdmin()) {
       navigate('/dashboard');
       return;
     }
@@ -81,8 +81,18 @@ export default function CashierManagement() {
     try {
       setLoading(true);
       const response = await api.get('/users');
-      const cashiersData = response.data.filter((u: any) => u.role === 'cashier' || u.role === 'admin');
-      setCashiers(cashiersData);
+      const mapped = response.data.map((u: any) => ({
+        id: u.id,
+        username: u.login ?? u.username ?? '',
+        fullName: u.name ?? u.fullName ?? '',
+        email: u.email,
+        phone: u.phone,
+        role: u.role,
+        isActive: u.active !== undefined ? u.active : (u.isActive ?? true),
+        createdAt: u.createdAt,
+        lastLogin: u.lastLogin,
+      }));
+      setCashiers(mapped);
     } catch (error) {
       errorHandler.handleError(error, { action: 'loadCashiers' });
     } finally {
@@ -101,10 +111,10 @@ export default function CashierManagement() {
     try {
       setSubmitting(true);
       const userData = {
-        username: formData.username,
+        login: formData.username,
+        name: formData.fullName,
         email: formData.email,
         phone: formData.phone,
-        fullName: formData.fullName,
         password: formData.password,
         role: formData.role
       };
@@ -228,24 +238,31 @@ export default function CashierManagement() {
 
   // Lavozim Badge varianti: admin = info, kassir = neutral
   const getRoleVariant = (role: string): 'success' | 'warning' | 'error' | 'info' | 'neutral' => {
-    switch (role) {
-      case 'admin': return 'info';
-      case 'cashier': return 'neutral';
+    const r = role?.toUpperCase();
+    switch (r) {
+      case 'ADMIN': return 'info';
+      case 'WAREHOUSE_MANAGER': return 'success';
+      case 'CASHIER': return 'neutral';
       default: return 'neutral';
     }
   };
 
   const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'admin': return latinToCyrillic('Admin');
-      case 'cashier': return latinToCyrillic('Kassir');
+    const r = role?.toUpperCase();
+    switch (r) {
+      case 'ADMIN': return latinToCyrillic('Admin');
+      case 'CASHIER': return latinToCyrillic('Kassir');
+      case 'WAREHOUSE_MANAGER': return latinToCyrillic('Ombor mudiri');
       default: return role;
     }
   };
 
-  // Avatar: soft indigo for admin, soft slate for cashier (premium, not gradient)
-  const avatarTint = (role: string) =>
-    role === 'admin' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-600';
+  const avatarTint = (role: string) => {
+    const r = role?.toUpperCase();
+    if (r === 'ADMIN') return 'bg-indigo-50 text-indigo-600';
+    if (r === 'WAREHOUSE_MANAGER') return 'bg-emerald-50 text-emerald-600';
+    return 'bg-slate-100 text-slate-600';
+  };
 
   const getInitials = (name: string) => {
     const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -256,9 +273,9 @@ export default function CashierManagement() {
 
   const hasActiveFilters = !!searchTerm;
   const activeCount = cashiers.filter(c => c.isActive).length;
-  const adminCount = cashiers.filter(c => c.role === 'admin').length;
+  const adminCount = cashiers.filter(c => c.role?.toUpperCase() === 'ADMIN').length;
 
-  if (!hasPermission('admin')) {
+  if (!isAdmin()) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(15,23,42,0.06)] border border-slate-200/70 p-8 sm:p-10 text-center max-w-md w-full">
@@ -711,8 +728,9 @@ export default function CashierManagement() {
                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
                   >
-                    <option value="cashier">{latinToCyrillic("Kassir")}</option>
-                    <option value="admin">{latinToCyrillic("Admin")}</option>
+                    <option value="CASHIER">{latinToCyrillic("Kassir")}</option>
+                    <option value="WAREHOUSE_MANAGER">{latinToCyrillic("Ombor mudiri")}</option>
+                    <option value="ADMIN">{latinToCyrillic("Admin")}</option>
                   </select>
                 </div>
                 <div>

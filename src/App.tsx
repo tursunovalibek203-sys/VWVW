@@ -134,6 +134,9 @@ function AppRoutes() {
             <WarehouseLayout>
               <Routes>
                 <Route path="" element={<WarehouseHome />} />
+                <Route path="products" element={<SimplifiedInventory />} />
+                <Route path="products/:id" element={<ProductDetail />} />
+                <Route path="add-product" element={<AddProduct />} />
                 <Route path="add-bag" element={<WarehouseAddBag />} />
                 <Route path="reports" element={<WarehouseReports />} />
                 <Route path="*" element={<Navigate to="/warehouse" />} />

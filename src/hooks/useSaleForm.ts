@@ -43,6 +43,10 @@ function getKomplektAdditions(
   }
   // 36gr va boshqalar: avtomatik qo'shilmaydi
 
+  // Preform qancha dona beradi
+  const preformUnitsPerBag = product.unitsPerBag || 1;
+  const totalUnits = quantity * preformUnitsPerBag;
+
   const result: SaleItemForm[] = [];
   for (const rule of toAdd) {
     const match = allProducts.find((p) => {
@@ -51,17 +55,19 @@ function getKomplektAdditions(
       return pWH === rule.type && pName.includes(String(rule.size));
     });
     if (match) {
-      const upb = match.unitsPerBag || 2000;
+      const upb = match.unitsPerBag || 1;
       const ppb = parseFloat(match.pricePerBag?.toString() || '0') || 0;
+      // Dona / qop soni = preform dona soni / krishka(yoki ruchka) qopdagi dona soni
+      const kQty = Math.ceil(totalUnits / upb);
       result.push({
         productId: match.id,
         productName: match.name,
-        quantity: quantity.toString(),
-        bagDisplayValue: quantity.toString(),
+        quantity: kQty.toString(),
+        bagDisplayValue: kQty.toString(),
         pricePerBag: ppb,
         pricePerPiece: ppb / upb,
         unitsPerBag: upb,
-        subtotal: quantity * ppb,
+        subtotal: kQty * ppb,
         warehouse: match.warehouse || rule.type,
         saleType: 'bag',
       });
@@ -327,7 +333,8 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
         const kIdx = items.findIndex((i) => i.productId === kItem.productId);
         if (kIdx >= 0) {
           const existing = items[kIdx];
-          const newQty = (typeof existing.quantity === 'number' ? existing.quantity : parseFloat(existing.quantity || '0')) + quantity;
+          const kQty = parseFloat(kItem.quantity?.toString() || '0');
+          const newQty = (typeof existing.quantity === 'number' ? existing.quantity : parseFloat(existing.quantity || '0')) + kQty;
           items[kIdx] = {
             ...existing,
             quantity: newQty.toString(),
@@ -435,8 +442,10 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
         currency: form.currency,
         isKocha: form.isKocha,
         driverId: form.driverId || undefined,
-        driverCollectedAmount: form.driverId
-          ? (form.driverCollectsAll ? totalAmount : parseFloat(form.driverCollectsAmount || '0'))
+        driverCollectedAmount: form.driverId && form.driverCollectsAll
+          ? (form.driverCollectsAmount?.trim() && parseFloat(form.driverCollectsAmount) > 0
+              ? parseFloat(form.driverCollectsAmount)
+              : totalAmount)
           : 0,
         deliveryFee: parseFloat(form.deliveryFee || '0'),
         deliveryFeePaidBy: form.deliveryFeePaidBy || 'COMPANY',

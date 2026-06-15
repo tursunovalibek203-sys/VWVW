@@ -62,6 +62,8 @@ export default function Login() {
       const role = data.user.role?.toUpperCase();
       if (role === 'CASHIER' || role === 'SELLER') {
         navigate('/cashier/sales');
+      } else if (role === 'WAREHOUSE_MANAGER') {
+        navigate('/warehouse');
       } else {
         navigate('/dashboard');
       }

@@ -302,7 +302,7 @@ export function generateSimpleReceiptHTML(data: SimpleReceiptData): string {
         <div class="header">
             <div class="header-top">
                 <div class="logo-container">
-                    <img src="/exsel/5242567361200591582 (3).jpg" alt="Logo" />
+                    <img src="/logo.jpg" alt="Logo" onerror="this.style.display='none'" />
                 </div>
                 <div class="company-info">
                     <div class="company-name">LUX PET PLAST</div>

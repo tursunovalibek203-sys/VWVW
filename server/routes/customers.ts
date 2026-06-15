@@ -147,9 +147,15 @@ router.post('/', async (req: AuthRequest, res) => {
 
   try {
 
-    const { telegramId, balance, balanceUZS, balanceUSD, debt, debtUZS, debtUSD, telegramChatId: _tc, ...customerData } = req.body;
+    const { telegramId, balance, balanceUZS, balanceUSD, debt, debtUZS, debtUSD, telegramChatId: _tc, ...rawCustomerData } = req.body;
 
-
+    // Bo'sh string optional fieldlarni null ga o'girish (unique constraint xatoligini oldini olish)
+    const customerData = {
+      ...rawCustomerData,
+      email: rawCustomerData.email?.trim() || null,
+      address: rawCustomerData.address?.trim() || null,
+      telegramUsername: rawCustomerData.telegramUsername?.trim() || null,
+    };
 
     // Validatsiya - ism va telefon raqami kiritilishi shart
 
@@ -269,11 +275,17 @@ router.post('/', async (req: AuthRequest, res) => {
 
     res.json(customer);
 
-  } catch (error) {
+  } catch (error: any) {
 
-    console.error('Create customer error:', error);
+    console.error('Create customer error:', error?.message || error);
 
-    res.status(500).json({ error: 'Failed to create customer' });
+    // Unique constraint xatoligi (email yoki telegramChatId takrorlanishi)
+    if (error?.code === 'P2002') {
+      const field = error?.meta?.target?.join(', ') || 'maydon';
+      return res.status(400).json({ error: `Bu ${field} allaqachon boshqa mijozda mavjud` });
+    }
+
+    res.status(500).json({ error: 'Failed to create customer', details: error?.message });
 
   }
 

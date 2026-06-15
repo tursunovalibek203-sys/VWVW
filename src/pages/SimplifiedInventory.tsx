@@ -53,6 +53,7 @@ type CategoryId = 'all' | 'preform' | 'krishka' | 'ruchka' | 'other';
 export default function SimplifiedInventory() {
   const navigate = useNavigate();
   const isCashierRoute = window.location.pathname.startsWith('/cashier');
+  const isWarehouseRoute = window.location.pathname.startsWith('/warehouse');
   const { addToast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -685,7 +686,7 @@ export default function SimplifiedInventory() {
     <div className="flex items-center justify-end gap-1.5">
       <button
         type="button"
-        onClick={() => navigate(isCashierRoute ? `/cashier/products/${product.id}` : `/products/${product.id}`)}
+        onClick={() => navigate(isCashierRoute ? `/cashier/products/${product.id}` : isWarehouseRoute ? `/warehouse/products/${product.id}` : `/products/${product.id}`)}
         className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
         aria-label={latinToCyrillic('Batafsil')}
         title={latinToCyrillic('Batafsil')}
@@ -793,7 +794,7 @@ export default function SimplifiedInventory() {
           </button>
           <button
             type="button"
-            onClick={() => navigate(isCashierRoute ? '/cashier/add-product' : '/add-product')}
+            onClick={() => navigate(isCashierRoute ? '/cashier/add-product' : isWarehouseRoute ? '/warehouse/add-product' : '/add-product')}
             className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" />
@@ -923,7 +924,7 @@ export default function SimplifiedInventory() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => navigate(isCashierRoute ? '/cashier/add-product' : '/add-product')}
+                  onClick={() => navigate(isCashierRoute ? '/cashier/add-product' : isWarehouseRoute ? '/warehouse/add-product' : '/add-product')}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-[0.98]"
                 >
                   <Plus className="w-4 h-4" />
@@ -986,7 +987,7 @@ export default function SimplifiedInventory() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => navigate(isCashierRoute ? `/cashier/products/${product.id}` : `/products/${product.id}`)}
+                          onClick={() => navigate(isCashierRoute ? `/cashier/products/${product.id}` : isWarehouseRoute ? `/warehouse/products/${product.id}` : `/products/${product.id}`)}
                           className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex-shrink-0"
                           title={latinToCyrillic('Sahifani ko\'rish')}
                         >

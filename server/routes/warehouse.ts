@@ -27,25 +27,19 @@ router.get('/today', async (req: AuthRequest, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Bugungi sotuvlar (SaleItem orqali mahsulot bo'yicha guruhlab)
-    const saleItems = await prisma.saleItem.findMany({
+    // Bugungi sotuvlar — har bir sotuv alohida, mijoz ismi bilan
+    const todaySales = await prisma.sale.findMany({
       where: {
-        sale: {
-          createdAt: { gte: todayStart, lte: todayEnd },
+        createdAt: { gte: todayStart, lte: todayEnd },
+      },
+      include: {
+        customer: { select: { name: true } },
+        items: {
+          include: { product: { select: { name: true } } },
         },
       },
-      include: { product: { select: { name: true } } },
+      orderBy: { createdAt: 'desc' },
     });
-
-    // Sotuvlarni mahsulot bo'yicha guruhlash
-    const salesMap = new Map<string, { productName: string; totalBags: number; count: number }>();
-    for (const item of saleItems) {
-      const name = item.product?.name ?? 'Noma\'lum';
-      const existing = salesMap.get(name) ?? { productName: name, totalBags: 0, count: 0 };
-      existing.totalBags += item.quantity ?? 0;
-      existing.count += 1;
-      salesMap.set(name, existing);
-    }
 
     const formattedAdditions = additions.map((m) => ({
       id: m.id,
@@ -56,13 +50,23 @@ router.get('/today', async (req: AuthRequest, res) => {
       userName: m.userName,
     }));
 
+    const formattedSales = todaySales.map((s) => ({
+      id: s.id,
+      customerName: s.customer?.name ?? (s as any).manualCustomerName ?? 'Ko\'cha xaridor',
+      totalBags: s.items.reduce((sum, item) => sum + (item.quantity ?? 0), 0),
+      items: s.items.map((item) => ({
+        productName: item.product?.name ?? 'Noma\'lum',
+        quantity: item.quantity ?? 0,
+      })),
+      createdAt: s.createdAt.toISOString(),
+    }));
+
     const totalAddedBags = formattedAdditions.reduce((sum, a) => sum + a.quantity, 0);
-    const sales = Array.from(salesMap.values());
-    const totalSoldBags = sales.reduce((sum, s) => sum + s.totalBags, 0);
+    const totalSoldBags = formattedSales.reduce((sum, s) => sum + s.totalBags, 0);
 
     return res.json(successResponse({
       additions: formattedAdditions,
-      sales,
+      sales: formattedSales,
       totalAddedBags,
       totalSoldBags,
     }));

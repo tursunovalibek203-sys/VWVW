@@ -123,14 +123,22 @@ export default function CustomerProfileModern() {
 
   const handleExportExcel = () => {
     if (!customer || sales.length === 0) return;
+    const paymentLabel = (m: string) => {
+      if (m === 'CARD') return latinToCyrillic('Karta');
+      if (m === 'CLICK') return 'Click';
+      return latinToCyrillic('Naqd');
+    };
     const rows = sales.map(s => ({
-      [latinToCyrillic('Sana')]:        formatDate(s.createdAt),
-      [latinToCyrillic('Mahsulotlar')]: getProductNames(s),
-      [latinToCyrillic('Jami')]:        s.totalAmount,
-      [latinToCyrillic("To'langan")]:   s.paidAmount,
-      [latinToCyrillic('Qarz')]:        s.debtAmount || 0,
-      [latinToCyrillic('Valyuta')]:     s.currency,
-      [latinToCyrillic('Holat')]:       s.paymentStatus,
+      [latinToCyrillic('Sana')]:                 formatDate(s.createdAt),
+      [latinToCyrillic('Mahsulotlar')]:           getProductNames(s),
+      [latinToCyrillic('Jami')]:                  s.totalAmount,
+      [latinToCyrillic("To'langan")]:             s.paidAmount,
+      [latinToCyrillic('Qarz')]:                  s.debtAmount || 0,
+      [latinToCyrillic('Valyuta')]:               s.currency,
+      [latinToCyrillic("To'lov turi")]:           paymentLabel(s.paymentMethod || s.paymentType || 'CASH'),
+      [latinToCyrillic('Haydovchi')]:             s.driver?.name || s.driverName || '—',
+      [latinToCyrillic('Yetkazib berish narxi')]: s.deliveryFee || 0,
+      [latinToCyrillic('Holat')]:                 s.paymentStatus,
     }));
     exportToExcel(rows, {
       fileName: `${customer.name} - savdolar`,

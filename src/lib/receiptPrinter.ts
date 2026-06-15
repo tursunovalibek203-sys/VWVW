@@ -5,12 +5,13 @@ export interface ReceiptData {
   date: string;
   time: string;
   cashier: string;
+  currency?: string;     // 'UZS' | 'USD'
   exchangeRate: number;  // Yangi - dollar kursi
   customer: {
     name: string;
     phone?: string;
     address?: string;
-    
+
     previousBalance?: number;
     previousBalanceUZS?: number;
     previousBalanceUSD?: number;
@@ -34,6 +35,7 @@ export interface ReceiptData {
     unit: string;
     piecesPerBag?: number;
     pricePerUnit: number;
+    pricePerPiece?: number;
     subtotal: number;
   }>;
   subtotal: number;
@@ -56,505 +58,366 @@ export interface ReceiptData {
 }
 
 export function generateReceiptHTML(data: ReceiptData): string {
-  const itemsHTML = data.items.map(item => `
-    <div class="item">
-      <div class="item-name">${item.name}</div>
-      <div class="item-qty">${item.quantity} ${item.unit}</div>
-      <div class="item-price">${item.subtotal.toLocaleString()}</div>
-    </div>
-  `).join('');
-  // itemsHTML is used below in the template string
+  const isUSD = (data.currency ?? 'USD') !== 'UZS';
+  const currencySuffix = isUSD ? '' : " so'm";
 
-  const paymentsHTML = Object.entries(data.payments)
-    .filter(([_, amount]) => amount && amount > 0)
+  const fmtAmt = (n: number) => {
+    if (isUSD) return `$${n % 1 === 0 ? n.toLocaleString() : n.toFixed(2)}`;
+    return `${Math.round(n).toLocaleString()} so'm`;
+  };
+
+  const paymentsRows = Object.entries(data.payments)
+    .filter(([, amount]) => amount && amount > 0)
     .map(([type, amount]) => {
-      const label = type === 'uzs' ? 'Naqd (UZS)' : 
-                    type === 'usd' ? 'Dollar (USD)' : 'Karta';
-      const displayAmount = type === 'usd' 
-        ? `$${(amount / data.exchangeRate).toFixed(2)} (${amount.toLocaleString()} so'm)`
-        : `${amount?.toLocaleString()} so'm`;
-      return `
-        <div>
-          <span>${label}:</span>
-          <span>${displayAmount}</span>
-        </div>
-      `;
+      const label = type === 'uzs' ? "Naqd (so'm)" :
+                    type === 'usd' ? 'Dollar ($)' : 'Karta';
+      const display = type === 'usd'
+        ? `$${(amount! / data.exchangeRate).toFixed(2)}`
+        : `${Math.round(amount!).toLocaleString()}${currencySuffix}`;
+      return `<tr><td class="pay-label">${label}:</td><td class="pay-val">${display}</td></tr>`;
     }).join('');
 
-  return `
-<!DOCTYPE html>
+  const hasDebt = data.debt > 0;
+  const hasPrevDebt = (data.customer.previousBalanceUZS ?? 0) > 0 || (data.customer.previousBalanceUSD ?? 0) > 0;
+  const hasTotalDebt = (data.customer.totalDebtUZS ?? 0) > 0 || (data.customer.totalDebtUSD ?? 0) > 0;
+
+  return `<!DOCTYPE html>
 <html lang="uz">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chek #${data.receiptNumber}</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8">
+  <title>Chek #${data.receiptNumber}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        @media print {
-            @page {
-                size: 80mm auto;
-                margin: 0 !important;
-            }
-            html, body {
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 72mm !important;
-            }
-            .no-print {
-                display: none;
-            }
-        }
+    @media print {
+      @page { size: 80mm auto; margin: 0; }
+      html, body { margin: 0 !important; padding: 0 !important; width: 80mm !important; }
+      .no-print { display: none !important; }
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
 
-        body {
-            font-family: 'Courier New', monospace;
-            width: 72mm;
-            margin: 0 auto;
-            padding: 0;
-            background: white;
-            font-size: 14px;
-            line-height: 1.4;
-        }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      width: 76mm;
+      margin: 0 auto;
+      background: #fff;
+      color: #000;
+      padding: 3mm 2mm 8mm;
+    }
 
-        .receipt {
-            width: 100%;
-        }
+    /* ─── LOGO ─── */
+    .logo-box {
+      padding: 6px 4px 5px;
+      border-bottom: 2px solid #000;
+    }
+    .logo-top {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 6px;
+    }
+    .logo-img {
+      height: auto;
+      width: auto;
+      max-height: 30px;
+      max-width: 30px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+    .logo-box .brand {
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      line-height: 1.2;
+    }
+    .logo-box .brand-sub {
+      font-size: 8px;
+      letter-spacing: 0.3px;
+      margin-top: 1px;
+      font-weight: 600;
+    }
+    .contact-info {
+      font-size: 8px;
+      margin-top: 4px;
+      text-align: center;
+    }
 
-        .logo {
-            text-align: center;
-            margin-bottom: 8px;
-            position: relative;
-        }
+    /* ─── DIVIDERS ─── */
+    .div-solid  { border-top: 2px solid #000; margin: 5px 0; }
+    .div-dash   { border-top: 1px dashed #555; margin: 5px 0; }
+    .div-double { border-top: 3px double #000; margin: 5px 0; }
 
-        .logo::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
-            opacity: 0.8;
-        }
+    /* ─── INFO ROWS ─── */
+    .info-table { width: 100%; font-size: 10.5px; }
+    .info-table td { vertical-align: top; padding: 1px 0; }
+    .info-table .lbl { width: 42%; font-weight: 700; white-space: nowrap; }
+    .info-table .val { width: 58%; word-break: break-word; }
 
-        .logo::after {
-            content: '';
-            position: absolute;
-            top: 3px;
-            left: 0;
-            width: 100%;
-            height: 1px;
-            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
-            opacity: 0.6;
-            animation: pulse 2s infinite;
-        }
+    /* ─── SECTION TITLE ─── */
+    .section-title {
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      text-align: center;
+      padding: 6px 0;
+      background: #000;
+      color: #fff;
+      margin: 8px 0 4px;
+    }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 0.6; }
-            50% { opacity: 1; }
-        }
+    /* ─── ITEMS TABLE ─── */
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 9px;
+      margin-bottom: 0;
+    }
+    .items-table th {
+      background: #333;
+      color: #fff;
+      font-weight: 900;
+      padding: 4px 2px;
+      border: 1px solid #000;
+      font-size: 8px;
+      letter-spacing: 0.2px;
+      text-align: center;
+      white-space: normal;
+      line-height: 1.2;
+    }
+    .items-table td {
+      padding: 4px 2px;
+      border-bottom: 1px solid #ddd;
+      vertical-align: top;
+    }
+    .items-table .col-no      { width: 14px; text-align: center; }
+    .items-table .col-name    { width: auto; text-align: left; word-break: break-word; white-space: normal; }
+    .items-table .col-qty     { width: 24px; text-align: center; }
+    .items-table .col-perbag  { width: 28px; text-align: center; }
+    .items-table .col-price   { width: 38px; text-align: right; }
+    .items-table .col-total   { width: 42px; text-align: right; font-weight: 700; }
 
-        .logo h1 {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 900;
-            letter-spacing: 4px;
-            font-family: 'Impact', 'Arial Black', sans-serif;
-            text-transform: uppercase;
-        }
+    /* ─── TOTALS ─── */
+    .totals-table { width: 100%; font-size: 10.5px; margin: 4px 0; }
+    .totals-table td { padding: 1.5px 0; vertical-align: middle; }
+    .pay-label { font-weight: 600; }
+    .pay-val { text-align: right; font-weight: 700; }
 
-        .logo h2 {
-            margin: 2px 0 0 0;
-            font-size: 12px;
-            font-weight: normal;
-            letter-spacing: 1px;
-        }
+    .grand-total-row td {
+      font-size: 15px;
+      font-weight: 900;
+      padding: 6px 0;
+      border-top: 2px solid #000;
+      border-bottom: 2px solid #000;
+      background: #f0f0f0;
+    }
+    .paid-row td {
+      font-size: 12px;
+      font-weight: 900;
+      color: #000;
+      padding: 3px 0;
+    }
+    .debt-row td {
+      font-size: 12px;
+      font-weight: 900;
+      color: #c00;
+      padding: 3px 0;
+      border-top: 1px solid #c00;
+    }
 
-        .header {
-            text-align: center;
-            margin-bottom: 6px;
-            border-bottom: 1px dashed #000;
-            padding-bottom: 6px;
-            position: relative;
-        }
+    /* ─── DEBT SECTION ─── */
+    .debt-section {
+      border: 2px solid #c00;
+      margin: 8px 0;
+      padding: 6px;
+      background: #fff0f0;
+    }
+    .debt-section .title {
+      font-weight: 900;
+      font-size: 11px;
+      text-align: center;
+      letter-spacing: 1px;
+      color: #c00;
+      border-bottom: 1px dashed #c00;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+    }
+    .debt-section table { width: 100%; font-size: 10px; }
+    .debt-section td { padding: 2px 0; }
+    .debt-section .d-lbl { font-weight: 600; }
+    .debt-section .d-val { text-align: right; font-weight: 700; color: #c00; }
+    .debt-section .d-date { color: #c00; font-size: 9px; }
 
-        .header::before {
-            content: '';
-            position: absolute;
-            top: -1px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #3b82f6, transparent);
-            opacity: 0.7;
-        }
+    /* ─── DRIVER ─── */
+    .driver-section {
+      border: 1px solid #000;
+      margin: 6px 0;
+      padding: 6px;
+      background: #f9f9f9;
+    }
+    .driver-section .title {
+      font-weight: 900;
+      text-align: center;
+      font-size: 11px;
+      border-bottom: 1px solid #000;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+    }
 
-        .header::after {
-            content: '';
-            position: absolute;
-            bottom: -1px;
-            left: 0;
-            width: 100%;
-            height: 1px;
-            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
-            opacity: 0.6;
-        }
-
-        .company-name {
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 3px;
-        }
-
-        .company-info {
-            font-size: 12px;
-            line-height: 1.3;
-        }
-
-        .receipt-info {
-            margin: 6px 0;
-            font-size: 12px;
-        }
-
-        .receipt-info div {
-            display: flex;
-            justify-content: space-between;
-            margin: 2px 0;
-        }
-
-        .items {
-            margin: 6px 0;
-            border: 1px solid #000;
-            position: relative;
-        }
-
-        .items::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: linear-gradient(90deg, #10b981, #3b82f6, #8b5cf6);
-            opacity: 0.8;
-        }
-
-        .items::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 1px;
-            background: linear-gradient(90deg, #8b5cf6, #3b82f6, #10b981);
-            opacity: 0.6;
-        }
-
-        .items table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-        }
-
-        .items th {
-            background: #f0f0f0;
-            padding: 4px;
-            border: 1px solid #000;
-            font-weight: bold;
-            text-align: left;
-        }
-
-        .items td {
-            padding: 4px;
-            border: 1px solid #000;
-        }
-
-        .items td:nth-child(1) {
-            width: 28%;
-        }
-
-        .items td:nth-child(2) {
-            width: 18%;
-            text-align: center;
-        }
-
-        .items td:nth-child(3) {
-            width: 18%;
-            text-align: center;
-        }
-
-        .items td:nth-child(4) {
-            width: 18%;
-            text-align: right;
-        }
-
-        .items td:nth-child(5) {
-            width: 18%;
-            text-align: right;
-        }
-
-        .totals {
-            margin: 6px 0;
-            font-size: 14px;
-            position: relative;
-        }
-
-        .totals::before {
-            content: '';
-            position: absolute;
-            top: -3px;
-            left: 0;
-            width: 100%;
-            height: 1px;
-            background: linear-gradient(90deg, #f59e0b, #ef4444, #f59e0b);
-            opacity: 0.7;
-        }
-
-        .total-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 3px 0;
-        }
-
-        .total-row.grand-total {
-            font-size: 18px;
-            font-weight: bold;
-            border-top: 1px solid #000;
-            padding-top: 3px;
-            margin-top: 6px;
-        }
-
-        .footer {
-            text-align: center;
-            margin-top: 8px;
-            padding-top: 6px;
-            border-top: 1px dashed #000;
-            font-size: 12px;
-            position: relative;
-        }
-
-        .footer::before {
-            content: '';
-            position: absolute;
-            top: -1px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899);
-            opacity: 0.8;
-        }
-
-        .footer::after {
-            content: '';
-            position: absolute;
-            top: 1px;
-            left: 0;
-            width: 100%;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, #6366f1, transparent);
-            opacity: 0.5;
-            animation: pulse 3s infinite;
-        }
-
-        .footer div {
-            margin: 2px 0;
-        }
-    </style>
+    /* ─── FOOTER ─── */
+    .footer {
+      text-align: center;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 3px double #000;
+    }
+    .footer .thanks {
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .footer .sub { font-size: 9.5px; margin-top: 2px; }
+    .footer .brand-footer {
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      margin-top: 8px;
+    }
+    .footer .receipt-id { font-size: 8px; color: #666; margin-top: 6px; }
+  </style>
 </head>
 <body>
-    <div class="receipt">
-        <!-- Logo Section -->
-        <div class="logo">
-            <h1>LUX PET PLAST</h1>
-        </div>
-
-        <!-- Header -->
-        <div class="header">
-            <div class="company-info">
-                Tel: ${data.companyInfo.phone}
-            </div>
-        </div>
-
-        <!-- Receipt Info -->
-        <div class="receipt-info">
-            <div>
-                <span>Chek:</span>
-                <span>${data.receiptNumber}</span>
-            </div>
-            <div>
-                <span>Sana:</span>
-                <span>${data.date} ${data.time}</span>
-            </div>
-            <div>
-                <span>Mijoz:</span>
-                <span>${data.customer.name}</span>
-            </div>
-            ${data.customer.previousBalanceUZS !== undefined || data.customer.previousBalanceUSD !== undefined ? `
-            <div style="font-weight: bold; color: #d32f2f; border-bottom: 1px solid #ddd; padding-bottom: 3px;">
-                <span>OLDINGI QARZ:</span>
-            </div>
-            ${data.customer.previousBalanceUZS !== undefined ? `
-            <div style="color: #d32f2f;">
-                <span>So'mda:</span>
-                <span>${data.customer.previousBalanceUZS.toLocaleString()} so'm</span>
-            </div>
-            ` : ''}
-            ${data.customer.previousBalanceUSD !== undefined ? `
-            <div style="color: #d32f2f;">
-                <span>Dollarda:</span>
-                <span>$${data.customer.previousBalanceUSD.toLocaleString()}</span>
-            </div>
-            ` : ''}
-            ${data.customer.previousDebtDays ? `
-            <div style="color: #d32f2f; font-size: 8px;">
-                <span>Qarz muddati:</span>
-                <span>${data.customer.previousDebtDays} kun o'tgan</span>
-            </div>
-            ` : ''}
-            ` : ''}
-        </div>
-
-        <!-- Items -->
-        <div class="items">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Mahsulot</th>
-                        <th>Soni</th>
-                        <th>Qopdagi</th>
-                        <th>Narxi</th>
-                        <th>Jami narxi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${data.items.map(item => `
-                    <tr>
-                        <td>${item.name}</td>
-                        <td>${item.quantity} ${item.unit}</td>
-                        <td>${item.piecesPerBag || '-'}</td>
-                        <td>${item.pricePerUnit.toLocaleString()}</td>
-                        <td>${item.subtotal.toLocaleString()}</td>
-                    </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Totals -->
-        <div class="totals">
-            <div class="total-row grand-total">
-                <span>JAMI SUMMA:</span>
-                <span>${data.total.toLocaleString()}</span>
-            </div>
-        </div>
-
-        <!-- Payment Details -->
-        <div class="receipt-info" style="margin-top: 8px;">
-            ${paymentsHTML}
-            <div style="font-weight: bold; border-top: 1px solid #000; padding-top: 3px; margin-top: 3px;">
-                <span>To'landi:</span>
-                <span>${data.totalPaid.toLocaleString()}</span>
-            </div>
-            ${data.debt > 0 ? `
-            <div style="color: #d32f2f;">
-                <span>Qarz:</span>
-                <span>${data.debt.toLocaleString()}</span>
-            </div>
-            ` : ''}
-        </div>
-
-        ${data.driver ? `
-        <!-- Driver Info -->
-        <div class="receipt-info" style="margin-top: 8px; border: 1px solid #000; padding: 4px; background: #f9f9f9;">
-            <div style="font-weight: bold; margin-bottom: 3px; text-align: center; border-bottom: 1px solid #000; padding-bottom: 2px;">
-                YETKAZIB BERISH
-            </div>
-            <div>
-                <span>Haydovchi:</span>
-                <span>${data.driver.name}</span>
-            </div>
-            ${data.driver.phone ? `
-            <div>
-                <span>Tel:</span>
-                <span>${data.driver.phone}</span>
-            </div>
-            ` : ''}
-            <div style="border-top: 1px dashed #000; margin-top: 3px; padding-top: 3px;">
-                <span>Zavod to'laydi:</span>
-                <span style="font-weight: bold;">${data.driver.factoryShare.toLocaleString()}</span>
-            </div>
-            <div>
-                <span>Mijoz to'laydi:</span>
-                <span style="font-weight: bold;">${data.driver.customerShare.toLocaleString()}</span>
-            </div>
-        </div>
-        ` : ''}
-
-        <!-- Footer -->
-        <div class="footer">
-            ${data.customer.newBalanceUZS !== undefined || data.customer.newBalanceUSD !== undefined || data.customer.totalDebtUZS !== undefined || data.customer.totalDebtUSD !== undefined ? `
-            <div style="font-weight: bold; font-size: 14px; margin-bottom: 6px; padding: 4px; background: #f0f0f0; border: 1px solid #000;">
-                <div style="font-weight: bold; text-align: center; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 2px;">
-                    YANGI QARZ HOLATI:
-                </div>
-                ${data.customer.totalDebtUZS !== undefined ? `
-                <div style="display: flex; justify-content: space-between;">
-                    <span>Jami qarz (so'm):</span>
-                    <span style="color: #d32f2f;">${data.customer.totalDebtUZS.toLocaleString()} so'm</span>
-                </div>
-                ` : ''}
-                ${data.customer.totalDebtUSD !== undefined ? `
-                <div style="display: flex; justify-content: space-between;">
-                    <span>Jami qarz ($):</span>
-                    <span style="color: #d32f2f;">$${data.customer.totalDebtUSD.toLocaleString()}</span>
-                </div>
-                ` : ''}
-                ${data.customer.newBalanceUZS !== undefined ? `
-                <div style="display: flex; justify-content: space-between;">
-                    <span>Yangi qarz (so'm):</span>
-                    <span style="color: #d32f2f;">${data.customer.newBalanceUZS.toLocaleString()} so'm</span>
-                </div>
-                ` : ''}
-                ${data.customer.newBalanceUSD !== undefined ? `
-                <div style="display: flex; justify-content: space-between;">
-                    <span>Yangi qarz ($):</span>
-                    <span style="color: #d32f2f;">$${data.customer.newBalanceUSD.toLocaleString()}</span>
-                </div>
-                ` : ''}
-                ${data.customer.paymentDueDate && ((data.customer.totalDebtUZS && data.customer.totalDebtUZS > 0) || (data.customer.totalDebtUSD && data.customer.totalDebtUSD > 0)) ? `
-                <div style="display: flex; justify-content: space-between; margin-top: 3px; font-size: 9px; color: #d32f2f; border-top: 1px dashed #000; padding-top: 3px;">
-                    <span>To'lash muddati:</span>
-                    <span>${data.customer.paymentDueDate}</span>
-                </div>
-                ` : ''}
-            </div>
-            ` : ''}
-            <div style="font-weight: bold; margin-top: 8px;">RAHMAT!</div>
-            <div>Xaridingiz uchun tashakkur!</div>
-            <div style="margin-top: 10px; font-size: 16px; font-weight: 900; letter-spacing: 3px; font-family: 'Impact', 'Arial Black', sans-serif;">LUX PET PLAST</div>
-            <div style="margin-top: 4px; font-size: 8px;">ID: ${data.saleId}</div>
-        </div>
+  <!-- ═══ LOGO ═══ -->
+  <div class="logo-box">
+    <div class="logo-top">
+      <img src="/logo.jpg" alt="LUX PET PLAST" class="logo-img" onerror="this.style.display='none'">
+      <div>
+        <div class="brand">LUX PET PLAST</div>
+        <div class="brand-sub">Производство ПЭТ преформ</div>
+      </div>
     </div>
+    <div class="contact-info">
+      <div>Buxoro viloyati, Vobkent tumani</div>
+      <div>Tel: +998 91 414 44 58 | +998 91 920 07 00</div>
+    </div>
+  </div>
 
-    <script>
-        // Avtomatik chop etish
-        window.onload = function() {
-            setTimeout(function() {
-                window.print();
-                // Chop etishdan keyin oynani yopish
-                setTimeout(function() {
-                    window.close();
-                }, 1000);
-            }, 500);
-        };
-    </script>
+  <!-- ═══ CHEK SARLAVHASI ═══ -->
+  <div class="section-title">SAVDO CHEKI</div>
+
+  <div style="margin: 5px 0;">
+    <table class="info-table">
+      <tr><td class="lbl">Chek #:</td><td class="val"><b>${data.receiptNumber}</b></td></tr>
+      <tr><td class="lbl">Sana:</td><td class="val">${data.date}</td></tr>
+      <tr><td class="lbl">Vaqt:</td><td class="val">${data.time}</td></tr>
+      <tr><td class="lbl">Kassir:</td><td class="val">${data.cashier}</td></tr>
+    </table>
+  </div>
+
+  <div class="div-dash"></div>
+
+  <!-- ═══ MIJOZ ═══ -->
+  <table class="info-table">
+    <tr><td class="lbl">Mijoz:</td><td class="val"><b>${data.customer.name}</b></td></tr>
+    ${data.customer.phone ? `<tr><td class="lbl">Tel:</td><td class="val">${data.customer.phone}</td></tr>` : ''}
+  </table>
+
+  ${hasPrevDebt ? `
+  <div class="div-dash"></div>
+  <div style="font-size:9.5px; color:#c00;">
+    <div style="font-weight:900; margin-bottom:2px;">OLDINGI QARZ:</div>
+    ${(data.customer.previousBalanceUZS ?? 0) > 0 ? `<div>${data.customer.previousBalanceUZS!.toLocaleString()} so'm</div>` : ''}
+    ${(data.customer.previousBalanceUSD ?? 0) > 0 ? `<div>$${data.customer.previousBalanceUSD!.toLocaleString()}</div>` : ''}
+    ${data.customer.previousDebtDays ? `<div style="font-size:8.5px;">${data.customer.previousDebtDays} kun avvalgi qarz</div>` : ''}
+  </div>
+  ` : ''}
+
+  <!-- ═══ MAHSULOTLAR ═══ -->
+  <div class="section-title">MAHSULOTLAR</div>
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th class="col-no">#</th>
+        <th class="col-name" style="text-align:left;">Mahsulot</th>
+        <th class="col-qty">Qop</th>
+        <th class="col-perbag">1 qopda dona</th>
+        <th class="col-price">1 dona narxi</th>
+        <th class="col-total">Jami</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${data.items.map((item, i) => {
+        const ppb = item.piecesPerBag || 1;
+        const donaNarxi = item.pricePerPiece ?? (item.pricePerUnit / ppb);
+        const fmtPrice = (n: number) => isUSD
+          ? `$${n % 1 === 0 ? n.toLocaleString() : n.toFixed(3).replace(/\.?0+$/, '')}`
+          : `${Math.round(n).toLocaleString()}`;
+        return `
+      <tr>
+        <td class="col-no">${i + 1}</td>
+        <td class="col-name">${item.name}</td>
+        <td class="col-qty">${item.quantity}</td>
+        <td class="col-perbag">${item.piecesPerBag ?? '—'}</td>
+        <td class="col-price">${fmtPrice(donaNarxi)}</td>
+        <td class="col-total">${fmtPrice(item.subtotal)}</td>
+      </tr>`;
+      }).join('')}
+    </tbody>
+  </table>
+
+  <!-- ═══ SUMMA ═══ -->
+  <table class="totals-table" style="margin-top:6px;">
+    <tr class="grand-total-row">
+      <td class="pay-label">JAMI SUMMA:</td>
+      <td class="pay-val">${fmtAmt(data.total)}</td>
+    </tr>
+  </table>
+
+  <div class="div-dash" style="margin:4px 0;"></div>
+
+  <div style="font-size:9.5px; font-weight:700; margin-bottom:2px;">TO'LOV:</div>
+  <table class="totals-table">
+    ${paymentsRows}
+    <tr class="paid-row">
+      <td class="pay-label">TO'LANDI:</td>
+      <td class="pay-val">${fmtAmt(data.totalPaid)}</td>
+    </tr>
+    ${hasDebt ? `
+    <tr class="debt-row">
+      <td class="pay-label">QARZ:</td>
+      <td class="pay-val">${fmtAmt(data.debt)}</td>
+    </tr>
+    ` : ''}
+  </table>
+
+  <!-- ═══ QARZ HOLATI ═══ -->
+  ${hasTotalDebt ? `
+  <div class="debt-section">
+    <div class="title">QARZ HOLATI</div>
+    <table>
+      ${(data.customer.totalDebtUZS ?? 0) > 0 ? `<tr><td class="d-lbl">Jami qarz (so'm):</td><td class="d-val">${data.customer.totalDebtUZS!.toLocaleString()} so'm</td></tr>` : ''}
+      ${(data.customer.totalDebtUSD ?? 0) > 0 ? `<tr><td class="d-lbl">Jami qarz ($):</td><td class="d-val">$${data.customer.totalDebtUSD!.toLocaleString()}</td></tr>` : ''}
+      ${data.customer.paymentDueDate ? `<tr><td colspan="2" class="d-date" style="padding-top:3px;border-top:1px dashed #c00;margin-top:3px;">Muddat: ${data.customer.paymentDueDate} gacha to'lang!</td></tr>` : ''}
+    </table>
+  </div>
+  ` : ''}
+
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+        setTimeout(function() { window.close(); }, 800);
+      }, 400);
+    };
+  </script>
 </body>
-</html>
-  `;
+</html>`;
 }
 
 export function generateDeliveryStatementHTML(data: ReceiptData): string {
@@ -578,6 +441,8 @@ export function generateDeliveryStatementHTML(data: ReceiptData): string {
         @media print {
             @page { size: 80mm auto; margin: 0; }
             body { margin: 0; width: 80mm; }
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
         body {
             font-family: 'Times New Roman', serif;
@@ -589,34 +454,22 @@ export function generateDeliveryStatementHTML(data: ReceiptData): string {
             padding: 5px;
             background: white;
         }
+        .logo-box {
+            text-align: center;
+            padding: 8px 4px 6px;
+            border-bottom: 2px solid #000;
+        }
+        .logo-img {
+            max-width: 100%;
+            height: auto;
+            max-height: 40mm;
+            margin-bottom: 6px;
+        }
         .header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             position: relative;
             padding-top: 10px;
-        }
-        
-        /* Yuqori yuk xati chizig'i */
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: linear-gradient(90deg, #2563eb 0%, #3b82f6 25%, #60a5fa 50%, #3b82f6 75%, #2563eb 100%);
-            opacity: 0.8;
-        }
-
-        .header::after {
-            content: '';
-            position: absolute;
-            top: 4px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: linear-gradient(90deg, transparent 0%, #93c5fd 50%, transparent 100%);
-            opacity: 0.6;
         }
         .header h1 {
             font-size: 20px;
@@ -627,6 +480,13 @@ export function generateDeliveryStatementHTML(data: ReceiptData): string {
             font-size: 16px;
             margin: 5px 0;
             font-weight: normal;
+        }
+        .contact-info {
+            text-align: center;
+            font-size: 10px;
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px dashed #000;
         }
         .info-section {
             margin-bottom: 20px;
@@ -705,9 +565,14 @@ export function generateDeliveryStatementHTML(data: ReceiptData): string {
     </style>
 </head>
 <body>
-    <div class="header">
+    <div class="logo-box">
+        <img src="/logo.jpg" alt="LUX PET PLAST" class="logo-img" onerror="this.style.display='none'">
         <h1>LUX PET PLAST</h1>
         <h2>YUK VA BALANS XATI</h2>
+        <div class="contact-info">
+            <div>Buxoro viloyati, Vobkent tumani</div>
+            <div>Tel: +998 91 414 44 58 | +998 91 920 07 00</div>
+        </div>
     </div>
 
     <div class="info-section">
@@ -887,48 +752,67 @@ export function generateDeliveryStatementThermalHTML(data: ReceiptData): string 
         }
 
         .container {
-            width: 100%;
-        }
+      width: 100%;
+    }
 
-        /* Phone Number - 8 6 5 */
-        .phone-header {
-            text-align: center;
-            font-size: 20px;
-            font-weight: 900;
-            letter-spacing: 10px;
-            padding: 8px 0;
-            border-bottom: 2px solid #000;
-            margin-bottom: 4px;
-            font-family: 'Courier New', monospace;
-            text-shadow: 1px 1px 0 #ccc;
-        }
+    /* LOGO */
+    .logo-box {
+      text-align: center;
+      padding: 8px 4px 6px;
+      border-bottom: 2px solid #000;
+    }
+    .logo-img {
+      max-width: 100%;
+      height: auto;
+      max-height: 40mm;
+      margin-bottom: 6px;
+    }
 
-        /* Header */
-        .header {
-            text-align: center;
-            margin-bottom: 10px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #000;
-        }
+    /* Phone Number - 8 6 5 */
+    .phone-header {
+      text-align: center;
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: 10px;
+      padding: 8px 0;
+      border-bottom: 2px solid #000;
+      margin-bottom: 4px;
+      font-family: 'Courier New', monospace;
+      text-shadow: 1px 1px 0 #ccc;
+      display: none;
+    }
 
-        .brand-name {
-            font-size: 24px;
-            font-weight: 900;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            line-height: 1.1;
-            margin-bottom: 4px;
-            font-family: 'Courier New', 'Arial Black', sans-serif;
-            text-shadow: 1px 1px 0 #ddd;
-        }
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+    }
 
-        .brand-sub {
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            color: #000;
-            font-family: 'Courier New', monospace;
-        }
+    .brand-name {
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      line-height: 1.1;
+      margin-bottom: 4px;
+      font-family: 'Courier New', 'Arial Black', sans-serif;
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: #000;
+      font-family: 'Courier New', monospace;
+    }
+    .contact-info {
+      text-align: center;
+      font-size: 9px;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed #000;
+    }
 
         /* Document Title */
         .doc-title {
@@ -1115,15 +999,15 @@ export function generateDeliveryStatementThermalHTML(data: ReceiptData): string 
 </head>
 <body>
     <div class="container">
-        <!-- Phone Number -->
-        <div class="phone-header">
-            8 6 5
-        </div>
-
-        <!-- Header -->
-        <div class="header">
+        <!-- Logo -->
+        <div class="logo-box">
+            <img src="/logo.jpg" alt="LUX PET PLAST" class="logo-img" onerror="this.style.display='none'">
             <div class="brand-name">LUX PET PLAST</div>
             <div class="brand-sub">Производство ПЭТ преформ</div>
+            <div class="contact-info">
+                <div>Buxoro viloyati, Vobkent tumani</div>
+                <div>Tel: +998 91 414 44 58 | +998 91 920 07 00</div>
+            </div>
         </div>
 
         <!-- Document Title -->
@@ -1281,10 +1165,10 @@ export function printReceipt(data: ReceiptData): void {
   printToPhysicalPrinter(data).catch(console.error);
 }
 
-export function printDeliveryStatement(data: ReceiptData, useThermal: boolean = true): void {
-  console.log('📄 Yuk va Balans Xati:', data, 'Thermal:', useThermal);
-  const html = useThermal ? generateDeliveryStatementThermalHTML(data) : generateDeliveryStatementHTML(data);
-  const printWindow = window.open('', '_blank', useThermal ? 'width=320,height=600' : 'width=800,height=600');
+export function printDeliveryStatement(data: ReceiptData): void {
+  console.log('📄 Yuk va Balans Xati:', data);
+  const html = generateDeliveryStatementThermalHTML(data);
+  const printWindow = window.open('', '_blank', 'width=320,height=600');
   
   if (printWindow) {
     printWindow.document.write(html);
@@ -1538,54 +1422,58 @@ export function prepareSaleReceipt(
   const isUZS = currency === 'UZS';
   // rate variable used for future currency conversion features
   
-  const items = sale.items.map((item: any) => ({
-    name: item.productName || item.product?.name || 'Mahsulot',
-    quantity: item.quantity,
-    unit: item.product?.bagType || 'qop',
-    piecesPerBag: item.product?.piecesPerBag || null,
-    pricePerUnit: item.pricePerBag * (isUZS ? 1 : exchangeRate),
-    subtotal: item.subtotal * (isUZS ? 1 : exchangeRate)
-  }));
-  
-  const subtotal = sale.totalAmount * (isUZS ? 1 : exchangeRate);
-  const taxRate = 0; // QQS chekda ko'rsatilmaydi
+  const items = sale.items.map((item: any) => {
+    const isPiece = item.saleType === 'piece';
+    const unit = isPiece ? 'dona' : 'qop';
+    const piecesPerBag: number | null = item.product?.piecesPerBag || null;
+    // Narxlar to'g'ridan-to'g'ri savdo valyutasida ($ yoki so'm) — exchangeRate bilan ko'paytirmaylik
+    const pricePerUnit = isPiece
+      ? (item.pricePerPiece || (item.pricePerBag / (item.unitsPerBag || 1)))
+      : item.pricePerBag;
+    const pricePerPiece = isPiece
+      ? pricePerUnit
+      : (piecesPerBag ? pricePerUnit / piecesPerBag : undefined);
+    return {
+      name: item.productName || item.product?.name || 'Mahsulot',
+      quantity: item.quantity,
+      unit,
+      piecesPerBag,
+      pricePerUnit,
+      pricePerPiece,
+      subtotal: item.subtotal
+    };
+  });
+
+  const subtotal = sale.totalAmount;
+  const taxRate = 0;
   const tax = 0;
-  const total = subtotal; // QQS qo'shilmaydi, jami = subtotal
-  
+  const total = subtotal;
+
   // To'lovlarni tayyorlash
   const payments: any = {};
   if (sale.paymentDetails) {
-    const details = typeof sale.paymentDetails === 'string' 
-      ? JSON.parse(sale.paymentDetails) 
+    const details = typeof sale.paymentDetails === 'string'
+      ? JSON.parse(sale.paymentDetails)
       : sale.paymentDetails;
-    
+
     if (details.uzs) payments.uzs = parseFloat(details.uzs);
     if (details.usd) payments.usd = parseFloat(details.usd) * exchangeRate;
     if (details.click) payments.card = parseFloat(details.click);
   }
+
+  const totalPaid = sale.paidAmount;
+  const debt = Math.max(0, sale.debtAmount || 0);
   
-  const totalPaid = sale.paidAmount * (isUZS ? 1 : exchangeRate);
-  const debt = Math.max(0, (sale.debtAmount || 0) * (isUZS ? 1 : exchangeRate));
-  
-  // Mijozning yangi balansini hisoblash
-  // Eski balans + yangi qarz (agar qarz bo'lsa)
-  const previousBalanceUZS = customer?.balanceUZS || 0;
-  const previousBalanceUSD = customer?.balanceUSD || 0;
   const previousDebtUZS = customer?.debtUZS || 0;
   const previousDebtUSD = customer?.debtUSD || 0;
   
-  // Yangi balansni hisoblash (valyutaga qarab)
-  let newBalanceUZS = previousBalanceUZS;
-  let newBalanceUSD = previousBalanceUSD;
+  // Jami qarzni hisoblash (valyutaga qarab)
   let totalDebtUZS = previousDebtUZS;
   let totalDebtUSD = previousDebtUSD;
-  
-  // newBalance variables used in receipt data preparation
+
   if (isUZS) {
-    newBalanceUZS = previousBalanceUZS + (sale.debtAmount < 0 ? Math.abs(sale.debtAmount) : 0);
     totalDebtUZS = previousDebtUZS + (sale.debtAmount > 0 ? sale.debtAmount : 0);
   } else {
-    newBalanceUSD = previousBalanceUSD + (sale.debtAmount < 0 ? Math.abs(sale.debtAmount) : 0);
     totalDebtUSD = previousDebtUSD + (sale.debtAmount > 0 ? sale.debtAmount : 0);
   }
   
@@ -1599,10 +1487,13 @@ export function prepareSaleReceipt(
   
   return {
     saleId: sale.id,
-    receiptNumber: sale.id.slice(0, 8).toUpperCase(),
+    receiptNumber: sale.receiptNumber != null
+      ? String(sale.receiptNumber).padStart(4, '0')
+      : sale.id.slice(0, 8).toUpperCase(),
     date,
     time,
     cashier: user?.name || 'Kassir',
+    currency: currency === 'UZS' ? 'UZS' : 'USD',
     exchangeRate,  // Dollar kursi
     customer: {
       name: displayName,
@@ -1610,8 +1501,6 @@ export function prepareSaleReceipt(
       address: isKocha ? undefined : customer?.address,
       previousBalanceUZS: previousDebtUZS !== 0 ? previousDebtUZS : undefined,
       previousBalanceUSD: previousDebtUSD !== 0 ? previousDebtUSD : undefined,
-      newBalanceUZS: totalDebtUZS !== 0 ? totalDebtUZS : undefined,
-      newBalanceUSD: totalDebtUSD !== 0 ? totalDebtUSD : undefined,
       totalDebtUZS: totalDebtUZS !== 0 ? totalDebtUZS : undefined,
       totalDebtUSD: totalDebtUSD !== 0 ? totalDebtUSD : undefined,
       previousDebtDays: (previousDebtUZS > 0 || previousDebtUSD > 0) ? previousDebtDays : undefined,

@@ -165,13 +165,22 @@ export default function CustomerProfile() {
   const averagePurchase = sales.length > 0 ? totalPurchases / sales.length : 0;
 
   const handleExportExcel = () => {
+    const paymentLabel = (m: string) => {
+      if (m === 'CARD') return 'Karta';
+      if (m === 'CLICK') return 'Click';
+      return 'Naqd';
+    };
     const historyData = sales.map(sale => ({
       'Sana': formatDate(sale.createdAt),
       'Mahsulotlar': sale.items?.map((i: any) => `${i.product?.name || i.productName || 'N/A'} (${i.quantity})`).join(', ') || sale.product?.name || 'N/A',
       'Jami': sale.totalAmount,
-      'To\'langan': sale.paidAmount,
+      "To'langan": sale.paidAmount,
       'Qarz': sale.debtAmount,
       'Valyuta': sale.currency,
+      "To'lov turi": paymentLabel(sale.paymentMethod || sale.paymentType || 'CASH'),
+      'Haydovchi': sale.driver?.name || sale.driverName || '—',
+      'Yetkazib berish narxi': sale.deliveryFee || 0,
+      'Holat': sale.paymentStatus,
     }));
     exportToExcel(historyData, { fileName: `Mijoz_${customer.name}_Tarixi` });
   };
@@ -191,13 +200,15 @@ export default function CustomerProfile() {
     }
 
     const cashSalesData = cashSales.map(sale => ({
-      [latinToCyrillic('Sana')]: formatDate(sale.createdAt),
-      [latinToCyrillic('Mahsulotlar')]: sale.items?.map((i: any) => `${i.product?.name || i.productName || 'N/A'} (${i.quantity})`).join(', ') || sale.product?.name || 'N/A',
-      [latinToCyrillic('Jami summa')]: sale.totalAmount,
-      [latinToCyrillic('To\'langan')]: sale.paidAmount,
-      [latinToCyrillic('Qarz')]: sale.debtAmount,
-      [latinToCyrillic('Valyuta')]: sale.currency,
-      [latinToCyrillic('To\'lov turi')]: latinToCyrillic('Naqd pul'),
+      [latinToCyrillic('Sana')]:                  formatDate(sale.createdAt),
+      [latinToCyrillic('Mahsulotlar')]:            sale.items?.map((i: any) => `${i.product?.name || i.productName || 'N/A'} (${i.quantity})`).join(', ') || sale.product?.name || 'N/A',
+      [latinToCyrillic('Jami summa')]:             sale.totalAmount,
+      [latinToCyrillic("To'langan")]:              sale.paidAmount,
+      [latinToCyrillic('Qarz')]:                   sale.debtAmount,
+      [latinToCyrillic('Valyuta')]:                sale.currency,
+      [latinToCyrillic("To'lov turi")]:            latinToCyrillic('Naqd pul'),
+      [latinToCyrillic('Haydovchi')]:              sale.driver?.name || sale.driverName || '—',
+      [latinToCyrillic('Yetkazib berish narxi')]:  sale.deliveryFee || 0,
     }));
 
     exportToExcel(cashSalesData, {

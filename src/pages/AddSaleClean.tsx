@@ -18,8 +18,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, Package, ShoppingCart, User, WifiOff, AlertCircle, RefreshCw, Search, Trash2, Truck } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ReceiptModal } from '../components/ReceiptModal';
-import type { ReceiptData } from '../lib/receiptPrinter';
+import { printReceipt } from '../lib/receiptPrinter';
 import { latinToCyrillic } from '../lib/transliterator';
 import { useSaleForm } from '../hooks/useSaleForm';
 import { ProductTypeCard, CartItem, PaymentSection } from '../components/sales';
@@ -352,7 +351,6 @@ export default function AddSaleClean() {
   const [error, setError] = useState<string | null>(null);
   const [drivers, setDrivers] = useState<{ id: string; name: string; phone?: string; debtToCompany?: number }[]>([]);
   const [driverSearch, setDriverSearch] = useState('');
-  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
 
   // Real-time product sync
   const handleProductUpdate = useCallback((updatedProduct: Product) => {
@@ -515,7 +513,10 @@ export default function AddSaleClean() {
     if (saleForm.isSubmitting) return;
     try {
       const receipt = await saleForm.submitSale();
-      setReceiptData(receipt);
+      printReceipt(receipt);
+      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), latinToCyrillic('Sotuv saqlandi. Chek chiqarilmoqda...')));
+      const isCashierRoute = window.location.pathname.startsWith('/cashier');
+      navigate(isCashierRoute ? '/cashier/sales' : '/sales');
     } catch (error: any) {
       console.error('❌ Sotuv yaratishda xatolik:', error);
       let errorMessage = latinToCyrillic('Sotuv yaratib bo\'lmadi');
@@ -532,13 +533,7 @@ export default function AddSaleClean() {
       }
       addToast(toast.error(latinToCyrillic('Xatolik'), errorMessage));
     }
-  }, [saleForm, addToast]);
-
-  const handleReceiptClose = useCallback(() => {
-    setReceiptData(null);
-    const isCashierRoute = window.location.pathname.startsWith('/cashier');
-    navigate(isCashierRoute ? '/cashier/sales' : '/sales');
-  }, [navigate]);
+  }, [saleForm, addToast, navigate]);
 
   // Handle retry
   const handleRetry = useCallback(() => {
@@ -552,10 +547,6 @@ export default function AddSaleClean() {
   const itemCount = saleForm.form.items.length;
 
   return (
-    <>
-    {receiptData && (
-      <ReceiptModal data={receiptData} onClose={handleReceiptClose} />
-    )}
     <div className="min-h-screen bg-slate-50/60 pb-24">
       <div className="space-y-6">
         {/* Offline Warning Banner */}
@@ -656,78 +647,11 @@ export default function AddSaleClean() {
           </div>
         </div>
 
-        {/* 2 ustunli grid: Chap=Mahsulotlar+Savat | O'ng=Mijoz+Haydovchi+To'lov */}
+        {/* 2 ustunli grid: Chap=Mijoz+Yetkazib berish+Mahsulotlar | O'ng=Savat+To'lov */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
 
-          {/* ── USTUN 1: Mahsulotlar + Savat ── */}
+          {/* ── USTUN 1: Mijoz + Yetkazib berish + Mahsulotlar ── */}
           <div className="flex flex-col gap-4">
-            <ProductSection
-              filteredProducts={filteredProducts}
-              currency={saleForm.form.currency}
-              activeCategory={saleForm.activeCategory}
-              productSearch={saleForm.productSearch}
-              latinToCyrillic={latinToCyrillic}
-              onCategoryChange={(cat) => saleForm.setActiveCategory(cat as any)}
-              onSearchChange={saleForm.setProductSearch}
-              onSelectProduct={handleSelectProduct}
-              onQuickAdd={handleQuickAdd}
-            />
-
-            {/* Savat */}
-            <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden">
-              <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-slate-200/70">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                    <ShoppingCart className="w-[18px] h-[18px]" />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-semibold text-slate-900 tracking-tight">{latinToCyrillic('Savat')}</h2>
-                    <p className="text-xs text-slate-400 tabular-nums">{itemCount} {latinToCyrillic('ta mahsulot')}</p>
-                  </div>
-                </div>
-                {itemCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={saleForm.clearItems}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors active:scale-[0.97]"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    {latinToCyrillic('Tozalash')}
-                  </button>
-                )}
-              </div>
-              {itemCount > 0 ? (
-                <div className="p-4 sm:p-5 space-y-2 max-h-[55vh] overflow-y-auto">
-                  {saleForm.form.items.map((item, index) => (
-                    <CartItem
-                      key={index}
-                      item={item}
-                      index={index}
-                      isEditing={editingItemIndex === index}
-                      products={saleForm.products}
-                      currency={saleForm.form.currency}
-                      latinToCyrillic={latinToCyrillic}
-                      onUpdate={(idx, updates) => {
-                        saleForm.updateItem(idx, updates);
-                        setEditingItemIndex(idx);
-                      }}
-                      onRemove={saleForm.removeItem}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={ShoppingCart}
-                  title={latinToCyrillic('Savat bo\'sh')}
-                  description={latinToCyrillic('Chapdagi ro\'yxatdan mahsulot tanlang')}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* ── USTUN 2: Mijoz + Haydovchi + To'lov (sticky) ── */}
-          <div className="flex flex-col gap-4 lg:sticky lg:top-6">
-
             {/* Mijoz */}
             <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] p-4 sm:p-5">
               <div className="flex items-center gap-2 mb-3">
@@ -906,10 +830,10 @@ export default function AddSaleClean() {
                             {latinToCyrillic('Aniq summa')}
                           </button>
                         </div>
-                        {saleForm.form.driverCollectsAmount?.trim() && (
+                        {saleForm.form.driverCollectsAmount != null && saleForm.form.driverCollectsAmount !== '' && (
                           <input type="number" min="0" placeholder={latinToCyrillic('Summa (UZS)')}
-                            value={saleForm.form.driverCollectsAmount?.trim() || ''}
-                            onChange={e => saleForm.updateFormField('driverCollectsAmount', e.target.value)}
+                            value={saleForm.form.driverCollectsAmount.trim() === '' ? '' : saleForm.form.driverCollectsAmount.trim()}
+                            onChange={e => saleForm.updateFormField('driverCollectsAmount', e.target.value || ' ')}
                             className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
                           />
                         )}
@@ -941,6 +865,73 @@ export default function AddSaleClean() {
               </div>
             </div>
 
+            <ProductSection
+              filteredProducts={filteredProducts}
+              currency={saleForm.form.currency}
+              activeCategory={saleForm.activeCategory}
+              productSearch={saleForm.productSearch}
+              latinToCyrillic={latinToCyrillic}
+              onCategoryChange={(cat) => saleForm.setActiveCategory(cat as any)}
+              onSearchChange={saleForm.setProductSearch}
+              onSelectProduct={handleSelectProduct}
+              onQuickAdd={handleQuickAdd}
+            />
+          </div>
+
+          {/* ── USTUN 2: Savat + To'lov (sticky) ── */}
+          <div className="flex flex-col gap-4 lg:sticky lg:top-6">
+
+            {/* Savat */}
+            <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden">
+              <div className="flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-slate-200/70">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                    <ShoppingCart className="w-[18px] h-[18px]" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-semibold text-slate-900 tracking-tight">{latinToCyrillic('Savat')}</h2>
+                    <p className="text-xs text-slate-400 tabular-nums">{itemCount} {latinToCyrillic('ta mahsulot')}</p>
+                  </div>
+                </div>
+                {itemCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={saleForm.clearItems}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors active:scale-[0.97]"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {latinToCyrillic('Tozalash')}
+                  </button>
+                )}
+              </div>
+              {itemCount > 0 ? (
+                <div className="p-4 sm:p-5 space-y-2 max-h-[55vh] overflow-y-auto">
+                  {saleForm.form.items.map((item, index) => (
+                    <CartItem
+                      key={index}
+                      item={item}
+                      index={index}
+                      isEditing={editingItemIndex === index}
+                      products={saleForm.products}
+                      currency={saleForm.form.currency}
+                      latinToCyrillic={latinToCyrillic}
+                      onUpdate={(idx, updates) => {
+                        saleForm.updateItem(idx, updates);
+                        setEditingItemIndex(idx);
+                      }}
+                      onRemove={saleForm.removeItem}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={ShoppingCart}
+                  title={latinToCyrillic('Savat bo\'sh')}
+                  description={latinToCyrillic('Chapdagi ro\'yxatdan mahsulot tanlang')}
+                />
+              )}
+            </div>
+
             {/* To'lov */}
             <PaymentSection
               form={saleForm.form}
@@ -967,6 +958,5 @@ export default function AddSaleClean() {
         </div>{/* end 2-col grid */}
       </div>
     </div>
-    </>
   );
 }

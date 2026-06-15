@@ -17,7 +17,9 @@ import {
   Receipt,
   Banknote,
   Smartphone,
+  Printer,
 } from 'lucide-react';
+import { printReceipt, prepareSaleReceipt } from '../lib/receiptPrinter';
 import { latinToCyrillic } from '../lib/transliterator';
 import api from '../lib/professionalApi';
 import { extractPaginatedData } from '../lib/apiHelpers';
@@ -61,6 +63,7 @@ export default function SalesModern() {
   const [todayExpenses, setTodayExpenses] = useState(0);
   // UI-only: detail modal (replaces console.log())
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [printingId, setPrintingId] = useState<string | null>(null);
 
   const statuses = ['all', 'completed', 'pending', 'cancelled'];
   const periods = ['all', 'today', 'week', 'month', 'year'];
@@ -157,6 +160,22 @@ export default function SalesModern() {
   const handleRefresh = () => {
     setRefreshing(true);
     loadSales(page);
+  };
+
+  const handlePrintSale = async (saleId: string) => {
+    setPrintingId(saleId);
+    try {
+      const { data: fullSale } = await api.get(`/sales/${saleId}`);
+      const sale = fullSale?.data ?? fullSale;
+      const customer = sale.customer ?? { name: sale.manualCustomerName || sale.customerName || "Noma'lum" };
+      const user = sale.user ?? sale.cashier ?? { name: 'Kassir' };
+      const receiptData = prepareSaleReceipt(sale, customer, user, sale.driver, sale.exchangeRate || 12500);
+      printReceipt(receiptData);
+    } catch {
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Chek chiqarishda xatolik')));
+    } finally {
+      setPrintingId(null);
+    }
   };
 
   // Memoized filtered sales for better performance
@@ -593,7 +612,17 @@ export default function SalesModern() {
                         <span className="text-sm text-slate-600">{sale.cashier}</span>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handlePrintSale(sale.id)}
+                            disabled={printingId === sale.id}
+                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
+                            aria-label={latinToCyrillic('Chek chiqarish')}
+                            title={latinToCyrillic('Chek chiqarish')}
+                          >
+                            <Printer className={`w-4 h-4 ${printingId === sale.id ? 'animate-pulse' : ''}`} />
+                          </button>
                           <button
                             type="button"
                             onClick={() => setSelectedSale(sale)}
@@ -664,19 +693,30 @@ export default function SalesModern() {
                   </div>
                 </div>
 
-                <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-xs text-slate-400 inline-flex items-center gap-1">
-                    <User className="w-3.5 h-3.5" />
+                <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <span className="text-xs text-slate-400 inline-flex items-center gap-1 min-w-0 truncate">
+                    <User className="w-3.5 h-3.5 flex-shrink-0" />
                     {sale.cashier}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSale(sale)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                  >
-                    <Eye className="w-4 h-4" />
-                    {latinToCyrillic("Ko'rish")}
-                  </button>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handlePrintSale(sale.id)}
+                      disabled={printingId === sale.id}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <Printer className={`w-4 h-4 ${printingId === sale.id ? 'animate-pulse' : ''}`} />
+                      {latinToCyrillic('Chek')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSale(sale)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                    >
+                      <Eye className="w-4 h-4" />
+                      {latinToCyrillic("Ko'rish")}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -765,9 +805,21 @@ export default function SalesModern() {
         onClose={() => setSelectedSale(null)}
         title={latinToCyrillic("Sotuv ma'lumotlari")}
         footer={
-          <Button variant="secondary" onClick={() => setSelectedSale(null)}>
-            {latinToCyrillic('Yopish')}
-          </Button>
+          <div className="flex items-center gap-2">
+            {selectedSale && (
+              <Button
+                variant="secondary"
+                onClick={() => handlePrintSale(selectedSale.id)}
+                disabled={printingId === selectedSale?.id}
+                leftIcon={<Printer className="w-4 h-4" />}
+              >
+                {latinToCyrillic('Chek chiqarish')}
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => setSelectedSale(null)}>
+              {latinToCyrillic('Yopish')}
+            </Button>
+          </div>
         }
       >
         {selectedSale && (

@@ -92,7 +92,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/customers': 'Mijozlar',
   '/cashbox': 'Kassa',
   '/daftar': 'Daftar',
-  '/cashiers': 'Kassirlar boshqaruvi',
+  '/cashiers': 'Xodimlar',
   '/reports': 'Hisobotlar',
   '/settings': 'Sozlamalar',
   '/analytics': 'Analitika',

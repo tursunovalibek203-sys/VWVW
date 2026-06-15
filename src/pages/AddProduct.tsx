@@ -11,6 +11,7 @@ import { useToast, toast } from '../components/ui/Toast';
 export default function AddProduct() {
   const navigate = useNavigate();
   const isCashier = window.location.pathname.startsWith('/cashier');
+  const isWarehouse = window.location.pathname.startsWith('/warehouse');
   const [searchParams] = useSearchParams();
   const { addToast } = useToast();
   const editId = searchParams.get('edit');
@@ -172,7 +173,7 @@ export default function AddProduct() {
         latinToCyrillic("Xatolik"),
         latinToCyrillic("Mahsulot ma'lumotlarini yuklashda xatolik yuz berdi!")
       ));
-      navigate(isCashier ? '/cashier/products' : '/products');
+      navigate(isCashier ? '/cashier/products' : isWarehouse ? '/warehouse/products' : '/products');
     } finally {
       setLoadingProduct(false);
     }

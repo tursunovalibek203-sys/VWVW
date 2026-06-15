@@ -2,6 +2,46 @@ import { Trash2 } from 'lucide-react';
 import type { SaleItemForm, Product } from '../../types';
 import { getCurrencySymbol, getDisplayAmount } from '../../lib/saleUtils';
 
+const getProductTypeKey = (product: Product): string | null => {
+  const name = product.name?.toLowerCase() || '';
+  const bagType = product.bagType?.toLowerCase() || '';
+  const warehouse = product.warehouse?.toLowerCase() || '';
+
+  // Preform - gram bo'yicha
+  if (warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|гр|г)/i.test(name + ' ' + bagType)) {
+    const gramMatch = (bagType + ' ' + name).match(/(\d+)\s*(?:гр|г|gr|g)/i);
+    if (gramMatch) {
+      return `preform-${gramMatch[1]}gr`;
+    }
+    return 'preform-other';
+  }
+
+  // Krishka - mm bo'yicha
+  if (warehouse === 'krishka' || name.includes('krishka') || name.includes('qopqoq') || name.includes('cap')) {
+    const sizeMatch = name.match(/(\d{2,3})/);
+    if (sizeMatch && [28, 38, 48, 55].includes(parseInt(sizeMatch[1]))) {
+      return `krishka-${sizeMatch[1]}mm`;
+    }
+    return 'krishka-other';
+  }
+
+  // Ruchka - mm bo'yicha
+  if (warehouse === 'ruchka' || name.includes('ruchka') || name.includes('handle')) {
+    const sizeMatch = name.match(/(\d{2,3})/);
+    if (sizeMatch && [28, 38, 48].includes(parseInt(sizeMatch[1]))) {
+      return `ruchka-${sizeMatch[1]}mm`;
+    }
+    return 'ruchka-other';
+  }
+
+  // Custom warehouse
+  if (warehouse.startsWith('custom-')) {
+    return warehouse;
+  }
+
+  return 'other';
+};
+
 interface CartItemProps {
   item: SaleItemForm;
   index: number;
@@ -24,6 +64,14 @@ export const CartItem = ({
   onRemove,
 }: CartItemProps) => {
   const cartProduct = products.find((p) => p.id === item.productId);
+  
+  // Faqat shu turdagi mahsulotlarni filterlash
+  const filteredProducts = (() => {
+    if (!cartProduct) return products;
+    const typeKey = getProductTypeKey(cartProduct);
+    if (!typeKey) return products;
+    return products.filter(p => getProductTypeKey(p) === typeKey);
+  })();
 
   const handleQuantityChange = (val: string) => {
     const cleanVal = val.replace(/[^0-9.]/g, '');
@@ -160,7 +208,7 @@ export const CartItem = ({
             }}
             className="w-full text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
           >
-            {products.map((p) => (
+            {filteredProducts.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
