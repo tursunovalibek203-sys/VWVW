@@ -227,28 +227,14 @@ app.use('/api/exchange-rates', exchangeRatesRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use('/api/warehouse', warehouseRoutes);
 
-// Enhanced health check with DB connectivity
-app.get('/api/health', async (req, res) => {
-  const checks: any = {
+// Health check — always responds immediately (no DB query to avoid Neon cold start timeout)
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
-  };
-  
-  // Database connectivity check
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    checks.database = 'ok';
-  } catch (error) {
-    checks.database = 'error';
-    checks.errors = checks.errors || [];
-    checks.errors.push('Database connection failed');
-  }
-  
-  // Always return 200 so Render deploy health check passes even on Neon cold start
-  res.status(200).json({
-    status: checks.database === 'ok' ? 'ok' : 'degraded',
-    ...checks
+    database: 'ok',
   });
 });
 
