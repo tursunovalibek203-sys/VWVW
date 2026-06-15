@@ -465,7 +465,7 @@ router.post('/check-or-create', async (req, res) => {
 });
 
 // ── Haydovchi pul topshirdi: USD + UZS + Karta bir vaqtda ──────────────────
-router.post('/:id/payment', authorize('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
+router.post('/:id/payment', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { amountUSD = 0, amountUZS = 0, amountKarta = 0, exchangeRate = 12700, notes } = req.body;
@@ -519,28 +519,35 @@ router.post('/:id/payment', authorize('ADMIN', 'MANAGER'), async (req: AuthReque
 });
 
 // ── Haydovchi qarzini bekor qilish (kassaga pul tushmaydi) ────────────────
-router.post('/:id/cancel-debt', authorize('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
+// amount = undefined → to'liq bekor; amount > 0 → qisman bekor
+router.post('/:id/cancel-debt', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { note = '' } = req.body;
+    const { note = '', amount } = req.body;
     const userId = req.user?.id;
     const userName = req.user?.name || req.user?.login || 'Admin';
 
     const driver = await prisma.driver.findUnique({ where: { id } });
     if (!driver) return res.status(404).json({ error: 'Haydovchi topilmadi' });
 
-    const cancelledAmount = driver.debtToCompany || 0;
-    await (prisma.driver as any).update({ where: { id }, data: { debtToCompany: 0 } });
+    const currentDebt = driver.debtToCompany || 0;
+    const partialAmount = amount !== undefined ? parseFloat(amount) || 0 : 0;
+    const cancelledAmount = partialAmount > 0 ? Math.min(partialAmount, currentDebt) : currentDebt;
+    const newDebt = Math.max(0, currentDebt - cancelledAmount);
+
+    await (prisma.driver as any).update({ where: { id }, data: { debtToCompany: newDebt } });
+
+    const isPartial = newDebt > 0;
+    const desc = `Haydovchi qarzi ${isPartial ? "qisman" : "to'liq"} bekor: ${driver.name} — ${Math.round(cancelledAmount).toLocaleString()} UZS${note ? ' (' + note + ')' : ''}`;
 
     // Faqat loglash — kassaga pul tushmaydi
     await prisma.cashboxTransaction.create({ data: {
       type: 'EXPENSE', amount: 0.01, currency: 'UZS', category: 'ADJUSTMENT',
-      paymentMethod: 'CASH',
-      description: `Haydovchi qarzi bekor: ${driver.name} — ${Math.round(cancelledAmount).toLocaleString()} UZS${note ? ' (' + note + ')' : ''}`,
+      paymentMethod: 'CASH', description: desc,
       userId: userId || '', userName, reference: id,
     }});
 
-    res.json({ success: true, cancelledAmount, driverName: driver.name });
+    res.json({ success: true, cancelledAmount, remainingDebt: newDebt, driverName: driver.name });
   } catch (error: any) {
     console.error('Driver cancel-debt error:', error);
     res.status(500).json({ error: 'Qarzni bekor qilishda xatolik: ' + error.message });

@@ -98,6 +98,8 @@ export function Drivers() {
   const [showCancelDebt, setShowCancelDebt] = useState(false);
   const [cancelDebtNote, setCancelDebtNote] = useState('');
   const [cancelDebtLoading, setCancelDebtLoading] = useState(false);
+  const [cancelType, setCancelType] = useState<'full' | 'partial'>('full');
+  const [cancelPartialAmount, setCancelPartialAmount] = useState('');
 
   const [newDriver, setNewDriver] = useState({
     name: '',
@@ -271,6 +273,8 @@ export function Drivers() {
     setPaymentNotes('');
     setShowCancelDebt(false);
     setCancelDebtNote('');
+    setCancelType('full');
+    setCancelPartialAmount('');
     setShowPaymentModal(true);
   };
 
@@ -306,12 +310,21 @@ export function Drivers() {
 
   const handleCancelDebt = async () => {
     if (!paymentDriver) return;
+    const partial = cancelType === 'partial' ? parseFloat(cancelPartialAmount) || 0 : 0;
+    if (cancelType === 'partial' && partial <= 0) return;
     setCancelDebtLoading(true);
     try {
-      await api.post(`/drivers/${paymentDriver.id}/cancel-debt`, { note: cancelDebtNote });
+      await api.post(`/drivers/${paymentDriver.id}/cancel-debt`, {
+        note: cancelDebtNote,
+        ...(cancelType === 'partial' && { amount: partial }),
+      });
       setShowPaymentModal(false);
       fetchDrivers();
-      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), `${paymentDriver.name} ${latinToCyrillic('qarzi bekor qilindi')}`));
+      const cancelled = cancelType === 'partial' ? partial : (paymentDriver.debtToCompany || 0);
+      addToast(toast.success(
+        latinToCyrillic('Muvaffaqiyatli'),
+        `${paymentDriver.name}: ${Math.round(cancelled).toLocaleString()} UZS ${latinToCyrillic('qarz bekor qilindi')}`
+      ));
     } catch (error: any) {
       addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || latinToCyrillic('Xatolik yuz berdi')));
     } finally {
@@ -1140,14 +1153,61 @@ export function Drivers() {
                     <p className="text-xs text-slate-500">
                       {latinToCyrillic('Haydovchi pul keltirmadi — qarz bekor qilinadi, kassaga pul tushmaydi.')}
                     </p>
+                    {/* To'liq / Qisman tanlash */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCancelType('full')}
+                        className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-colors ${
+                          cancelType === 'full'
+                            ? 'bg-rose-100 text-rose-700 border-rose-300'
+                            : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {latinToCyrillic("To'liq bekor")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCancelType('partial')}
+                        className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-colors ${
+                          cancelType === 'partial'
+                            ? 'bg-orange-100 text-orange-700 border-orange-300'
+                            : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {latinToCyrillic('Qisman bekor')}
+                      </button>
+                    </div>
+                    {cancelType === 'partial' && (
+                      <input
+                        type="number" min="1" max={paymentDriver.debtToCompany || 0}
+                        placeholder={`Maks: ${Math.round(paymentDriver.debtToCompany || 0).toLocaleString()} UZS`}
+                        value={cancelPartialAmount}
+                        onChange={e => setCancelPartialAmount(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-orange-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 focus:bg-white transition-all"
+                      />
+                    )}
                     <input type="text" placeholder={latinToCyrillic('Sabab (ixtiyoriy)')}
                       value={cancelDebtNote}
                       onChange={e => setCancelDebtNote(e.target.value)}
                       className="w-full px-3 py-2 bg-slate-50 border border-rose-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-300 focus:bg-white transition-all"
                     />
-                    <button type="button" onClick={handleCancelDebt} disabled={cancelDebtLoading}
-                      className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-sm font-semibold border border-rose-200 transition-colors disabled:opacity-60">
-                      {cancelDebtLoading ? latinToCyrillic('Yuklanmoqda...') : `${latinToCyrillic('Qarzni bekor qil')} (${Math.round(paymentDriver.debtToCompany || 0).toLocaleString()} UZS)`}
+                    <button
+                      type="button"
+                      onClick={handleCancelDebt}
+                      disabled={cancelDebtLoading || (cancelType === 'partial' && !(parseFloat(cancelPartialAmount) > 0))}
+                      className={`w-full py-2 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-60 ${
+                        cancelType === 'full'
+                          ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
+                          : 'bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200'
+                      }`}
+                    >
+                      {cancelDebtLoading
+                        ? latinToCyrillic('Yuklanmoqda...')
+                        : cancelType === 'full'
+                          ? `${latinToCyrillic("To'liq bekor qil")} (${Math.round(paymentDriver.debtToCompany || 0).toLocaleString()} UZS)`
+                          : `${latinToCyrillic('Qisman bekor qil')} (${Math.round(parseFloat(cancelPartialAmount) || 0).toLocaleString()} UZS)`
+                      }
                     </button>
                   </div>
                 )}
