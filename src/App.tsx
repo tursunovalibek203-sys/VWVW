@@ -1,4 +1,4 @@
-     import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useThemeStore } from './store/themeStore';
 import { useEffect, Suspense, lazy } from 'react';
 import './i18n';
@@ -66,6 +66,12 @@ const Settings = lazy(() => import('./pages/Settings'));
 // Layouts
 const ProfessionalLayout = lazy(() => import('./components/ProfessionalLayout'));
 const CashierLayout = lazy(() => import('./layouts/CashierLayout'));
+const WarehouseLayout = lazy(() => import('./layouts/WarehouseLayout'));
+
+// Warehouse pages
+const WarehouseHome = lazy(() => import('./pages/warehouse/WarehouseHome'));
+const WarehouseAddBag = lazy(() => import('./pages/warehouse/WarehouseAddBag'));
+const WarehouseReports = lazy(() => import('./pages/warehouse/WarehouseReports'));
 
 
 function App() {
@@ -78,10 +84,10 @@ function App() {
   }, [theme]);
 
   return (
-    <ErrorBoundary>
-      <ToastProvider>
-        <LanguageProvider>
-          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <ToastProvider>
+      <LanguageProvider>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <ErrorBoundary>
             <Suspense fallback={
               <div className="min-h-screen flex items-center justify-center bg-slate-50">
                 <div className="flex flex-col items-center gap-3">
@@ -92,15 +98,28 @@ function App() {
             }>
               <AppRoutes />
             </Suspense>
-          </BrowserRouter>
-        </LanguageProvider>
-      </ToastProvider>
-    </ErrorBoundary>
+          </ErrorBoundary>
+        </BrowserRouter>
+      </LanguageProvider>
+    </ToastProvider>
   );
 }
 
 // Separate component for routes to use hooks inside Router context
 function AppRoutes() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const onUnauthorized = () => {
+      const path = window.location.pathname;
+      if (path !== '/' && path !== '/login' && path !== '/cashier/login') {
+        navigate(path.startsWith('/cashier') ? '/cashier/login' : '/login', { replace: true });
+      }
+    };
+    window.addEventListener('app:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('app:unauthorized', onUnauthorized);
+  }, [navigate]);
+
   return (
     <Routes>
       {/* ========== PUBLIC ROUTES ========== */}
@@ -108,6 +127,22 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/cashier/login" element={<CashierLogin />} />
       
+      {/* ========== WAREHOUSE ROUTES (Protected) ========== */}
+      <Route path="/warehouse/*" element={
+        <AuthGuard>
+          <RoleGuard requiredPermission={PERMISSIONS.ACCESS_WAREHOUSE_PANEL} fallback="/login">
+            <WarehouseLayout>
+              <Routes>
+                <Route path="" element={<WarehouseHome />} />
+                <Route path="add-bag" element={<WarehouseAddBag />} />
+                <Route path="reports" element={<WarehouseReports />} />
+                <Route path="*" element={<Navigate to="/warehouse" />} />
+              </Routes>
+            </WarehouseLayout>
+          </RoleGuard>
+        </AuthGuard>
+      } />
+
       {/* ========== CASHIER ROUTES (Protected) ========== */}
       <Route path="/cashier/*" element={
         <AuthGuard>

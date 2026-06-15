@@ -206,11 +206,8 @@ class ProfessionalApi {
     const { useAuthStore } = await import('../store/authStore');
     useAuthStore.getState().logout();
 
-    // Kassir sahifasidan chiqsak — kassir loginiga yo'naltiramiz
-    const path = window.location.pathname;
-    if (path !== '/' && path !== '/login' && path !== '/cashier/login') {
-      window.location.href = path.startsWith('/cashier') ? '/cashier/login' : '/login';
-    }
+    // React Router navigate orqali — oq ekransiz SPA navigatsiya
+    window.dispatchEvent(new CustomEvent('app:unauthorized'));
   }
 
   private enhanceError(error: any): ApiError {
