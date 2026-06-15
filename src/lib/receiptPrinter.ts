@@ -72,7 +72,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
       const display = type === 'usd'
         ? `$${(amount! / data.exchangeRate).toFixed(2)}`
         : isUSD ? fmtAmt(amount!) : `${Math.round(amount!).toLocaleString()} so'm`;
-      return `<tr><td style="font-size:10px;padding:1px 0;">${label}:</td><td style="font-size:10px;text-align:right;font-weight:700;padding:1px 0;">${display}</td></tr>`;
+      return `<tr><td style="font-size:12px;padding:2px 0;">${label}:</td><td style="font-size:12px;text-align:right;font-weight:700;padding:2px 0;">${display}</td></tr>`;
     }).join('');
 
   const hasDebt    = data.debt > 0;
@@ -80,11 +80,11 @@ export function generateReceiptHTML(data: ReceiptData): string {
   const hasTotalDebt = (data.customer.totalDebtUZS ?? 0) > 0 || (data.customer.totalDebtUSD ?? 0) > 0;
 
   const row = (l: string, r: string, bold = false, red = false) =>
-    `<div style="display:flex;justify-content:space-between;margin:1px 0;font-size:10px;${red ? 'color:#c00;' : ''}${bold ? 'font-weight:700;' : ''}">`
+    `<div style="display:flex;justify-content:space-between;margin:2px 0;font-size:12px;${red ? 'color:#c00;' : ''}${bold ? 'font-weight:700;' : ''}">`
     + `<span>${l}</span><span>${r}</span></div>`;
 
-  const ln  = `<div style="border-top:1px dashed #555;margin:4px 0;"></div>`;
-  const ln2 = `<div style="border-top:2px solid #000;margin:4px 0;"></div>`;
+  const ln  = `<div style="border-top:1px dashed #555;margin:5px 0;"></div>`;
+  const ln2 = `<div style="border-top:2px solid #000;margin:5px 0;"></div>`;
 
   return `<!DOCTYPE html>
 <html lang="uz">
@@ -92,7 +92,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
 <meta charset="UTF-8">
 <title>Chek #${data.receiptNumber}</title>
 <style>
-  @page { size: 80mm auto; margin: 2mm 0; }
+  @page { size: 80mm auto; margin: 3mm 0; }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   @media print {
     html, body { margin: 0 !important; padding: 0 !important; width: 80mm !important; }
@@ -100,25 +100,25 @@ export function generateReceiptHTML(data: ReceiptData): string {
   }
   body {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 10px;
-    line-height: 1.35;
-    width: 76mm;
+    font-size: 12px;
+    line-height: 1.4;
+    width: 74mm;
     margin: 0 auto;
     background: #fff;
     color: #000;
-    padding: 2mm 2mm 2mm;
+    padding: 2mm;
   }
   table { width: 100%; border-collapse: collapse; }
-  th { background: #333; color: #fff; font-size: 9px; padding: 3px 2px; border: 1px solid #000; text-align: center; }
-  td { font-size: 10px; padding: 3px 2px; border-bottom: 1px solid #ddd; vertical-align: top; }
+  th { background: #333; color: #fff; font-size: 11px; padding: 4px 3px; border: 1px solid #000; text-align: center; }
+  td { font-size: 12px; padding: 4px 3px; border-bottom: 1px solid #ddd; vertical-align: top; }
 </style>
 </head>
 <body>
-  <div style="text-align:center;padding-bottom:4px;border-bottom:2px solid #000;margin-bottom:4px;">
-    <div style="font-size:13px;font-weight:900;letter-spacing:1px;">LUX PET PLAST</div>
-    <div style="font-size:8px;">Buxoro vil., Vobkent tumani</div>
-    <div style="font-size:8px;">+998 91 414 44 58 | +998 91 920 07 00</div>
-    <div style="font-size:10px;font-weight:bold;margin-top:3px;">SAVDO CHEKI #${data.receiptNumber}</div>
+  <div style="text-align:center;padding-bottom:5px;border-bottom:2px solid #000;margin-bottom:5px;">
+    <div style="font-size:16px;font-weight:900;letter-spacing:1px;">LUX PET PLAST</div>
+    <div style="font-size:10px;">Buxoro vil., Vobkent tumani</div>
+    <div style="font-size:10px;">+998 91 414 44 58 | +998 91 920 07 00</div>
+    <div style="font-size:12px;font-weight:bold;margin-top:3px;">SAVDO CHEKI #${data.receiptNumber}</div>
   </div>
 
   ${row('Sana:', `${data.date} ${data.time}`)}
@@ -135,8 +135,8 @@ export function generateReceiptHTML(data: ReceiptData): string {
   <table style="margin-bottom:4px;">
     <thead><tr>
       <th style="width:40%;text-align:left;">Mahsulot</th>
-      <th style="width:14%;">Qop</th>
-      <th style="width:20%;text-align:right;">Narx</th>
+      <th style="width:12%;">Qop</th>
+      <th style="width:22%;text-align:right;">Narx</th>
       <th style="width:26%;text-align:right;">Jami</th>
     </tr></thead>
     <tbody>
@@ -154,7 +154,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
   </table>
 
   ${ln2}
-  <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:900;margin:2px 0;">
+  <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:900;margin:3px 0;">
     <span>JAMI:</span><span>${fmtAmt(data.total)}</span>
   </div>
   ${ln}
@@ -162,17 +162,17 @@ export function generateReceiptHTML(data: ReceiptData): string {
     <tbody style="border:none;">
     ${paymentsRows}
     <tr style="border-top:1px dashed #555;">
-      <td style="border:none;font-weight:700;font-size:11px;">TO'LANDI:</td>
-      <td style="border:none;text-align:right;font-weight:700;font-size:11px;">${fmtAmt(data.totalPaid)}</td>
+      <td style="border:none;font-weight:700;font-size:13px;">TO'LANDI:</td>
+      <td style="border:none;text-align:right;font-weight:700;font-size:13px;">${fmtAmt(data.totalPaid)}</td>
     </tr>
-    ${hasDebt ? `<tr><td style="border:none;font-weight:700;color:#c00;font-size:11px;">QARZ:</td><td style="border:none;text-align:right;font-weight:700;color:#c00;font-size:11px;">${fmtAmt(data.debt)}</td></tr>` : ''}
+    ${hasDebt ? `<tr><td style="border:none;font-weight:700;color:#c00;font-size:13px;">QARZ:</td><td style="border:none;text-align:right;font-weight:700;color:#c00;font-size:13px;">${fmtAmt(data.debt)}</td></tr>` : ''}
     </tbody>
   </table>
 
   ${hasTotalDebt ? ln
     + ((data.customer.totalDebtUZS ?? 0) > 0 ? row('Jami qarz (so\'m):', `${data.customer.totalDebtUZS!.toLocaleString()} so'm`, true, true) : '')
     + ((data.customer.totalDebtUSD ?? 0) > 0 ? row('Jami qarz ($):', `$${data.customer.totalDebtUSD!.toLocaleString()}`, true, true) : '')
-    + (data.customer.paymentDueDate ? `<div style="font-size:9px;color:#c00;margin-top:2px;">Muddat: ${data.customer.paymentDueDate} gacha</div>` : '')
+    + (data.customer.paymentDueDate ? `<div style="font-size:11px;color:#c00;margin-top:2px;">Muddat: ${data.customer.paymentDueDate} gacha</div>` : '')
     : ''}
 
   ${data.driver ? ln
@@ -182,7 +182,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
     : ''}
 
   ${ln2}
-  <div style="text-align:center;font-size:9px;font-weight:bold;">Xaridingiz uchun rahmat!</div>
+  <div style="text-align:center;font-size:11px;font-weight:bold;">Xaridingiz uchun rahmat!</div>
 
 <script>
   window.onload = function() { setTimeout(function() { window.print(); }, 300); };
@@ -461,16 +461,16 @@ export function generateDeliveryStatementThermalHTML(data: ReceiptData): string 
 
   const itemsHTML = data.items.map((item, i) => `
     <tr>
-      <td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;">${i + 1}</td>
-      <td style="border:1px solid #000;padding:3px;font-size:10px;word-break:break-word;">${item.name}</td>
-      <td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;">${item.quantity}</td>
-      <td style="border:1px solid #000;padding:3px;text-align:right;font-size:10px;font-weight:700;">${fmtAmt(item.subtotal)}</td>
+      <td style="border:1px solid #000;padding:4px 3px;text-align:center;font-size:11px;">${i + 1}</td>
+      <td style="border:1px solid #000;padding:4px 3px;font-size:12px;word-break:break-word;">${item.name}</td>
+      <td style="border:1px solid #000;padding:4px 3px;text-align:center;font-size:12px;">${item.quantity}</td>
+      <td style="border:1px solid #000;padding:4px 3px;text-align:right;font-size:12px;font-weight:700;">${fmtAmt(item.subtotal)}</td>
     </tr>`).join('');
 
   const row = (l: string, r: string, bold = false, red = false) =>
-    `<div style="display:flex;justify-content:space-between;margin:1px 0;font-size:10px;${red ? 'color:#c00;' : ''}${bold ? 'font-weight:700;' : ''}"><span>${l}</span><span>${r}</span></div>`;
-  const ln  = `<div style="border-top:1px dashed #555;margin:4px 0;"></div>`;
-  const ln2 = `<div style="border-top:2px solid #000;margin:4px 0;"></div>`;
+    `<div style="display:flex;justify-content:space-between;margin:2px 0;font-size:12px;${red ? 'color:#c00;' : ''}${bold ? 'font-weight:700;' : ''}"><span>${l}</span><span>${r}</span></div>`;
+  const ln  = `<div style="border-top:1px dashed #555;margin:5px 0;"></div>`;
+  const ln2 = `<div style="border-top:2px solid #000;margin:5px 0;"></div>`;
 
   const hasUZSDebt = (data.customer.totalDebtUZS || 0) > 0;
   const hasUSDDebt = (data.customer.totalDebtUSD || 0) > 0;
@@ -483,18 +483,18 @@ export function generateDeliveryStatementThermalHTML(data: ReceiptData): string 
 <meta charset="UTF-8">
 <title>Yuk Xati #${data.receiptNumber}</title>
 <style>
-  @page { size: 80mm auto; margin: 2mm 0; }
+  @page { size: 80mm auto; margin: 3mm 0; }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   @media print { html, body { margin: 0 !important; padding: 0 !important; width: 80mm !important; } -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.35; width: 76mm; margin: 0 auto; color: #000; background: #fff; padding: 2mm; }
+  body { font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; width: 74mm; margin: 0 auto; color: #000; background: #fff; padding: 2mm; }
   table { width: 100%; border-collapse: collapse; }
 </style>
 </head>
 <body>
-  <div style="text-align:center;padding-bottom:4px;border-bottom:2px solid #000;margin-bottom:4px;">
-    <div style="font-size:13px;font-weight:900;">LUX PET PLAST</div>
-    <div style="font-size:8px;">Buxoro vil., Vobkent | +998 91 414 44 58</div>
-    <div style="font-size:10px;font-weight:bold;margin-top:2px;">YUK XATI #${data.receiptNumber}</div>
+  <div style="text-align:center;padding-bottom:5px;border-bottom:2px solid #000;margin-bottom:5px;">
+    <div style="font-size:16px;font-weight:900;">LUX PET PLAST</div>
+    <div style="font-size:10px;">Buxoro vil., Vobkent | +998 91 414 44 58</div>
+    <div style="font-size:12px;font-weight:bold;margin-top:2px;">YUK XATI #${data.receiptNumber}</div>
   </div>
   ${row('Mijoz:', data.customer.name, true)}
   ${data.customer.phone ? row('Tel:', data.customer.phone) : ''}
@@ -503,16 +503,16 @@ export function generateDeliveryStatementThermalHTML(data: ReceiptData): string 
   ${ln2}
   <table>
     <thead><tr>
-      <th style="background:#333;color:#fff;padding:3px;font-size:9px;width:8%;">№</th>
-      <th style="background:#333;color:#fff;padding:3px;font-size:9px;text-align:left;width:46%;">Mahsulot</th>
-      <th style="background:#333;color:#fff;padding:3px;font-size:9px;width:16%;">Qop</th>
-      <th style="background:#333;color:#fff;padding:3px;font-size:9px;text-align:right;width:30%;">Jami</th>
+      <th style="background:#333;color:#fff;padding:4px 3px;font-size:11px;width:8%;">№</th>
+      <th style="background:#333;color:#fff;padding:4px 3px;font-size:11px;text-align:left;width:44%;">Mahsulot</th>
+      <th style="background:#333;color:#fff;padding:4px 3px;font-size:11px;width:16%;">Qop</th>
+      <th style="background:#333;color:#fff;padding:4px 3px;font-size:11px;text-align:right;width:32%;">Jami</th>
     </tr></thead>
     <tbody>${itemsHTML}
     <tr style="border-top:2px solid #000;">
-      <td colspan="2" style="border:none;padding:3px;font-weight:700;font-size:10px;">JAMI:</td>
-      <td style="border:none;padding:3px;text-align:center;font-weight:700;">${totalBags}</td>
-      <td style="border:none;padding:3px;text-align:right;font-weight:700;">${fmtAmt(data.total)}</td>
+      <td colspan="2" style="border:none;padding:4px 3px;font-weight:700;font-size:12px;">JAMI:</td>
+      <td style="border:none;padding:4px 3px;text-align:center;font-weight:700;font-size:12px;">${totalBags}</td>
+      <td style="border:none;padding:4px 3px;text-align:right;font-weight:700;font-size:12px;">${fmtAmt(data.total)}</td>
     </tr>
     </tbody>
   </table>
@@ -532,11 +532,11 @@ export function generateDeliveryStatementThermalHTML(data: ReceiptData): string 
     : ''}
   ${ln2}
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:10px;">
-    <div style="border-top:2px solid #000;text-align:center;padding-top:3px;font-size:9px;font-weight:700;">Kassir</div>
-    <div style="border-top:2px solid #000;text-align:center;padding-top:3px;font-size:9px;font-weight:700;">Mijoz</div>
+    <div style="border-top:2px solid #000;text-align:center;padding-top:3px;font-size:11px;font-weight:700;">Kassir</div>
+    <div style="border-top:2px solid #000;text-align:center;padding-top:3px;font-size:11px;font-weight:700;">Mijoz</div>
   </div>
   ${ln2}
-  <div style="text-align:center;font-size:9px;font-weight:bold;">Xaridingiz uchun rahmat!</div>
+  <div style="text-align:center;font-size:11px;font-weight:bold;">Xaridingiz uchun rahmat!</div>
 <script>
   window.onload = function() { setTimeout(function() { window.print(); }, 300); };
 </script>

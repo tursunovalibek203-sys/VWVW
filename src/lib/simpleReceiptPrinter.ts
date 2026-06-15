@@ -79,10 +79,10 @@ export function generateSimpleReceiptHTML(data: SimpleReceiptData): string {
       : item.quantity;
     const price = isPiece ? (item.pricePerPiece || 0) : (item.pricePerBag || 0);
     return `<tr>
-      <td style="padding:3px 4px;border:1px solid #000;font-size:10px;">${item.name}</td>
-      <td style="padding:3px 4px;border:1px solid #000;font-size:10px;text-align:center;">${bags}</td>
-      <td style="padding:3px 4px;border:1px solid #000;font-size:10px;text-align:right;">${price.toLocaleString()}</td>
-      <td style="padding:3px 4px;border:1px solid #000;font-size:10px;text-align:right;font-weight:bold;">${item.subtotal.toLocaleString()} ${sym}</td>
+      <td style="padding:4px 4px;border:1px solid #000;font-size:12px;">${item.name}</td>
+      <td style="padding:4px 4px;border:1px solid #000;font-size:12px;text-align:center;">${bags}</td>
+      <td style="padding:4px 4px;border:1px solid #000;font-size:12px;text-align:right;">${price.toLocaleString()}</td>
+      <td style="padding:4px 4px;border:1px solid #000;font-size:12px;text-align:right;font-weight:bold;">${item.subtotal.toLocaleString()} ${sym}</td>
     </tr>`;
   }).join('');
 
@@ -91,7 +91,7 @@ export function generateSimpleReceiptHTML(data: SimpleReceiptData): string {
     .map(([type, amount]) => {
       const label = type === 'uzs' ? 'Naqd (so\'m)' : type === 'usd' ? 'Naqd ($)' : 'Click';
       const s = type === 'usd' ? '$' : "so'm";
-      return `<tr><td style="padding:2px 0;font-size:10px;">${label}:</td><td style="padding:2px 0;font-size:10px;text-align:right;">${(amount as number).toLocaleString()} ${s}</td></tr>`;
+      return `<tr><td style="padding:3px 0;font-size:12px;">${label}:</td><td style="padding:3px 0;font-size:12px;text-align:right;">${(amount as number).toLocaleString()} ${s}</td></tr>`;
     }).join('');
 
   const prevDebtUZS = data.customer.previousBalanceUZS || 0;
@@ -105,33 +105,33 @@ export function generateSimpleReceiptHTML(data: SimpleReceiptData): string {
 <meta charset="UTF-8">
 <title>Chek #${data.receiptNumber}</title>
 <style>
-  @page { size: 80mm auto; margin: 2mm 0; }
+  @page { size: 80mm auto; margin: 3mm 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: 'Courier New', monospace;
-    font-size: 10px;
-    line-height: 1.35;
-    width: 76mm;
+    font-size: 12px;
+    line-height: 1.4;
+    width: 74mm;
     margin: 0 auto;
     color: #000;
     background: #fff;
   }
-  .ln { border-bottom: 1px dashed #000; margin: 4px 0; }
-  .ln2 { border-bottom: 2px solid #000; margin: 4px 0; }
-  .row { display: flex; justify-content: space-between; margin: 1px 0; font-size: 10px; }
+  .ln  { border-bottom: 1px dashed #000; margin: 5px 0; }
+  .ln2 { border-bottom: 2px solid #000; margin: 5px 0; }
+  .row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 12px; }
   .bold { font-weight: bold; }
   table { width: 100%; border-collapse: collapse; }
-  th { border: 1px solid #000; padding: 3px 3px; font-size: 9px; text-align: center; background: #000; color: #fff; }
-  td { border: 1px solid #000; padding: 3px 3px; font-size: 10px; vertical-align: top; }
+  th { border: 1px solid #000; padding: 4px 3px; font-size: 11px; text-align: center; background: #000; color: #fff; }
+  td { border: 1px solid #000; padding: 4px 3px; font-size: 12px; vertical-align: top; }
   tr:nth-child(even) td { background: #f5f5f5; }
 </style>
 </head>
 <body>
   <div style="text-align:center;margin-bottom:5px;">
-    <div style="font-size:14px;font-weight:bold;letter-spacing:1px;">LUX PET PLAST</div>
-    <div style="font-size:8px;">Buxoro vil., Vobkent tumani</div>
-    <div style="font-size:8px;">+998 91 414 44 58 | +998 91 920 07 00</div>
-    <div style="font-size:9px;font-weight:bold;margin-top:3px;">SOTUV CHEKI #${data.receiptNumber}</div>
+    <div style="font-size:16px;font-weight:bold;letter-spacing:1px;">LUX PET PLAST</div>
+    <div style="font-size:10px;">Buxoro vil., Vobkent tumani</div>
+    <div style="font-size:10px;">+998 91 414 44 58 | +998 91 920 07 00</div>
+    <div style="font-size:11px;font-weight:bold;margin-top:3px;">SOTUV CHEKI #${data.receiptNumber}</div>
   </div>
   <div class="ln2"></div>
 
@@ -149,33 +149,33 @@ export function generateSimpleReceiptHTML(data: SimpleReceiptData): string {
   <table style="margin-bottom:4px;">
     <thead><tr>
       <th style="width:40%;text-align:left;">Mahsulot</th>
-      <th style="width:12%;">Qop</th>
+      <th style="width:11%;">Qop</th>
       <th style="width:22%;text-align:right;">Narx</th>
-      <th style="width:26%;text-align:right;">Jami</th>
+      <th style="width:27%;text-align:right;">Jami</th>
     </tr></thead>
     <tbody>${itemsHTML}</tbody>
   </table>
 
   <div class="ln2"></div>
-  <div class="row bold" style="font-size:12px;">
+  <div class="row bold" style="font-size:14px;">
     <span>JAMI:</span><span>${data.total.toLocaleString()} ${sym}</span>
   </div>
   <div class="ln"></div>
   <table style="width:100%;border:none;">
     <tbody>${paymentsHTML}
     <tr style="border-top:1px dashed #000;">
-      <td style="border:none;padding:2px 0;font-size:10px;font-weight:bold;">To'langan:</td>
-      <td style="border:none;padding:2px 0;font-size:10px;font-weight:bold;text-align:right;">${data.totalPaid.toLocaleString()} ${sym}</td>
+      <td style="border:none;padding:3px 0;font-size:12px;font-weight:bold;">To'langan:</td>
+      <td style="border:none;padding:3px 0;font-size:12px;font-weight:bold;text-align:right;">${data.totalPaid.toLocaleString()} ${sym}</td>
     </tr>
     </tbody>
   </table>
   ${(newDebtUZS > 0 || newDebtUSD > 0) ? `
   <div class="ln"></div>
-  ${newDebtUZS > 0 ? `<div class="row bold" style="color:#c00;font-size:11px;"><span>Qarz (so'm):</span><span>${newDebtUZS.toLocaleString()} so'm</span></div>` : ''}
-  ${newDebtUSD > 0 ? `<div class="row bold" style="color:#c00;font-size:11px;"><span>Qarz ($):</span><span>$${newDebtUSD.toLocaleString()}</span></div>` : ''}
-  ` : `<div class="row" style="color:green;"><span>Qarz:</span><span>0</span></div>`}
+  ${newDebtUZS > 0 ? `<div class="row bold" style="color:#c00;font-size:13px;"><span>Qarz (so'm):</span><span>${newDebtUZS.toLocaleString()} so'm</span></div>` : ''}
+  ${newDebtUSD > 0 ? `<div class="row bold" style="color:#c00;font-size:13px;"><span>Qarz ($):</span><span>$${newDebtUSD.toLocaleString()}</span></div>` : ''}
+  ` : `<div class="row" style="color:green;font-size:12px;"><span>Qarz:</span><span>0</span></div>`}
   <div class="ln2"></div>
-  <div style="text-align:center;font-size:9px;margin-top:3px;font-weight:bold;">Xaridingiz uchun rahmat!</div>
+  <div style="text-align:center;font-size:11px;margin-top:3px;font-weight:bold;">Xaridingiz uchun rahmat!</div>
 
 <script>
   window.onload = function() {
@@ -190,10 +190,10 @@ export function generateDeliveryReceiptHTML(data: SimpleReceiptData): string {
   const sym = data.currency?.toUpperCase() === 'USD' ? '$' : "so'm";
   const itemsHTML = data.items.map((item, i) => `
     <tr>
-      <td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;">${i + 1}</td>
-      <td style="border:1px solid #000;padding:3px;font-size:10px;">${item.name}</td>
-      <td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;">${item.quantity}</td>
-      <td style="border:1px solid #000;padding:3px;text-align:right;font-size:10px;font-weight:bold;">${item.subtotal.toLocaleString()} ${sym}</td>
+      <td style="border:1px solid #000;padding:4px 3px;text-align:center;font-size:11px;">${i + 1}</td>
+      <td style="border:1px solid #000;padding:4px 3px;font-size:12px;">${item.name}</td>
+      <td style="border:1px solid #000;padding:4px 3px;text-align:center;font-size:12px;">${item.quantity}</td>
+      <td style="border:1px solid #000;padding:4px 3px;text-align:right;font-size:12px;font-weight:bold;">${item.subtotal.toLocaleString()} ${sym}</td>
     </tr>`).join('');
 
   return `<!DOCTYPE html>
@@ -202,21 +202,21 @@ export function generateDeliveryReceiptHTML(data: SimpleReceiptData): string {
 <meta charset="UTF-8">
 <title>Yuk Xati #${data.receiptNumber}</title>
 <style>
-  @page { size: 80mm auto; margin: 2mm 0; }
+  @page { size: 80mm auto; margin: 3mm 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.35; width: 76mm; margin: 0 auto; color: #000; }
-  .row { display: flex; justify-content: space-between; margin: 1px 0; }
-  .ln { border-bottom: 1px dashed #000; margin: 4px 0; }
-  .ln2 { border-bottom: 2px solid #000; margin: 4px 0; }
+  body { font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; width: 74mm; margin: 0 auto; color: #000; }
+  .row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 12px; }
+  .ln { border-bottom: 1px dashed #000; margin: 5px 0; }
+  .ln2 { border-bottom: 2px solid #000; margin: 5px 0; }
   table { width: 100%; border-collapse: collapse; }
-  th { border: 1px solid #000; padding: 3px; font-size: 9px; background: #000; color: #fff; }
+  th { border: 1px solid #000; padding: 4px 3px; font-size: 11px; background: #000; color: #fff; }
 </style>
 </head>
 <body>
   <div style="text-align:center;margin-bottom:5px;">
-    <div style="font-size:13px;font-weight:bold;">LUX PET PLAST</div>
-    <div style="font-size:8px;">Buxoro vil., Vobkent | +998 91 414 44 58</div>
-    <div style="font-size:9px;font-weight:bold;margin-top:2px;">YUK XATI #${data.receiptNumber}</div>
+    <div style="font-size:16px;font-weight:bold;">LUX PET PLAST</div>
+    <div style="font-size:10px;">Buxoro vil., Vobkent | +998 91 414 44 58</div>
+    <div style="font-size:11px;font-weight:bold;margin-top:2px;">YUK XATI #${data.receiptNumber}</div>
   </div>
   <div class="ln2"></div>
   <div class="row"><span>Mijoz:</span><span style="font-weight:bold;">${data.customer.name}</span></div>
@@ -226,18 +226,18 @@ export function generateDeliveryReceiptHTML(data: SimpleReceiptData): string {
   <table>
     <thead><tr>
       <th style="width:8%;">№</th>
-      <th style="width:46%;text-align:left;">Mahsulot</th>
+      <th style="width:44%;text-align:left;">Mahsulot</th>
       <th style="width:16%;">Qop</th>
-      <th style="width:30%;text-align:right;">Jami</th>
+      <th style="width:32%;text-align:right;">Jami</th>
     </tr></thead>
     <tbody>${itemsHTML}</tbody>
   </table>
   <div class="ln2"></div>
-  <div class="row" style="font-weight:bold;font-size:11px;">
+  <div class="row" style="font-weight:bold;font-size:13px;">
     <span>JAMI:</span><span>${data.total.toLocaleString()} ${sym}</span>
   </div>
   <div class="ln"></div>
-  <div style="text-align:center;font-size:9px;font-weight:bold;margin-top:3px;">Xaridingiz uchun rahmat!</div>
+  <div style="text-align:center;font-size:11px;font-weight:bold;margin-top:3px;">Xaridingiz uchun rahmat!</div>
 <script>
   window.onload = function() { setTimeout(function() { window.print(); }, 300); };
 </script>
