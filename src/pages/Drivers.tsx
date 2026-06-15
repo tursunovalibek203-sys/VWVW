@@ -348,9 +348,9 @@ export function Drivers() {
   const avatarTint = (_status: string) => 'bg-slate-100 text-slate-600';
 
   const filteredDrivers = drivers.filter(d =>
-    d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    d.phone.includes(searchTerm) ||
-    d.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    (d.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (d.phone || '').includes(searchTerm) ||
+    (d.vehicleNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const hasActiveFilters = !!searchTerm;
