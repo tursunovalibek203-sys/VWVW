@@ -244,7 +244,7 @@ export class SalesService {
             SET
               "currentStock" = "currentStock" - ${bagsToDeduct},
               "currentUnits" = "currentUnits" - ${unitsToDeduct},
-              "updatedAt" = datetime('now')
+              "updatedAt" = NOW()
             WHERE "id" = ${item.productId}
           `;
 
@@ -406,7 +406,7 @@ export class SalesService {
           await tx.$executeRaw`
             UPDATE "Driver"
             SET "debtToCompany" = "debtToCompany" + ${debtInUZS},
-                "updatedAt" = datetime('now')
+                "updatedAt" = NOW()
             WHERE "id" = ${driverId}
           `;
         }
@@ -573,7 +573,7 @@ export class SalesService {
             SET
               "currentStock" = "currentStock" - ${bagsToDeduct},
               "currentUnits" = "currentUnits" - ${unitsToDeduct},
-              "updatedAt" = datetime('now')
+              "updatedAt" = NOW()
             WHERE "id" = ${item.productId}
           `;
         }
