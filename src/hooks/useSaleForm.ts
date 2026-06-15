@@ -263,8 +263,10 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     const defaultUnits = getDefaultUnitsPerBag(updatedProduct.name);
     const unitsPerBag = updatedProduct.unitsPerBag || defaultUnits || 2000;
 
-    // Narxni hisoblash - basePrice dan (sozlamalardan olingan)
-    const displayPrice = basePrice;
+    // Narxni hisoblash — basePrice USD da saqlangan, joriy valyutaga aylantirish
+    const displayPrice = form.currency === 'UZS'
+      ? Math.round(basePrice * exchangeRateRef.current)
+      : basePrice;
 
     setNewItem({
       productId: updatedProduct.id,
