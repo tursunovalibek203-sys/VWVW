@@ -520,10 +520,11 @@ router.post('/:id/payment', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req
 
 // ── Haydovchi qarzini bekor qilish (kassaga pul tushmaydi) ────────────────
 // amount = undefined → to'liq bekor; amount > 0 → qisman bekor
+// customerId = optional → o'sha mijozning debtUZS iga qo'shiladi
 router.post('/:id/cancel-debt', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { note = '', amount } = req.body;
+    const { note = '', amount, customerId } = req.body;
     const userId = req.user?.id;
     const userName = req.user?.name || req.user?.login || 'Admin';
 
@@ -537,17 +538,30 @@ router.post('/:id/cancel-debt', authorize('ADMIN', 'MANAGER', 'CASHIER'), async 
 
     await (prisma.driver as any).update({ where: { id }, data: { debtToCompany: newDebt } });
 
-    const isPartial = newDebt > 0;
-    const desc = `Haydovchi qarzi ${isPartial ? "qisman" : "to'liq"} bekor: ${driver.name} — ${Math.round(cancelledAmount).toLocaleString()} UZS${note ? ' (' + note + ')' : ''}`;
+    // Agar mijoz tanlangan bo'lsa — uning debtUZS ini oshiramiz
+    let customerName: string | null = null;
+    if (customerId) {
+      const customer = await prisma.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true } });
+      if (customer) {
+        await prisma.customer.update({
+          where: { id: customerId },
+          data: { debtUZS: { increment: cancelledAmount } },
+        });
+        customerName = customer.name;
+      }
+    }
 
-    // Faqat loglash — kassaga pul tushmaydi
+    const isPartial = newDebt > 0;
+    const customerNote = customerName ? ` → ${customerName} ga o'tkazildi` : '';
+    const desc = `Haydovchi qarzi ${isPartial ? "qisman" : "to'liq"} bekor: ${driver.name} — ${Math.round(cancelledAmount).toLocaleString()} UZS${customerNote}${note ? ' (' + note + ')' : ''}`;
+
     await prisma.cashboxTransaction.create({ data: {
       type: 'EXPENSE', amount: 0.01, currency: 'UZS', category: 'ADJUSTMENT',
       paymentMethod: 'CASH', description: desc,
       userId: userId || '', userName, reference: id,
     }});
 
-    res.json({ success: true, cancelledAmount, remainingDebt: newDebt, driverName: driver.name });
+    res.json({ success: true, cancelledAmount, remainingDebt: newDebt, driverName: driver.name, customerName });
   } catch (error: any) {
     console.error('Driver cancel-debt error:', error);
     res.status(500).json({ error: 'Qarzni bekor qilishda xatolik: ' + error.message });

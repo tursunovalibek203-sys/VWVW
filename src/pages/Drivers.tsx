@@ -100,6 +100,9 @@ export function Drivers() {
   const [cancelDebtLoading, setCancelDebtLoading] = useState(false);
   const [cancelType, setCancelType] = useState<'full' | 'partial'>('full');
   const [cancelPartialAmount, setCancelPartialAmount] = useState('');
+  const [cancelCustomers, setCancelCustomers] = useState<{id: string; name: string; phone: string}[]>([]);
+  const [cancelCustomerSearch, setCancelCustomerSearch] = useState('');
+  const [cancelSelectedCustomer, setCancelSelectedCustomer] = useState<{id: string; name: string; phone: string} | null>(null);
 
   const [newDriver, setNewDriver] = useState({
     name: '',
@@ -275,7 +278,19 @@ export function Drivers() {
     setCancelDebtNote('');
     setCancelType('full');
     setCancelPartialAmount('');
+    setCancelCustomerSearch('');
+    setCancelSelectedCustomer(null);
     setShowPaymentModal(true);
+  };
+
+  const handleShowCancelDebt = (open: boolean) => {
+    setShowCancelDebt(open);
+    if (open && cancelCustomers.length === 0) {
+      api.get('/customers').then(r => {
+        const list = Array.isArray(r.data) ? r.data : (r.data?.data ?? []);
+        setCancelCustomers(list.map((c: any) => ({ id: c.id, name: c.name, phone: c.phone || '' })));
+      }).catch(() => {});
+    }
   };
 
   const handleDriverPayment = async (e: React.FormEvent) => {
@@ -317,13 +332,15 @@ export function Drivers() {
       await api.post(`/drivers/${paymentDriver.id}/cancel-debt`, {
         note: cancelDebtNote,
         ...(cancelType === 'partial' && { amount: partial }),
+        ...(cancelSelectedCustomer && { customerId: cancelSelectedCustomer.id }),
       });
       setShowPaymentModal(false);
       fetchDrivers();
       const cancelled = cancelType === 'partial' ? partial : (paymentDriver.debtToCompany || 0);
+      const customerPart = cancelSelectedCustomer ? ` → ${cancelSelectedCustomer.name}` : '';
       addToast(toast.success(
         latinToCyrillic('Muvaffaqiyatli'),
-        `${paymentDriver.name}: ${Math.round(cancelled).toLocaleString()} UZS ${latinToCyrillic('qarz bekor qilindi')}`
+        `${paymentDriver.name}: ${Math.round(cancelled).toLocaleString()} UZS ${latinToCyrillic('qarz bekor qilindi')}${customerPart}`
       ));
     } catch (error: any) {
       addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || latinToCyrillic('Xatolik yuz berdi')));
@@ -1144,7 +1161,7 @@ export function Drivers() {
 
               {/* Qarzni bekor qilish */}
               <div className="border-t border-slate-100 pt-3">
-                <button type="button" onClick={() => setShowCancelDebt(v => !v)}
+                <button type="button" onClick={() => handleShowCancelDebt(!showCancelDebt)}
                   className="text-xs font-semibold text-rose-500 hover:text-rose-700 transition-colors">
                   {showCancelDebt ? '▲' : '▼'} {latinToCyrillic('Qarzni bekor qilish (kassaga tushmaydi)')}
                 </button>
@@ -1153,55 +1170,104 @@ export function Drivers() {
                     <p className="text-xs text-slate-500">
                       {latinToCyrillic('Haydovchi pul keltirmadi — qarz bekor qilinadi, kassaga pul tushmaydi.')}
                     </p>
+
                     {/* To'liq / Qisman tanlash */}
                     <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCancelType('full')}
+                      <button type="button" onClick={() => setCancelType('full')}
                         className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-colors ${
                           cancelType === 'full'
                             ? 'bg-rose-100 text-rose-700 border-rose-300'
                             : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
+                        }`}>
                         {latinToCyrillic("To'liq bekor")}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setCancelType('partial')}
+                      <button type="button" onClick={() => setCancelType('partial')}
                         className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-colors ${
                           cancelType === 'partial'
                             ? 'bg-orange-100 text-orange-700 border-orange-300'
                             : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
+                        }`}>
                         {latinToCyrillic('Qisman bekor')}
                       </button>
                     </div>
+
                     {cancelType === 'partial' && (
-                      <input
-                        type="number" min="1" max={paymentDriver.debtToCompany || 0}
+                      <input type="number" min="1" max={paymentDriver.debtToCompany || 0}
                         placeholder={`Maks: ${Math.round(paymentDriver.debtToCompany || 0).toLocaleString()} UZS`}
                         value={cancelPartialAmount}
                         onChange={e => setCancelPartialAmount(e.target.value)}
                         className="w-full px-3 py-2 bg-slate-50 border border-orange-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 focus:bg-white transition-all"
                       />
                     )}
+
+                    {/* Mijozga qarz o'tkazish */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-slate-500">
+                        {latinToCyrillic('Mijozga qarz o\'tkazish')}
+                        <span className="text-slate-300 font-normal ml-1">({latinToCyrillic('ixtiyoriy')})</span>
+                      </label>
+                      {cancelSelectedCustomer ? (
+                        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+                          <div>
+                            <p className="text-xs font-semibold text-blue-800">{cancelSelectedCustomer.name}</p>
+                            <p className="text-xs text-blue-400">{cancelSelectedCustomer.phone}</p>
+                          </div>
+                          <button type="button"
+                            onClick={() => { setCancelSelectedCustomer(null); setCancelCustomerSearch(''); }}
+                            className="text-blue-400 hover:text-blue-600 p-1">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <input type="text"
+                            placeholder={latinToCyrillic('Mijoz ismi yoki telefon...')}
+                            value={cancelCustomerSearch}
+                            onChange={e => setCancelCustomerSearch(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white transition-all"
+                          />
+                          {cancelCustomerSearch.length >= 1 && (
+                            <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-36 overflow-y-auto">
+                              {cancelCustomers
+                                .filter(c =>
+                                  c.name.toLowerCase().includes(cancelCustomerSearch.toLowerCase()) ||
+                                  (c.phone || '').includes(cancelCustomerSearch)
+                                )
+                                .slice(0, 5)
+                                .map(c => (
+                                  <button key={c.id} type="button"
+                                    onClick={() => { setCancelSelectedCustomer(c); setCancelCustomerSearch(''); }}
+                                    className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+                                    <span className="font-semibold text-slate-900">{c.name}</span>
+                                    <span className="text-slate-400 ml-2">{c.phone}</span>
+                                  </button>
+                                ))}
+                              {cancelCustomers.filter(c =>
+                                c.name.toLowerCase().includes(cancelCustomerSearch.toLowerCase()) ||
+                                (c.phone || '').includes(cancelCustomerSearch)
+                              ).length === 0 && (
+                                <div className="px-3 py-2 text-xs text-slate-400">
+                                  {latinToCyrillic('Mijoz topilmadi')}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
                     <input type="text" placeholder={latinToCyrillic('Sabab (ixtiyoriy)')}
                       value={cancelDebtNote}
                       onChange={e => setCancelDebtNote(e.target.value)}
                       className="w-full px-3 py-2 bg-slate-50 border border-rose-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-300 focus:bg-white transition-all"
                     />
-                    <button
-                      type="button"
-                      onClick={handleCancelDebt}
+                    <button type="button" onClick={handleCancelDebt}
                       disabled={cancelDebtLoading || (cancelType === 'partial' && !(parseFloat(cancelPartialAmount) > 0))}
                       className={`w-full py-2 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-60 ${
                         cancelType === 'full'
                           ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
                           : 'bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200'
-                      }`}
-                    >
+                      }`}>
                       {cancelDebtLoading
                         ? latinToCyrillic('Yuklanmoqda...')
                         : cancelType === 'full'
