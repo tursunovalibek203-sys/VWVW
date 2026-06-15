@@ -147,12 +147,12 @@ export class SalesService {
 
     if (!items?.length) throw new Error('Kamida bitta mahsulot tanlash kerak');
 
-    // Haydovchi tayinlangan bo'lsa, qolgan summani u yig'adi deb hisoblaymiz.
-    // Bu mijozni qarz ko'rsatmaslik uchun kerak — haydovchi mas'ul.
+    // Haydovchi faqat belgilangan summani yig'adi.
+    // Qolgan summa (remaining - actualDriverCollected) mijoz qarziga yoziladi.
     const remaining = Math.max(0, totalAmount - paidAmount);
     const actualDriverCollected = driverId
-      ? Math.max(driverCollectedAmount || 0, remaining)
-      : (driverCollectedAmount || 0);
+      ? Math.min(driverCollectedAmount || 0, remaining)   // haydovchi ko'pi bilan remaining yig'a oladi
+      : 0;
 
     // To'lov statusini hisoblash — haydovchi summasi ham hisobga olinadi
     const totalCovered = DecimalHelper.add(paidAmount, actualDriverCollected);

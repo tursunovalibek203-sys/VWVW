@@ -89,7 +89,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     paidUSD: editSale?.paidUSD || '',
     paidKARTA: editSale?.paidKARTA || '',
     paymentType: editSale?.paymentType || 'cash',
-    currency: editSale?.currency || 'USD',
+    currency: editSale?.currency || 'UZS',
     isKocha: editSale?.isKocha || false,
     manualCustomerName: '',
     manualCustomerPhone: '',

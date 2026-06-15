@@ -831,7 +831,7 @@ export default function AddSaleClean() {
                           </button>
                         </div>
                         {saleForm.form.driverCollectsAmount != null && saleForm.form.driverCollectsAmount !== '' && (
-                          <input type="number" min="0" placeholder={latinToCyrillic('Summa (UZS)')}
+                          <input type="number" min="0" placeholder={`${latinToCyrillic('Summa')} (${saleForm.form.currency})`}
                             value={saleForm.form.driverCollectsAmount.trim() === '' ? '' : saleForm.form.driverCollectsAmount.trim()}
                             onChange={e => saleForm.updateFormField('driverCollectsAmount', e.target.value || ' ')}
                             className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
