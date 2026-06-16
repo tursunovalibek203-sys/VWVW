@@ -21,7 +21,9 @@ export interface UseSaleFormOptions {
 function getKomplektAdditions(
   product: Product,
   quantity: number,
-  allProducts: Product[]
+  allProducts: Product[],
+  currency: string,
+  exchangeRate: number
 ): SaleItemForm[] {
   const warehouse = (product.warehouse || '').toLowerCase();
   if (warehouse !== 'kapsula' && warehouse !== 'preform') return [];
@@ -56,7 +58,9 @@ function getKomplektAdditions(
     });
     if (match) {
       const upb = match.unitsPerBag || 1;
-      const ppb = parseFloat(match.pricePerBag?.toString() || '0') || 0;
+      const rawPpb = parseFloat(match.pricePerBag?.toString() || '0') || 0;
+      // Bazada narx USD da saqlanadi — joriy valyutaga aylantirish (asosiy mahsulot bilan bir xil mantiq)
+      const ppb = currency === 'UZS' ? Math.round(rawPpb * exchangeRate) : rawPpb;
       // Dona / qop soni = preform dona soni / krishka(yoki ruchka) qopdagi dona soni
       const kQty = Math.ceil(totalUnits / upb);
       result.push({
@@ -297,7 +301,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     const isPieceSale = newItem.saleType === 'piece';
     const subtotal = isPieceSale ? quantity * pricePerPiece : quantity * pricePerBag;
 
-    const komplektItems = getKomplektAdditions(product, quantity, products);
+    const komplektItems = getKomplektAdditions(product, quantity, products, form.currency, exchangeRateRef.current);
 
     setForm((prev) => {
       const items = [...prev.items];
