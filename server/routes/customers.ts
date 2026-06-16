@@ -4,7 +4,6 @@ import { prisma } from '../utils/prisma';
 
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
-import { sendEnhancedPaymentConfirmation } from '../bot/archive/enhanced-bot';
 import { successResponse, errorResponse } from '../utils/response';
 import { DecimalHelper } from '../utils/decimal-helper';
 import { createCustomerTopic } from '../utils/telegram-forum';

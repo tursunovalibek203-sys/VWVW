@@ -17,26 +17,29 @@ function startDailyScheduler() {
 
   // Har daqiqa tekshiramiz — server restart bo'lsa ham o'tkazib yubormaymiz
   dailySchedulerTimer = setInterval(async () => {
-    const now  = new Date();
-    const h    = now.getHours();
-    const m    = now.getMinutes();
-    const date = now.toISOString().slice(0, 10);   // YYYY-MM-DD
+    const now = new Date();
+    // O'zbekiston vaqti = UTC + 5 soat
+    const uzNow = new Date(now.getTime() + 5 * 60 * 60 * 1000);
+    const h    = uzNow.getUTCHours();
+    const m    = uzNow.getUTCMinutes();
+    const date = uzNow.toISOString().slice(0, 10);   // YYYY-MM-DD (UZT bo'yicha)
 
-    // 19:00 – 19:04 oralig'ida va bugun hali yuborilmagan bo'lsa
+    // 19:00 – 19:04 oralig'ida (O'zbekiston vaqti) va bugun hali yuborilmagan bo'lsa
     if (h === 19 && m < 5 && date !== lastSentDate) {
       lastSentDate = date;
-      console.log(`⏰ Kunlik hisobot yuborilmoqda (${now.toLocaleTimeString('uz-UZ')})…`);
-      try { await sendExcelBackupToAdmins('🕖 Kunlik avtomatik hisobot (19:00)'); }
+      console.log(`⏰ Kunlik hisobot yuborilmoqda (UZT ${h}:${String(m).padStart(2,'0')})…`);
+      try { await sendExcelBackupToAdmins('🕖 Kunlik avtomatik hisobot (19:00 UZT)'); }
       catch (err) { console.error('❌ Kunlik hisobot xatolik:', err); }
     }
   }, 60_000);   // har 60 soniyada
 
-  // Qancha vaqt qolganini konsolda ko'rsatamiz
+  // Qancha vaqt qolganini konsolda ko'rsatamiz (UZT bo'yicha)
   const now  = new Date();
-  const next = new Date(); next.setHours(19, 0, 0, 0);
-  if (next <= now) next.setDate(next.getDate() + 1);
-  const mins = Math.round((next.getTime() - now.getTime()) / 60_000);
-  console.log(`⏰ Kunlik hisobot scheduler ishga tushdi — keyingi yuborish ~${mins} daqiqadan keyin (19:00)`);
+  const uzNow = new Date(now.getTime() + 5 * 60 * 60 * 1000);
+  const next = new Date(uzNow); next.setUTCHours(19, 0, 0, 0);
+  if (next <= uzNow) next.setUTCDate(next.getUTCDate() + 1);
+  const mins = Math.round((next.getTime() - uzNow.getTime()) / 60_000);
+  console.log(`⏰ Kunlik hisobot scheduler ishga tushdi — keyingi yuborish ~${mins} daqiqadan keyin (19:00 UZT)`);
 }
 
 export async function sendExcelBackupToAdmins(caption = '📊 Kunlik hisobot') {
@@ -58,15 +61,28 @@ export async function sendExcelBackupToAdmins(caption = '📊 Kunlik hisobot') {
 
 export async function sendBufferToAdmins(buffer: Buffer, filename: string, caption = '📊 Hisobot') {
   const adminIds = getAdminChatIds();
-  if (!adminIds.length) throw new Error('TELEGRAM_ADMIN_CHAT_ID topilmadi');
-  if (!adminBot) throw new Error('Admin bot ishga tushmagan');
-  for (const chatId of adminIds) {
-    await adminBot.sendDocument(
-      chatId, buffer,
-      { caption, parse_mode: 'Markdown' },
-      { filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
-    );
+  if (!adminIds.length) throw new Error('TELEGRAM_ADMIN_CHAT_ID sozlanmagan — Render environment variables tekshiring');
+  if (!adminBot) {
+    // Bot token bor bo'lsa qayta ulanishga harakat
+    const token = process.env.TELEGRAM_ADMIN_BOT_TOKEN;
+    if (!token) throw new Error('TELEGRAM_ADMIN_BOT_TOKEN sozlanmagan — Render environment variables tekshiring');
+    throw new Error('Admin bot hali ishga tushmagan — bir daqiqa kuting va qaytadan urinib ko\'ring');
   }
+  let sent = 0;
+  for (const chatId of adminIds) {
+    try {
+      await adminBot.sendDocument(
+        chatId, buffer,
+        { caption, parse_mode: 'Markdown' },
+        { filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+      );
+      sent++;
+    } catch (err: any) {
+      console.error(`❌ ${chatId} ga yuborishda xatolik:`, err.message);
+      throw new Error(`Telegram yuborishda xatolik: ${err.message}`);
+    }
+  }
+  if (sent === 0) throw new Error('Hech bir adminga yuborib bo\'lmadi');
 }
 
 export function initAdminBot() {

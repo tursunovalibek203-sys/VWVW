@@ -42,6 +42,7 @@ interface Driver {
   totalDeliveries: number;
   currentLocation?: string;
   debtToCompany?: number;
+  debtToCompanyUSD?: number;
   active: boolean;
   createdAt: string;
   user?: {
@@ -588,10 +589,19 @@ export function Drivers() {
                       </div>
                     </td>
                     <td className="px-5 py-4 text-center">
-                      {(driver.debtToCompany || 0) > 0 ? (
-                        <span className="inline-flex items-center gap-1 text-sm font-bold text-amber-600 tabular-nums">
-                          {Math.round(driver.debtToCompany!).toLocaleString()}
-                        </span>
+                      {((driver.debtToCompanyUSD || 0) > 0 || (driver.debtToCompany || 0) > 0) ? (
+                        <div className="flex flex-col items-center gap-0.5">
+                          {(driver.debtToCompanyUSD || 0) > 0 && (
+                            <span className="text-sm font-bold text-amber-600 tabular-nums">
+                              ${driver.debtToCompanyUSD!.toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                            </span>
+                          )}
+                          {(driver.debtToCompany || 0) > (driver.debtToCompanyUSD || 0) * 10 && (
+                            <span className="text-xs font-semibold text-amber-500 tabular-nums">
+                              {Math.round(driver.debtToCompany!).toLocaleString()} UZS
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-slate-300 text-sm">—</span>
                       )}

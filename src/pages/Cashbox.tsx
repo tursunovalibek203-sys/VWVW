@@ -186,7 +186,7 @@ export default function Cashbox() {
   const [exchForm,     setExchForm]     = useState({
     fromCurrency: 'USD', toCurrency: 'UZS', fromType: 'CASH', toType: 'CASH', amount: '', description: '',
   });
-  const [expForm,  setExpForm]  = useState({ amount: '', currency: 'UZS', category: 'SALARY', paymentMethod: 'CASH', description: '' });
+  const [expForm,  setExpForm]  = useState({ amountUZS: '', amountUSD: '', amountKarta: '', category: 'SALARY', description: '' });
   const [loanForm, setLoanForm] = useState({ employeeName: '', amount: '', currency: 'UZS', purpose: '', dueDate: '', notes: '' });
   const [advForm,  setAdvForm]  = useState({ employeeName: '', amount: '', currency: 'UZS', purpose: '', notes: '' });
 
@@ -353,16 +353,26 @@ export default function Cashbox() {
       'Ayirboshlash amalga oshirildi', ()=>{ setShowExchange(false); setExchForm({fromCurrency:'USD',toCurrency:'UZS',fromType:'CASH',toType:'CASH',amount:'',description:''}); }); };
 
   const handleExpense  = async () => {
-    if (!expForm.amount || +expForm.amount <= 0 || submitting) return;
+    const uzs   = parseFloat(expForm.amountUZS)   || 0;
+    const usd   = parseFloat(expForm.amountUSD)   || 0;
+    const karta = parseFloat(expForm.amountKarta) || 0;
+    if ((uzs <= 0 && usd <= 0 && karta <= 0) || submitting) return;
     setSubmitting(true);
     try {
-      const res = await api.post('/expenses', { amount:+expForm.amount, currency:expForm.currency, category:expForm.category, paymentMethod:expForm.paymentMethod, description:expForm.description });
+      const reqs: Promise<any>[] = [];
+      const desc = expForm.description;
+      const cat  = expForm.category;
+      if (uzs   > 0) reqs.push(api.post('/expenses', { amount: uzs,   currency: 'UZS', category: cat, paymentMethod: 'CASH', description: desc }));
+      if (usd   > 0) reqs.push(api.post('/expenses', { amount: usd,   currency: 'USD', category: cat, paymentMethod: 'CASH', description: desc }));
+      if (karta > 0) reqs.push(api.post('/expenses', { amount: karta, currency: 'UZS', category: cat, paymentMethod: 'CARD', description: desc }));
+      const results = await Promise.all(reqs);
       setShowExpense(false);
-      setExpForm({ amount:'', currency:'UZS', category:'SALARY', paymentMethod:'CASH', description:'' });
+      setExpForm({ amountUZS: '', amountUSD: '', amountKarta: '', category: 'SALARY', description: '' });
       loadAll(true);
       addToast({ type: 'success', title: t('Xarajat qoshildi') });
-      if (res.data?.budgetWarning) {
-        const info = res.data.budgetInfo;
+      const warn = results.find(r => r.data?.budgetWarning);
+      if (warn) {
+        const info = warn.data.budgetInfo;
         addToast({ type: 'warning', title: t('Budjet oshdi'), message: `${getCat(info?.category).label}: ${Math.round(info?.newTotal||0).toLocaleString()} / ${Math.round(info?.allocated||0).toLocaleString()} ${info?.currency}` });
       }
     } catch (err: any) {
@@ -1601,7 +1611,7 @@ export default function Cashbox() {
       <CModal open={showExpense} onClose={()=>setShowExpense(false)} title={t('Yangi xarajat')}
         footer={<>
           <button onClick={()=>setShowExpense(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold">{t('Bekor')}</button>
-          <button onClick={handleExpense} disabled={submitting} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold inline-flex items-center gap-2">
+          <button onClick={handleExpense} disabled={submitting || ((parseFloat(expForm.amountUZS)||0) <= 0 && (parseFloat(expForm.amountUSD)||0) <= 0 && (parseFloat(expForm.amountKarta)||0) <= 0)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-sm font-semibold inline-flex items-center gap-2">
             {submitting&&<Loader2 className="w-4 h-4 animate-spin"/>}{t('Saqlash')}
           </button>
         </>}>
@@ -1623,18 +1633,32 @@ export default function Cashbox() {
             }
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div><Lbl>{t('Summa')}</Lbl><input value={expForm.amount} onChange={e=>setExpForm({...expForm,amount:e.target.value})} type="number" min="0" placeholder="0.00" className={inp}/></div>
-          <div><Lbl>{t('Valyuta')}</Lbl>
-            <select value={expForm.currency} onChange={e=>setExpForm({...expForm,currency:e.target.value})} className={inp}>
-              <option value="UZS">UZS</option><option value="USD">USD</option>
-            </select>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <Lbl>{t('UZS (naqd)')}</Lbl>
+            <input value={expForm.amountUZS} onChange={e=>setExpForm({...expForm,amountUZS:e.target.value})}
+              type="number" min="0" placeholder="0" className={inp}/>
+          </div>
+          <div>
+            <Lbl>{t('Dollar ($)')}</Lbl>
+            <input value={expForm.amountUSD} onChange={e=>setExpForm({...expForm,amountUSD:e.target.value})}
+              type="number" min="0" step="0.01" placeholder="0.00" className={inp}/>
+          </div>
+          <div>
+            <Lbl>{t('Karta (UZS)')}</Lbl>
+            <input value={expForm.amountKarta} onChange={e=>setExpForm({...expForm,amountKarta:e.target.value})}
+              type="number" min="0" placeholder="0" className={inp}/>
           </div>
         </div>
-        <div><Lbl>{t('Tolov usuli')}</Lbl>
-          <MethodPicker value={expForm.paymentMethod}
-            onChange={v=>setExpForm(prev=>({...prev,paymentMethod:v,currency:v==='CARD'?'UZS':prev.currency}))}/>
-        </div>
+        {/* Jami ko'rsatish */}
+        {((parseFloat(expForm.amountUZS)||0) > 0 || (parseFloat(expForm.amountUSD)||0) > 0 || (parseFloat(expForm.amountKarta)||0) > 0) && (
+          <div className="bg-red-50 rounded-xl p-3 text-sm text-red-700 font-semibold flex flex-wrap gap-3">
+            <span>{t('Jami')}:</span>
+            {(parseFloat(expForm.amountUZS)||0) > 0 && <span>{Math.round(parseFloat(expForm.amountUZS)).toLocaleString()} UZS</span>}
+            {(parseFloat(expForm.amountUSD)||0) > 0 && <span>${parseFloat(expForm.amountUSD).toLocaleString()}</span>}
+            {(parseFloat(expForm.amountKarta)||0) > 0 && <span>{Math.round(parseFloat(expForm.amountKarta)).toLocaleString()} UZS ({t('Karta')})</span>}
+          </div>
+        )}
         <div><Lbl>{t('Tavsif')}</Lbl><input value={expForm.description} onChange={e=>setExpForm({...expForm,description:e.target.value})} placeholder={t('Ixtiyoriy...')} className={inp}/></div>
       </CModal>
 

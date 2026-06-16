@@ -398,17 +398,24 @@ export class SalesService {
           }
         }
         // 9. DRIVER DEBT — haydovchi mijozdan pul yig'sa, kompaniyaga qarzdor bo'ladi
-        // debtToCompany har doim UZS da saqlanadi — USD bo'lsa kursga ko'paytiramiz
+        // debtToCompany = UZS da jami qarz | debtToCompanyUSD = USD da qarz
         if (driverId && actualDriverCollected > 0) {
-          const debtInUZS = safeCurrency === 'USD'
-            ? actualDriverCollected * exchangeRate
-            : actualDriverCollected;
-          await tx.$executeRaw`
-            UPDATE "Driver"
-            SET "debtToCompany" = "debtToCompany" + ${debtInUZS},
-                "updatedAt" = NOW()
-            WHERE "id" = ${driverId}
-          `;
+          if (safeCurrency === 'USD') {
+            await tx.$executeRaw`
+              UPDATE "Driver"
+              SET "debtToCompanyUSD" = "debtToCompanyUSD" + ${actualDriverCollected},
+                  "debtToCompany"    = "debtToCompany" + ${actualDriverCollected * exchangeRate},
+                  "updatedAt" = NOW()
+              WHERE "id" = ${driverId}
+            `;
+          } else {
+            await tx.$executeRaw`
+              UPDATE "Driver"
+              SET "debtToCompany" = "debtToCompany" + ${actualDriverCollected},
+                  "updatedAt" = NOW()
+              WHERE "id" = ${driverId}
+            `;
+          }
         }
 
         // 10. DELIVERY FEE — yetkazib berish narxi

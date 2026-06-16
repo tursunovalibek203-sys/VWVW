@@ -374,7 +374,8 @@ model Driver {
   totalDeliveries Int      @default(0)
   currentLocation String?  // Joriy joylashuv
   notes           String?
-  debtToCompany   Float    @default(0) // Yig'ib, hali topshirmagan pul (kompaniyaga qarzi)
+  debtToCompany    Float    @default(0) // Yig'ib, hali topshirmagan pul UZS da
+  debtToCompanyUSD Float    @default(0) // Yig'ib, hali topshirmagan pul USD da
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

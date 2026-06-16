@@ -468,50 +468,68 @@ router.post('/check-or-create', async (req, res) => {
 router.post('/:id/payment', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { amountUSD = 0, amountUZS = 0, amountKarta = 0, exchangeRate = 12700, notes } = req.body;
-    const userId = req.user?.id;
-    const userName = req.user?.name || req.user?.login || 'Admin';
+    const { amountUSD = 0, amountUZS = 0, amountKarta = 0, exchangeRate = 12500, notes } = req.body;
+    const userId = req.user?.id || '';
+    const userName = req.user?.name || 'Admin';
 
     const usd   = parseFloat(amountUSD)   || 0;
     const uzs   = parseFloat(amountUZS)   || 0;
     const karta = parseFloat(amountKarta) || 0;
-    const rate  = parseFloat(exchangeRate) || 12700;
+    const rate  = parseFloat(exchangeRate) || parseInt(process.env.USD_TO_UZS_RATE || '12500', 10);
 
     if (usd <= 0 && uzs <= 0 && karta <= 0) {
       return res.status(400).json({ error: 'Kamida bitta summa kiritilishi kerak' });
     }
 
-    const driver = await prisma.driver.findUnique({ where: { id } });
+    const driver = await (prisma.driver as any).findUnique({ where: { id } });
     if (!driver) return res.status(404).json({ error: 'Haydovchi topilmadi' });
-
-    // Jami UZS ekvivalenti (qarz kamaytirish uchun)
-    const totalInUZS = (usd * rate) + uzs + karta;
-    const newDebt = Math.max(0, (driver.debtToCompany || 0) - totalInUZS);
-    await (prisma.driver as any).update({ where: { id }, data: { debtToCompany: newDebt } });
 
     const desc = `Haydovchi to'lovi: ${driver.name}${notes ? ' (' + notes + ')' : ''}`;
 
-    // Kassaga kirim — har valyuta alohida
-    if (usd > 0) {
-      await prisma.cashboxTransaction.create({ data: {
-        type: 'INCOME', amount: usd, currency: 'USD', category: 'INCOME',
-        paymentMethod: 'CASH', description: desc, userId: userId || '', userName, reference: id,
-      }});
-    }
-    if (uzs > 0) {
-      await prisma.cashboxTransaction.create({ data: {
-        type: 'INCOME', amount: uzs, currency: 'UZS', category: 'INCOME',
-        paymentMethod: 'CASH', description: desc, userId: userId || '', userName, reference: id,
-      }});
-    }
-    if (karta > 0) {
-      await prisma.cashboxTransaction.create({ data: {
-        type: 'INCOME', amount: karta, currency: 'UZS', category: 'INCOME',
-        paymentMethod: 'CARD', description: desc, userId: userId || '', userName, reference: id,
-      }});
-    }
+    // Atomik: driver qarz kamaytirish + kassaga kirim — barchasi bitta transaksiyada
+    await prisma.$transaction(async (tx) => {
+      // USD qarzni kamaytirish
+      const newDebtUSD = Math.max(0, (driver.debtToCompanyUSD || 0) - usd);
+      // UZS qarzni kamaytirish (USD to'lovi ham UZS ekvivalentida)
+      const uzsEquivalent = (usd * rate) + uzs + karta;
+      const newDebtUZS = Math.max(0, (driver.debtToCompany || 0) - uzsEquivalent);
 
-    res.json({ success: true, driverName: driver.name, totalInUZS, remainingDebt: newDebt });
+      await tx.$executeRaw`
+        UPDATE "Driver"
+        SET "debtToCompanyUSD" = ${newDebtUSD},
+            "debtToCompany"    = ${newDebtUZS},
+            "updatedAt"        = NOW()
+        WHERE "id" = ${id}
+      `;
+
+      // Kassaga kirim — har valyuta alohida
+      if (usd > 0) {
+        await tx.cashboxTransaction.create({ data: {
+          type: 'INCOME', amount: usd, currency: 'USD', category: 'PAYMENT',
+          paymentMethod: 'CASH', description: desc, userId, userName, reference: id,
+        }});
+      }
+      if (uzs > 0) {
+        await tx.cashboxTransaction.create({ data: {
+          type: 'INCOME', amount: uzs, currency: 'UZS', category: 'PAYMENT',
+          paymentMethod: 'CASH', description: desc, userId, userName, reference: id,
+        }});
+      }
+      if (karta > 0) {
+        await tx.cashboxTransaction.create({ data: {
+          type: 'INCOME', amount: karta, currency: 'UZS', category: 'PAYMENT',
+          paymentMethod: 'CARD', description: desc, userId, userName, reference: id,
+        }});
+      }
+    });
+
+    res.json({
+      success: true,
+      driverName: driver.name,
+      paid: { usd, uzs, karta },
+      remainingDebtUZS: Math.max(0, (driver.debtToCompany || 0) - ((usd * rate) + uzs + karta)),
+      remainingDebtUSD: Math.max(0, (driver.debtToCompanyUSD || 0) - usd),
+    });
   } catch (error: any) {
     console.error('Driver payment error:', error);
     res.status(500).json({ error: 'Haydovchi to\'lovida xatolik: ' + error.message });
