@@ -7,7 +7,7 @@ import api from '../lib/api';
 
 const TELEGRAM_WEB_URL = '/telegram-web/';
 
-type AuthStep = 'idle' | 'phone' | 'code' | 'done';
+type AuthStep = 'idle' | 'phone' | 'code' | 'password' | 'done';
 
 interface TgStatus {
   linked: boolean;
@@ -26,6 +26,7 @@ export default function ModernChat() {
   const [step, setStep] = useState<AuthStep>('idle');
   const [phone, setPhone] = useState('+998');
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
   const [testChatId, setTestChatId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -58,8 +59,26 @@ export default function ModernChat() {
     setError(''); setBusy(true);
     try {
       const { data } = await api.post('/telegram-user/verify-code', { code });
+      if (data.needPassword) {
+        setStep('password');
+        setMsg('Hisobingiz 2 bosqichli himoya (parol) bilan yoqilgan');
+        return;
+      }
       setMsg(`✅ Ulandi: ${data.phone}`);
       setStep('done');
+      fetchStatus();
+    } catch (e: any) {
+      setError(e.response?.data?.error || e.message);
+    } finally { setBusy(false); }
+  };
+
+  const handleVerifyPassword = async () => {
+    setError(''); setBusy(true);
+    try {
+      const { data } = await api.post('/telegram-user/verify-password', { password });
+      setMsg(`✅ Ulandi: ${data.phone}`);
+      setStep('done');
+      setPassword('');
       fetchStatus();
     } catch (e: any) {
       setError(e.response?.data?.error || e.message);
@@ -210,6 +229,34 @@ export default function ModernChat() {
                   </button>
                   <button onClick={() => setStep('phone')} className="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded text-sm">
                     Orqaga
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {step === 'password' && (
+              <div className="space-y-2">
+                <p className="text-gray-400 text-xs">🔒 Telegram hisobingiz parol bilan himoyalangan (2FA):</p>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Key className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder="Telegram cloud parol"
+                      className="w-full pl-8 pr-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-green-500"
+                      disabled={busy}
+                      autoFocus
+                    />
+                  </div>
+                  <button
+                    onClick={handleVerifyPassword}
+                    disabled={busy || password.length < 1}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-sm font-medium flex items-center gap-1.5"
+                  >
+                    {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                    Tasdiqlash
                   </button>
                 </div>
               </div>

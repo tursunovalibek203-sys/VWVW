@@ -1,12 +1,13 @@
-import { TelegramClient } from 'telegram';
+import { TelegramClient, Api } from 'telegram';
 import { StringSession } from 'telegram/sessions';
+import { computeCheck } from 'telegram/Password';
 import { prisma } from '../utils/prisma';
 
 const API_ID = parseInt(process.env.TELEGRAM_API_ID || '0');
 const API_HASH = process.env.TELEGRAM_API_HASH || '';
 
-// In-memory map for pending auth state (phoneCodeHash)
-const pendingAuth = new Map<string, { phoneCodeHash: string; phone: string }>();
+// In-memory map for pending auth state (phoneCodeHash + session — must reuse same DC connection)
+const pendingAuth = new Map<string, { phoneCodeHash: string; phone: string; session: string }>();
 
 function makeClient(session: string = '') {
   if (!API_ID || !API_HASH) throw new Error('TELEGRAM_API_ID yoki TELEGRAM_API_HASH sozlanmagan');
@@ -26,35 +27,74 @@ export class TelegramUserService {
     const client = makeClient();
     await client.connect();
     const result = await client.sendCode({ apiId: API_ID, apiHash: API_HASH }, phone);
-    pendingAuth.set(userId, { phoneCodeHash: result.phoneCodeHash, phone });
+    // Save the session used for sendCode — Telegram may migrate to a different DC,
+    // and phoneCodeHash is only valid against that same DC connection.
+    const session = (client.session as StringSession).save();
+    pendingAuth.set(userId, { phoneCodeHash: result.phoneCodeHash, phone, session });
     await client.disconnect();
     return { sent: true };
   }
 
-  // Step 2: verify code and save session
-  static async verifyCode(userId: string, code: string) {
+  // Step 2: verify code and save session (or signal that 2FA password is needed)
+  static async verifyCode(userId: string, code: string): Promise<{ linked: true; phone: string } | { needPassword: true }> {
     const pending = pendingAuth.get(userId);
     if (!pending) throw new Error('Avval kod yuborish kerak');
-    const { phoneCodeHash, phone } = pending;
+    const { phoneCodeHash, phone, session } = pending;
 
-    const client = makeClient();
+    const client = makeClient(session);
     await client.connect();
-    await client.invoke(
-      new (require('telegram/tl').Api.auth.SignIn)({
-        phoneNumber: phone,
-        phoneCodeHash,
-        phoneCode: code,
-      })
-    );
+    try {
+      await client.invoke(
+        new Api.auth.SignIn({ phoneNumber: phone, phoneCodeHash, phoneCode: code })
+      );
+    } catch (e: any) {
+      // 2FA cloud password enabled — keep session, ask for password next
+      if (e?.errorMessage === 'SESSION_PASSWORD_NEEDED' || /SESSION_PASSWORD_NEEDED/.test(e?.message || '')) {
+        const updatedSession = (client.session as StringSession).save();
+        pendingAuth.set(userId, { phoneCodeHash, phone, session: updatedSession });
+        await client.disconnect();
+        return { needPassword: true };
+      }
+      await client.disconnect();
+      throw e;
+    }
+
+    const newSession = (client.session as StringSession).save();
+    await client.disconnect();
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { telegramSession: newSession, telegramPhone: phone, telegramLinkedAt: new Date() },
+    });
+    pendingAuth.delete(userId);
+    return { linked: true, phone };
+  }
+
+  // Step 3 (only if account has 2FA cloud password enabled)
+  static async verifyPassword(userId: string, password: string) {
+    const pending = pendingAuth.get(userId);
+    if (!pending) throw new Error('Sessiya topilmadi, qaytadan urinib ko\'ring');
+
+    const client = makeClient(pending.session);
+    await client.connect();
+    try {
+      const passwordInfo = await client.invoke(new Api.account.GetPassword());
+      const srpCheck = await computeCheck(passwordInfo, password);
+      await client.invoke(new Api.auth.CheckPassword({ password: srpCheck }));
+    } catch (e) {
+      await client.disconnect();
+      throw e;
+    }
+
     const session = (client.session as StringSession).save();
     await client.disconnect();
 
     await prisma.user.update({
       where: { id: userId },
-      data: { telegramSession: session, telegramPhone: phone, telegramLinkedAt: new Date() },
+      data: { telegramSession: session, telegramPhone: pending.phone, telegramLinkedAt: new Date() },
     });
     pendingAuth.delete(userId);
-    return { linked: true, phone };
+    return { linked: true, phone: pending.phone };
   }
 
   // Unlink telegram
@@ -65,7 +105,7 @@ export class TelegramUserService {
       try {
         const client = makeClient(user.telegramSession);
         await client.connect();
-        await client.invoke(new (require('telegram/tl').Api.auth.LogOut)({}));
+        await client.invoke(new Api.auth.LogOut());
         await client.disconnect();
       } catch { /* ignore — clean up DB regardless */ }
     }

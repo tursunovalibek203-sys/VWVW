@@ -42,9 +42,21 @@ router.post('/verify-code', async (req: AuthRequest, res) => {
     const { code } = req.body;
     if (!code) return res.status(400).json({ error: 'Kod kerak' });
     const result = await TelegramUserService.verifyCode(req.user!.id, code);
-    res.json(result);
+    res.json(result); // { linked: true, phone } yoki { needPassword: true }
   } catch (e: any) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/telegram-user/verify-password — only needed if account has 2FA cloud password
+router.post('/verify-password', async (req: AuthRequest, res) => {
+  try {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ error: 'Parol kerak' });
+    const result = await TelegramUserService.verifyPassword(req.user!.id, password);
+    res.json(result);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message?.includes('PASSWORD_HASH_INVALID') ? 'Parol noto\'g\'ri' : e.message });
   }
 });
 
