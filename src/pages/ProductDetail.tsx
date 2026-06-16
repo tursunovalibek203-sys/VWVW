@@ -5,7 +5,7 @@ import Input from '../components/Input';
 import Modal from '../components/Modal';
 import api from '../lib/professionalApi';
 import { extractData, extractArray } from '../lib/apiHelpers';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import { Badge } from '../components/ui/Badge';
 import { PageLoading } from '../components/ui/LoadingSpinner';
 import { useToast, toast } from '../components/ui/Toast';
@@ -417,7 +417,7 @@ export default function ProductDetail() {
               </div>
               <div className="min-w-0">
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight break-words">
-                  {product.name}
+                  {trData(product.name)}
                 </h1>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 rounded-lg text-xs font-semibold text-white backdrop-blur-sm">
@@ -426,12 +426,12 @@ export default function ProductDetail() {
                   </span>
                   {product.productType?.name && (
                     <span className="px-2.5 py-1 bg-white/10 rounded-lg text-xs font-medium text-white/90 backdrop-blur-sm">
-                      {product.productType.name}
+                      {trData(product.productType.name)}
                     </span>
                   )}
                   {product.category?.name && (
                     <span className="px-2.5 py-1 bg-white/10 rounded-lg text-xs font-medium text-white/90 backdrop-blur-sm">
-                      {product.category.name}
+                      {trData(product.category.name)}
                     </span>
                   )}
                   {product.bagType && (
@@ -626,7 +626,7 @@ export default function ProductDetail() {
                     const item = sale.items?.find((i: any) => i.productId === id);
                     const dateRaw = sale.createdAt || sale.date || sale.saleDate;
                     const dateStr = dateRaw ? new Date(dateRaw).toLocaleDateString() : '—';
-                    const customerName = sale.manualCustomerName || sale.customer?.name || sale.customerName || latinToCyrillic('Noma\'lum');
+                    const customerName = trData(sale.manualCustomerName || sale.customer?.name || sale.customerName || latinToCyrillic('Noma\'lum'));
                     return (
                       <tr key={sale.id} className="hover:bg-blue-50/40 transition-colors">
                         <td className="px-5 py-4">
@@ -664,7 +664,7 @@ export default function ProductDetail() {
                 const item = sale.items?.find((i: any) => i.productId === id);
                 const dateRaw = sale.createdAt || sale.date || sale.saleDate;
                 const dateStr = dateRaw ? new Date(dateRaw).toLocaleDateString() : '—';
-                const customerName = sale.manualCustomerName || sale.customer?.name || sale.customerName || latinToCyrillic('Noma\'lum');
+                const customerName = trData(sale.manualCustomerName || sale.customer?.name || sale.customerName || latinToCyrillic('Noma\'lum'));
                 return (
                   <div key={sale.id} className="p-4">
                     <div className="flex items-center justify-between gap-3">
@@ -927,7 +927,7 @@ export default function ProductDetail() {
               type="button"
               variant="outline"
               onClick={() => {
-                if (confirm(latinToCyrillic(`Rostdan ham "${product.name}" mahsulotni o'chirmoqchimisiz? Bu amal bekor qilinmaydi!`))) {
+                if (confirm(latinToCyrillic(`Rostdan ham "${trData(product.name)}" mahsulotni o'chirmoqchimisiz? Bu amal bekor qilinmaydi!`))) {
                   deleteProduct();
                 }
               }}
@@ -959,7 +959,7 @@ export default function ProductDetail() {
             setKomplektItems([]);
             setKomplektSearch('');
           }}
-          title={`${product.name} - ${latinToCyrillic('Komplekt qo\'shish')}`}
+          title={`${trData(product.name)} - ${latinToCyrillic('Komplekt qo\'shish')}`}
         >
           <div className="space-y-4">
             {/* Qidiruv */}
@@ -981,7 +981,7 @@ export default function ProductDetail() {
                 <div className="space-y-2">
                   {komplektItems.map((item, index) => (
                     <div key={item.productId} className="flex items-center justify-between bg-white p-3 rounded-lg">
-                      <span className="font-medium">{item.productName}</span>
+                      <span className="font-medium">{trData(item.productName)}</span>
                       <div className="flex items-center gap-2">
                         <input
                           type="number"
@@ -1022,7 +1022,7 @@ export default function ProductDetail() {
                     onClick={() => {
                       setKomplektItems(prev => [...prev, {
                         productId: p.id,
-                        productName: p.name,
+                        productName: trData(p.name),
                         quantity: 1
                       }]);
                       setKomplektSearch('');
@@ -1030,7 +1030,7 @@ export default function ProductDetail() {
                     className="w-full flex items-center justify-between p-3 border rounded-lg hover:bg-orange-50 hover:border-orange-300 transition-colors text-left"
                   >
                     <div>
-                      <span className="font-medium">{p.name}</span>
+                      <span className="font-medium">{trData(p.name)}</span>
                       <p className="text-sm text-gray-500">{p.currentStock} {latinToCyrillic('qop qoldiq')}</p>
                     </div>
                     <Plus className="w-5 h-5 text-orange-500" />
@@ -1189,7 +1189,7 @@ export default function ProductDetail() {
       const confirmMsg = `${latinToCyrillic('Chegirma shablonlarini boshqa mahsulotlarga qo\'llash')}:\n\n${
         Object.entries(customerDiscounts).map(([customerId, discount]) => {
           const customer = localCustomers.find(c => c.id === customerId);
-          return `- ${customer?.name}: ${discount > 0 ? '-' : '+'}${Math.abs(discount)} UZS`;
+          return `- ${trData(customer?.name)}: ${discount > 0 ? '-' : '+'}${Math.abs(discount)} UZS`;
         }).join('\n')
       }\n\n${latinToCyrillic('Davom ettirilsinmi?')}`;
 
@@ -1326,7 +1326,7 @@ export default function ProductDetail() {
       <div className="space-y-4">
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-xl border border-blue-100">
           <p className="text-sm font-medium mb-1 text-gray-900">
-            <strong>{product?.name}</strong> {latinToCyrillic('mahsuloti uchun har bir mijozga alohida narx belgilang')}
+            <strong>{trData(product?.name)}</strong> {latinToCyrillic('mahsuloti uchun har bir mijozga alohida narx belgilang')}
           </p>
           <p className="text-xs text-gray-500">
             {latinToCyrillic('Asosiy narx')}: <strong>{product?.pricePerBag?.toLocaleString()} UZS</strong>/{latinToCyrillic('qop')}
@@ -1429,7 +1429,7 @@ export default function ProductDetail() {
                   {index + 1}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-lg truncate">{customer.name}</h4>
+                  <h4 className="font-semibold text-lg truncate">{trData(customer.name)}</h4>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className="text-xs text-gray-500 inline-flex items-center gap-1">
                       <User className="w-3 h-3" />

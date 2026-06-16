@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from './Card';
 import api from '../lib/api';
 import { formatCurrency } from '../lib/utils';
 import ModernLayout from './ModernLayout';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import { safeParseFloat, safePercentage } from '../lib/safe-math';
 import {
   DollarSign, Users,
@@ -108,7 +108,7 @@ function UnitEconomicsCard({ data }: { data: any[] }) {
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="font-semibold">{product.name}</p>
+                    <p className="font-semibold">{trData(product.name)}</p>
                     <p className="text-sm text-muted-foreground">
                       Sotuv: {formatCurrency(product.price, 'USD')} | 
                       Tannarx: {formatCurrency(product.cost, 'USD')}
@@ -420,7 +420,7 @@ function DemandForecastCard({ data }: { data: any }) {
           {recommendations?.map((rec: any, idx: number) => (
             <div key={idx} className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg">
               <div>
-                <p className="font-medium">{rec.productName}</p>
+                <p className="font-medium">{trData(rec.productName)}</p>
                 <p className="text-sm text-muted-foreground">
                   Ertaga: {rec.predictedSales} dona sotiladi
                 </p>
@@ -456,7 +456,7 @@ function DynamicPricingCard({ data }: { data: any[] }) {
           {data?.map((item: any) => (
             <div key={item.id} className="p-4 border rounded-lg">
               <div className="flex justify-between items-center mb-2">
-                <p className="font-semibold">{item.productName}</p>
+                <p className="font-semibold">{trData(item.productName)}</p>
                 <span className={`px-2 py-1 rounded text-xs ${
                   item.demand === 'high' ? 'bg-red-100 text-red-700' :
                   item.demand === 'low' ? 'bg-green-100 text-green-700' :
@@ -522,7 +522,7 @@ function FraudDetectionCard({ data }: { data: any[] }) {
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{fraud.description}</p>
                   <div className="mt-2 text-xs text-muted-foreground">
-                    <p>Kassir: {fraud.cashierName}</p>
+                    <p>Kassir: {trData(fraud.cashierName)}</p>
                     <p>Vaqt: {fraud.timestamp}</p>
                     <p>Summa: {formatCurrency(fraud.amount, 'USD')}</p>
                   </div>
@@ -624,8 +624,8 @@ function AutomationCard({ data }: { data: any }) {
                   automation.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
                 }`} />
                 <div>
-                  <p className="font-medium">{automation.name}</p>
-                  <p className="text-xs text-muted-foreground">{automation.description}</p>
+                  <p className="font-medium">{trData(automation.name)}</p>
+                  <p className="text-xs text-muted-foreground">{trData(automation.description)}</p>
                 </div>
               </div>
               <div className="text-right text-sm">

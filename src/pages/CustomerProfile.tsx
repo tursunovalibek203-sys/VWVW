@@ -31,7 +31,7 @@ import { useToast, toast } from '../components/ui/Toast';
 import api from '../lib/professionalApi';
 import { formatCurrency, formatDate } from '../lib/utils';
 import { exportToExcel } from '../lib/excelUtils';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 
 export default function CustomerProfile() {
   const { id } = useParams();
@@ -172,17 +172,17 @@ export default function CustomerProfile() {
     };
     const historyData = sales.map(sale => ({
       'Sana': formatDate(sale.createdAt),
-      'Mahsulotlar': sale.items?.map((i: any) => `${i.product?.name || i.productName || 'N/A'} (${i.quantity})`).join(', ') || sale.product?.name || 'N/A',
+      'Mahsulotlar': trData(sale.items?.map((i: any) => `${i.product?.name || i.productName || 'N/A'} (${i.quantity})`).join(', ') || sale.product?.name || 'N/A'),
       'Jami': sale.totalAmount,
       "To'langan": sale.paidAmount,
       'Qarz': sale.debtAmount,
       'Valyuta': sale.currency,
       "To'lov turi": paymentLabel(sale.paymentMethod || sale.paymentType || 'CASH'),
-      'Haydovchi': sale.driver?.name || sale.driverName || '—',
+      'Haydovchi': trData(sale.driver?.name || sale.driverName || '—'),
       'Yetkazib berish narxi': sale.deliveryFee || 0,
       'Holat': sale.paymentStatus,
     }));
-    exportToExcel(historyData, { fileName: `Mijoz_${customer.name}_Tarixi` });
+    exportToExcel(historyData, { fileName: `Mijoz_${trData(customer.name)}_Tarixi` });
   };
 
   // Faqat naqd (cash) savdolarni eksport qilish
@@ -201,18 +201,18 @@ export default function CustomerProfile() {
 
     const cashSalesData = cashSales.map(sale => ({
       [latinToCyrillic('Sana')]:                  formatDate(sale.createdAt),
-      [latinToCyrillic('Mahsulotlar')]:            sale.items?.map((i: any) => `${i.product?.name || i.productName || 'N/A'} (${i.quantity})`).join(', ') || sale.product?.name || 'N/A',
+      [latinToCyrillic('Mahsulotlar')]:            trData(sale.items?.map((i: any) => `${i.product?.name || i.productName || 'N/A'} (${i.quantity})`).join(', ') || sale.product?.name || 'N/A'),
       [latinToCyrillic('Jami summa')]:             sale.totalAmount,
       [latinToCyrillic("To'langan")]:              sale.paidAmount,
       [latinToCyrillic('Qarz')]:                   sale.debtAmount,
       [latinToCyrillic('Valyuta')]:                sale.currency,
       [latinToCyrillic("To'lov turi")]:            latinToCyrillic('Naqd pul'),
-      [latinToCyrillic('Haydovchi')]:              sale.driver?.name || sale.driverName || '—',
+      [latinToCyrillic('Haydovchi')]:              trData(sale.driver?.name || sale.driverName || '—'),
       [latinToCyrillic('Yetkazib berish narxi')]:  sale.deliveryFee || 0,
     }));
 
     exportToExcel(cashSalesData, {
-      fileName: `Mijoz_${customer.name}_Naqd_Savdolari`
+      fileName: `Mijoz_${trData(customer.name)}_Naqd_Savdolari`
     });
   };
 
@@ -323,11 +323,11 @@ export default function CustomerProfile() {
           <div className="mt-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
             <div className="flex items-center gap-4 min-w-0">
               <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-white text-xl sm:text-2xl font-extrabold flex-shrink-0 shadow-inner">
-                {getInitials(customer.name)}
+                {getInitials(trData(customer.name))}
               </div>
               <div className="min-w-0">
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight truncate">
-                  {customer.name}
+                  {trData(customer.name)}
                 </h1>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {customer.category && (
@@ -385,7 +385,7 @@ export default function CustomerProfile() {
           </div>
           <div className="min-w-0">
             <p className="text-xs font-medium text-gray-500">{latinToCyrillic('Manzil')}</p>
-            <p className="mt-0.5 text-sm font-bold text-gray-900 truncate">{customer.address || '—'}</p>
+            <p className="mt-0.5 text-sm font-bold text-gray-900 truncate">{trData(customer.address) || '—'}</p>
           </div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 flex items-center gap-3 transition-all duration-200 hover:shadow-md">
@@ -486,14 +486,14 @@ export default function CustomerProfile() {
                           {sale.items?.map((i: any, idx: number) => (
                             <div key={idx} className="flex items-center gap-2">
                               <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
-                              <span className="font-medium text-gray-900">{i.product?.name || i.productName || 'N/A'}</span>
+                              <span className="font-medium text-gray-900">{trData(i.product?.name || i.productName || 'N/A')}</span>
                               <span className="text-gray-300">×</span>
                               <span className="bg-gray-100 px-2 py-0.5 rounded-md text-xs font-semibold text-gray-700">{i.quantity}</span>
                             </div>
                           )) || (sale.product?.name ? (
                             <div className="flex items-center gap-2">
                               <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
-                              <span className="font-medium text-gray-900">{sale.product.name}</span>
+                              <span className="font-medium text-gray-900">{trData(sale.product.name)}</span>
                               <span className="text-gray-300">×</span>
                               <span className="bg-gray-100 px-2 py-0.5 rounded-md text-xs font-semibold text-gray-700">{sale.quantity}</span>
                             </div>
@@ -590,7 +590,7 @@ export default function CustomerProfile() {
         onConfirm={handleDeleteCustomer}
         variant="danger"
         title={latinToCyrillic('Mijozni o\'chirish')}
-        message={latinToCyrillic(`"${customer.name}" mijozini rostdan ham o'chirmoqchimisiz? Barcha sotuvlar, to'lovlar va qarzlar ham o'chiriladi. Bu amalni qaytarib bo'lmaydi.`)}
+        message={latinToCyrillic(`"${trData(customer.name)}" mijozini rostdan ham o'chirmoqchimisiz? Barcha sotuvlar, to'lovlar va qarzlar ham o'chiriladi. Bu amalni qaytarib bo'lmaydi.`)}
         confirmText={isDeleting ? latinToCyrillic('O\'chirilmoqda...') : latinToCyrillic('O\'chirish')}
         cancelText={latinToCyrillic('Bekor qilish')}
       />
@@ -617,10 +617,10 @@ export default function CustomerProfile() {
             <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-                  {getInitials(customer.name)}
+                  {getInitials(trData(customer.name))}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-bold text-gray-900 truncate">{customer.name}</h3>
+                  <h3 className="font-bold text-gray-900 truncate">{trData(customer.name)}</h3>
                   <p className="text-sm text-gray-600">
                     {latinToCyrillic('Qarz')}: <span className="font-semibold text-rose-600">${debtUSD.toFixed(2)}</span>
                     <span className="text-gray-300 mx-2">|</span>

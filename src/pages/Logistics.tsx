@@ -7,7 +7,7 @@ import { useToast, toast as toastFactory } from '../components/ui/Toast';
 import { TableSkeleton } from '../components/ui/LoadingSpinner';
 import api from '../lib/professionalApi';
 import { formatDate } from '../lib/utils';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import {
   Truck,
   User,
@@ -341,7 +341,7 @@ export default function Logistics() {
                                     {(delivery.sale?.customer?.name || '?').charAt(0).toUpperCase()}
                                   </div>
                                   <span className="text-sm font-medium text-slate-900">
-                                    {delivery.sale?.customer?.name || L("Noma'lum")}
+                                    {delivery.sale?.customer?.name ? trData(delivery.sale.customer.name) : L("Noma'lum")}
                                   </span>
                                 </div>
                               </td>
@@ -356,7 +356,7 @@ export default function Logistics() {
                                   <div className="space-y-1">
                                     <span className="inline-flex items-center gap-1.5 text-sm text-slate-900">
                                       <User className="w-4 h-4 text-slate-400" />
-                                      {delivery.driver.name}
+                                      {trData(delivery.driver.name)}
                                     </span>
                                     {delivery.vehicle && (
                                       <span className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -409,7 +409,7 @@ export default function Logistics() {
                             </div>
                             <div className="min-w-0">
                               <p className="text-sm font-semibold text-slate-900 truncate">
-                                {delivery.sale?.customer?.name || L("Noma'lum")}
+                                {delivery.sale?.customer?.name ? trData(delivery.sale.customer.name) : L("Noma'lum")}
                               </p>
                               <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 tabular-nums">
                                 <Clock className="w-3 h-3" />
@@ -428,7 +428,7 @@ export default function Logistics() {
                           {delivery.driver && (
                             <p className="text-xs text-slate-500 flex items-center gap-1.5">
                               <User className="w-3.5 h-3.5" />
-                              {delivery.driver.name}
+                              {trData(delivery.driver.name)}
                               {delivery.vehicle && (
                                 <>
                                   <Truck className="w-3.5 h-3.5 ml-1.5" />
@@ -542,7 +542,7 @@ export default function Logistics() {
                             {(driver.name || '?').charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-900 truncate">{driver.name}</p>
+                            <p className="text-sm font-bold text-slate-900 truncate">{trData(driver.name)}</p>
                             <p className="text-xs text-slate-500 flex items-center gap-1 truncate">
                               <Phone className="w-3 h-3 flex-shrink-0" />
                               {driver.phone}

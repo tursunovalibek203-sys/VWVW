@@ -1,6 +1,7 @@
 import { Trash2 } from 'lucide-react';
 import type { SaleItemForm, Product } from '../../types';
 import { getCurrencySymbol, getDisplayAmount } from '../../lib/saleUtils';
+import { trData } from '../../lib/transliterator';
 
 const getProductTypeKey = (product: Product): string | null => {
   const name = product.name?.toLowerCase() || '';
@@ -210,7 +211,7 @@ export const CartItem = ({
           >
             {filteredProducts.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {trData(p.name)}
               </option>
             ))}
           </select>

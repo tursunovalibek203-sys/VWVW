@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Package, AlertTriangle, CheckCircle, ArrowUpDown } from 'lucide-react';
+import { trData } from '../../lib/transliterator';
 
 interface WarehouseItem3DProps {
   product: {
@@ -81,7 +82,7 @@ function WarehouseItem3D({ product, position, onClick }: WarehouseItem3DProps) {
       {/* Label */}
       <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-xs whitespace-nowrap">
         <div className="bg-black/80 text-white px-2 py-1 rounded text-center">
-          <div className="font-semibold truncate max-w-20">{product.name}</div>
+          <div className="font-semibold truncate max-w-20">{trData(product.name)}</div>
           <div className="text-xs opacity-80">{product.currentStock}/{product.maxCapacity}</div>
         </div>
       </div>
@@ -100,9 +101,9 @@ function WarehouseItem3D({ product, position, onClick }: WarehouseItem3DProps) {
       {/* Hover Effect */}
       {isHovered && (
         <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/90 text-white px-3 py-2 rounded-lg text-xs whitespace-nowrap z-50">
-          <div className="font-semibold">{product.name}</div>
+          <div className="font-semibold">{trData(product.name)}</div>
           <div>Zaxira: {stockPercentage.toFixed(1)}%</div>
-          <div>Kategoriya: {product.category}</div>
+          <div>Kategoriya: {trData(product.category)}</div>
         </div>
       )}
     </div>

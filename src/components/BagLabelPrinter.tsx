@@ -7,6 +7,7 @@ import {
   printAndSaveBagLabels,
   printBagLabels80mm
 } from '../lib/bagLabelPrinter';
+import { trData } from '../lib/transliterator';
 
 interface Product {
   id: string;
@@ -134,7 +135,7 @@ export default function BagLabelPrinter({
                 Mahsulot ma'lumotlari
               </h3>
               <div className="space-y-1 text-sm">
-                <p><span className="text-gray-600">Nomi:</span> {getProductName()}</p>
+                <p><span className="text-gray-600">Nomi:</span> {trData(getProductName())}</p>
                 <p><span className="text-gray-600">Turi:</span> {getProductType()}</p>
                 <p><span className="text-gray-600">Qopdagi dona:</span> {product.unitsPerBag} dona</p>
                 <p><span className="text-gray-600">Kod:</span> {productCode}-{typeCode}</p>
@@ -277,7 +278,7 @@ export default function BagLabelPrinter({
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <p className="font-bold">{label.productName}</p>
+                        <p className="font-bold">{trData(label.productName)}</p>
                         <p className="text-gray-600">{label.productType}</p>
                       </div>
                       <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">

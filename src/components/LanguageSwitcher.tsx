@@ -1,31 +1,46 @@
-import { useTranslation } from 'react-i18next';
-import { Globe } from 'lucide-react';
+import { useScript } from '../contexts/ScriptContext';
 
-export default function LanguageSwitcher() {
-  const { i18n } = useTranslation();
+interface LanguageSwitcherProps {
+  iconOnly?: boolean;
+}
 
-  const languages = [
-    { code: 'uz', label: 'ЎЗ', name: 'O\'zbekcha (Кирил)' },
-    { code: 'ru', label: 'РУ', name: 'Русский' }
-  ];
+const OPTIONS: { code: 'latin' | 'cyrillic'; label: string; name: string }[] = [
+  { code: 'latin', label: 'UZB', name: "O'zbekcha (lotin)" },
+  { code: 'cyrillic', label: 'KRIL', name: 'Ўзбекча (Крилча)' },
+];
 
-  const currentLang = languages.find(lang => lang.code === i18n.language) || languages[0];
+export default function LanguageSwitcher({ iconOnly = false }: LanguageSwitcherProps) {
+  const { script, setScript } = useScript();
 
-  const toggleLanguage = () => {
-    const nextLang = i18n.language === 'uz' ? 'ru' : 'uz';
-    i18n.changeLanguage(nextLang);
-  };
+  if (iconOnly) {
+    const current = OPTIONS.find((o) => o.code === script) || OPTIONS[1];
+    return (
+      <button
+        onClick={() => setScript(script === 'latin' ? 'cyrillic' : 'latin')}
+        title={current.name}
+        className="w-9 h-9 flex items-center justify-center rounded-xl text-[10px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+      >
+        {current.code === 'latin' ? 'UZB' : 'KR'}
+      </button>
+    );
+  }
 
   return (
-    <button
-      onClick={toggleLanguage}
-      className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
-      title={currentLang.name}
-    >
-      <Globe className="w-4 h-4 text-blue-600" />
-      <span className="text-sm font-medium">
-        {currentLang.label}
-      </span>
-    </button>
+    <div className="flex w-full p-0.5 rounded-lg bg-slate-100 border border-slate-200">
+      {OPTIONS.map((opt) => (
+        <button
+          key={opt.code}
+          onClick={() => setScript(opt.code)}
+          title={opt.name}
+          className={`flex-1 px-2 py-1.5 rounded-md text-xs font-bold tracking-wide transition-all ${
+            script === opt.code
+              ? 'bg-white text-indigo-600 shadow-sm'
+              : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import { Search } from 'lucide-react';
 import type { Customer } from '../types';
+import { trData } from '../lib/transliterator';
 
 interface CustomerSelectorProps {
   customers: Customer[];
@@ -85,7 +86,7 @@ export default function CustomerSelector({
               >
                 <div className="flex items-center justify-between w-full">
                   <div className="min-w-0">
-                    <p className={`font-black uppercase tracking-tight truncate text-xs ${selectedId === customer.id ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{customer.name}</p>
+                    <p className={`font-black uppercase tracking-tight truncate text-xs ${selectedId === customer.id ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{trData(customer.name)}</p>
                     <p className={`text-[10px] font-bold uppercase tracking-widest truncate ${selectedId === customer.id ? 'text-blue-100' : 'text-gray-400'}`}>{customer.phone || '—'}</p>
                   </div>
                   {customer.debtUSD && customer.debtUSD > 0 && (

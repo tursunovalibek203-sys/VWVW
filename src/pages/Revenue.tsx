@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/professionalApi';
 import { formatCurrency } from '../lib/utils';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import { useToast } from '../components/ui/Toast';
 import { CardSkeleton } from '../components/ui/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
@@ -290,7 +290,7 @@ export default function Revenue() {
                         <BarChart3 className="w-5 h-5 text-indigo-600" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-slate-900 truncate">{product.name}</p>
+                        <p className="font-medium text-slate-900 truncate">{trData(product.name)}</p>
                         <div className="flex items-center gap-2 mt-1.5">
                           <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
                             <div

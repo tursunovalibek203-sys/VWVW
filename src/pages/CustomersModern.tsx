@@ -60,7 +60,7 @@ const FIELDS = [
 ] as const;
 
 const OPERATORS = ['>', '<', '>=', '<='] as const;
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import { getExchangeRates } from '../lib/settings';
 import api from '../lib/professionalApi';
 import { extractArray, extractData } from '../lib/apiHelpers';
@@ -464,7 +464,7 @@ export default function CustomersModern() {
       const rows = customers.map((customer, index) => {
         return [
           (index + 1).toString(),
-          customer.name,
+          trData(customer.name),
           customer.phone || '-',
           customer.category,
           (customer.balance || 0).toLocaleString(),
@@ -473,7 +473,7 @@ export default function CustomersModern() {
           ((customer.debt || 0) / 12500).toFixed(2),
           (customer.monthlySales || 0).toFixed(2),
           (customer.totalSales || 0).toFixed(2),
-          customer.address || '-'
+          trData(customer.address) || '-'
         ];
       });
 
@@ -711,15 +711,15 @@ export default function CustomersModern() {
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarTint(getCustomerRule(customer))}`}>
-                          {getInitials(customer.name)}
+                          {getInitials(trData(customer.name))}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-900 truncate">{customer.name}</p>
+                          <p className="text-sm font-semibold text-slate-900 truncate">{trData(customer.name)}</p>
                           {ruleBadge(getCustomerRule(customer))}
                           {!getCustomerRule(customer) && customer.address && (
                             <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 truncate">
                               <MapPin className="w-3 h-3 flex-shrink-0" />
-                              <span className="truncate">{customer.address}</span>
+                              <span className="truncate">{trData(customer.address)}</span>
                             </p>
                           )}
                         </div>
@@ -811,10 +811,10 @@ export default function CustomersModern() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${avatarTint(getCustomerRule(customer))}`}>
-                    {getInitials(customer.name)}
+                    {getInitials(trData(customer.name))}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">{customer.name}</p>
+                    <p className="text-sm font-semibold text-slate-900 truncate">{trData(customer.name)}</p>
                     {customer.phone && (
                       <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 tabular-nums">
                         <Phone className="w-3 h-3" />
@@ -852,7 +852,7 @@ export default function CustomersModern() {
                 {customer.address ? (
                   <span className="text-xs text-slate-400 inline-flex items-center gap-1 min-w-0">
                     <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="truncate">{customer.address}</span>
+                    <span className="truncate">{trData(customer.address)}</span>
                   </span>
                 ) : <span />}
                 <div className="flex items-center gap-1 flex-shrink-0">
@@ -888,7 +888,7 @@ export default function CustomersModern() {
         title={latinToCyrillic("Mijozni o'chirish")}
         message={
           customerToDelete
-            ? latinToCyrillic(`"${customerToDelete.name}" mijozini rostdan ham o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi.`)
+            ? latinToCyrillic(`"${trData(customerToDelete.name)}" mijozini rostdan ham o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi.`)
             : ''
         }
         confirmText={latinToCyrillic("O'chirish")}

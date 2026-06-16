@@ -1,4 +1,5 @@
 // Professional Point of Sale (POS) System for Cashier
+import { trData } from './transliterator';
 
 // Payment Methods
 export enum PaymentMethod {
@@ -894,7 +895,7 @@ export class ProfessionalPOSManager {
     const receiptLines = [
       `${this.config.storeName}`,
       `${this.config.registerName}`,
-      `Cashier: ${transaction.cashierName}`,
+      `Cashier: ${trData(transaction.cashierName)}`,
       `Date: ${transaction.createdAt.toLocaleDateString()}`,
       `Time: ${transaction.createdAt.toLocaleTimeString()}`,
       '',
@@ -903,7 +904,7 @@ export class ProfessionalPOSManager {
     ];
 
     transaction.items.forEach(item => {
-      receiptLines.push(`${item.productName}`);
+      receiptLines.push(`${trData(item.productName)}`);
       receiptLines.push(`${item.quantity} x ${item.unitPrice.toLocaleString()} = ${item.totalPrice.toLocaleString()}`);
       if (item.discount > 0) {
         receiptLines.push(`Discount: ${item.discountType === 'percentage' ? `${item.discount}%` : item.discount.toLocaleString()}`);

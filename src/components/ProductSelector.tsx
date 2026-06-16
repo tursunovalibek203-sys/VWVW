@@ -1,6 +1,6 @@
 import { Search, ChevronDown, ChevronRight, Star } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 
 
 interface Product {
@@ -308,7 +308,7 @@ export default function ProductSelector({
                               <h4 className={`font-black text-sm uppercase tracking-tight truncate ${
                                 isSelected ? 'text-white' : 'text-gray-900 dark:text-white'
                               }`}>
-                                {product.name}
+                                {trData(product.name)}
                               </h4>
                               <div className="flex items-center gap-2">
                                 <p className={`text-xs font-bold uppercase tracking-widest truncate ${
@@ -422,7 +422,7 @@ export default function ProductSelector({
                                   >
                                     <div className="min-w-0">
                                       <h5 className={`font-black text-[10px] uppercase truncate ${selectedId === variant.id ? 'text-white' : 'text-gray-700 dark:text-gray-300'}`}>
-                                        {variant.variantName}
+                                        {trData(variant.variantName)}
                                       </h5>
                                       <div className="flex items-center gap-1">
                                         <p className={`text-[8px] font-bold uppercase tracking-widest truncate ${selectedId === variant.id ? 'text-white/70' : 'text-gray-400'}`}>

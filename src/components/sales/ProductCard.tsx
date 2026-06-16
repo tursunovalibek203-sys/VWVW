@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react';
 import type { Product } from '../../types';
 import { getCurrencySymbol, getDisplayAmount } from '../../lib/saleUtils';
+import { trData } from '../../lib/transliterator';
 
 interface ProductCardProps {
   product: Product;
@@ -51,7 +52,7 @@ export const ProductCard = ({
             isSelected ? 'text-white drop-shadow-sm' : 'text-gray-800'
           }`}
         >
-          {product.name}
+          {trData(product.name)}
         </span>
         <div className="flex items-center gap-2 mt-2">
           {product.bagType && (

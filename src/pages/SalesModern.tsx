@@ -20,7 +20,7 @@ import {
   Printer,
 } from 'lucide-react';
 import { printReceipt, prepareSaleReceipt } from '../lib/receiptPrinter';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import api from '../lib/professionalApi';
 import { extractPaginatedData } from '../lib/apiHelpers';
 import { TableSkeleton } from '../components/ui/LoadingSpinner';
@@ -91,13 +91,13 @@ export default function SalesModern() {
       const mappedSales: Sale[] = salesData.map((s: any) => ({
         id: s.id,
         date: s.createdAt || s.date || new Date().toISOString().split('T')[0],
-        customerName: s.manualCustomerName || s.customer?.name || s.customerName || 'Noma\'lum',
+        customerName: trData(s.manualCustomerName || s.customer?.name || s.customerName || 'Noma\'lum'),
         totalAmount: s.totalAmount || s.amount || 0,
         paidAmount: s.paidAmount || 0,
         paymentType: s.paymentMethod || s.paymentType || 'cash',
         status: s.paymentStatus?.toLowerCase() || 'completed',
         items: s.itemCount || s.items?.length || 0,
-        cashier: s.user?.name || s.cashier?.name || s.cashierName || 'Admin',
+        cashier: trData(s.user?.name || s.cashier?.name || s.cashierName || 'Admin'),
         currency: (s.currency === 'USD' ? 'USD' : 'UZS') as 'UZS' | 'USD',
       }));
 

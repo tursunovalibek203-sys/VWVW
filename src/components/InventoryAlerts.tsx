@@ -4,6 +4,7 @@ import { Card, CardContent } from './Card';
 import Button from './Button';
 import api from '../lib/api';
 import { useNavigate } from 'react-router-dom';
+import { trData } from '../lib/transliterator';
 
 interface LowStockProduct {
   id: number;
@@ -69,7 +70,7 @@ export default function InventoryAlerts() {
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <Package className="w-4 h-4 text-yellow-600 flex-shrink-0" />
                   <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{product.name}</p>
+                    <p className="font-medium text-sm truncate">{trData(product.name)}</p>
                     <p className="text-xs text-muted-foreground">{product.bagType}</p>
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Search, Package, Plus, X, CheckCircle2, ChevronRight } from 'lucide-react';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import { validateQuantity } from '../lib/safe-math';
 
 interface Product {
@@ -235,7 +235,7 @@ export default function SimplifiedProductSelector({
                       <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shadow-md">
                         <Package className="w-4 h-4 text-white" />
                       </div>
-                      <span className="font-black text-gray-900 text-base">{displayName}</span>
+                      <span className="font-black text-gray-900 text-base">{trData(displayName)}</span>
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold">{groupProducts.length}</span>
                     </div>
                     <span className="text-sm text-gray-600 font-medium">
@@ -258,7 +258,7 @@ export default function SimplifiedProductSelector({
                       >
                         <div className="flex justify-between items-center">
                           <div className="flex-1">
-                            <h5 className="font-bold text-gray-900 text-sm">{product.name}</h5>
+                            <h5 className="font-bold text-gray-900 text-sm">{trData(product.name)}</h5>
                             <div className="flex items-center gap-2 text-xs mt-1">
                               <span className="text-gray-500">
                                 {latinToCyrillic("Zaxira")}: <span className="font-bold text-gray-700">{product.currentStock} qop</span>
@@ -292,7 +292,7 @@ export default function SimplifiedProductSelector({
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 mb-6 border-2 border-blue-200">
             <div className="flex justify-between items-center">
               <div>
-                <h4 className="font-black text-gray-900 text-lg">{selectedProduct.name}</h4>
+                <h4 className="font-black text-gray-900 text-lg">{trData(selectedProduct.name)}</h4>
                 <p className="text-sm text-blue-600 font-bold">
                   {currency === 'UZS' ? 'UZS' : '$'}{getDisplayPrice(selectedProduct.pricePerBag)} / {latinToCyrillic("qop")}
                 </p>

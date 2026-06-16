@@ -3,6 +3,7 @@ import { useThemeStore } from './store/themeStore';
 import { useEffect, Suspense, lazy } from 'react';
 import './i18n';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { ScriptProvider } from './contexts/ScriptContext';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import { ToastProvider } from './components/ui/Toast';
 import { AuthGuard } from './components/guards/AuthGuard';
@@ -96,7 +97,9 @@ function App() {
                 </div>
               </div>
             }>
-              <AppRoutes />
+              <ScriptProvider>
+                <AppRoutes />
+              </ScriptProvider>
             </Suspense>
           </ErrorBoundary>
         </BrowserRouter>

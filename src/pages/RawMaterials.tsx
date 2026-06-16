@@ -17,7 +17,7 @@ import {
   PackageX,
   Boxes,
 } from 'lucide-react';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import { exportToExcel } from '../lib/excelUtils';
 import { useToast, toast } from '../components/ui/Toast';
 import { Badge } from '../components/ui/Badge';
@@ -359,7 +359,7 @@ export default function RawMaterials() {
               {lowStockMaterials.length} {latinToCyrillic('ta xom ashyo kam qoldi')}
             </p>
             <p className="mt-0.5 text-xs text-amber-700 truncate">
-              {lowStockMaterials.slice(0, 4).map((m) => m.name).join(', ')}
+              {lowStockMaterials.slice(0, 4).map((m) => trData(m.name)).join(', ')}
               {lowStockMaterials.length > 4 && ` +${lowStockMaterials.length - 4}`}
             </p>
           </div>
@@ -470,7 +470,7 @@ export default function RawMaterials() {
                           </div>
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">
-                              {material.name}
+                              {trData(material.name)}
                             </p>
                             <p className="text-xs text-gray-400">
                               {latinToCyrillic('Min')}: {material.minStockLimit} {material.unit}
@@ -480,7 +480,7 @@ export default function RawMaterials() {
                       </td>
                       <td className="px-5 py-4">
                         <span className="text-sm text-gray-600">
-                          {material.supplier?.name || latinToCyrillic('Yetkazuvchi yoq')}
+                          {material.supplier?.name ? trData(material.supplier.name) : latinToCyrillic('Yetkazuvchi yoq')}
                         </span>
                       </td>
                       <td className="px-5 py-4 text-right">
@@ -541,10 +541,10 @@ export default function RawMaterials() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-gray-900 truncate">
-                        {material.name}
+                        {trData(material.name)}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5 truncate">
-                        {material.supplier?.name || latinToCyrillic('Yetkazuvchi yoq')}
+                        {material.supplier?.name ? trData(material.supplier.name) : latinToCyrillic('Yetkazuvchi yoq')}
                       </p>
                     </div>
                   </div>
@@ -736,7 +736,7 @@ export default function RawMaterials() {
                     <option value="">{latinToCyrillic('Yetkazuvchini tanlang')}</option>
                     {suppliers.map((supplier) => (
                       <option key={supplier.id} value={supplier.id}>
-                        {supplier.name}
+                        {trData(supplier.name)}
                       </option>
                     ))}
                   </select>

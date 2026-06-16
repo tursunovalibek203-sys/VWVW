@@ -21,7 +21,7 @@ import {
   CheckCircle2,
   Clock,
 } from 'lucide-react';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import { exportToExcel } from '../lib/excelUtils';
 import { useToast, toast } from '../components/ui/Toast';
 import { TableSkeleton } from '../components/ui/LoadingSpinner';
@@ -145,7 +145,7 @@ export function Drivers() {
       return;
     }
     const dataToExport = drivers.map(d => ({
-      'Ism': d.name,
+      'Ism': trData(d.name),
       'Telefon': d.phone,
       'Guvohnoma': d.licenseNumber,
       'Mashina': d.vehicleNumber,
@@ -316,7 +316,7 @@ export function Drivers() {
       if (usd > 0)   parts.push(`$${usd.toLocaleString()}`);
       if (uzs > 0)   parts.push(`${uzs.toLocaleString()} UZS`);
       if (karta > 0) parts.push(`${karta.toLocaleString()} UZS (${latinToCyrillic('karta')})`);
-      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), `${paymentDriver.name}: ${parts.join(' + ')} ${latinToCyrillic('qabul qilindi')}`));
+      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), `${trData(paymentDriver.name)}: ${parts.join(' + ')} ${latinToCyrillic('qabul qilindi')}`));
     } catch (error: any) {
       addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || latinToCyrillic("To'lovda xatolik yuz berdi")));
     } finally {
@@ -338,10 +338,10 @@ export function Drivers() {
       setShowPaymentModal(false);
       fetchDrivers();
       const cancelled = cancelType === 'partial' ? partial : (paymentDriver.debtToCompany || 0);
-      const customerPart = cancelSelectedCustomer ? ` → ${cancelSelectedCustomer.name}` : '';
+      const customerPart = cancelSelectedCustomer ? ` → ${trData(cancelSelectedCustomer.name)}` : '';
       addToast(toast.success(
         latinToCyrillic('Muvaffaqiyatli'),
-        `${paymentDriver.name}: ${Math.round(cancelled).toLocaleString()} UZS ${latinToCyrillic('qarz bekor qilindi')}${customerPart}`
+        `${trData(paymentDriver.name)}: ${Math.round(cancelled).toLocaleString()} UZS ${latinToCyrillic('qarz bekor qilindi')}${customerPart}`
       ));
     } catch (error: any) {
       addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || latinToCyrillic('Xatolik yuz berdi')));
@@ -552,10 +552,10 @@ export function Drivers() {
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarTint(driver.status)}`}>
-                          {getInitials(driver.name)}
+                          {getInitials(trData(driver.name))}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-900 truncate">{driver.name}</p>
+                          <p className="text-sm font-semibold text-slate-900 truncate">{trData(driver.name)}</p>
                           <p className="text-xs text-slate-400 mt-0.5 tabular-nums">
                             {driver.totalDeliveries} {latinToCyrillic('ta yetkazish')}
                           </p>
@@ -571,7 +571,7 @@ export function Drivers() {
                         {driver.currentLocation && (
                           <p className="text-xs text-slate-400 flex items-center gap-1.5 truncate">
                             <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                            <span className="truncate">{driver.currentLocation}</span>
+                            <span className="truncate">{trData(driver.currentLocation)}</span>
                           </p>
                         )}
                       </div>
@@ -696,10 +696,10 @@ export function Drivers() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${avatarTint(driver.status)}`}>
-                    {getInitials(driver.name)}
+                    {getInitials(trData(driver.name))}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">{driver.name}</p>
+                    <p className="text-sm font-semibold text-slate-900 truncate">{trData(driver.name)}</p>
                     <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 tabular-nums">
                       <Phone className="w-3 h-3" />
                       {driver.phone}
@@ -804,7 +804,7 @@ export function Drivers() {
         title={latinToCyrillic("Haydovchini o'chirish")}
         message={
           driverToDelete
-            ? latinToCyrillic(`"${driverToDelete.name}" haydovchisini rostdan ham o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi.`)
+            ? latinToCyrillic(`"${trData(driverToDelete.name)}" haydovchisini rostdan ham o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi.`)
             : ''
         }
         confirmText={latinToCyrillic("O'chirish")}
@@ -935,7 +935,7 @@ export function Drivers() {
                     <div key={order.id} className="p-4 bg-slate-50 rounded-xl flex justify-between items-center gap-3 hover:bg-indigo-50/60 transition-colors border border-transparent hover:border-indigo-100">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-900 truncate tabular-nums">#{order.orderNumber}</p>
-                        <p className="text-xs text-slate-500 truncate">{order.customer?.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{trData(order.customer?.name)}</p>
                       </div>
                       <button
                         onClick={() => handleAssignOrder(order.id)}
@@ -961,7 +961,7 @@ export function Drivers() {
                     <div key={assignment.id} className="p-4 bg-white rounded-xl border border-slate-200/70 flex justify-between items-center gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-900 truncate tabular-nums">#{assignment.order.orderNumber}</p>
-                        <p className="text-xs text-slate-500 truncate">{assignment.order.customer?.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{trData(assignment.order.customer?.name)}</p>
                       </div>
                       <Badge variant={getStatusVariant(assignment.status)}>{assignment.status}</Badge>
                     </div>
@@ -983,10 +983,10 @@ export function Drivers() {
             <div className="px-6 py-4 border-b border-slate-200/70 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3 min-w-0">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${avatarTint(selectedDriver?.status || '')}`}>
-                  {selectedDriver ? getInitials(selectedDriver.name) : '?'}
+                  {selectedDriver ? getInitials(trData(selectedDriver.name)) : '?'}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-base font-bold text-slate-900 truncate">{selectedDriver?.name}</h3>
+                  <h3 className="text-base font-bold text-slate-900 truncate">{trData(selectedDriver?.name || '')}</h3>
                   <p className="text-xs text-emerald-600 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     {latinToCyrillic('Onlayn chat')}
@@ -1061,7 +1061,7 @@ export function Drivers() {
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-base font-bold text-slate-900">{latinToCyrillic('Pul topshirdi')}</h3>
-                  <p className="text-xs text-slate-400 truncate">{paymentDriver.name}</p>
+                  <p className="text-xs text-slate-400 truncate">{trData(paymentDriver.name)}</p>
                 </div>
               </div>
               <button
@@ -1219,7 +1219,7 @@ export function Drivers() {
                       {cancelSelectedCustomer ? (
                         <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
                           <div>
-                            <p className="text-xs font-semibold text-blue-800">{cancelSelectedCustomer.name}</p>
+                            <p className="text-xs font-semibold text-blue-800">{trData(cancelSelectedCustomer.name)}</p>
                             <p className="text-xs text-blue-400">{cancelSelectedCustomer.phone}</p>
                           </div>
                           <button type="button"
@@ -1248,7 +1248,7 @@ export function Drivers() {
                                   <button key={c.id} type="button"
                                     onClick={() => { setCancelSelectedCustomer(c); setCancelCustomerSearch(''); }}
                                     className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
-                                    <span className="font-semibold text-slate-900">{c.name}</span>
+                                    <span className="font-semibold text-slate-900">{trData(c.name)}</span>
                                     <span className="text-slate-400 ml-2">{c.phone}</span>
                                   </button>
                                 ))}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Package, PackagePlus, Loader2, Boxes, Hash, ArrowRight } from 'lucide-react';
 import api from '../lib/professionalApi';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import { useToast, toast } from '../components/ui/Toast';
 import { CardSkeleton } from '../components/ui/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
@@ -71,7 +71,7 @@ export default function CashierAddStock() {
 
       addToast(toast.success(
         latinToCyrillic('Qabul qilindi'),
-        `"${product.name}" ${latinToCyrillic('mahsulotiga')} ${quantity} ${latinToCyrillic("qop qo'shildi. Jami:")} ${updatedStock} ${latinToCyrillic('qop')}`
+        `"${trData(product.name)}" ${latinToCyrillic('mahsulotiga')} ${quantity} ${latinToCyrillic("qop qo'shildi. Jami:")} ${updatedStock} ${latinToCyrillic('qop')}`
       ));
 
       // Formni tozalash
@@ -173,7 +173,7 @@ export default function CashierAddStock() {
                 <option value="">{latinToCyrillic('Mahsulotni tanlang...')}</option>
                 {sortedProducts.map((product) => (
                   <option key={product.id} value={product.id}>
-                    {product.name} — {latinToCyrillic('zaxira')}: {product.currentStock || 0} {latinToCyrillic('qop')}
+                    {trData(product.name)} — {latinToCyrillic('zaxira')}: {product.currentStock || 0} {latinToCyrillic('qop')}
                   </option>
                 ))}
               </select>
@@ -214,7 +214,7 @@ export default function CashierAddStock() {
                 <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
                   {latinToCyrillic('Tanlangan mahsulot')}
                 </h4>
-                <p className="text-sm font-semibold text-slate-900">{activeProduct.name}</p>
+                <p className="text-sm font-semibold text-slate-900">{trData(activeProduct.name)}</p>
 
                 <div className="mt-4 flex items-center justify-between gap-3">
                   <div className="flex-1 bg-white rounded-xl border border-slate-200 p-3 text-center">

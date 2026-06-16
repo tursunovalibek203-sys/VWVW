@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, Package, Users, ShoppingCart, FileText, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import { trData } from '../lib/transliterator';
 
 interface SearchResult {
   id: string;
@@ -58,14 +59,14 @@ export default function GlobalSearch() {
         const searchResults: SearchResult[] = [
           ...products.data.slice(0, 3).map((item: any) => ({
             id: item.id,
-            title: item.name,
+            title: trData(item.name),
             subtitle: `${item.currentStock} Ò›Ð¾Ð¿ Ð¼Ð°Ð²Ð¶ÑƒÐ´`,
             type: 'product' as const,
             url: '/products',
           })),
           ...customers.data.slice(0, 3).map((item: any) => ({
             id: item.id,
-            title: item.name,
+            title: trData(item.name),
             subtitle: item.phone,
             type: 'customer' as const,
             url: '/customers',
@@ -73,7 +74,7 @@ export default function GlobalSearch() {
           ...sales.data.slice(0, 2).map((item: any) => ({
             id: item.id,
             title: `Ð¡Ð¾Ñ‚ÑƒÐ² #${item.id.slice(-6)}`,
-            subtitle: `${item.customer.name} - ${item.totalAmount} UZS`,
+            subtitle: `${trData(item.customer.name)} - ${item.totalAmount} UZS`,
             type: 'sale' as const,
             url: '/sales',
           })),

@@ -4,7 +4,7 @@ import {
   RefreshCw, CheckCheck, TrendingDown, Clock,
 } from 'lucide-react';
 import api from '../lib/professionalApi';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import { CardSkeleton } from '../components/ui/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import { Badge } from '../components/ui/Badge';
@@ -68,7 +68,7 @@ export default function Notifications() {
           id: alert.productId,
           type: 'stock' as const,
           title: 'Kam Zaxira',
-          message: `${alert.productName} - ${alert.currentStock} qop qoldi`,
+          message: `${trData(alert.productName)} - ${alert.currentStock} qop qoldi`,
           severity: alert.status,
           createdAt: new Date(),
         })),
@@ -77,8 +77,8 @@ export default function Notifications() {
           type: 'customer' as const,
           title: 'Mijoz Ogohlantirish',
           message: customer.debt > 0
-            ? `${customer.name} - ${customer.debt} UZS qarz`
-            : `${customer.name} - 30 kun xarid qilmagan`,
+            ? `${trData(customer.name)} - ${customer.debt} UZS qarz`
+            : `${trData(customer.name)} - 30 kun xarid qilmagan`,
           severity: 'warning',
           createdAt: new Date(),
         })),
@@ -88,7 +88,7 @@ export default function Notifications() {
             id: forecast.productId,
             type: 'forecast' as const,
             title: 'Prognoz Ogohlantirish',
-            message: `${forecast.productName} - ${forecast.daysUntilStockout} kunda tugaydi`,
+            message: `${trData(forecast.productName)} - ${forecast.daysUntilStockout} kunda tugaydi`,
             severity: forecast.status,
             createdAt: new Date(),
           })),

@@ -4,6 +4,7 @@ import { Button } from './Button';
 import { Badge } from './Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './Tabs';
 import { Progress } from './Progress';
+import { trData } from '../lib/transliterator';
 import { 
   ShoppingCart, 
   Wallet, 
@@ -170,7 +171,7 @@ export default function CustomerPortal() {
     } else {
       setCart([...cart, {
         productId: product.id,
-        productName: product.name,
+        productName: trData(product.name),
         quantityBags: quantity,
         pricePerBag: product.pricePerBag,
         subtotal: quantity * product.pricePerBag
@@ -213,7 +214,7 @@ export default function CustomerPortal() {
                 {level.emoji}
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{customer?.name}</h1>
+                <h1 className="text-2xl font-bold text-gray-900">{trData(customer?.name)}</h1>
                 <p className="text-gray-600">LUX PET PLAST - Premium Mijoz</p>
               </div>
             </div>
@@ -336,7 +337,7 @@ export default function CustomerPortal() {
                       <div className="mt-2">
                         {order.items.map((item, index) => (
                           <div key={index} className="text-sm text-gray-600">
-                            {item.product.name} - {item.quantityBags} qop
+                            {trData(item.product.name)} - {item.quantityBags} qop
                           </div>
                         ))}
                       </div>
@@ -362,7 +363,7 @@ export default function CustomerPortal() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {products.map((product) => (
                         <div key={product.id} className="border rounded-lg p-4">
-                          <h3 className="font-semibold mb-2">{product.name}</h3>
+                          <h3 className="font-semibold mb-2">{trData(product.name)}</h3>
                           <p className="text-sm text-gray-600 mb-2">Omborda: {product.currentStock} ta</p>
                           <p className="font-bold text-lg mb-3">{product.pricePerBag.toLocaleString()} so'm/qop</p>
                           <div className="flex gap-2">
@@ -405,7 +406,7 @@ export default function CustomerPortal() {
                         {cart.map((item, index) => (
                           <div key={index} className="flex justify-between items-center">
                             <div>
-                              <h4 className="font-semibold">{item.productName}</h4>
+                              <h4 className="font-semibold">{trData(item.productName)}</h4>
                               <p className="text-sm text-gray-600">{item.quantityBags} qop Ã— {item.pricePerBag.toLocaleString()}</p>
                             </div>
                             <p className="font-semibold">{item.subtotal.toLocaleString()} so'm</p>
@@ -595,7 +596,7 @@ export default function CustomerPortal() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Ism</label>
-                        <p className="text-lg">{customer?.name}</p>
+                        <p className="text-lg">{trData(customer?.name)}</p>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>

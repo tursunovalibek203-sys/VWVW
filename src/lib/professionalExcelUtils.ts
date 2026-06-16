@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { errorHandler } from './professionalErrorHandler';
+import { trData } from './transliterator';
 
 // Excel Export Options
 export interface ExcelExportOptions {
@@ -375,7 +376,7 @@ export class ProfessionalExcelUtils {
   exportSales(sales: any[], options?: ExcelExportOptions): boolean {
     const salesData = sales.map(sale => ({
       'id': sale.id,
-      'customerName': sale.customer?.name || 'Ko\'cha savdo',
+      'customerName': sale.customer?.name ? trData(sale.customer.name) : 'Ko\'cha savdo',
       'date': sale.createdAt,
       'items': sale.items?.length || 0,
       'totalAmount': sale.totalAmount,
@@ -397,7 +398,7 @@ export class ProfessionalExcelUtils {
   exportProducts(products: any[], options?: ExcelExportOptions): boolean {
     const productsData = products.map(product => ({
       'id': product.id,
-      'name': product.name,
+      'name': trData(product.name),
       'code': product.code,
       'warehouse': product.warehouse,
       'stock': product.currentStock || 0,
@@ -419,7 +420,7 @@ export class ProfessionalExcelUtils {
   exportCustomers(customers: any[], options?: ExcelExportOptions): boolean {
     const customersData = customers.map(customer => ({
       'id': customer.id,
-      'name': customer.name,
+      'name': trData(customer.name),
       'phone': customer.phone,
       'address': customer.address,
       'debtUZS': customer.debtUZS || 0,

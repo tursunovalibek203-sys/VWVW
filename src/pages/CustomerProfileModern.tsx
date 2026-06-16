@@ -21,7 +21,7 @@ import {
   Banknote,
   DollarSign,
 } from 'lucide-react';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import { formatDate, formatCurrency } from '../lib/utils';
 import { exportToExcel } from '../lib/excelUtils';
 import api from '../lib/professionalApi';
@@ -136,12 +136,12 @@ export default function CustomerProfileModern() {
       [latinToCyrillic('Qarz')]:                  s.debtAmount || 0,
       [latinToCyrillic('Valyuta')]:               s.currency,
       [latinToCyrillic("To'lov turi")]:           paymentLabel(s.paymentMethod || s.paymentType || 'CASH'),
-      [latinToCyrillic('Haydovchi')]:             s.driver?.name || s.driverName || '—',
+      [latinToCyrillic('Haydovchi')]:             trData(s.driver?.name || s.driverName || '—'),
       [latinToCyrillic('Yetkazib berish narxi')]: s.deliveryFee || 0,
       [latinToCyrillic('Holat')]:                 s.paymentStatus,
     }));
     exportToExcel(rows, {
-      fileName: `${customer.name} - savdolar`,
+      fileName: `${trData(customer.name)} - savdolar`,
       sheetName: latinToCyrillic('Savdolar'),
     });
   };
@@ -260,10 +260,10 @@ export default function CustomerProfileModern() {
 
   const getProductNames = (sale: Sale) => {
     if (sale.items && sale.items.length > 0) {
-      return sale.items.map(item => item.product?.name || item.productName || 'N/A').join(', ');
+      return trData(sale.items.map(item => item.product?.name || item.productName || 'N/A').join(', '));
     }
     if (sale.product?.name) {
-      return sale.product.name;
+      return trData(sale.product.name);
     }
     return '-';
   };
@@ -292,7 +292,7 @@ export default function CustomerProfileModern() {
     {
       icon: MapPin,
       label: latinToCyrillic('Manzil'),
-      value: customer.address || '-',
+      value: trData(customer.address) || '-',
       tint: 'bg-sky-50 text-sky-600',
     },
     {
@@ -375,12 +375,12 @@ export default function CustomerProfileModern() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-center gap-4 min-w-0">
             <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-bold flex-shrink-0 ${avatarTint}`}>
-              {getInitials(customer.name)}
+              {getInitials(trData(customer.name))}
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2.5">
                 <h1 className="text-[22px] sm:text-2xl font-bold text-slate-900 tracking-tight truncate">
-                  {customer.name}
+                  {trData(customer.name)}
                 </h1>
                 {categoryLabel && (
                   <Badge variant={getCategoryVariant(customer.category)}>
@@ -661,10 +661,10 @@ export default function CustomerProfileModern() {
                 <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700 text-sm font-bold flex-shrink-0">
-                      {customer.name.charAt(0).toUpperCase()}
+                      {trData(customer.name).charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-bold text-slate-900 truncate">{customer.name}</h3>
+                      <h3 className="font-bold text-slate-900 truncate">{trData(customer.name)}</h3>
                       <p className="text-sm text-slate-500">
                         {latinToCyrillic('Qarz')}: <span className="font-semibold text-rose-600">{(customer.debtUZS || 0) > 0 ? `${Math.round(customer.debtUZS).toLocaleString()} so'm` : ''}{(customer.debtUSD || 0) > 0 ? ` $${customer.debtUSD.toFixed(2)}` : ''}{(customer.debtUZS || 0) <= 0 && (customer.debtUSD || 0) <= 0 ? '0' : ''}</span>
                       </p>

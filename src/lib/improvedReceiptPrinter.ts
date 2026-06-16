@@ -1,4 +1,6 @@
 // Improved receipt printer with better design and accurate calculations
+import { trData } from './transliterator';
+
 export interface ImprovedReceiptData {
   saleId: string;
   receiptNumber: string;
@@ -67,10 +69,10 @@ export function generateImprovedReceiptHTML(data: ImprovedReceiptData): string {
         <tr style="background: ${idx % 2 === 0 ? '#fafafa' : '#ffffff'};">
           <td style="text-align: center; font-weight: bold; color: #374151; padding: 4px; font-size: 8px;">${idx + 1}</td>
           <td style="padding: 4px;">
-            <div style="font-weight: 600; color: #111827; font-size: 8px; line-height: 1.2;">${item.name}</div>
+            <div style="font-weight: 600; color: #111827; font-size: 8px; line-height: 1.2;">${trData(item.name)}</div>
             <div style="font-size: 7px; color: #6b7280; margin-top: 1px;">
-              ${isPieceSale ? 
-                `${pieces.toLocaleString()} dona × ${pricePerUnit.toLocaleString()} ${currencySymbol}` : 
+              ${isPieceSale ?
+                `${pieces.toLocaleString()} dona × ${pricePerUnit.toLocaleString()} ${currencySymbol}` :
                 `${bags} qop × ${pricePerUnit.toLocaleString()} ${currencySymbol}`
               }
             </div>
@@ -90,22 +92,22 @@ export function generateImprovedReceiptHTML(data: ImprovedReceiptData): string {
   // Generate all items HTML
   let allItemsHTML = '';
   let itemCounter = 1;
-  
+
   if (groupedItems.preform && groupedItems.preform.length > 0) {
     allItemsHTML += generateItemsHTML(groupedItems.preform);
     itemCounter += groupedItems.preform.length;
   }
-  
+
   if (groupedItems.krishka && groupedItems.krishka.length > 0) {
     allItemsHTML += generateItemsHTML(groupedItems.krishka);
     itemCounter += groupedItems.krishka.length;
   }
-  
+
   if (groupedItems.ruchka && groupedItems.ruchka.length > 0) {
     allItemsHTML += generateItemsHTML(groupedItems.ruchka);
     itemCounter += groupedItems.ruchka.length;
   }
-  
+
   if (groupedItems.other && groupedItems.other.length > 0) {
     allItemsHTML += generateItemsHTML(groupedItems.other);
   }
@@ -114,13 +116,13 @@ export function generateImprovedReceiptHTML(data: ImprovedReceiptData): string {
   const paymentsHTML = Object.entries(data.payments)
     .filter(([_, amount]) => amount && amount > 0)
     .map(([type, amount]) => {
-      const label = type === 'uzs' ? 'Naqd UZS' : 
+      const label = type === 'uzs' ? 'Naqd UZS' :
                     type === 'usd' ? 'Naqd USD' : 'Click';
-      const icon = type === 'uzs' ? 'UZS' : 
+      const icon = type === 'uzs' ? 'UZS' :
                    type === 'usd' ? '$' : 'Click';
-      const bgColor = type === 'uzs' ? '#dbeafe' : 
+      const bgColor = type === 'uzs' ? '#dbeafe' :
                       type === 'usd' ? '#fef3c7' : '#f3e8ff';
-      const color = type === 'uzs' ? '#1e40af' : 
+      const color = type === 'uzs' ? '#1e40af' :
                     type === 'usd' ? '#d97706' : '#7c3aed';
       return `
         <div style="display: flex; justify-content: space-between; padding: 6px 8px; background: ${bgColor}; border: 1px solid ${type === 'uzs' ? '#bfdbfe' : type === 'usd' ? '#fde68a' : '#e9d5ff'}; border-radius: 4px; margin-bottom: 4px;">
@@ -140,23 +142,23 @@ export function generateImprovedReceiptHTML(data: ImprovedReceiptData): string {
     <title>Chek #${data.receiptNumber}</title>
     <style>
         @media print {
-            @page { 
-                size: 80mm auto; 
-                margin: 2mm; 
+            @page {
+                size: 80mm auto;
+                margin: 2mm;
             }
-            body { 
-                margin: 0; 
-                width: 80mm; 
-                font-size: 10px; 
+            body {
+                margin: 0;
+                width: 80mm;
+                font-size: 10px;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
             .no-print { display: none !important; }
         }
-        * { 
-            box-sizing: border-box; 
-            margin: 0; 
-            padding: 0; 
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
         body {
             font-family: 'Segoe UI', 'Arial Unicode MS', 'DejaVu Sans', 'Tahoma', 'Geneva', 'Verdana', sans-serif;
@@ -477,7 +479,7 @@ export function generateImprovedReceiptHTML(data: ImprovedReceiptData): string {
             <div style="color: #374151; font-size: 8px; line-height: 1.5;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
                     <span><strong>Ismi:</strong></span>
-                    <span>${data.customer.name}</span>
+                    <span>${trData(data.customer.name)}</span>
                 </div>
                 ${data.customer.phone ? `
                 <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
@@ -650,7 +652,7 @@ export function generateUzbekReceiptHTML(data: ImprovedReceiptData): string {
         <tr style="background: ${idx % 2 === 0 ? '#fafafa' : '#ffffff'};">
           <td style="text-align: center; font-weight: bold; color: #374151; padding: 4px; font-size: 8px;">${idx + 1}</td>
           <td style="padding: 4px;">
-            <div style="font-weight: 600; color: #111827; font-size: 8px; line-height: 1.2;">${encodeUzbekText(item.name)}</div>
+            <div style="font-weight: 600; color: #111827; font-size: 8px; line-height: 1.2;">${encodeUzbekText(trData(item.name))}</div>
             <div style="font-size: 7px; color: #6b7280; margin-top: 1px;">
               ${isPieceSale ? 
                 `${pieces.toLocaleString()} dona × ${pricePerUnit.toLocaleString()} ${currencySymbol}` : 
@@ -983,7 +985,7 @@ export function generateUzbekReceiptHTML(data: ImprovedReceiptData): string {
             <div style="color: #374151; font-size: 8px; line-height: 1.5;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
                     <span><strong>${encodeUzbekText('Ismi:')}</strong></span>
-                    <span>${data.customer.name}</span>
+                    <span>${trData(data.customer.name)}</span>
                 </div>
                 ${data.customer.phone ? `
                 <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">

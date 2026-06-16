@@ -15,6 +15,7 @@ import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/utils';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { latinToCyrillic } from '../lib/transliterator';
+import LanguageSwitcher from './LanguageSwitcher';
 
 interface NavigationItem {
   name: string;
@@ -255,6 +256,16 @@ export default function ProfessionalLayout({ children }: { children: ReactNode }
             <X className="w-5 h-5" />
           </button>
         )}
+      </div>
+
+      {/* Til almashtirish */}
+      <div
+        className={cn(
+          'flex border-b border-slate-100 flex-shrink-0 py-2',
+          iconOnly ? 'justify-center px-2' : 'px-4'
+        )}
+      >
+        <LanguageSwitcher iconOnly={iconOnly} />
       </div>
 
       {/* Nav */}

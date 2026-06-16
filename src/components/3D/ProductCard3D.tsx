@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Package, TrendingUp, Eye } from 'lucide-react';
+import { trData } from '../../lib/transliterator';
 
 interface ProductCard3DProps {
   product: {
@@ -65,12 +66,12 @@ export function ProductCard3D({ product, onClick }: ProductCard3DProps) {
             <div className="flex items-center justify-between mb-4">
               <Package className="w-8 h-8 text-white/80" />
               <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
-                {product.bagType}
+                {trData(product.bagType)}
               </span>
             </div>
-            
+
             <h3 className="text-lg font-bold mb-2 line-clamp-2">
-              {product.name}
+              {trData(product.name)}
             </h3>
             
             <div className="flex-1 flex items-center justify-center">

@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/professionalApi';
 import { exportToExcel } from '../lib/excelUtils';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import { useNavigate } from 'react-router-dom';
 import { errorHandler } from '../lib/professionalErrorHandler';
 import { extractArray } from '../lib/apiHelpers';
@@ -555,7 +555,7 @@ export default function SimplifiedInventory() {
         const unitsPerBag = product.unitsPerBag || 2000;
         const pricePerPiece = product.pricePerPiece || (product.pricePerBag / unitsPerBag) || 0;
         return [
-          product.name,
+          trData(product.name),
           category,
           product.pricePerBag?.toFixed(2) || '0.00',
           unitsPerBag.toString(),
@@ -635,7 +635,7 @@ export default function SimplifiedInventory() {
 
       // Sotuv ustunlari — har bir sotuv alohida ustun
       const saleCols = sales.map((s: any) => {
-        const cust = s.customer?.name || s.manualCustomerName || l("Ko'cha");
+        const cust = trData(s.customer?.name) || s.manualCustomerName || l("Ko'cha");
         return {
           header: `${l('Sotuv')}: ${cust} ${fmtDate(s.createdAt)}`,
           saleId: s.id,
@@ -646,7 +646,7 @@ export default function SimplifiedInventory() {
       // Har bir mahsulot uchun qator
       const rows = products.map(product => {
         const row: Record<string, string | number> = {
-          [l('Mahsulot')]:  product.name,
+          [l('Mahsulot')]:  trData(product.name),
           [l('Tur')]:       product.warehouse || l('Boshqa'),
         };
 
@@ -843,7 +843,7 @@ export default function SimplifiedInventory() {
               {lowStockProducts.length} {latinToCyrillic('ta mahsulot kam qoldi')}
             </p>
             <p className="mt-0.5 text-xs text-amber-700 truncate">
-              {lowStockProducts.slice(0, 4).map((p) => p.name).join(', ')}
+              {lowStockProducts.slice(0, 4).map((p) => trData(p.name)).join(', ')}
               {lowStockProducts.length > 4 && ` +${lowStockProducts.length - 4}`}
             </p>
           </div>
@@ -979,7 +979,7 @@ export default function SimplifiedInventory() {
                     return (
                       <div key={product.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-slate-50/60 transition-colors">
                         <span className="text-sm font-medium text-slate-800 flex-1 min-w-0 truncate">
-                          {product.name}
+                          {trData(product.name)}
                         </span>
                         <span className={`text-sm font-bold tabular-nums flex-shrink-0 ${stockColor}`}>
                           {(product.currentStock || 0).toLocaleString()}
@@ -1213,7 +1213,7 @@ export default function SimplifiedInventory() {
                         <tr key={product.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           <td className="px-4 py-3 font-medium text-gray-900 border-b border-gray-100">
                             <div className="flex items-center justify-between">
-                              <span>{product.name}</span>
+                              <span>{trData(product.name)}</span>
                               {isEditingRow ? (
                                 <div className="flex items-center gap-1">
                                   <button
@@ -1308,7 +1308,7 @@ export default function SimplifiedInventory() {
                         <tr key={product.id} className={index % 2 === 0 ? 'bg-purple-50' : 'bg-white'}>
                           <td className="px-4 py-3 font-medium text-gray-900 border-b border-gray-100">
                             <div className="flex items-center justify-between">
-                              <span>{product.name}</span>
+                              <span>{trData(product.name)}</span>
                               {isEditingRow ? (
                                 <div className="flex items-center gap-1">
                                   <button
@@ -1403,7 +1403,7 @@ export default function SimplifiedInventory() {
                         <tr key={product.id} className={index % 2 === 0 ? 'bg-pink-50' : 'bg-white'}>
                           <td className="px-4 py-3 font-medium text-gray-900 border-b border-gray-100">
                             <div className="flex items-center justify-between">
-                              <span>{product.name}</span>
+                              <span>{trData(product.name)}</span>
                               {isEditingRow ? (
                                 <div className="flex items-center gap-1">
                                   <button
@@ -1504,7 +1504,7 @@ export default function SimplifiedInventory() {
                         <tr key={product.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                           <td className="px-4 py-3 font-medium text-gray-900 border-b border-gray-100">
                             <div className="flex items-center justify-between">
-                              <span>{product.name}</span>
+                              <span>{trData(product.name)}</span>
                               {isEditingRow ? (
                                 <div className="flex items-center gap-1">
                                   <button
@@ -1614,7 +1614,7 @@ export default function SimplifiedInventory() {
         title={latinToCyrillic('Mahsulotni o\'chirish')}
         message={
           deleteTarget
-            ? `"${deleteTarget.name}" ${latinToCyrillic('mahsulotini o\'chirmoqchimisiz? Bu amalni qaytarib bo\'lmaydi.')}`
+            ? `"${trData(deleteTarget.name)}" ${latinToCyrillic('mahsulotini o\'chirmoqchimisiz? Bu amalni qaytarib bo\'lmaydi.')}`
             : ''
         }
         confirmText={latinToCyrillic('O\'chirish')}

@@ -4,7 +4,7 @@ import { Save, ArrowLeft, RefreshCw, X, Loader2, DollarSign, Warehouse, Boxes, P
 import CustomDropdown from '../components/CustomDropdown';
 import { useVariants } from '../hooks/useVariants';
 import api from '../lib/professionalApi';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import { PageLoading } from '../components/ui/LoadingSpinner';
 import { useToast, toast } from '../components/ui/Toast';
 
@@ -279,14 +279,14 @@ export default function AddProduct() {
         response = await api.put(`/products/${editId}`, productData);
         addToast(toast.success(
           latinToCyrillic("Saqlandi"),
-          `"${response.data.name}" ` + latinToCyrillic("mahsuloti muvaffaqiyatli yangilandi!")
+          `"${trData(response.data.name)}" ` + latinToCyrillic("mahsuloti muvaffaqiyatli yangilandi!")
         ));
         setTimeout(() => navigate(isCashier ? '/cashier/products' : '/products'), 1200);
       } else {
         response = await api.post('/products', productData);
         addToast(toast.success(
           latinToCyrillic("Saqlandi"),
-          `"${response.data.name}" ` + latinToCyrillic("mahsuloti muvaffaqiyatli yaratildi!")
+          `"${trData(response.data.name)}" ` + latinToCyrillic("mahsuloti muvaffaqiyatli yaratildi!")
         ));
         setIsNameManuallyEdited(false);
         setManualSuffix('');

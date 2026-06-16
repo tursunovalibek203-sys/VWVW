@@ -35,6 +35,7 @@ import {
   SupplierStatus,
   OrderStatus
 } from '../lib/professionalSupplyChain';
+import { trData } from '../lib/transliterator';
 
 interface SupplyChainDashboardProps {
   refreshInterval?: number;
@@ -306,7 +307,7 @@ export default function ProfessionalSupplyChainDashboard({
                         {index + 1}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{perf.supplier.name}</p>
+                        <p className="text-sm font-medium text-gray-900">{trData(perf.supplier.name)}</p>
                         <p className="text-xs text-gray-500">{perf.metrics.orderCount} orders</p>
                       </div>
                     </div>
@@ -344,7 +345,7 @@ export default function ProfessionalSupplyChainDashboard({
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">{order.orderNumber}</p>
-                      <p className="text-xs text-gray-500">{order.supplierName}</p>
+                      <p className="text-xs text-gray-500">{trData(order.supplierName)}</p>
                     </div>
                   </div>
                   
@@ -414,13 +415,13 @@ export default function ProfessionalSupplyChainDashboard({
                         <div className="flex-shrink-0 h-10 w-10">
                           <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
                             <span className="text-sm font-medium text-gray-600">
-                              {supplier.name.charAt(0)}
+                              {trData(supplier.name).charAt(0)}
                             </span>
                           </div>
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {supplier.name}
+                            {trData(supplier.name)}
                           </div>
                           <div className="text-sm text-gray-500">
                             {supplier.code}
@@ -551,7 +552,7 @@ export default function ProfessionalSupplyChainDashboard({
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-900">{order.orderNumber}</p>
-                          <p className="text-xs text-gray-500">{order.supplierName}</p>
+                          <p className="text-xs text-gray-500">{trData(order.supplierName)}</p>
                         </div>
                       </div>
                       
@@ -627,7 +628,7 @@ export default function ProfessionalSupplyChainDashboard({
                 <div className="space-y-2">
                   {inventoryAnalytics?.topProducts.slice(0, 5).map((product: any, index: number) => (
                     <div key={product.productId} className="flex justify-between">
-                      <span className="text-sm text-gray-600">{product.productName}</span>
+                      <span className="text-sm text-gray-600">{trData(product.productName)}</span>
                       <span className="text-sm font-bold text-gray-900">{product.totalQuantity}</span>
                     </div>
                   ))}
@@ -652,7 +653,7 @@ export default function ProfessionalSupplyChainDashboard({
                            <Activity className="w-4 h-4 text-blue-600" />}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{movement.productName}</p>
+                          <p className="text-sm font-medium text-gray-900">{trData(movement.productName)}</p>
                           <p className="text-xs text-gray-500">{movement.sku}</p>
                         </div>
                       </div>
@@ -672,7 +673,7 @@ export default function ProfessionalSupplyChainDashboard({
                         <span className="font-medium">Date:</span> {movement.performedAt.toLocaleDateString()}
                       </div>
                       <div>
-                        <span className="font-medium">By:</span> {movement.performedBy}
+                        <span className="font-medium">By:</span> {trData(movement.performedBy)}
                       </div>
                       <div>
                         <span className="font-medium">Reason:</span> {movement.reason}
@@ -722,7 +723,7 @@ export default function ProfessionalSupplyChainDashboard({
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">{shipment.trackingNumber}</p>
-                      <p className="text-xs text-gray-500">{shipment.carrier} - {shipment.orderNumber}</p>
+                      <p className="text-xs text-gray-500">{trData(shipment.carrier)} - {shipment.orderNumber}</p>
                     </div>
                   </div>
                   
@@ -755,7 +756,7 @@ export default function ProfessionalSupplyChainDashboard({
                     {shipment.timeline.slice(-3).map((event, index) => (
                       <div key={index} className="flex items-center gap-3 text-xs">
                         <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                        <span className="text-gray-600">{event.description}</span>
+                        <span className="text-gray-600">{trData(event.description)}</span>
                         <span className="text-gray-500">{event.timestamp.toLocaleDateString()}</span>
                       </div>
                     ))}
@@ -794,7 +795,7 @@ export default function ProfessionalSupplyChainDashboard({
                       }`} />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{inspection.productName}</p>
+                      <p className="text-sm font-medium text-gray-900">{trData(inspection.productName)}</p>
                       <p className="text-xs text-gray-500">Batch: {inspection.batchNumber}</p>
                     </div>
                   </div>
@@ -816,7 +817,7 @@ export default function ProfessionalSupplyChainDashboard({
                     <span className="font-medium">Quantity:</span> {inspection.inspectedQuantity}/{inspection.quantity}
                   </div>
                   <div>
-                    <span className="font-medium">Inspector:</span> {inspection.inspector}
+                    <span className="font-medium">Inspector:</span> {trData(inspection.inspector)}
                   </div>
                   <div>
                     <span className="font-medium">Date:</span> {inspection.inspectedAt.toLocaleDateString()}
@@ -828,7 +829,7 @@ export default function ProfessionalSupplyChainDashboard({
                   <div className="space-y-2">
                     {inspection.criteria.slice(0, 3).map((criterion, index) => (
                       <div key={index} className="flex items-center justify-between text-xs">
-                        <span className="text-gray-600">{criterion.name}</span>
+                        <span className="text-gray-600">{trData(criterion.name)}</span>
                         <span className={`font-medium ${
                           criterion.result === 'pass' ? 'text-green-600' : 'text-red-600'
                         }`}>

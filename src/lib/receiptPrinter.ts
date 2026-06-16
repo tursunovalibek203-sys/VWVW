@@ -1,4 +1,6 @@
 // Chek chiqarish utility
+import { trData } from './transliterator';
+
 export interface ReceiptData {
   saleId: string;
   receiptNumber: string;
@@ -123,7 +125,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
 
   ${row('Sana:', `${data.date} ${data.time}`)}
   ${row('Kassir:', data.cashier)}
-  ${row('Mijoz:', data.customer.name, true)}
+  ${row('Mijoz:', trData(data.customer.name), true)}
   ${data.customer.phone ? row('Tel:', data.customer.phone) : ''}
   ${hasPrevDebt ? ln
     + ((data.customer.previousBalanceUZS ?? 0) > 0 ? row('Oldingi qarz (so\'m):', `${data.customer.previousBalanceUZS!.toLocaleString()} so'm`, false, true) : '')
@@ -144,7 +146,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
       const ppb = item.piecesPerBag || 1;
       const narx = item.pricePerPiece != null ? item.pricePerPiece : (item.pricePerUnit / ppb);
       return `<tr>
-        <td style="word-break:break-word;white-space:normal;">${item.name}</td>
+        <td style="word-break:break-word;white-space:normal;">${trData(item.name)}</td>
         <td style="text-align:center;">${item.quantity}</td>
         <td style="text-align:right;">${fmtAmt(narx)}</td>
         <td style="text-align:right;font-weight:700;">${fmtAmt(item.subtotal)}</td>
@@ -176,7 +178,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
     : ''}
 
   ${data.driver ? ln
-    + row('Haydovchi:', data.driver.name)
+    + row('Haydovchi:', trData(data.driver.name))
     + row('Zavod to\'laydi:', `${data.driver.factoryShare.toLocaleString()} so'm`)
     + row('Mijoz to\'laydi:', `${data.driver.customerShare.toLocaleString()} so'm`)
     : ''}
@@ -194,7 +196,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
 export function generateDeliveryStatementHTML(data: ReceiptData): string {
   const itemsHTML = data.items.map(item => `
     <tr>
-      <td>${item.name}</td>
+      <td>${trData(item.name)}</td>
       <td style="text-align:center">${item.quantity} ${item.unit}</td>
       <td style="text-align:right">${item.pricePerUnit.toLocaleString()}</td>
       <td style="text-align:right">${item.subtotal.toLocaleString()}</td>
@@ -357,7 +359,7 @@ export function generateDeliveryStatementHTML(data: ReceiptData): string {
         </div>
         <div class="info-row">
             <div class="info-label">Mijoz:</div>
-            <div class="info-value">${data.customer.name}</div>
+            <div class="info-value">${trData(data.customer.name)}</div>
         </div>
         <div class="info-row">
             <div class="info-label">Telefon:</div>
@@ -419,7 +421,7 @@ export function generateDeliveryStatementHTML(data: ReceiptData): string {
         <h3>YETKAZIB BERISH</h3>
         <div class="balance-row">
             <span>Haydovchi:</span>
-            <span>${data.driver.name}</span>
+            <span>${trData(data.driver.name)}</span>
         </div>
         <div class="balance-row">
             <span>Zavod to'laydi:</span>
@@ -462,7 +464,7 @@ export function generateDeliveryStatementThermalHTML(data: ReceiptData): string 
   const itemsHTML = data.items.map((item, i) => `
     <tr>
       <td style="border:1px solid #000;padding:4px 3px;text-align:center;font-size:11px;">${i + 1}</td>
-      <td style="border:1px solid #000;padding:4px 3px;font-size:12px;word-break:break-word;">${item.name}</td>
+      <td style="border:1px solid #000;padding:4px 3px;font-size:12px;word-break:break-word;">${trData(item.name)}</td>
       <td style="border:1px solid #000;padding:4px 3px;text-align:center;font-size:12px;">${item.quantity}</td>
       <td style="border:1px solid #000;padding:4px 3px;text-align:right;font-size:12px;font-weight:700;">${fmtAmt(item.subtotal)}</td>
     </tr>`).join('');
@@ -496,7 +498,7 @@ export function generateDeliveryStatementThermalHTML(data: ReceiptData): string 
     <div style="font-size:10px;">Buxoro vil., Vobkent | +998 91 414 44 58</div>
     <div style="font-size:12px;font-weight:bold;margin-top:2px;">YUK XATI #${data.receiptNumber}</div>
   </div>
-  ${row('Mijoz:', data.customer.name, true)}
+  ${row('Mijoz:', trData(data.customer.name), true)}
   ${data.customer.phone ? row('Tel:', data.customer.phone) : ''}
   ${row('Sana:', `${data.date} ${data.time}`)}
   ${row('Kassir:', data.cashier)}
@@ -526,7 +528,7 @@ export function generateDeliveryStatementThermalHTML(data: ReceiptData): string 
     + (hasUSDDebt ? row("Jami qarz ($):", `$${data.customer.totalDebtUSD!.toLocaleString()}`, true, true) : '')
     : ''}
   ${data.driver ? ln
-    + row('Haydovchi:', data.driver.name)
+    + row('Haydovchi:', trData(data.driver.name))
     + row("Zavod to'laydi:", `${data.driver.factoryShare.toLocaleString()} so'm`)
     + row("Mijoz to'laydi:", `${data.driver.customerShare.toLocaleString()} so'm`)
     : ''}
@@ -655,7 +657,7 @@ function generateTextReceipt(data: ReceiptData): string {
   
   // Items section
   const itemsText = data.items.map(item => {
-    const name = item.name.substring(0, 20).padEnd(20);
+    const name = trData(item.name).substring(0, 20).padEnd(20);
     const qty = item.quantity.toString().padStart(4);
     const price = item.pricePerUnit.toLocaleString().padStart(8);
     const total = item.subtotal.toLocaleString().padStart(10);
@@ -687,7 +689,7 @@ function generateTextReceipt(data: ReceiptData): string {
   receipt += padLine('Sana: ' + data.date, 'Vaqt: ' + data.time) + '\n';
   receipt += padLine('Buyurtma: ' + data.receiptNumber, '') + '\n';
   receipt += padLine('Kassir: ' + data.cashier, '') + '\n';
-  receipt += padLine('Mijoz: ' + data.customer.name, '') + '\n';
+  receipt += padLine('Mijoz: ' + trData(data.customer.name), '') + '\n';
   if (data.customer.phone) {
     receipt += padLine('Tel: ' + data.customer.phone, '') + '\n';
   }
@@ -731,7 +733,7 @@ function generateTextReceipt(data: ReceiptData): string {
   if (data.driver) {
     receipt += separator + '\n';
     receipt += 'YETKAZIB BERISH:\n';
-    receipt += padLine('Haydovchi:', data.driver.name) + '\n';
+    receipt += padLine('Haydovchi:', trData(data.driver.name)) + '\n';
     if (data.driver.phone) {
       receipt += padLine('Tel:', data.driver.phone) + '\n';
     }
@@ -810,22 +812,27 @@ export function prepareSaleReceipt(
   const items = sale.items.map((item: any) => {
     const isPiece = item.saleType === 'piece';
     const unit = isPiece ? 'dona' : 'qop';
-    const piecesPerBag: number | null = item.product?.piecesPerBag || null;
-    // Narxlar to'g'ridan-to'g'ri savdo valyutasida ($ yoki so'm) — exchangeRate bilan ko'paytirmaylik
+    // Product modeli `unitsPerBag` ishlatadi (`piecesPerBag` yo'q)
+    // Server items: item.product.unitsPerBag | Forma items: item.unitsPerBag
+    const piecesPerBag: number | null =
+      Number(item.product?.unitsPerBag || item.unitsPerBag) || null;
+    const pricePerBagNum = parseFloat(item.pricePerBag) || 0;
+    const pricePerPieceNum = parseFloat(item.pricePerPiece) || 0;
+    const unitsNum = piecesPerBag || 1;
     const pricePerUnit = isPiece
-      ? (item.pricePerPiece || (item.pricePerBag / (item.unitsPerBag || 1)))
-      : item.pricePerBag;
+      ? (pricePerPieceNum || (pricePerBagNum / unitsNum))
+      : pricePerBagNum;
     const pricePerPiece = isPiece
       ? pricePerUnit
-      : (piecesPerBag ? pricePerUnit / piecesPerBag : undefined);
+      : (piecesPerBag ? pricePerBagNum / piecesPerBag : undefined);
     return {
       name: item.productName || item.product?.name || 'Mahsulot',
-      quantity: item.quantity,
+      quantity: Number(item.quantity) || 0,
       unit,
       piecesPerBag,
       pricePerUnit,
       pricePerPiece,
-      subtotal: item.subtotal
+      subtotal: parseFloat(item.subtotal) || 0,
     };
   });
 

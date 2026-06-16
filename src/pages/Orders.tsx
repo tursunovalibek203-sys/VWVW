@@ -9,7 +9,7 @@ import { TableSkeleton } from '../components/ui/LoadingSpinner';
 import api from '../lib/professionalApi';
 import { formatDate } from '../lib/dateUtils';
 import { useNavigate } from 'react-router-dom';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import {
   Package,
   Plus,
@@ -176,8 +176,8 @@ export default function Orders() {
   const handleExport = () => {
     const dataToExport = filteredOrders.map((o) => ({
       'Buyurtma #': o.orderNumber,
-      Mijoz: o.customer?.name || "Noma'lum",
-      Mahsulotlar: o.items?.map((i: any) => `${i.productName} (${i.quantityBags} qop)`).join(', '),
+      Mijoz: trData(o.customer?.name) || "Noma'lum",
+      Mahsulotlar: o.items?.map((i: any) => `${trData(i.productName)} (${i.quantityBags} qop)`).join(', '),
       'Jami summa': o.totalAmount,
       Sana: formatDate(o.createdAt),
       Status: statusConfig[o.status as keyof typeof statusConfig]?.label || o.status,
@@ -199,7 +199,7 @@ export default function Orders() {
       addToast(
         toastFactory.success(
           L('Ishlab chiqarish buyurtmasi yaratildi'),
-          `${response.data.productName} - ${quantity} ${L('qop')}`
+          `${trData(response.data.productName)} - ${quantity} ${L('qop')}`
         )
       );
       loadData();
@@ -253,7 +253,7 @@ export default function Orders() {
       ) {
         const warnings = response.data.inventoryCheck
           .filter((item: any) => item.needProduction > 0)
-          .map((item: any) => `${item.productName}: ${item.needProduction} ${L('qop')}`)
+          .map((item: any) => `${trData(item.productName)}: ${item.needProduction} ${L('qop')}`)
           .join(', ');
 
         addToast(
@@ -539,7 +539,7 @@ Kassir: ${orderData.cashier}
 ----------------------------------------
 MIJOZ MA'LUMOTLARI:
 ----------------------------------------
-Ismi: ${orderData.customer?.name || "Noma'lum"}
+Ismi: ${trData(orderData.customer?.name) || "Noma'lum"}
 Tel: ${orderData.customer?.phone || 'Mavjud emas'}
 Manzil: ${orderData.customer?.address || 'Mavjud emas'}
 ----------------------------------------
@@ -547,7 +547,7 @@ ${
   orderData.items
     ?.map(
       (item: any) =>
-        `${(item.product?.name || item.productName || "Noma'lum")
+        `${trData(item.product?.name || item.productName || "Noma'lum")
           .substring(0, 24)
           .padEnd(24)
           .replace(/[^\x00-\x7F]/g, '')} | ${item.quantityBags
@@ -709,7 +709,7 @@ ID: SLS-${selectedOrder.id}
       order.items?.forEach((item: any) => {
         if (!productStats[item.productId]) {
           productStats[item.productId] = {
-            productName: item.product?.name || "Noma'lum",
+            productName: trData(item.product?.name) || "Noma'lum",
             totalOrdered: 0,
             inStock: 0,
             needProduction: 0,
@@ -1042,10 +1042,10 @@ ID: SLS-${selectedOrder.id}
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                              {(order.customer?.name || '?').charAt(0).toUpperCase()}
+                              {trData(order.customer?.name || '?').charAt(0).toUpperCase()}
                             </div>
                             <span className="text-sm font-medium text-slate-900">
-                              {order.customer?.name || L("Noma'lum")}
+                              {trData(order.customer?.name) || L("Noma'lum")}
                               {order.customer?.category === 'VIP' && (
                                 <span className="ml-1.5 text-amber-500" title="VIP">
                                   &#9733;
@@ -1128,11 +1128,11 @@ ID: SLS-${selectedOrder.id}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
-                        {(order.customer?.name || '?').charAt(0).toUpperCase()}
+                        {trData(order.customer?.name || '?').charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-900 truncate">
-                          {order.customer?.name || L("Noma'lum")}
+                          {trData(order.customer?.name) || L("Noma'lum")}
                         </p>
                         <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 tabular-nums">
                           <Hash className="w-3 h-3" />
@@ -1475,7 +1475,7 @@ ID: SLS-${selectedOrder.id}
                             key={i}
                             className="bg-white p-3 rounded-lg flex justify-between items-center border border-amber-200/70"
                           >
-                            <span className="text-sm font-medium text-slate-700">{c.productName}</span>
+                            <span className="text-sm font-medium text-slate-700">{trData(c.productName)}</span>
                             <span className="text-sm font-bold text-amber-700 tabular-nums">
                               -{c.needProduction} {L('qop')}
                             </span>
@@ -1597,7 +1597,7 @@ ID: SLS-${selectedOrder.id}
               {/* Order Info Grid */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                  { label: L('Mijoz'), value: selectedOrder.customer?.name || '-', icon: User },
+                  { label: L('Mijoz'), value: trData(selectedOrder.customer?.name) || '-', icon: User },
                   { label: L('Holat'), value: getStatusMeta(selectedOrder.status).label, icon: Activity },
                   {
                     label: L('Sana'),
@@ -1646,7 +1646,7 @@ ID: SLS-${selectedOrder.id}
                         <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
                           <td className="py-3 px-4">
                             <p className="text-sm font-semibold text-slate-900">
-                              {item.product?.name || L('Mahsulot')}
+                              {trData(item.product?.name) || L('Mahsulot')}
                             </p>
                             {item.product?.bagType && (
                               <p className="text-xs text-slate-400">{item.product.bagType}</p>

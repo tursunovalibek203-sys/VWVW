@@ -1,7 +1,7 @@
 import { CheckCircle, Printer, X, ArrowRight, User, Package } from 'lucide-react';
 import type { ReceiptData } from '../lib/receiptPrinter';
 import { printReceipt } from '../lib/receiptPrinter';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 
 interface ReceiptModalProps {
   data: ReceiptData;
@@ -10,6 +10,11 @@ interface ReceiptModalProps {
 
 export function ReceiptModal({ data, onClose }: ReceiptModalProps) {
   const hasDebt = data.debt > 0;
+  const isUSD = (data.currency ?? 'USD') !== 'UZS';
+  const fmtPrice = (n: number) =>
+    isUSD
+      ? `$${n % 1 === 0 ? n.toLocaleString() : n.toFixed(2)}`
+      : `${Math.round(n).toLocaleString()} so'm`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -53,8 +58,7 @@ export function ReceiptModal({ data, onClose }: ReceiptModalProps) {
                 {latinToCyrillic('Jami summa')}
               </p>
               <p className="text-2xl font-bold text-slate-900 tabular-nums mt-0.5">
-                {data.total.toLocaleString()}
-                <span className="text-sm font-medium text-slate-400 ml-1">so'm</span>
+                {fmtPrice(data.total)}
               </p>
             </div>
             <div className={`text-right ${hasDebt ? 'block' : 'hidden'}`}>
@@ -62,8 +66,7 @@ export function ReceiptModal({ data, onClose }: ReceiptModalProps) {
                 {latinToCyrillic('Qarz')}
               </p>
               <p className="text-lg font-bold text-rose-600 tabular-nums mt-0.5">
-                {data.debt.toLocaleString()}
-                <span className="text-sm font-medium ml-1">so'm</span>
+                {fmtPrice(data.debt)}
               </p>
             </div>
           </div>
@@ -77,7 +80,7 @@ export function ReceiptModal({ data, onClose }: ReceiptModalProps) {
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-slate-400">{latinToCyrillic('Mijoz')}</p>
-                <p className="text-sm font-semibold text-slate-900">{data.customer.name}</p>
+                <p className="text-sm font-semibold text-slate-900">{trData(data.customer.name)}</p>
                 {data.customer.phone && (
                   <p className="text-xs text-slate-400">{data.customer.phone}</p>
                 )}
@@ -106,17 +109,17 @@ export function ReceiptModal({ data, onClose }: ReceiptModalProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-900 leading-tight truncate">
-                      {item.name}
+                      {trData(item.name)}
                     </p>
                     <p className="text-xs text-slate-400 tabular-nums">
                       {item.quantity} {item.unit}
-                      {item.piecesPerBag ? ` · 1 ${latinToCyrillic('qopda')} ${item.piecesPerBag}` : ''}
+                      {item.piecesPerBag ? ` · 1 ${latinToCyrillic('qopda')} ${item.piecesPerBag.toLocaleString()}` : ''}
                       {' · '}
-                      {item.pricePerUnit.toLocaleString()} so'm
+                      {fmtPrice(item.pricePerUnit)}
                     </p>
                   </div>
                   <p className="text-sm font-semibold text-slate-800 tabular-nums flex-shrink-0">
-                    {item.subtotal.toLocaleString()}
+                    {fmtPrice(item.subtotal)}
                   </p>
                 </div>
               ))}
@@ -185,7 +188,7 @@ export function ReceiptModal({ data, onClose }: ReceiptModalProps) {
                   </p>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-500">{latinToCyrillic('Haydovchi')}</span>
-                    <span className="font-medium">{data.driver.name}</span>
+                    <span className="font-medium">{trData(data.driver.name)}</span>
                   </div>
                   {data.driver.phone && (
                     <div className="flex justify-between text-sm">

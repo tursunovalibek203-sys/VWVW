@@ -1,5 +1,6 @@
 import { User } from 'lucide-react';
 import type { Customer } from '../../types';
+import { trData } from '../../lib/transliterator';
 
 interface CustomerSelectorProps {
   customers: Customer[];
@@ -81,7 +82,7 @@ export const CustomerSelector = ({
           >
             <div className="flex justify-between items-center">
               <div>
-                <p className="font-bold text-gray-900 text-sm">{customer.name}</p>
+                <p className="font-bold text-gray-900 text-sm">{trData(customer.name)}</p>
                 <p className="text-xs text-gray-500">{customer.phone || '—'}</p>
               </div>
               {customer.debtUSD && customer.debtUSD > 0 && (

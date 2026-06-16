@@ -1,8 +1,28 @@
 // O'zbek tilini lotin yozuvidan kirill yozuviga transliteratsiya qilish
 
-// Yaxshilangan transliteratsiya funksiyasi
+export type UiScript = 'latin' | 'cyrillic';
+const SCRIPT_STORAGE_KEY = 'uiScript';
+export const SCRIPT_CHANGE_EVENT = 'uiscriptchange';
+
+// Saytda ishlatiladigan joriy yozuv turini olish (lotin yoki krilcha)
+export function getScript(): UiScript {
+  if (typeof window === 'undefined') return 'cyrillic';
+  return (localStorage.getItem(SCRIPT_STORAGE_KEY) as UiScript) || 'cyrillic';
+}
+
+// Joriy yozuv turini o'rnatish va shu haqida butun saytga xabar berish
+export function setScript(script: UiScript): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(SCRIPT_STORAGE_KEY, script);
+  window.dispatchEvent(new CustomEvent(SCRIPT_CHANGE_EVENT, { detail: script }));
+}
+
+// Kod ichida qattiq yozilgan (hardcoded) lotincha matnni joriy yozuvda ko'rsatish.
+// Sayt bo'ylab minglab joyda shu funksiya bilan o'ralgan matnlar bor — script
+// 'latin' bo'lsa matn o'zgarishsiz qoladi, 'cyrillic' bo'lsa krilchaga o'giriladi.
 export function latinToCyrillic(text: string): string {
   if (!text) return text;
+  if (getScript() === 'latin') return text;
 
   let result = text;
 
@@ -82,6 +102,14 @@ export function cyrillicToLatin(text: string): string {
   }
 
   return result;
+}
+
+// Bazadan kelgan dinamik matnlar (mijoz, mahsulot, yetkazib beruvchi nomlari va h.k.)
+// uchun. Bu ma'lumotlar krilcha holatda saqlanadi — script 'latin' bo'lganda
+// lotinga o'giriladi, 'cyrillic' bo'lganda o'zgarishsiz qoladi.
+export function trData(text: string): string {
+  if (!text) return text;
+  return getScript() === 'latin' ? cyrillicToLatin(text) : text;
 }
 
 // Qisqa nom bilan export

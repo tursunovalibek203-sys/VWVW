@@ -1,4 +1,6 @@
 // Haqiqiy chekga o'xshash dizayn - barcha shakllarsiz
+import { trData } from './transliterator';
+
 export interface SimpleReceiptData {
   saleId: string;
   receiptNumber: string;
@@ -79,7 +81,7 @@ export function generateSimpleReceiptHTML(data: SimpleReceiptData): string {
       : item.quantity;
     const price = isPiece ? (item.pricePerPiece || 0) : (item.pricePerBag || 0);
     return `<tr>
-      <td style="padding:4px 4px;border:1px solid #000;font-size:12px;">${item.name}</td>
+      <td style="padding:4px 4px;border:1px solid #000;font-size:12px;">${trData(item.name)}</td>
       <td style="padding:4px 4px;border:1px solid #000;font-size:12px;text-align:center;">${bags}</td>
       <td style="padding:4px 4px;border:1px solid #000;font-size:12px;text-align:right;">${price.toLocaleString()}</td>
       <td style="padding:4px 4px;border:1px solid #000;font-size:12px;text-align:right;font-weight:bold;">${item.subtotal.toLocaleString()} ${sym}</td>
@@ -135,7 +137,7 @@ export function generateSimpleReceiptHTML(data: SimpleReceiptData): string {
   </div>
   <div class="ln2"></div>
 
-  <div class="row"><span>Mijoz:</span><span class="bold">${data.customer.name}</span></div>
+  <div class="row"><span>Mijoz:</span><span class="bold">${trData(data.customer.name)}</span></div>
   ${data.customer.phone ? `<div class="row"><span>Tel:</span><span>${data.customer.phone}</span></div>` : ''}
   <div class="row"><span>Sana:</span><span>${data.date} ${data.time}</span></div>
   <div class="row"><span>Kassir:</span><span>${data.cashier}</span></div>
@@ -191,7 +193,7 @@ export function generateDeliveryReceiptHTML(data: SimpleReceiptData): string {
   const itemsHTML = data.items.map((item, i) => `
     <tr>
       <td style="border:1px solid #000;padding:4px 3px;text-align:center;font-size:11px;">${i + 1}</td>
-      <td style="border:1px solid #000;padding:4px 3px;font-size:12px;">${item.name}</td>
+      <td style="border:1px solid #000;padding:4px 3px;font-size:12px;">${trData(item.name)}</td>
       <td style="border:1px solid #000;padding:4px 3px;text-align:center;font-size:12px;">${item.quantity}</td>
       <td style="border:1px solid #000;padding:4px 3px;text-align:right;font-size:12px;font-weight:bold;">${item.subtotal.toLocaleString()} ${sym}</td>
     </tr>`).join('');
@@ -219,7 +221,7 @@ export function generateDeliveryReceiptHTML(data: SimpleReceiptData): string {
     <div style="font-size:11px;font-weight:bold;margin-top:2px;">YUK XATI #${data.receiptNumber}</div>
   </div>
   <div class="ln2"></div>
-  <div class="row"><span>Mijoz:</span><span style="font-weight:bold;">${data.customer.name}</span></div>
+  <div class="row"><span>Mijoz:</span><span style="font-weight:bold;">${trData(data.customer.name)}</span></div>
   <div class="row"><span>Sana:</span><span>${data.date} ${data.time}</span></div>
   <div class="row"><span>Kassir:</span><span>${data.cashier}</span></div>
   <div class="ln2"></div>

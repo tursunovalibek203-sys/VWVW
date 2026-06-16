@@ -19,7 +19,7 @@ import {
   CheckCircle2,
   Loader2,
 } from 'lucide-react';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, trData } from '../lib/transliterator';
 import { exportToExcel } from '../lib/excelUtils';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useToast, toast } from '../components/ui/Toast';
@@ -124,11 +124,11 @@ export default function Suppliers() {
       return;
     }
     const dataToExport = filteredSuppliers.map((s) => ({
-      [latinToCyrillic('Kompaniya')]: s.name,
-      [latinToCyrillic("Mas'ul shaxs")]: s.contactPerson,
+      [latinToCyrillic('Kompaniya')]: trData(s.name),
+      [latinToCyrillic("Mas'ul shaxs")]: trData(s.contactPerson),
       [latinToCyrillic('Telefon')]: s.phone,
       [latinToCyrillic('Email')]: s.email || '-',
-      [latinToCyrillic('Manzil')]: s.address || '-',
+      [latinToCyrillic('Manzil')]: trData(s.address) || '-',
       [latinToCyrillic("To'lov muddati")]: s.paymentTerms,
       [latinToCyrillic('Status')]: s.active ? latinToCyrillic('Faol') : latinToCyrillic('Nofaol'),
     }));
@@ -431,14 +431,14 @@ export default function Suppliers() {
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                          {getInitials(supplier.name)}
+                          {getInitials(trData(supplier.name))}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-900 truncate">{supplier.name}</p>
+                          <p className="text-sm font-semibold text-slate-900 truncate">{trData(supplier.name)}</p>
                           {supplier.address && (
                             <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 truncate">
                               <MapPin className="w-3 h-3 flex-shrink-0" />
-                              <span className="truncate">{supplier.address}</span>
+                              <span className="truncate">{trData(supplier.address)}</span>
                             </p>
                           )}
                         </div>
@@ -447,7 +447,7 @@ export default function Suppliers() {
                     <td className="px-5 py-4">
                       <p className="text-sm text-slate-700 flex items-center gap-1.5">
                         <User className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                        <span className="truncate">{supplier.contactPerson}</span>
+                        <span className="truncate">{trData(supplier.contactPerson)}</span>
                       </p>
                     </td>
                     <td className="px-5 py-4">
@@ -530,13 +530,13 @@ export default function Suppliers() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
-                    {getInitials(supplier.name)}
+                    {getInitials(trData(supplier.name))}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">{supplier.name}</p>
+                    <p className="text-sm font-semibold text-slate-900 truncate">{trData(supplier.name)}</p>
                     <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
                       <User className="w-3 h-3 flex-shrink-0" />
-                      <span className="truncate">{supplier.contactPerson}</span>
+                      <span className="truncate">{trData(supplier.contactPerson)}</span>
                     </p>
                   </div>
                 </div>
@@ -559,7 +559,7 @@ export default function Suppliers() {
                 {supplier.address && (
                   <p className="text-sm text-slate-500 flex items-center gap-2 min-w-0">
                     <MapPin className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                    <span className="truncate">{supplier.address}</span>
+                    <span className="truncate">{trData(supplier.address)}</span>
                   </p>
                 )}
                 <p className="text-sm text-slate-500 flex items-center gap-2">
@@ -604,7 +604,7 @@ export default function Suppliers() {
         title={latinToCyrillic("Ta'minotchini nofaol qilish")}
         message={
           supplierToDeactivate
-            ? latinToCyrillic(`"${supplierToDeactivate.name}" ta'minotchisini nofaol qilmoqchimisiz?`)
+            ? latinToCyrillic(`"${trData(supplierToDeactivate.name)}" ta'minotchisini nofaol qilmoqchimisiz?`)
             : ''
         }
         confirmText={latinToCyrillic('Nofaol qilish')}
