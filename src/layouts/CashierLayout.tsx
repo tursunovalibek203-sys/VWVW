@@ -15,6 +15,7 @@ import {
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/utils';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 const CashierLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
@@ -84,6 +85,9 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
 
           {/* Foydalanuvchi */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <div className="w-24 sm:w-28 flex-shrink-0">
+              <LanguageSwitcher />
+            </div>
             {/* Admin uchun professional panelga o'tish tugmasi */}
             {isAdmin() && (
               <button

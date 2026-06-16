@@ -3,6 +3,7 @@ import { LayoutDashboard, PackagePlus, BarChart3, LogOut, Package, Shield } from
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/utils';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 const WarehouseLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
@@ -67,6 +68,9 @@ const WarehouseLayout = ({ children }: { children: React.ReactNode }) => {
 
           {/* Right: user + actions */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="w-24 sm:w-28 flex-shrink-0">
+              <LanguageSwitcher />
+            </div>
             {isAdmin() && (
               <button
                 type="button"
