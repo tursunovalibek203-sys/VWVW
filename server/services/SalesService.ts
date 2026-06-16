@@ -472,6 +472,38 @@ export class SalesService {
       } catch { /* silent */ }
     });
 
+    // Telegram receipt: mijoz chatId va kassir session bo'lsa yuborish
+    if (!isKocha && completeSale?.customer?.telegramChatId) {
+      setImmediate(async () => {
+        try {
+          const { TelegramUserService } = await import('./TelegramUserService.js');
+          const cashierUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { name: true, telegramSession: true },
+          });
+          if (!cashierUser?.telegramSession) return;
+
+          const receiptText = TelegramUserService.formatReceipt({
+            cashierName: cashierUser.name,
+            customerName: completeSale.customer!.name,
+            items: completeSale.items.map((i) => ({
+              name: i.product?.name || 'Mahsulot',
+              qty: i.quantity,
+              price: i.pricePerBag,
+              currency: safeCurrency,
+            })),
+            total: completeSale.totalAmount,
+            currency: safeCurrency,
+            paymentMethod: safePaymentMethod,
+            receiptNumber: completeSale.receiptNumber ?? undefined,
+          });
+          await TelegramUserService.sendMessage(userId, completeSale.customer!.telegramChatId!, receiptText);
+        } catch (e: any) {
+          console.warn('⚠️ Telegram receipt yuborishda xatolik:', e.message);
+        }
+      });
+    }
+
     return completeSale as SaleWithRelations;
   }
 

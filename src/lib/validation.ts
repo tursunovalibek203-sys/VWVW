@@ -18,7 +18,8 @@ export const customerSchema = z.object({
   balanceUZS: z.number().optional(),
   balanceUSD: z.number().optional(),
   debtUZS: z.number().optional(),
-  debtUSD: z.number().optional()
+  debtUSD: z.number().optional(),
+  telegramChatId: z.string().optional().or(z.literal(''))
 });
 
 // Product validation schema

@@ -1078,6 +1078,12 @@ export default function CustomersModern() {
                 ]}
               />
 
+              <FormField
+                name="telegramChatId"
+                label="Telegram Chat ID"
+                placeholder={latinToCyrillic('123456789 — sotuv/to\'lovda chek shu raqamga boradi')}
+              />
+
               <FormActions
                 onCancel={() => {
                   setShowAddForm(false);

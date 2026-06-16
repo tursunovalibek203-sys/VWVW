@@ -918,6 +918,41 @@ router.post('/:id/payment', async (req, res) => {
       } catch { /* silent */ }
     });
 
+    // Telegram to'lov tasdigi: mijoz chatId va kassir session bo'lsa
+    if (customer.telegramChatId) {
+      const cashierId = (req as any).user?.id;
+      if (cashierId) {
+        setImmediate(async () => {
+          try {
+            const { TelegramUserService } = await import('../services/TelegramUserService.js');
+            const cashierUser = await (await import('../utils/prisma.js')).prisma.user.findUnique({
+              where: { id: cashierId },
+              select: { name: true, telegramSession: true },
+            });
+            if (!cashierUser?.telegramSession) return;
+
+            const updatedCustomer = payment.customer;
+            const remainingDebt = currency === 'USD'
+              ? (updatedCustomer.debtUSD || 0)
+              : (updatedCustomer.debtUZS || 0);
+            const debtCurrency = currency;
+
+            const text = TelegramUserService.formatPaymentConfirmation({
+              cashierName: cashierUser.name,
+              customerName: customer.name,
+              amount,
+              currency,
+              remainingDebt,
+              debtCurrency,
+            });
+            await TelegramUserService.sendMessage(cashierId, customer.telegramChatId!, text);
+          } catch (e: any) {
+            console.warn('⚠️ Telegram payment xabari yuborishda xatolik:', e.message);
+          }
+        });
+      }
+    }
+
     res.json({
 
       success: true,

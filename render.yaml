@@ -20,3 +20,7 @@ services:
         value: https://luxpetplast-alpha.vercel.app,https://luxpetplast.vercel.app
       - key: USD_TO_UZS_RATE
         value: "12500"
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false

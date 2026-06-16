@@ -57,6 +57,7 @@ import employeeLoansRoutes from './routes/employee-loans';
 import exchangeRatesRoutes from './routes/exchange-rates';
 import ledgerRoutes from './routes/ledger';
 import warehouseRoutes from './routes/warehouse';
+import telegramUserRoutes from './routes/telegram-user';
 
 const app = express();
 const PORT = process.env.PORT || 5003;
@@ -226,6 +227,7 @@ app.use('/api/employee-loans', employeeLoansRoutes);
 app.use('/api/exchange-rates', exchangeRatesRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use('/api/warehouse', warehouseRoutes);
+app.use('/api/telegram-user', telegramUserRoutes);
 
 // Health check — always responds immediately (no DB query to avoid Neon cold start timeout)
 app.get('/api/health', (_req, res) => {

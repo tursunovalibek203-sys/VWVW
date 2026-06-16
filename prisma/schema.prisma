@@ -16,6 +16,10 @@ model User {
   name      String
   role      String   @default("SELLER") // ADMIN, SELLER, WAREHOUSE_MANAGER, ACCOUNTANT, DRIVER, CASHIER
   active    Boolean  @default(true)
+  // Telegram MTProto session (gramjs StringSession)
+  telegramPhone    String?
+  telegramSession  String?  @db.Text
+  telegramLinkedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
