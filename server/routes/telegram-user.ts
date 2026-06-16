@@ -17,7 +17,7 @@ router.get('/status', async (req: AuthRequest, res) => {
       linked: !!user?.telegramSession,
       phone: user?.telegramPhone || null,
       linkedAt: user?.telegramLinkedAt || null,
-      apiConfigured: !!(process.env.TELEGRAM_API_ID && process.env.TELEGRAM_API_HASH),
+      apiConfigured: true,
     });
   } catch (e: any) {
     res.status(500).json({ error: e.message });

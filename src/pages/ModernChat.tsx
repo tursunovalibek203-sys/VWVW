@@ -149,18 +149,6 @@ export default function ModernChat() {
               Kassir Telegram hisobi — chek va to'lovlarni avtomatik yuborish
             </h3>
 
-            {!status?.apiConfigured && (
-              <div className="bg-yellow-900/40 border border-yellow-700 rounded p-3 text-yellow-300 text-xs space-y-1">
-                <div className="font-medium">⚠️ API kalitlari sozlanmagan</div>
-                <div>Render → Environment Variables ga qo'shing:</div>
-                <div className="font-mono bg-yellow-900/40 rounded p-1.5 text-yellow-200">
-                  TELEGRAM_API_ID=123456<br />
-                  TELEGRAM_API_HASH=abcdef1234567890...
-                </div>
-                <div>Kalitlarni <span className="underline">my.telegram.org</span> dan oling</div>
-              </div>
-            )}
-
             {error && (
               <div className="bg-red-900/40 border border-red-700 rounded p-2 text-red-300 text-xs flex items-start gap-2">
                 <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -187,7 +175,7 @@ export default function ModernChat() {
                 </div>
                 <button
                   onClick={handleSendCode}
-                  disabled={busy || !status?.apiConfigured || phone.length < 10}
+                  disabled={busy || phone.length < 10}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-sm font-medium flex items-center gap-1.5"
                 >
                   {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
