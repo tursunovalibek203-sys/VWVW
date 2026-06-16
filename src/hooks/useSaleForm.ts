@@ -286,6 +286,90 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     });
   }, [products, getDefaultUnitsPerBag]);
 
+  // Mahsulotni bir bosishda tanlash VA savatga qo'shish — selectProduct + addItem
+  // orasidagi React state round-trip (stale newItem) muammosini oldini olish uchun
+  // hisob-kitob to'liq sinxron, mahalliy o'zgaruvchilarda bajariladi.
+  const selectAndAddProduct = useCallback((
+    product: Product,
+    selectedCustomer: Customer | undefined,
+    customerPrices: Record<string, string>
+  ) => {
+    let basePrice = parseFloat(product.pricePerBag?.toString() || '0') || 0;
+
+    const customerPrice = selectedCustomer && customerPrices[product.id];
+    if (customerPrice) {
+      basePrice = parseFloat(customerPrice) || 0;
+    } else if (selectedCustomer?.pricePerBag) {
+      basePrice = parseFloat(selectedCustomer.pricePerBag.toString()) || 0;
+    }
+
+    const productPrice = product.pricePerBag;
+    if (productPrice) {
+      basePrice = parseFloat(productPrice.toString()) || basePrice;
+    }
+
+    const defaultUnits = getDefaultUnitsPerBag(product.name);
+    const unitsPerBag = product.unitsPerBag || defaultUnits || 2000;
+
+    const rate = exchangeRateRef.current;
+    const pricePerBag = form.currency === 'UZS' ? Math.round(basePrice * rate) : basePrice;
+    const quantity = 1;
+    const pricePerPiece = pricePerBag / unitsPerBag;
+    const subtotal = quantity * pricePerBag;
+
+    const komplektItems = getKomplektAdditions(product, quantity, products, form.currency, rate);
+
+    setForm((prev) => {
+      const items = [...prev.items];
+
+      const existingIndex = items.findIndex((item) => item.productId === product.id);
+      if (existingIndex >= 0) {
+        const existing = items[existingIndex];
+        const newQty = (typeof existing.quantity === 'number' ? existing.quantity : parseFloat(existing.quantity || '0')) + quantity;
+        items[existingIndex] = {
+          ...existing,
+          quantity: newQty.toString(),
+          bagDisplayValue: newQty.toString(),
+          pricePerBag,
+          pricePerPiece,
+          subtotal: newQty * pricePerBag,
+        };
+      } else {
+        items.push({
+          productId: product.id,
+          productName: product.name,
+          quantity: quantity.toString(),
+          bagDisplayValue: quantity.toString(),
+          pricePerBag,
+          pricePerPiece,
+          unitsPerBag,
+          subtotal,
+          warehouse: product.warehouse || 'other',
+          saleType: 'bag',
+        });
+      }
+
+      for (const kItem of komplektItems) {
+        const kIdx = items.findIndex((i) => i.productId === kItem.productId);
+        if (kIdx >= 0) {
+          const existing = items[kIdx];
+          const kQty = parseFloat(kItem.quantity?.toString() || '0');
+          const newQty = (typeof existing.quantity === 'number' ? existing.quantity : parseFloat(existing.quantity || '0')) + kQty;
+          items[kIdx] = {
+            ...existing,
+            quantity: newQty.toString(),
+            bagDisplayValue: newQty.toString(),
+            subtotal: newQty * existing.pricePerBag,
+          };
+        } else {
+          items.push(kItem);
+        }
+      }
+
+      return { ...prev, items };
+    });
+  }, [products, form.currency, getDefaultUnitsPerBag]);
+
   const addItem = useCallback(async () => {
     if (!newItem.productId || !newItem.quantity) return;
 
@@ -557,6 +641,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     updateFormField,
     updateNewItemField,
     selectProduct,
+    selectAndAddProduct,
     addItem,
     updateItem,
     removeItem,

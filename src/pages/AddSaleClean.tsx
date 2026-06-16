@@ -490,20 +490,17 @@ export default function AddSaleClean() {
   // Handlers
 
   const handleSelectProduct = useCallback(
-    async (product: Product) => {
-      // Tezlashtirilgan - endi API chaqiruvi yo'q
-      saleForm.selectProduct(product, saleForm.products, saleForm.selectedCustomer, saleForm.customerPrices);
-      // Avtomatik savatga qo'shish (komplekt bilan)
-      await saleForm.addItem();
+    (product: Product) => {
+      // selectProduct+addItem orasidagi state race condition (eski narx/komplekt
+      // bilan qo'shilishi) oldini olish uchun bittada sinxron qo'shiladi
+      saleForm.selectAndAddProduct(product, saleForm.selectedCustomer, saleForm.customerPrices);
     },
     [saleForm]
   );
 
   const handleQuickAdd = useCallback(
-    async (product: Product) => {
-      // Tezlashtirilgan - endi API chaqiruvi yo'q
-      saleForm.selectProduct(product, saleForm.products, saleForm.selectedCustomer, saleForm.customerPrices);
-      await saleForm.addItem();
+    (product: Product) => {
+      saleForm.selectAndAddProduct(product, saleForm.selectedCustomer, saleForm.customerPrices);
     },
     [saleForm]
   );
