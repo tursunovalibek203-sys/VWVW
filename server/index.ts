@@ -241,8 +241,8 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Telegram Web Z — chat sahifasi uchun static serve (har doim, production ham dev ham)
-// Fayl manzili: VWVW/telegram_v6 (1)/telegram-web-z/dist/
-const telegramWebZPath = path.join(process.cwd(), '..', 'telegram_v6 (1)', 'telegram-web-z', 'dist');
+// Fayl manzili: VWVW/i/telegram_v6 (1)/telegram-web-z/dist/
+const telegramWebZPath = path.join(process.cwd(), 'i', 'telegram_v6 (1)', 'telegram-web-z', 'dist');
 app.use('/telegram-web', (req, res, next) => {
   // iframe ichida ishlashi uchun X-Frame-Options va CSP ni o'chiramiz
   res.removeHeader('X-Frame-Options');
