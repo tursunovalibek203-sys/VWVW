@@ -236,13 +236,23 @@ export default function Cashbox() {
   }, [loadAll]);
 
   // ── Computed ─────────────────────────────────────────────────────────────
-  // Naqt qo'ldagi pul (NET balans: kirim - chiqim)
+  // 1. Naqt qo'ldagi pul (NET balans: jami kirim - jami chiqim)
   const cashUZS  = cashbox?.byCurrency?.cashUZS  || 0;
   const cashUSD  = cashbox?.byCurrency?.cashUSD  || 0;
   const cardUZS  = cashbox?.byCurrency?.cardUZS  || 0;
   const clickUZS = cashbox?.byCurrency?.clickUZS || 0;
   const totalUZS = cashUZS + cashUSD * exchangeRate + cardUZS + clickUZS;
   const totalUSD = cashUSD + (cashUZS + cardUZS + clickUZS) / exchangeRate;
+
+  // 2. Jami kirim (barcha manbalar: sotuv, mijoz to'lovi, haydovchi, manual)
+  const totalIncUZS  = cashbox?.totalIncomeBy?.cashUZS  || 0;
+  const totalIncUSD  = cashbox?.totalIncomeBy?.cashUSD  || 0;
+  const totalIncCard = (cashbox?.totalIncomeBy?.cardUZS  || 0) + (cashbox?.totalIncomeBy?.clickUZS || 0);
+
+  // 3. Jami chiqim
+  const totalExpUZS  = cashbox?.totalExpenseBy?.cashUZS  || 0;
+  const totalExpUSD  = cashbox?.totalExpenseBy?.cashUSD  || 0;
+  const totalExpCard = (cashbox?.totalExpenseBy?.cardUZS  || 0) + (cashbox?.totalExpenseBy?.clickUZS || 0);
 
   // Bugungi kirim breakdown
   const todayIncomeCashUZS  = cashbox?.todayIncomeBy?.cashUZS  || 0;
@@ -583,188 +593,200 @@ export default function Cashbox() {
         </button>
       </div>
 
-      {/* ── 1. NAQT QO'LDAGI PUL ────────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-5 sm:p-6 text-white shadow-lg shadow-indigo-500/20">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-indigo-200 text-xs font-semibold uppercase tracking-widest">{t('Naqt qoldagi pul')}</p>
-            <p className="text-indigo-100 text-xs mt-0.5">{t('Jami kirim')} − {t('Jami chiqim')}</p>
-          </div>
-          {totalUZS < 0 && (
-            <div className="flex items-center gap-1.5 bg-rose-500/20 px-3 py-1.5 rounded-xl">
-              <AlertTriangle className="w-4 h-4 text-rose-300"/>
-              <span className="text-rose-200 text-xs font-semibold">{t('Manfiy')}</span>
-            </div>
-          )}
-        </div>
+      {/* ── 4 TA ASOSIY DIV ──────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
 
-        {/* 3 ta asosiy bucket: Naqt so'm | Karta so'm | Naqt $ */}
-        <div className="grid grid-cols-3 gap-3 mb-4 pb-4 border-b border-white/20">
-          <div className="bg-white/10 rounded-xl p-3">
-            <div className="flex items-center gap-1.5 mb-2">
-              <Banknote className="w-3.5 h-3.5 text-emerald-300"/>
-              <p className="text-indigo-200 text-xs font-semibold uppercase">{t('Naqt som')}</p>
+        {/* ── DIV 1: NAQD PUL (balans = kirim − chiqim) ── */}
+        <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-4 text-white shadow-lg shadow-indigo-500/20">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+              <Wallet className="w-4 h-4 text-white"/>
             </div>
-            <p className={`text-xl font-bold tabular-nums ${cashUZS < 0 ? 'text-rose-300' : 'text-white'}`}>
-              {Math.round(cashUZS).toLocaleString('en-US')}
-            </p>
-            <p className="text-indigo-300 text-xs mt-0.5">so'm</p>
+            <p className="text-xs font-bold text-indigo-100 uppercase tracking-wide">{t('Naqd pul')}</p>
+            {totalUZS < 0 && <AlertTriangle className="w-3.5 h-3.5 text-rose-300 ml-auto"/>}
           </div>
-
-          <div className="bg-white/10 rounded-xl p-3">
-            <div className="flex items-center gap-1.5 mb-2">
-              <CreditCard className="w-3.5 h-3.5 text-blue-300"/>
-              <p className="text-indigo-200 text-xs font-semibold uppercase">{t('Karta som')}</p>
+          <div className="space-y-2">
+            {/* Naqd USD */}
+            <div className="flex items-center justify-between bg-white/10 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5 text-amber-300"/>
+                <span className="text-xs text-indigo-200">{t('Naqd USD')}</span>
+              </div>
+              <span className={`text-sm font-bold tabular-nums ${cashUSD < 0 ? 'text-rose-300' : 'text-white'}`}>
+                {cashUSD % 1 === 0 ? cashUSD.toLocaleString('en-US') : cashUSD.toFixed(2)}
+                <span className="text-xs font-normal text-indigo-300 ml-1">$</span>
+              </span>
             </div>
-            <p className={`text-xl font-bold tabular-nums ${cardUZS < 0 ? 'text-rose-300' : 'text-white'}`}>
-              {Math.round(cardUZS).toLocaleString('en-US')}
-            </p>
-            <p className="text-indigo-300 text-xs mt-0.5">so'm</p>
-          </div>
-
-          <div className="bg-white/10 rounded-xl p-3">
-            <div className="flex items-center gap-1.5 mb-2">
-              <DollarSign className="w-3.5 h-3.5 text-amber-300"/>
-              <p className="text-indigo-200 text-xs font-semibold uppercase">{t('Naqt dollar')}</p>
+            {/* Naqd UZS */}
+            <div className="flex items-center justify-between bg-white/10 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-1.5">
+                <Banknote className="w-3.5 h-3.5 text-emerald-300"/>
+                <span className="text-xs text-indigo-200">{t('Naqd UZS')}</span>
+              </div>
+              <span className={`text-sm font-bold tabular-nums ${cashUZS < 0 ? 'text-rose-300' : 'text-white'}`}>
+                {Math.round(cashUZS).toLocaleString('en-US')}
+                <span className="text-xs font-normal text-indigo-300 ml-1">so'm</span>
+              </span>
             </div>
-            <p className={`text-xl font-bold tabular-nums ${cashUSD < 0 ? 'text-rose-300' : 'text-white'}`}>
-              {cashUSD % 1 === 0 ? cashUSD.toLocaleString('en-US') : cashUSD.toFixed(2)}
-            </p>
-            <p className="text-indigo-300 text-xs mt-0.5">$</p>
+            {/* Karta */}
+            <div className="flex items-center justify-between bg-white/10 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-blue-300"/>
+                <span className="text-xs text-indigo-200">{t('Karta')}</span>
+              </div>
+              <span className={`text-sm font-bold tabular-nums ${cardUZS < 0 ? 'text-rose-300' : 'text-white'}`}>
+                {Math.round(cardUZS + clickUZS).toLocaleString('en-US')}
+                <span className="text-xs font-normal text-indigo-300 ml-1">so'm</span>
+              </span>
+            </div>
           </div>
-        </div>
-
-        {/* Jami */}
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-indigo-200 text-xs font-medium mb-1">{t('Jami (dollar hisobida)')}</p>
-            <p className={`text-3xl font-bold tabular-nums ${totalUSD < 0 ? 'text-rose-300' : ''}`}>
+          <div className="mt-3 pt-3 border-t border-white/20 flex justify-between items-center">
+            <span className="text-xs text-indigo-300">{t('Jami')}</span>
+            <span className={`text-base font-bold tabular-nums ${totalUSD < 0 ? 'text-rose-300' : 'text-white'}`}>
               {totalUSD % 1 === 0 ? Math.round(totalUSD).toLocaleString('en-US') : totalUSD.toFixed(2)}{' '}
-              <span className="text-xl text-indigo-200">$</span>
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-indigo-200 text-xs font-medium mb-1">{t('So mda')}</p>
-            <p className="text-indigo-100 font-semibold tabular-nums text-sm">
-              {Math.round(totalUZS).toLocaleString('en-US')} so'm
-            </p>
+              <span className="text-indigo-300 font-normal">$</span>
+            </span>
           </div>
         </div>
-      </div>
 
-      {/* ── 2. BUGUNGI KIRIM / CHIQIM ────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Bugungi kirim */}
-        <div className="bg-white rounded-2xl border border-slate-200/70 p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center">
+        {/* ── DIV 2: JAMI KIRIM ── */}
+        <div className="bg-white rounded-2xl border border-emerald-100 p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
               <TrendingUp className="w-4 h-4 text-emerald-600"/>
             </div>
-            <p className="text-sm font-bold text-slate-700 uppercase tracking-wide">{t('Bugungi kirim')}</p>
+            <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">{t('Jami kirim')}</p>
           </div>
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between py-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Banknote className="w-3.5 h-3.5 text-emerald-500"/>
-                <span className="text-sm text-slate-600">{t('Naqt som')}</span>
-              </div>
-              <span className="text-sm font-bold text-slate-900 tabular-nums">
-                {Math.round(todayIncomeCashUZS).toLocaleString('en-US')}
-                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-3.5 h-3.5 text-blue-500"/>
-                <span className="text-sm text-slate-600">{t('Karta som')}</span>
-              </div>
-              <span className="text-sm font-bold text-slate-900 tabular-nums">
-                {Math.round(todayIncomeCardUZS).toLocaleString('en-US')}
-                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-2">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between py-1.5 border-b border-slate-50">
+              <div className="flex items-center gap-1.5">
                 <DollarSign className="w-3.5 h-3.5 text-amber-500"/>
-                <span className="text-sm text-slate-600">{t('Dollar')}</span>
+                <span className="text-xs text-slate-500">{t('Kirim USD')}</span>
               </div>
-              <span className="text-sm font-bold text-slate-900 tabular-nums">
-                {todayIncomeCashUSD % 1 === 0 ? todayIncomeCashUSD.toLocaleString('en-US') : todayIncomeCashUSD.toFixed(2)}
+              <span className="text-sm font-bold text-slate-800 tabular-nums">
+                {totalIncUSD % 1 === 0 ? totalIncUSD.toLocaleString('en-US') : totalIncUSD.toFixed(2)}
                 <span className="text-xs font-normal text-slate-400 ml-1">$</span>
               </span>
             </div>
-            <div className="mt-1 pt-2.5 border-t border-emerald-100 flex justify-between items-center">
-              <span className="text-xs text-slate-400">{t('Jami')}</span>
-              <div className="text-right">
-                <span className="text-base font-bold text-emerald-600 tabular-nums">
-                  +{Math.round(todayIncomeCashUZS + todayIncomeCardUZS + todayIncomeCashUSD * exchangeRate).toLocaleString('en-US')}
-                  <span className="text-xs font-normal ml-1">so'm</span>
-                </span>
-                {todayIncomeCashUSD > 0 && (
-                  <p className="text-xs text-emerald-500 tabular-nums">
-                    +{(todayIncomeCashUSD + (todayIncomeCashUZS + todayIncomeCardUZS) / exchangeRate).toFixed(2)} $
-                  </p>
-                )}
+            <div className="flex items-center justify-between py-1.5 border-b border-slate-50">
+              <div className="flex items-center gap-1.5">
+                <Banknote className="w-3.5 h-3.5 text-emerald-500"/>
+                <span className="text-xs text-slate-500">{t('Kirim UZS')}</span>
               </div>
+              <span className="text-sm font-bold text-slate-800 tabular-nums">
+                {Math.round(totalIncUZS).toLocaleString('en-US')}
+                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <div className="flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-blue-500"/>
+                <span className="text-xs text-slate-500">{t('Karta kirim')}</span>
+              </div>
+              <span className="text-sm font-bold text-slate-800 tabular-nums">
+                {Math.round(totalIncCard).toLocaleString('en-US')}
+                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+              </span>
+            </div>
+          </div>
+          <div className="mt-3 pt-2 border-t border-emerald-100 flex justify-between items-center">
+            <span className="text-xs text-slate-400">{t('Jami')}</span>
+            <span className="text-base font-bold text-emerald-600 tabular-nums">
+              +{Math.round(totalIncUZS + totalIncCard + totalIncUSD * exchangeRate).toLocaleString('en-US')}
+              <span className="text-xs font-normal ml-1">so'm</span>
+            </span>
+          </div>
+        </div>
+
+        {/* ── DIV 3: JAMI CHIQIM ── */}
+        <div className="bg-white rounded-2xl border border-rose-100 p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-rose-50 flex items-center justify-center">
+              <TrendingDown className="w-4 h-4 text-rose-600"/>
+            </div>
+            <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">{t('Jami chiqim')}</p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between py-1.5 border-b border-slate-50">
+              <div className="flex items-center gap-1.5">
+                <Banknote className="w-3.5 h-3.5 text-emerald-500"/>
+                <span className="text-xs text-slate-500">{t('Chiqim UZS')}</span>
+              </div>
+              <span className="text-sm font-bold text-slate-800 tabular-nums">
+                {Math.round(totalExpUZS).toLocaleString('en-US')}
+                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1.5 border-b border-slate-50">
+              <div className="flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5 text-amber-500"/>
+                <span className="text-xs text-slate-500">{t('Chiqim USD')}</span>
+              </div>
+              <span className="text-sm font-bold text-slate-800 tabular-nums">
+                {totalExpUSD % 1 === 0 ? totalExpUSD.toLocaleString('en-US') : totalExpUSD.toFixed(2)}
+                <span className="text-xs font-normal text-slate-400 ml-1">$</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1.5">
+              <div className="flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-blue-500"/>
+                <span className="text-xs text-slate-500">{t('Karta chiqim')}</span>
+              </div>
+              <span className="text-sm font-bold text-slate-800 tabular-nums">
+                {Math.round(totalExpCard).toLocaleString('en-US')}
+                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
+              </span>
+            </div>
+          </div>
+          <div className="mt-3 pt-2 border-t border-rose-100 flex justify-between items-center">
+            <span className="text-xs text-slate-400">{t('Jami')}</span>
+            <span className="text-base font-bold text-rose-600 tabular-nums">
+              -{Math.round(totalExpUZS + totalExpCard + totalExpUSD * exchangeRate).toLocaleString('en-US')}
+              <span className="text-xs font-normal ml-1">so'm</span>
+            </span>
+          </div>
+        </div>
+
+        {/* ── DIV 4: NET BALANS (jami) ── */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center">
+              <Scale className="w-4 h-4 text-slate-600"/>
+            </div>
+            <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">{t('Net balans')}</p>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-slate-400 mb-1">{t('Dollar hisobida')}</p>
+              <p className={`text-2xl font-bold tabular-nums ${totalUSD < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                {totalUSD % 1 === 0 ? Math.round(totalUSD).toLocaleString('en-US') : totalUSD.toFixed(2)}{' '}
+                <span className="text-lg text-slate-400 font-normal">$</span>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">{t('So mda')}</p>
+              <p className={`text-lg font-bold tabular-nums ${totalUZS < 0 ? 'text-rose-600' : 'text-slate-700'}`}>
+                {Math.round(totalUZS).toLocaleString('en-US')}
+                <span className="text-sm text-slate-400 font-normal ml-1">so'm</span>
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 pt-2 border-t border-slate-100">
+            <div className="flex justify-between text-xs text-slate-400">
+              <span>{t('Bugun kirim')}</span>
+              <span className="text-emerald-600 font-semibold">
+                +{Math.round(cashbox?.todayIncome || 0).toLocaleString('en-US')}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs text-slate-400 mt-1">
+              <span>{t('Bugun chiqim')}</span>
+              <span className="text-rose-600 font-semibold">
+                -{Math.round(cashbox?.todayExpense || 0).toLocaleString('en-US')}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Bugungi chiqim */}
-        <div className="bg-white rounded-2xl border border-slate-200/70 p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-xl bg-rose-50 flex items-center justify-center">
-              <TrendingDown className="w-4 h-4 text-rose-600"/>
-            </div>
-            <p className="text-sm font-bold text-slate-700 uppercase tracking-wide">{t('Bugungi chiqim')}</p>
-          </div>
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between py-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Banknote className="w-3.5 h-3.5 text-emerald-500"/>
-                <span className="text-sm text-slate-600">{t('Naqt som')}</span>
-              </div>
-              <span className="text-sm font-bold text-slate-900 tabular-nums">
-                {Math.round(todayExpenseCashUZS).toLocaleString('en-US')}
-                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-3.5 h-3.5 text-blue-500"/>
-                <span className="text-sm text-slate-600">{t('Karta som')}</span>
-              </div>
-              <span className="text-sm font-bold text-slate-900 tabular-nums">
-                {Math.round(todayExpenseCardUZS).toLocaleString('en-US')}
-                <span className="text-xs font-normal text-slate-400 ml-1">so'm</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-3.5 h-3.5 text-amber-500"/>
-                <span className="text-sm text-slate-600">{t('Dollar')}</span>
-              </div>
-              <span className="text-sm font-bold text-slate-900 tabular-nums">
-                {todayExpenseCashUSD % 1 === 0 ? todayExpenseCashUSD.toLocaleString('en-US') : todayExpenseCashUSD.toFixed(2)}
-                <span className="text-xs font-normal text-slate-400 ml-1">$</span>
-              </span>
-            </div>
-            <div className="mt-1 pt-2.5 border-t border-rose-100 flex justify-between items-center">
-              <span className="text-xs text-slate-400">{t('Jami')}</span>
-              <div className="text-right">
-                <span className="text-base font-bold text-rose-600 tabular-nums">
-                  -{Math.round(todayExpenseCashUZS + todayExpenseCardUZS + todayExpenseCashUSD * exchangeRate).toLocaleString('en-US')}
-                  <span className="text-xs font-normal ml-1">so'm</span>
-                </span>
-                {todayExpenseCashUSD > 0 && (
-                  <p className="text-xs text-rose-500 tabular-nums">
-                    -{(todayExpenseCashUSD + (todayExpenseCashUZS + todayExpenseCardUZS) / exchangeRate).toFixed(2)} $
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* ── 3. OYLIK STATISTIKA ──────────────────────────────────────────── */}

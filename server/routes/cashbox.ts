@@ -177,6 +177,10 @@ router.get('/summary', async (req, res) => {
     const monthIncomeBy  = parseBreakdown(monthBreakdownRaw  as any[], 'INCOME');
     const monthExpenseBy = parseBreakdown(monthBreakdownRaw  as any[], 'EXPENSE');
 
+    // Jami (all-time) kirim va chiqim — valyuta+usul bo'yicha (currencyRaw dan)
+    const totalIncomeBy  = parseBreakdown(currencyRaw as any[], 'INCOME');
+    const totalExpenseBy = parseBreakdown(currencyRaw as any[], 'EXPENSE');
+
     res.json({
       totalBalance,
       totalUSD,
@@ -185,6 +189,8 @@ router.get('/summary', async (req, res) => {
       monthlyIncome,
       monthlyExpense,
       byCurrency: { cashUZS, cashUSD, cardUZS, clickUZS },
+      totalIncomeBy,
+      totalExpenseBy,
       dailyFlow,
       todayIncomeBy,
       todayExpenseBy,
