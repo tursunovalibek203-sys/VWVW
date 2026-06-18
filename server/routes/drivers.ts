@@ -32,7 +32,7 @@ router.get('/', async (req, res) => {
 });
 
 // Haydovchi yaratish
-router.post('/', authorize('ADMIN'), async (req: AuthRequest, res) => {
+router.post('/', authorize('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
   try {
     const { 
       name, 
@@ -85,7 +85,7 @@ router.post('/', authorize('ADMIN'), async (req: AuthRequest, res) => {
 });
 
 // Haydovchi ma'lumotlarini yangilash
-router.put('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
+router.put('/:id', authorize('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
@@ -409,7 +409,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Haydovchini o'chirish
-router.delete('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
+router.delete('/:id', authorize('ADMIN', 'MANAGER'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
