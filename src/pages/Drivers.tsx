@@ -111,7 +111,7 @@ export function Drivers() {
     phone: '',
     licenseNumber: '',
     vehicleNumber: '',
-    email: '',
+    login: '',
     password: '',
     telegramBotToken: ''
   });
@@ -196,7 +196,7 @@ export function Drivers() {
         phone: '',
         licenseNumber: '',
         vehicleNumber: '',
-        email: '',
+        login: '',
         password: '',
         telegramBotToken: ''
       });
@@ -875,14 +875,14 @@ export function Drivers() {
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="driver-email" className="block text-xs font-semibold text-slate-600">Email ({latinToCyrillic('ixtiyoriy')})</label>
+                <label htmlFor="driver-login" className="block text-xs font-semibold text-slate-600">{latinToCyrillic('Login')} ({latinToCyrillic('ixtiyoriy')})</label>
                 <input
-                  id="driver-email"
-                  type="email"
-                  placeholder="email@example.com"
+                  id="driver-login"
+                  type="text"
+                  placeholder="driver_login"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all"
-                  value={newDriver.email}
-                  onChange={(e) => setNewDriver({ ...newDriver, email: e.target.value })}
+                  value={newDriver.login}
+                  onChange={(e) => setNewDriver({ ...newDriver, login: e.target.value })}
                 />
               </div>
 
