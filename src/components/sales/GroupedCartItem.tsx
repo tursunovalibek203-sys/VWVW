@@ -54,6 +54,20 @@ export function GroupedCartItem({
     });
   };
 
+  const handleMainPriceChange = (val: string) => {
+    const clean = val.replace(/[^0-9.]/g, '');
+    const price = parseFloat(clean) || 0;
+    const qty = qtyNum(mainItem.quantity);
+    onUpdate(mainIndex, { pricePerBag: price, subtotal: qty * price });
+  };
+
+  const handleSubPriceChange = (idx: number, item: SaleItemForm, val: string) => {
+    const clean = val.replace(/[^0-9.]/g, '');
+    const price = parseFloat(clean) || 0;
+    const qty = qtyNum(item.quantity);
+    onUpdate(idx, { pricePerBag: price, subtotal: qty * price });
+  };
+
   const warehouseIcon = (wh?: string) => {
     if (wh === 'krishka') return '⭕';
     if (wh === 'ruchka') return '🎗';
@@ -90,48 +104,62 @@ export function GroupedCartItem({
       {!collapsed && (
         <div className="divide-y divide-blue-100">
           {/* Asosiy mahsulot satri */}
-          <div className="flex items-center gap-2 px-3 py-2">
-            <span className="text-sm w-5">🏭</span>
-            <span className="text-xs text-slate-600 flex-1 truncate">{trData(mainItem.productName)}</span>
-            <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2 px-3 py-2 flex-wrap">
+            <span className="text-sm w-5 shrink-0">🏭</span>
+            <span className="text-xs text-slate-600 flex-1 min-w-[80px] truncate">{trData(mainItem.productName)}</span>
+            <div className="flex items-center gap-1 shrink-0">
               <input
-                type="number"
-                min="0"
+                type="number" min="0"
                 value={qtyNum(mainItem.quantity) || ''}
                 onChange={e => handleMainQtyChange(e.target.value)}
-                className="w-14 text-center text-sm border border-blue-300 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-500"
+                className="w-12 text-center text-xs border border-blue-300 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-500"
                 placeholder="0"
               />
               <span className="text-xs text-slate-400">qop</span>
             </div>
-            <span className="text-xs text-slate-500 w-20 text-right">
-              {sym}{mainItem.pricePerBag.toLocaleString()}/qop
-            </span>
-            <span className="text-sm font-semibold text-slate-700 w-20 text-right tabular-nums">
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-xs text-slate-400">{sym}</span>
+              <input
+                type="number" min="0" step="0.01"
+                value={mainItem.pricePerBag || ''}
+                onChange={e => handleMainPriceChange(e.target.value)}
+                className="w-20 text-center text-xs border border-blue-300 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-500"
+                placeholder="narx"
+              />
+              <span className="text-xs text-slate-400">/qop</span>
+            </div>
+            <span className="text-sm font-semibold text-slate-700 w-16 text-right tabular-nums shrink-0">
               {sym}{mainItem.subtotal.toLocaleString()}
             </span>
           </div>
 
           {/* Komplekt sub-mahsulotlar */}
           {subItems.map((sub, i) => (
-            <div key={sub.productId} className="flex items-center gap-2 px-3 py-2 bg-white/60">
-              <span className="text-sm w-5">{warehouseIcon(sub.warehouse)}</span>
-              <span className="text-xs text-slate-600 flex-1 truncate">{trData(sub.productName)}</span>
-              <div className="flex items-center gap-1">
+            <div key={sub.productId} className="flex items-center gap-2 px-3 py-2 bg-white/60 flex-wrap">
+              <span className="text-sm w-5 shrink-0">{warehouseIcon(sub.warehouse)}</span>
+              <span className="text-xs text-slate-600 flex-1 min-w-[80px] truncate">{trData(sub.productName)}</span>
+              <div className="flex items-center gap-1 shrink-0">
                 <input
-                  type="number"
-                  min="0"
+                  type="number" min="0"
                   value={qtyNum(sub.quantity) || ''}
                   onChange={e => handleSubQtyChange(subIndices[i], sub, e.target.value)}
-                  className="w-14 text-center text-sm border border-slate-200 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-400"
+                  className="w-12 text-center text-xs border border-slate-200 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-400"
                   placeholder="0"
                 />
                 <span className="text-xs text-slate-400">qop</span>
               </div>
-              <span className="text-xs text-slate-500 w-20 text-right">
-                {sym}{sub.pricePerBag.toLocaleString()}/qop
-              </span>
-              <span className="text-sm font-semibold text-slate-700 w-20 text-right tabular-nums">
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-xs text-slate-400">{sym}</span>
+                <input
+                  type="number" min="0" step="0.01"
+                  value={sub.pricePerBag || ''}
+                  onChange={e => handleSubPriceChange(subIndices[i], sub, e.target.value)}
+                  className="w-20 text-center text-xs border border-slate-200 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-400"
+                  placeholder="narx"
+                />
+                <span className="text-xs text-slate-400">/qop</span>
+              </div>
+              <span className="text-sm font-semibold text-slate-700 w-16 text-right tabular-nums shrink-0">
                 {sym}{sub.subtotal.toLocaleString()}
               </span>
             </div>
