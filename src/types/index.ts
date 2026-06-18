@@ -397,6 +397,8 @@ export interface SaleItemForm {
   warehouse?: string;
   subType?: string;
   saleType: 'bag' | 'piece' | 'komplekt';
+  komplektGroupId?: string; // Bir komplektdagi barcha mahsulotlar uchun bir xil ID
+  isKomplektMain?: boolean;  // Asosiy mahsulot (preform/kapsula)
 }
 
 export interface SaleFormData {

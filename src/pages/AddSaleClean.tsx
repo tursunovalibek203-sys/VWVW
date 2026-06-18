@@ -21,7 +21,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { printReceipt } from '../lib/receiptPrinter';
 import { latinToCyrillic } from '../lib/transliterator';
 import { useSaleForm } from '../hooks/useSaleForm';
-import { ProductTypeCard, CartItem, PaymentSection } from '../components/sales';
+import { ProductTypeCard, CartItem, GroupedCartItem, PaymentSection } from '../components/sales';
 import { filterProductsByCategory, getCurrencySymbol, getDisplayAmount } from '../lib/saleUtils';
 import { useRealtime } from '../hooks/useRealtime';
 import api from '../lib/professionalApi';
@@ -903,22 +903,66 @@ export default function AddSaleClean() {
               </div>
               {itemCount > 0 ? (
                 <div className="p-4 sm:p-5 space-y-2 max-h-[55vh] overflow-y-auto">
-                  {saleForm.form.items.map((item, index) => (
-                    <CartItem
-                      key={index}
-                      item={item}
-                      index={index}
-                      isEditing={editingItemIndex === index}
-                      products={saleForm.products}
-                      currency={saleForm.form.currency}
-                      latinToCyrillic={latinToCyrillic}
-                      onUpdate={(idx, updates) => {
-                        saleForm.updateItem(idx, updates);
-                        setEditingItemIndex(idx);
-                      }}
-                      onRemove={saleForm.removeItem}
-                    />
-                  ))}
+                  {(() => {
+                    const items = saleForm.form.items;
+                    const rendered = new Set<string>();
+                    const nodes: React.ReactNode[] = [];
+
+                    items.forEach((item, index) => {
+                      if (item.komplektGroupId) {
+                        if (rendered.has(item.komplektGroupId)) return;
+                        rendered.add(item.komplektGroupId);
+
+                        const groupItems = items
+                          .map((it, i) => ({ it, i }))
+                          .filter(({ it }) => it.komplektGroupId === item.komplektGroupId);
+                        const main = groupItems.find(({ it }) => it.isKomplektMain);
+                        const subs = groupItems.filter(({ it }) => !it.isKomplektMain);
+
+                        if (!main) return;
+                        nodes.push(
+                          <GroupedCartItem
+                            key={item.komplektGroupId}
+                            mainItem={main.it}
+                            subItems={subs.map(({ it }) => it)}
+                            mainIndex={main.i}
+                            subIndices={subs.map(({ i }) => i)}
+                            currency={saleForm.form.currency}
+                            onUpdate={(idx, updates) => {
+                              saleForm.updateItem(idx, updates);
+                              setEditingItemIndex(idx);
+                            }}
+                            onRemoveGroup={(groupId) => {
+                              const idxs = items
+                                .map((it, i) => ({ it, i }))
+                                .filter(({ it }) => it.komplektGroupId === groupId)
+                                .map(({ i }) => i)
+                                .sort((a, b) => b - a);
+                              idxs.forEach(i => saleForm.removeItem(i));
+                            }}
+                          />
+                        );
+                      } else {
+                        nodes.push(
+                          <CartItem
+                            key={index}
+                            item={item}
+                            index={index}
+                            isEditing={editingItemIndex === index}
+                            products={saleForm.products}
+                            currency={saleForm.form.currency}
+                            latinToCyrillic={latinToCyrillic}
+                            onUpdate={(idx, updates) => {
+                              saleForm.updateItem(idx, updates);
+                              setEditingItemIndex(idx);
+                            }}
+                            onRemove={saleForm.removeItem}
+                          />
+                        );
+                      }
+                    });
+                    return nodes;
+                  })()}
                 </div>
               ) : (
                 <EmptyState

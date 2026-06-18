@@ -315,11 +315,17 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
 
     const komplektItems = getKomplektAdditions(product, quantity, products, form.currency, rate);
 
+    // Komplekt bo'lsa — barcha mahsulotlarga bir xil groupId beramiz
+    const groupId = komplektItems.length > 0
+      ? `kg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      : undefined;
+
     setForm((prev) => {
       const items = [...prev.items];
 
-      const existingIndex = items.findIndex((item) => item.productId === product.id);
-      if (existingIndex >= 0) {
+      const existingIndex = items.findIndex((item) => item.productId === product.id && !item.komplektGroupId);
+      if (existingIndex >= 0 && !groupId) {
+        // Komplektsiz mahsulot: sonini oshir
         const existing = items[existingIndex];
         const newQty = (typeof existing.quantity === 'number' ? existing.quantity : parseFloat(existing.quantity || '0')) + quantity;
         items[existingIndex] = {
@@ -331,6 +337,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
           subtotal: newQty * pricePerBag,
         };
       } else {
+        // Yangi card (komplektli yoki komplektsiz yangi qator)
         items.push({
           productId: product.id,
           productName: product.name,
@@ -342,24 +349,17 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
           subtotal,
           warehouse: product.warehouse || 'other',
           saleType: 'bag',
+          komplektGroupId: groupId,
+          isKomplektMain: !!groupId,
         });
       }
 
       for (const kItem of komplektItems) {
-        const kIdx = items.findIndex((i) => i.productId === kItem.productId);
-        if (kIdx >= 0) {
-          const existing = items[kIdx];
-          const kQty = parseFloat(kItem.quantity?.toString() || '0');
-          const newQty = (typeof existing.quantity === 'number' ? existing.quantity : parseFloat(existing.quantity || '0')) + kQty;
-          items[kIdx] = {
-            ...existing,
-            quantity: newQty.toString(),
-            bagDisplayValue: newQty.toString(),
-            subtotal: newQty * existing.pricePerBag,
-          };
-        } else {
-          items.push(kItem);
-        }
+        items.push({
+          ...kItem,
+          komplektGroupId: groupId,
+          isKomplektMain: false,
+        });
       }
 
       return { ...prev, items };
@@ -454,10 +454,14 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
   }, []);
 
   const removeItem = useCallback((index: number) => {
-    setForm((prev) => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index),
-    }));
+    setForm((prev) => {
+      const target = prev.items[index];
+      if (target?.komplektGroupId) {
+        // Komplekt guruhidagi barcha mahsulotlarni birga o'chirish
+        return { ...prev, items: prev.items.filter((item) => item.komplektGroupId !== target.komplektGroupId) };
+      }
+      return { ...prev, items: prev.items.filter((_, i) => i !== index) };
+    });
   }, []);
 
   const clearItems = useCallback(() => {

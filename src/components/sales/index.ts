@@ -6,3 +6,4 @@ export { PaymentSection } from './PaymentSection';
 export { SalesStatsCards } from './SalesStats';
 export { SalesFilters } from './SalesFilters';
 export { SaleCard } from './SaleCard';
+export { GroupedCartItem } from './GroupedCartItem';
