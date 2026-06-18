@@ -7,7 +7,7 @@ import {
   Smartphone, ArrowLeftRight, Receipt, Users, Zap, Truck, Wrench,
   Building2, ShoppingCart, MoreHorizontal, RefreshCw, Plus, Loader2, X,
   History, UserCheck, ArrowUpRight, ArrowDownRight, Download, Clock,
-  AlertTriangle, CheckCircle2, BarChart2, Scale, ChevronLeft,
+  AlertTriangle, CheckCircle2, BarChart2, Scale, ChevronLeft, Magnet,
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -1618,17 +1618,35 @@ export default function Cashbox() {
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <Lbl>{t('UZS (naqd)')}</Lbl>
+            <div className="flex items-center justify-between mb-1.5">
+              <Lbl>{t('UZS (naqd)')}</Lbl>
+              <button type="button" onClick={() => setExpForm({...expForm, amountUZS: String(Math.max(0, Math.round(cashUZS)))})}
+                title="Kassadagi naqd UZS ni to'ldirish" className="p-0.5 text-indigo-400 hover:text-indigo-600 transition-colors active:scale-90">
+                <Magnet className="w-3.5 h-3.5" />
+              </button>
+            </div>
             <input value={expForm.amountUZS} onChange={e=>setExpForm({...expForm,amountUZS:e.target.value})}
               type="number" min="0" placeholder="0" className={inp}/>
           </div>
           <div>
-            <Lbl>{t('Dollar ($)')}</Lbl>
+            <div className="flex items-center justify-between mb-1.5">
+              <Lbl>{t('Dollar ($)')}</Lbl>
+              <button type="button" onClick={() => setExpForm({...expForm, amountUSD: cashUSD > 0 ? cashUSD.toFixed(2) : '0'})}
+                title="Kassadagi naqd USD ni to'ldirish" className="p-0.5 text-indigo-400 hover:text-indigo-600 transition-colors active:scale-90">
+                <Magnet className="w-3.5 h-3.5" />
+              </button>
+            </div>
             <input value={expForm.amountUSD} onChange={e=>setExpForm({...expForm,amountUSD:e.target.value})}
               type="number" min="0" step="0.01" placeholder="0.00" className={inp}/>
           </div>
           <div>
-            <Lbl>{t('Karta (UZS)')}</Lbl>
+            <div className="flex items-center justify-between mb-1.5">
+              <Lbl>{t('Karta (UZS)')}</Lbl>
+              <button type="button" onClick={() => setExpForm({...expForm, amountKarta: String(Math.max(0, Math.round(cardUZS + clickUZS)))})}
+                title="Kassadagi karta balansini to'ldirish" className="p-0.5 text-indigo-400 hover:text-indigo-600 transition-colors active:scale-90">
+                <Magnet className="w-3.5 h-3.5" />
+              </button>
+            </div>
             <input value={expForm.amountKarta} onChange={e=>setExpForm({...expForm,amountKarta:e.target.value})}
               type="number" min="0" placeholder="0" className={inp}/>
           </div>
@@ -1718,7 +1736,14 @@ export default function Cashbox() {
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Lbl>{t('Summa')}</Lbl>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <Lbl>{t('Summa')}</Lbl>
+                  <button type="button" onClick={() => setRepayForm({...repayForm, amount: String(repayTarget?.remainingAmount ?? repayTarget?.amount ?? 0)})}
+                    title="Qolgan summani to'ldirish" className="p-0.5 text-indigo-400 hover:text-indigo-600 transition-colors active:scale-90">
+                    <Magnet className="w-3.5 h-3.5" />
+                  </button>
+                </div>
                 <input value={repayForm.amount} onChange={e=>setRepayForm({...repayForm,amount:e.target.value})} type="number" min="0" placeholder="0.00" className={inp}/>
               </div>
               <div><Lbl>{t('Valyuta')}</Lbl>

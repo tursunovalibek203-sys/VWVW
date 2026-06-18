@@ -1,4 +1,4 @@
-import { ShoppingCart, X, RotateCcw } from 'lucide-react';
+import { ShoppingCart, X, RotateCcw, Magnet } from 'lucide-react';
 import type { SaleFormData } from '../../types';
 import { getCurrencySymbol, getDisplayAmount } from '../../lib/saleUtils';
 
@@ -58,6 +58,16 @@ export const PaymentSection = ({
 
   const isDisabled = isSubmitting || form.items.length === 0;
 
+  // Auto-fill logic
+  const rate = parseFloat(exchangeRate) || 12500;
+  const uzsVal = parseFloat(form.paidUZS) || 0;
+  const usdVal = parseFloat(form.paidUSD) || 0;
+  const kartaVal = parseFloat(form.paidKARTA) || 0;
+  const totalInUZS = currency === 'USD' ? totalAmount * rate : totalAmount;
+  const fillUZS  = () => onUpdateForm({ paidUZS:  String(Math.max(0, Math.round(totalInUZS - usdVal * rate - kartaVal))) });
+  const fillUSD  = () => { const r = Math.max(0, (totalInUZS - uzsVal - kartaVal) / rate); onUpdateForm({ paidUSD: r > 0 ? r.toFixed(2) : '0' }); };
+  const fillKARTA = () => onUpdateForm({ paidKARTA: String(Math.max(0, Math.round(totalInUZS - uzsVal - usdVal * rate))) });
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-4">
@@ -110,47 +120,47 @@ export const PaymentSection = ({
           {/* Payment Inputs */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label htmlFor="paidUZS" className="block text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5">UZS</label>
+              <label htmlFor="paidUZS" className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5">
+                <span>UZS</span>
+                <button type="button" onClick={fillUZS} title="Qolgan summani to'ldirish" className="p-0.5 text-indigo-400 hover:text-indigo-600 transition-colors active:scale-90"><Magnet className="w-3.5 h-3.5" /></button>
+              </label>
               <input
                 id="paidUZS"
                 type="text"
                 inputMode="decimal"
                 placeholder="0"
                 value={form.paidUZS}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9]/g, '');
-                  onUpdateForm({ paidUZS: val });
-                }}
+                onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); onUpdateForm({ paidUZS: val }); }}
                 className="w-full h-11 px-3 text-sm font-medium text-slate-900 tabular-nums rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
               />
             </div>
             <div>
-              <label htmlFor="paidUSD" className="block text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5">USD</label>
+              <label htmlFor="paidUSD" className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-slate-400 mb-1.5">
+                <span>USD</span>
+                <button type="button" onClick={fillUSD} title="Qolgan summani to'ldirish" className="p-0.5 text-indigo-400 hover:text-indigo-600 transition-colors active:scale-90"><Magnet className="w-3.5 h-3.5" /></button>
+              </label>
               <input
                 id="paidUSD"
                 type="text"
                 inputMode="decimal"
                 placeholder="0.00"
                 value={form.paidUSD}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9.]/g, '').replace(/\.(?=.*\.)/g, '');
-                  onUpdateForm({ paidUSD: val });
-                }}
+                onChange={(e) => { const val = e.target.value.replace(/[^0-9.]/g, '').replace(/\.(?=.*\.)/g, ''); onUpdateForm({ paidUSD: val }); }}
                 className="w-full h-11 px-3 text-sm font-medium text-slate-900 tabular-nums rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
               />
             </div>
             <div>
-              <label htmlFor="paidKARTA" className="block text-xs font-medium uppercase tracking-wide text-blue-400 mb-1.5">{latinToCyrillic('Karta')}</label>
+              <label htmlFor="paidKARTA" className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-blue-400 mb-1.5">
+                <span>{latinToCyrillic('Karta')}</span>
+                <button type="button" onClick={fillKARTA} title="Qolgan summani to'ldirish" className="p-0.5 text-blue-400 hover:text-blue-600 transition-colors active:scale-90"><Magnet className="w-3.5 h-3.5" /></button>
+              </label>
               <input
                 id="paidKARTA"
                 type="text"
                 inputMode="decimal"
                 placeholder="0"
                 value={form.paidKARTA}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9]/g, '');
-                  onUpdateForm({ paidKARTA: val });
-                }}
+                onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ''); onUpdateForm({ paidKARTA: val }); }}
                 className="w-full h-11 px-3 text-sm font-medium text-slate-900 tabular-nums rounded-xl border border-blue-200 bg-blue-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
               />
             </div>

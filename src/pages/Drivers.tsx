@@ -20,6 +20,7 @@ import {
   Users,
   CheckCircle2,
   Clock,
+  Magnet,
 } from 'lucide-react';
 import { latinToCyrillic, trData } from '../lib/transliterator';
 import { exportToExcel } from '../lib/excelUtils';
@@ -1094,44 +1095,44 @@ export function Drivers() {
               </div>
 
               {/* 3 ta input */}
+              {(() => {
+                const _rate = parseFloat(paymentExchangeRate) || 12700;
+                const _uzs = parseFloat(paymentUZS) || 0;
+                const _usd = parseFloat(paymentUSD) || 0;
+                const _karta = parseFloat(paymentKarta) || 0;
+                const totalDebt = paymentDriver?.debtToCompany || 0;
+                const fUSD  = () => { const r = Math.max(0, (totalDebt - _uzs - _karta) / _rate); setPaymentUSD(r > 0 ? r.toFixed(2) : '0'); };
+                const fUZS  = () => setPaymentUZS(String(Math.max(0, Math.round(totalDebt - _usd * _rate - _karta))));
+                const fKarta = () => setPaymentKarta(String(Math.max(0, Math.round(totalDebt - _uzs - _usd * _rate))));
+                return (
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">{latinToCyrillic('Topshirilgan summalar')}</label>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-emerald-600 w-20 flex-shrink-0">💵 USD ($)</span>
-                  <input type="number" min="0" placeholder="0"
-                    value={paymentUSD}
-                    onChange={e => setPaymentUSD(e.target.value)}
-                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all"
-                  />
+                  <input type="number" min="0" placeholder="0" value={paymentUSD} onChange={e => setPaymentUSD(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all" />
+                  <button type="button" onClick={fUSD} title="Qolgan summani to'ldirish" className="p-1 text-indigo-400 hover:text-indigo-600 transition-colors active:scale-90 flex-shrink-0"><Magnet className="w-4 h-4" /></button>
                   {paymentUSD && parseFloat(paymentUSD) > 0 && (
-                    <span className="text-xs text-slate-400 w-24 text-right flex-shrink-0">
-                      ≈ {Math.round(parseFloat(paymentUSD) * (parseFloat(paymentExchangeRate)||12700)).toLocaleString()}
-                    </span>
+                    <span className="text-xs text-slate-400 w-20 text-right flex-shrink-0">≈ {Math.round(parseFloat(paymentUSD) * _rate).toLocaleString()}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-blue-600 w-20 flex-shrink-0">💴 {latinToCyrillic('Naqd')}</span>
-                  <input type="number" min="0" placeholder="0"
-                    value={paymentUZS}
-                    onChange={e => setPaymentUZS(e.target.value)}
-                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all"
-                  />
-                  {paymentUZS && parseFloat(paymentUZS) > 0 && (
-                    <span className="text-xs text-slate-400 w-24 text-right flex-shrink-0">UZS</span>
-                  )}
+                  <input type="number" min="0" placeholder="0" value={paymentUZS} onChange={e => setPaymentUZS(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all" />
+                  <button type="button" onClick={fUZS} title="Qolgan summani to'ldirish" className="p-1 text-indigo-400 hover:text-indigo-600 transition-colors active:scale-90 flex-shrink-0"><Magnet className="w-4 h-4" /></button>
+                  {paymentUZS && parseFloat(paymentUZS) > 0 && <span className="text-xs text-slate-400 w-20 text-right flex-shrink-0">UZS</span>}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-purple-600 w-20 flex-shrink-0">💳 {latinToCyrillic('Karta')}</span>
-                  <input type="number" min="0" placeholder="0"
-                    value={paymentKarta}
-                    onChange={e => setPaymentKarta(e.target.value)}
-                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all"
-                  />
-                  {paymentKarta && parseFloat(paymentKarta) > 0 && (
-                    <span className="text-xs text-slate-400 w-24 text-right flex-shrink-0">UZS</span>
-                  )}
+                  <input type="number" min="0" placeholder="0" value={paymentKarta} onChange={e => setPaymentKarta(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all" />
+                  <button type="button" onClick={fKarta} title="Qolgan summani to'ldirish" className="p-1 text-indigo-400 hover:text-indigo-600 transition-colors active:scale-90 flex-shrink-0"><Magnet className="w-4 h-4" /></button>
+                  {paymentKarta && parseFloat(paymentKarta) > 0 && <span className="text-xs text-slate-400 w-20 text-right flex-shrink-0">UZS</span>}
                 </div>
               </div>
+                );
+              })()}
 
               {/* Jami va qolgan qarz */}
               {(() => {

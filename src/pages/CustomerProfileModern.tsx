@@ -20,6 +20,7 @@ import {
   ShieldAlert,
   Banknote,
   DollarSign,
+  Magnet,
 } from 'lucide-react';
 import { latinToCyrillic, trData } from '../lib/transliterator';
 import { formatDate, formatCurrency } from '../lib/utils';
@@ -723,52 +724,44 @@ export default function CustomerProfileModern() {
                 </div>
 
                 {/* 3 ta to'lov inputi */}
+                {(() => {
+                  const _kurs = parseFloat(paymentForm.kurs) || 12700;
+                  const _uzs = parseFloat(paymentForm.uzs) || 0;
+                  const _usd = parseFloat(paymentForm.usd) || 0;
+                  const _karta = parseFloat(paymentForm.karta) || 0;
+                  const totalDebtUZS = (customer.debtUZS || 0) + (customer.debtUSD || 0) * _kurs;
+                  const fillUzs = () => setPaymentForm({ ...paymentForm, uzs: String(Math.max(0, Math.round(totalDebtUZS - _usd * _kurs - _karta))) });
+                  const fillUsd = () => { const r = Math.max(0, (totalDebtUZS - _uzs - _karta) / _kurs); setPaymentForm({ ...paymentForm, usd: r > 0 ? r.toFixed(2) : '0' }); };
+                  const fillKarta = () => setPaymentForm({ ...paymentForm, karta: String(Math.max(0, Math.round(totalDebtUZS - _uzs - _usd * _kurs))) });
+                  return (
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
-                      <Banknote className="w-3.5 h-3.5 text-emerald-600" />
-                      {latinToCyrillic("Naqt so'm")}
+                    <label className="flex items-center justify-between text-xs font-semibold text-slate-600 mb-1.5">
+                      <span className="flex items-center gap-1.5"><Banknote className="w-3.5 h-3.5 text-emerald-600" />{latinToCyrillic("Naqt so'm")}</span>
+                      <button type="button" onClick={fillUzs} title="Qolgan summani to'ldirish" className="p-0.5 text-indigo-400 hover:text-indigo-600 transition-colors active:scale-90"><Magnet className="w-3.5 h-3.5" /></button>
                     </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={paymentForm.uzs}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, uzs: e.target.value })}
-                      className="w-full h-12 px-3 text-base font-bold bg-emerald-50 border border-emerald-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
-                      placeholder="0"
-                      autoFocus
-                    />
+                    <input type="number" min="0" value={paymentForm.uzs} onChange={(e) => setPaymentForm({ ...paymentForm, uzs: e.target.value })}
+                      className="w-full h-12 px-3 text-base font-bold bg-emerald-50 border border-emerald-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all" placeholder="0" autoFocus />
                   </div>
                   <div>
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
-                      <DollarSign className="w-3.5 h-3.5 text-blue-600" />
-                      {latinToCyrillic('Naqt $')}
+                    <label className="flex items-center justify-between text-xs font-semibold text-slate-600 mb-1.5">
+                      <span className="flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5 text-blue-600" />{latinToCyrillic('Naqt $')}</span>
+                      <button type="button" onClick={fillUsd} title="Qolgan summani to'ldirish" className="p-0.5 text-indigo-400 hover:text-indigo-600 transition-colors active:scale-90"><Magnet className="w-3.5 h-3.5" /></button>
                     </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={paymentForm.usd}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, usd: e.target.value })}
-                      className="w-full h-12 px-3 text-base font-bold bg-blue-50 border border-blue-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                      placeholder="0"
-                    />
+                    <input type="number" min="0" step="0.01" value={paymentForm.usd} onChange={(e) => setPaymentForm({ ...paymentForm, usd: e.target.value })}
+                      className="w-full h-12 px-3 text-base font-bold bg-blue-50 border border-blue-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all" placeholder="0" />
                   </div>
                   <div>
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
-                      <CreditCard className="w-3.5 h-3.5 text-purple-600" />
-                      {latinToCyrillic('Karta')}
+                    <label className="flex items-center justify-between text-xs font-semibold text-slate-600 mb-1.5">
+                      <span className="flex items-center gap-1.5"><CreditCard className="w-3.5 h-3.5 text-purple-600" />{latinToCyrillic('Karta')}</span>
+                      <button type="button" onClick={fillKarta} title="Qolgan summani to'ldirish" className="p-0.5 text-indigo-400 hover:text-indigo-600 transition-colors active:scale-90"><Magnet className="w-3.5 h-3.5" /></button>
                     </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={paymentForm.karta}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, karta: e.target.value })}
-                      className="w-full h-12 px-3 text-base font-bold bg-purple-50 border border-purple-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
-                      placeholder="0"
-                    />
+                    <input type="number" min="0" value={paymentForm.karta} onChange={(e) => setPaymentForm({ ...paymentForm, karta: e.target.value })}
+                      className="w-full h-12 px-3 text-base font-bold bg-purple-50 border border-purple-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all" placeholder="0" />
                   </div>
                 </div>
+                  );
+                })()}
 
                 {/* Jami */}
                 {hasAny && (
