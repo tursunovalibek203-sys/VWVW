@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, ChevronDown, ChevronUp, Package } from 'lucide-react';
+import { ChevronDown, ChevronUp, Package } from 'lucide-react';
 import type { Product } from '../../types';
 import { getCurrencySymbol, getDisplayAmount } from '../../lib/saleUtils';
 
@@ -18,7 +18,6 @@ interface ProductTypeCardProps {
   products: Product[];
   currency: string;
   onSelectProduct: (product: Product) => void;
-  onQuickAdd: (product: Product) => void;
   latinToCyrillic: (text: string) => string;
 }
 
@@ -88,7 +87,6 @@ export const ProductTypeCard = ({
   products,
   currency,
   onSelectProduct,
-  onQuickAdd,
   latinToCyrillic,
 }: ProductTypeCardProps) => {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -145,57 +143,38 @@ export const ProductTypeCard = ({
       >
         <div className="p-3 grid grid-cols-1 gap-2">
           {variants.map((variant) => (
-            <div
+            <button
               key={variant.id}
+              type="button"
               onClick={() => onSelectProduct(products.find((p) => p.id === variant.id)!)}
-              className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 ${colors.light} border ${colors.border} ${colors.hover} hover:shadow-lg hover:scale-[1.02]`}
+              className={`w-full flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-150 ${colors.light} border ${colors.border} ${colors.hover} hover:shadow-md active:scale-[0.98] text-left`}
             >
               <div className="flex items-center gap-3">
-                {/* Color indicator */}
                 {variant.color && (
                   <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-md"
-                    style={{
-                      backgroundColor: getColorHex(variant.color),
-                    }}
-                    title={variant.color}
-                    // eslint-disable-line react/forbid-prop-types
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-[10px] font-bold text-white shadow-sm flex-shrink-0"
+                    style={{ backgroundColor: getColorHex(variant.color) }}
                   >
                     {variant.color.slice(0, 2).toUpperCase()}
                   </div>
                 )}
                 <div>
-                  <p className="font-bold text-gray-800 text-sm">{variant.name}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${colors.badge}`}>
+                  <p className="font-semibold text-gray-800 text-sm leading-tight">{variant.name}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`text-xs px-1.5 py-0.5 rounded-md font-semibold ${colors.badge}`}>
                       {variant.currentStock} {latinToCyrillic('qop')}
                     </span>
                     {variant.bagType && (
-                      <span className="text-xs text-gray-500">{variant.bagType}</span>
+                      <span className="text-xs text-gray-400">{variant.bagType}</span>
                     )}
                   </div>
                 </div>
               </div>
-
-              <div className="flex items-center gap-3">
-                <span className={`font-bold ${colors.text}`}>
-                  {getCurrencySymbol(currency)}
-                  {getDisplayAmount(variant.pricePerBag, currency)}
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onQuickAdd(products.find((p) => p.id === variant.id)!);
-                  }}
-                  aria-label={latinToCyrillic("Tez qo'shish")}
-                  title={latinToCyrillic("Tez qo'shish")}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-all transform hover:scale-110 active:scale-95 bg-gradient-to-br ${colors.header} text-white hover:shadow-xl`}
-                >
-                  <Plus className="w-6 h-6 stroke-[3]" />
-                </button>
-              </div>
-            </div>
+              <span className={`font-bold ${colors.text} flex-shrink-0`}>
+                {getCurrencySymbol(currency)}
+                {getDisplayAmount(variant.pricePerBag, currency)}
+              </span>
+            </button>
           ))}
         </div>
       </div>

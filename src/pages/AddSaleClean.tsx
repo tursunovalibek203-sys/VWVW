@@ -42,7 +42,6 @@ const ProductSection = ({
   onSearchChange,
   onCategoryChange,
   onSelectProduct,
-  onQuickAdd,
 }: {
   filteredProducts: Product[];
   currency: string;
@@ -52,7 +51,6 @@ const ProductSection = ({
   onSearchChange: (val: string) => void;
   onCategoryChange: (cat: string) => void;
   onSelectProduct: (product: Product) => void;
-  onQuickAdd: (product: Product) => void;
 }) => {
   const categories = [
     { id: 'all', label: latinToCyrillic('Hammasi') },
@@ -277,7 +275,7 @@ const ProductSection = ({
                 products={group.products}
                 currency={currency}
                 onSelectProduct={onSelectProduct}
-                onQuickAdd={onQuickAdd}
+
                 latinToCyrillic={latinToCyrillic}
               />
             ))}
@@ -289,7 +287,7 @@ const ProductSection = ({
                 products={group.products}
                 currency={currency}
                 onSelectProduct={onSelectProduct}
-                onQuickAdd={onQuickAdd}
+
                 latinToCyrillic={latinToCyrillic}
               />
             ))}
@@ -301,7 +299,7 @@ const ProductSection = ({
                 products={group.products}
                 currency={currency}
                 onSelectProduct={onSelectProduct}
-                onQuickAdd={onQuickAdd}
+
                 latinToCyrillic={latinToCyrillic}
               />
             ))}
@@ -314,7 +312,7 @@ const ProductSection = ({
                 products={group.products}
                 currency={currency}
                 onSelectProduct={onSelectProduct}
-                onQuickAdd={onQuickAdd}
+
                 latinToCyrillic={latinToCyrillic}
               />
             ))}
@@ -325,7 +323,7 @@ const ProductSection = ({
                 products={otherProducts}
                 currency={currency}
                 onSelectProduct={onSelectProduct}
-                onQuickAdd={onQuickAdd}
+
                 latinToCyrillic={latinToCyrillic}
               />
             )}
@@ -498,12 +496,6 @@ export default function AddSaleClean() {
     [saleForm]
   );
 
-  const handleQuickAdd = useCallback(
-    (product: Product) => {
-      saleForm.selectAndAddProduct(product, saleForm.selectedCustomer, saleForm.customerPrices);
-    },
-    [saleForm]
-  );
 
 
   const handleSubmit = useCallback(async () => {
@@ -647,8 +639,19 @@ export default function AddSaleClean() {
         {/* 2 ustunli grid: Chap=Mijoz+Yetkazib berish+Mahsulotlar | O'ng=Savat+To'lov */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
 
-          {/* ── USTUN 1: Mijoz + Yetkazib berish + Mahsulotlar ── */}
+          {/* ── USTUN 1: Mahsulotlar (tepada) + Mijoz + Haydovchi (pastda) ── */}
           <div className="flex flex-col gap-4">
+            <ProductSection
+              filteredProducts={filteredProducts}
+              currency={saleForm.form.currency}
+              activeCategory={saleForm.activeCategory}
+              productSearch={saleForm.productSearch}
+              latinToCyrillic={latinToCyrillic}
+              onCategoryChange={(cat) => saleForm.setActiveCategory(cat as any)}
+              onSearchChange={saleForm.setProductSearch}
+              onSelectProduct={handleSelectProduct}
+            />
+
             {/* Mijoz */}
             <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] p-4 sm:p-5">
               <div className="flex items-center gap-2 mb-3">
@@ -862,17 +865,6 @@ export default function AddSaleClean() {
               </div>
             </div>
 
-            <ProductSection
-              filteredProducts={filteredProducts}
-              currency={saleForm.form.currency}
-              activeCategory={saleForm.activeCategory}
-              productSearch={saleForm.productSearch}
-              latinToCyrillic={latinToCyrillic}
-              onCategoryChange={(cat) => saleForm.setActiveCategory(cat as any)}
-              onSearchChange={saleForm.setProductSearch}
-              onSelectProduct={handleSelectProduct}
-              onQuickAdd={handleQuickAdd}
-            />
           </div>
 
           {/* ── USTUN 2: Savat + To'lov (sticky) ── */}
@@ -902,7 +894,7 @@ export default function AddSaleClean() {
                 )}
               </div>
               {itemCount > 0 ? (
-                <div className="p-4 sm:p-5 space-y-2 max-h-[55vh] overflow-y-auto">
+                <div className="p-4 sm:p-5 space-y-2 max-h-[calc(100vh-20rem)] overflow-y-auto">
                   {(() => {
                     const items = saleForm.form.items;
                     const rendered = new Set<string>();
