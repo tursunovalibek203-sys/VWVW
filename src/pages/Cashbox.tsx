@@ -596,15 +596,16 @@ export default function Cashbox() {
       {/* ── 3 TA ASOSIY DIV ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
-        {/* ── DIV 1: NAQD PUL (balans = kirim − chiqim) ── */}
+        {/* ── DIV 1: QO'LDAGI NAQD PUL (kun boshi + kirim − chiqim) ── */}
         <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-4 text-white shadow-lg shadow-indigo-500/20">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-1">
             <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
               <Wallet className="w-4 h-4 text-white"/>
             </div>
-            <p className="text-xs font-bold text-indigo-100 uppercase tracking-wide">{t('Naqd pul')}</p>
+            <p className="text-xs font-bold text-indigo-100 uppercase tracking-wide">{t("Qo'ldagi naqd pul")}</p>
             {totalUZS < 0 && <AlertTriangle className="w-3.5 h-3.5 text-rose-300 ml-auto"/>}
           </div>
+          <p className="text-[10px] text-indigo-300 mb-3">{t("Bosh balans")} + {t("kirim")} − {t("chiqim")}</p>
           <div className="space-y-2">
             {/* Naqd USD */}
             <div className="flex items-center justify-between bg-white/10 rounded-lg px-3 py-2">
