@@ -68,6 +68,18 @@ export function GroupedCartItem({
     onUpdate(idx, { pricePerBag: price, subtotal: qty * price });
   };
 
+  const handleMainUnitsChange = (val: string) => {
+    const clean = val.replace(/[^0-9.]/g, '');
+    const units = parseFloat(clean) || 0;
+    onUpdate(mainIndex, { unitsPerBag: units });
+  };
+
+  const handleSubUnitsChange = (idx: number, val: string) => {
+    const clean = val.replace(/[^0-9.]/g, '');
+    const units = parseFloat(clean) || 0;
+    onUpdate(idx, { unitsPerBag: units });
+  };
+
   const warehouseIcon = (wh?: string) => {
     if (wh === 'krishka') return '⭕';
     if (wh === 'ruchka') return '🎗';
@@ -104,62 +116,68 @@ export function GroupedCartItem({
       {!collapsed && (
         <div className="divide-y divide-blue-100">
           {/* Asosiy mahsulot satri */}
-          <div className="flex items-center gap-2 px-3 py-2 flex-wrap">
+          <div className="flex items-center gap-1.5 px-3 py-2 flex-wrap">
             <span className="text-sm w-5 shrink-0">🏭</span>
-            <span className="text-xs text-slate-600 flex-1 min-w-[80px] truncate">{trData(mainItem.productName)}</span>
+            <span className="text-xs text-slate-600 flex-1 min-w-[60px] truncate">{trData(mainItem.productName)}</span>
             <div className="flex items-center gap-1 shrink-0">
-              <input
-                type="number" min="0"
+              <input type="number" min="0"
                 value={qtyNum(mainItem.quantity) || ''}
                 onChange={e => handleMainQtyChange(e.target.value)}
-                className="w-12 text-center text-xs border border-blue-300 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-500"
-                placeholder="0"
-              />
+                className="w-11 text-center text-xs border border-blue-300 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-500"
+                placeholder="0" title="Qop soni" />
               <span className="text-xs text-slate-400">qop</span>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <span className="text-xs text-slate-400">{sym}</span>
-              <input
-                type="number" min="0" step="0.01"
-                value={mainItem.pricePerBag || ''}
-                onChange={e => handleMainPriceChange(e.target.value)}
-                className="w-20 text-center text-xs border border-blue-300 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-500"
-                placeholder="narx"
-              />
+              <input type="number" min="0"
+                value={mainItem.unitsPerBag || ''}
+                onChange={e => handleMainUnitsChange(e.target.value)}
+                className="w-14 text-center text-xs border border-amber-300 rounded px-1 py-0.5 bg-amber-50 focus:outline-none focus:border-amber-500"
+                placeholder="dona" title="1 qopda nechta dona" />
               <span className="text-xs text-slate-400">/qop</span>
             </div>
-            <span className="text-sm font-semibold text-slate-700 w-16 text-right tabular-nums shrink-0">
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-xs text-slate-400">{sym}</span>
+              <input type="number" min="0" step="0.01"
+                value={mainItem.pricePerBag || ''}
+                onChange={e => handleMainPriceChange(e.target.value)}
+                className="w-18 text-center text-xs border border-blue-300 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-500"
+                placeholder="narx" />
+            </div>
+            <span className="text-sm font-semibold text-slate-700 w-14 text-right tabular-nums shrink-0">
               {sym}{mainItem.subtotal.toLocaleString()}
             </span>
           </div>
 
           {/* Komplekt sub-mahsulotlar */}
           {subItems.map((sub, i) => (
-            <div key={sub.productId} className="flex items-center gap-2 px-3 py-2 bg-white/60 flex-wrap">
+            <div key={sub.productId} className="flex items-center gap-1.5 px-3 py-2 bg-white/60 flex-wrap">
               <span className="text-sm w-5 shrink-0">{warehouseIcon(sub.warehouse)}</span>
-              <span className="text-xs text-slate-600 flex-1 min-w-[80px] truncate">{trData(sub.productName)}</span>
+              <span className="text-xs text-slate-600 flex-1 min-w-[60px] truncate">{trData(sub.productName)}</span>
               <div className="flex items-center gap-1 shrink-0">
-                <input
-                  type="number" min="0"
+                <input type="number" min="0"
                   value={qtyNum(sub.quantity) || ''}
                   onChange={e => handleSubQtyChange(subIndices[i], sub, e.target.value)}
-                  className="w-12 text-center text-xs border border-slate-200 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-400"
-                  placeholder="0"
-                />
+                  className="w-11 text-center text-xs border border-slate-200 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-400"
+                  placeholder="0" title="Qop soni" />
                 <span className="text-xs text-slate-400">qop</span>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <span className="text-xs text-slate-400">{sym}</span>
-                <input
-                  type="number" min="0" step="0.01"
-                  value={sub.pricePerBag || ''}
-                  onChange={e => handleSubPriceChange(subIndices[i], sub, e.target.value)}
-                  className="w-20 text-center text-xs border border-slate-200 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-400"
-                  placeholder="narx"
-                />
+                <input type="number" min="0"
+                  value={sub.unitsPerBag || ''}
+                  onChange={e => handleSubUnitsChange(subIndices[i], e.target.value)}
+                  className="w-14 text-center text-xs border border-amber-300 rounded px-1 py-0.5 bg-amber-50 focus:outline-none focus:border-amber-500"
+                  placeholder="dona" title="1 qopda nechta dona" />
                 <span className="text-xs text-slate-400">/qop</span>
               </div>
-              <span className="text-sm font-semibold text-slate-700 w-16 text-right tabular-nums shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-xs text-slate-400">{sym}</span>
+                <input type="number" min="0" step="0.01"
+                  value={sub.pricePerBag || ''}
+                  onChange={e => handleSubPriceChange(subIndices[i], sub, e.target.value)}
+                  className="w-18 text-center text-xs border border-slate-200 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-blue-400"
+                  placeholder="narx" />
+              </div>
+              <span className="text-sm font-semibold text-slate-700 w-14 text-right tabular-nums shrink-0">
                 {sym}{sub.subtotal.toLocaleString()}
               </span>
             </div>
