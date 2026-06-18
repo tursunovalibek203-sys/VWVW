@@ -568,8 +568,8 @@ export default function Cashbox() {
 
   if (loading) return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[0,1,2,3].map(i=><div key={i} className="h-28 bg-white rounded-2xl border border-slate-200 animate-pulse"/>)}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[0,1,2].map(i=><div key={i} className="h-28 bg-white rounded-2xl border border-slate-200 animate-pulse"/>)}
       </div>
       <div className="h-60 bg-white rounded-2xl border border-slate-200 animate-pulse"/>
     </div>
@@ -593,8 +593,8 @@ export default function Cashbox() {
         </button>
       </div>
 
-      {/* ── 4 TA ASOSIY DIV ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* ── 3 TA ASOSIY DIV ──────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
         {/* ── DIV 1: NAQD PUL (balans = kirim − chiqim) ── */}
         <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-4 text-white shadow-lg shadow-indigo-500/20">
@@ -744,46 +744,6 @@ export default function Cashbox() {
               -{Math.round(totalExpUZS + totalExpCard + totalExpUSD * exchangeRate).toLocaleString('en-US')}
               <span className="text-xs font-normal ml-1">so'm</span>
             </span>
-          </div>
-        </div>
-
-        {/* ── DIV 4: NET BALANS (jami) ── */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-slate-50 flex items-center justify-center">
-              <Scale className="w-4 h-4 text-slate-600"/>
-            </div>
-            <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">{t('Net balans')}</p>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs text-slate-400 mb-1">{t('Dollar hisobida')}</p>
-              <p className={`text-2xl font-bold tabular-nums ${totalUSD < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
-                {totalUSD % 1 === 0 ? Math.round(totalUSD).toLocaleString('en-US') : totalUSD.toFixed(2)}{' '}
-                <span className="text-lg text-slate-400 font-normal">$</span>
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 mb-1">{t('So mda')}</p>
-              <p className={`text-lg font-bold tabular-nums ${totalUZS < 0 ? 'text-rose-600' : 'text-slate-700'}`}>
-                {Math.round(totalUZS).toLocaleString('en-US')}
-                <span className="text-sm text-slate-400 font-normal ml-1">so'm</span>
-              </p>
-            </div>
-          </div>
-          <div className="mt-3 pt-2 border-t border-slate-100">
-            <div className="flex justify-between text-xs text-slate-400">
-              <span>{t('Bugun kirim')}</span>
-              <span className="text-emerald-600 font-semibold">
-                +{Math.round(cashbox?.todayIncome || 0).toLocaleString('en-US')}
-              </span>
-            </div>
-            <div className="flex justify-between text-xs text-slate-400 mt-1">
-              <span>{t('Bugun chiqim')}</span>
-              <span className="text-rose-600 font-semibold">
-                -{Math.round(cashbox?.todayExpense || 0).toLocaleString('en-US')}
-              </span>
-            </div>
           </div>
         </div>
 
