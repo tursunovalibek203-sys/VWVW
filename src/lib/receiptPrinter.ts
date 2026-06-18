@@ -88,58 +88,72 @@ export function generateReceiptHTML(data: ReceiptData): string {
   const ln  = `<div style="border-top:1px dashed #555;margin:5px 0;"></div>`;
   const ln2 = `<div style="border-top:2px solid #000;margin:5px 0;"></div>`;
 
+  const debtUZS = data.customer.totalDebtUZS ?? 0;
+  const debtUSD = data.customer.totalDebtUSD ?? 0;
+
   return `<!DOCTYPE html>
 <html lang="uz">
 <head>
 <meta charset="UTF-8">
 <title>Chek #${data.receiptNumber}</title>
 <style>
-  @page { size: 80mm auto; margin: 3mm 0; }
+  @page { size: 80mm auto; margin: 0; }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   @media print {
     html, body { margin: 0 !important; padding: 0 !important; width: 80mm !important; }
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    * { page-break-inside: avoid; }
   }
   body {
     font-family: 'Courier New', Courier, monospace;
     font-size: 12px;
-    line-height: 1.4;
-    width: 74mm;
+    line-height: 1.3;
+    width: 76mm;
     margin: 0 auto;
     background: #fff;
     color: #000;
-    padding: 2mm;
+    padding: 1mm 5mm;
   }
   table { width: 100%; border-collapse: collapse; }
-  th { background: #333; color: #fff; font-size: 11px; padding: 4px 3px; border: 1px solid #000; text-align: center; }
-  td { font-size: 12px; padding: 4px 3px; border-bottom: 1px solid #ddd; vertical-align: top; }
+  th { background: #333; color: #fff; font-size: 9px; padding: 3px 2px; border: 1px solid #000; text-align: center; }
+  td { font-size: 11px; padding: 3px 2px; border: 1px solid #000; vertical-align: top; }
 </style>
 </head>
 <body>
-  <div style="text-align:center;padding-bottom:5px;border-bottom:2px solid #000;margin-bottom:5px;">
-    <div style="font-size:16px;font-weight:900;letter-spacing:1px;">LUX PET PLAST</div>
-    <div style="font-size:10px;">Buxoro vil., Vobkent tumani</div>
-    <div style="font-size:10px;">+998 91 414 44 58 | +998 91 920 07 00</div>
-    <div style="font-size:12px;font-weight:bold;margin-top:3px;">SAVDO CHEKI #${data.receiptNumber}</div>
+  <!-- Header: Chap - logo, O'ng - nom va manzil -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:5px;border-bottom:2px solid #000;margin-bottom:5px;">
+    <img src="/logo.jpg" alt="Logo" style="width:18mm;height:auto;margin-right:3px;flex-shrink:0;" onerror="this.style.display='none'">
+    <div style="flex:1;">
+      <div style="font-size:19px;font-weight:900;letter-spacing:1px;line-height:1.1;">LUX PET PLAST</div>
+      <div style="font-size:10px;margin-top:3px;">Buxoro viloyati, Vobkent tumani</div>
+      <div style="font-size:10px;">+998 91 414 44 58</div>
+      <div style="font-size:10px;">+998 91 920 07 00</div>
+      <div style="font-size:11px;font-weight:bold;margin-top:3px;">SAVDO CHEKI #${data.receiptNumber}</div>
+    </div>
   </div>
 
+  <!-- Mijoz ma'lumotlari -->
   ${row('Sana:', `${data.date} ${data.time}`)}
   ${row('Kassir:', data.cashier)}
   ${row('Mijoz:', trData(data.customer.name), true)}
   ${data.customer.phone ? row('Tel:', data.customer.phone) : ''}
+
+  <!-- Bu savdodan oldingi qarz -->
   ${hasPrevDebt ? ln
-    + ((data.customer.previousBalanceUZS ?? 0) > 0 ? row('Oldingi qarz (so\'m):', `${data.customer.previousBalanceUZS!.toLocaleString()} so'm`, false, true) : '')
-    + ((data.customer.previousBalanceUSD ?? 0) > 0 ? row('Oldingi qarz ($):', `$${data.customer.previousBalanceUSD!.toLocaleString()}`, false, true) : '')
+    + ((data.customer.previousBalanceUZS ?? 0) > 0 ? row("Bu savdodan oldingi qarz (so'm):", `${data.customer.previousBalanceUZS!.toLocaleString()} so'm`, false, true) : '')
+    + ((data.customer.previousBalanceUSD ?? 0) > 0 ? row('Bu savdodan oldingi qarz ($):', `$${(data.customer.previousBalanceUSD!).toFixed(2)}`, false, true) : '')
     : ''}
 
   ${ln2}
 
+  <!-- Mahsulotlar jadvali: Mahsulot | Qop | 1 qopda | Dona narxi | Jami summa -->
   <table style="margin-bottom:4px;">
     <thead><tr>
-      <th style="width:40%;text-align:left;">Mahsulot</th>
-      <th style="width:12%;">Qop</th>
-      <th style="width:22%;text-align:right;">Narx</th>
-      <th style="width:26%;text-align:right;">Jami</th>
+      <th style="width:32%;text-align:left;">Mahsulot</th>
+      <th style="width:10%;">Qop</th>
+      <th style="width:13%;">1 qopda</th>
+      <th style="width:22%;text-align:right;">Dona narxi</th>
+      <th style="width:23%;text-align:right;">Jami summa</th>
     </tr></thead>
     <tbody>
     ${data.items.map((item) => {
@@ -148,6 +162,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
       return `<tr>
         <td style="word-break:break-word;white-space:normal;">${trData(item.name)}</td>
         <td style="text-align:center;">${item.quantity}</td>
+        <td style="text-align:center;">${item.piecesPerBag != null ? item.piecesPerBag : '-'}</td>
         <td style="text-align:right;">${fmtAmt(narx)}</td>
         <td style="text-align:right;font-weight:700;">${fmtAmt(item.subtotal)}</td>
       </tr>`;
@@ -156,10 +171,14 @@ export function generateReceiptHTML(data: ReceiptData): string {
   </table>
 
   ${ln2}
+
+  <!-- Jami summa -->
   <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:900;margin:3px 0;">
-    <span>JAMI:</span><span>${fmtAmt(data.total)}</span>
+    <span>JAMI SUMMA:</span><span>${fmtAmt(data.total)}</span>
   </div>
   ${ln}
+
+  <!-- To'lovlar -->
   <table style="border:none;">
     <tbody style="border:none;">
     ${paymentsRows}
@@ -167,20 +186,20 @@ export function generateReceiptHTML(data: ReceiptData): string {
       <td style="border:none;font-weight:700;font-size:13px;">TO'LANDI:</td>
       <td style="border:none;text-align:right;font-weight:700;font-size:13px;">${fmtAmt(data.totalPaid)}</td>
     </tr>
-    ${hasDebt ? `<tr><td style="border:none;font-weight:700;color:#c00;font-size:13px;">QARZ:</td><td style="border:none;text-align:right;font-weight:700;color:#c00;font-size:13px;">${fmtAmt(data.debt)}</td></tr>` : ''}
     </tbody>
   </table>
 
-  ${hasTotalDebt ? ln
-    + ((data.customer.totalDebtUZS ?? 0) > 0 ? row('Jami qarz (so\'m):', `${data.customer.totalDebtUZS!.toLocaleString()} so'm`, true, true) : '')
-    + ((data.customer.totalDebtUSD ?? 0) > 0 ? row('Jami qarz ($):', `$${data.customer.totalDebtUSD!.toLocaleString()}`, true, true) : '')
-    + (data.customer.paymentDueDate ? `<div style="font-size:11px;color:#c00;margin-top:2px;">Muddat: ${data.customer.paymentDueDate} gacha</div>` : '')
-    : ''}
+  <!-- Qarz (ikki valyutada) -->
+  ${(debtUZS > 0 || debtUSD > 0 || hasDebt) ? ln : ''}
+  ${debtUZS > 0 ? row("Qarz UZS:", `${debtUZS.toLocaleString()} so'm`, true, true) : ''}
+  ${debtUSD > 0 ? row('Qarz USD:', `$${debtUSD.toFixed(2)}`, true, true) : ''}
+  ${!debtUZS && !debtUSD && hasDebt ? row('QARZ:', fmtAmt(data.debt), true, true) : ''}
+  ${data.customer.paymentDueDate && (hasDebt || debtUZS > 0 || debtUSD > 0) ? `<div style="font-size:11px;color:#c00;margin-top:2px;">Muddat: ${data.customer.paymentDueDate} gacha</div>` : ''}
 
   ${data.driver ? ln
     + row('Haydovchi:', trData(data.driver.name))
-    + row('Zavod to\'laydi:', `${data.driver.factoryShare.toLocaleString()} so'm`)
-    + row('Mijoz to\'laydi:', `${data.driver.customerShare.toLocaleString()} so'm`)
+    + row("Zavod to'laydi:", `${data.driver.factoryShare.toLocaleString()} so'm`)
+    + row("Mijoz to'laydi:", `${data.driver.customerShare.toLocaleString()} so'm`)
     : ''}
 
   ${ln2}

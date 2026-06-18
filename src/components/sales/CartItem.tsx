@@ -177,169 +177,101 @@ export const CartItem = ({
     (parseFloat(item.unitsPerBag?.toString() || '2000') || 2000);
 
   return (
-    <div
-      className={`bg-gray-50 p-3 rounded-lg border ${
-        isEditing ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-      }`}
-    >
-      <div className="flex justify-between items-start mb-2">
-        <div className="flex-1">
-          <select
-            aria-label="Mahsulot tanlash"
-            value={item.productId}
-            onChange={(e) => {
-              const newProduct = products.find((p) => p.id === e.target.value);
-              if (newProduct) {
-                const unitsPerBag = newProduct.unitsPerBag || 2000;
-                const quantity = parseFloat(item.quantity?.toString() || '0') || 0;
-                const pricePerBag = parseFloat(newProduct.pricePerBag?.toString() || '0') || 0;
-                const pricePerPiece = pricePerBag / unitsPerBag;
-                const subtotal = quantity * pricePerBag;
+    <div className={`rounded-xl border px-3 py-2.5 space-y-2 ${isEditing ? 'border-blue-400 bg-blue-50/40' : 'border-slate-200 bg-white'}`}>
 
-                onUpdate(index, {
-                  productId: newProduct.id,
-                  productName: newProduct.name,
-                  unitsPerBag,
-                  pricePerBag,
-                  pricePerPiece,
-                  subtotal,
-                  warehouse: newProduct.warehouse || 'other',
-                });
-              }
-            }}
-            className="w-full text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-          >
-            {filteredProducts.map((p) => (
-              <option key={p.id} value={p.id}>
-                {trData(p.name)}
-              </option>
-            ))}
-          </select>
-          <div className="flex items-center gap-2 mt-1">
-            {cartProduct?.bagType && (
-              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded">
-                {cartProduct.bagType}
-              </span>
-            )}
-            <span className="text-xs text-gray-500">{item.unitsPerBag || 2000} dona/qop</span>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => onRemove(index)}
-          className="text-red-500 hover:text-red-700 p-1"
-          title={latinToCyrillic("O'chirish")}
+      {/* Qator 1: Mahsulot tanlash + o'chirish */}
+      <div className="flex items-center gap-2">
+        <select
+          aria-label="Mahsulot tanlash"
+          value={item.productId}
+          onChange={(e) => {
+            const newProduct = products.find((p) => p.id === e.target.value);
+            if (newProduct) {
+              const unitsPerBag = newProduct.unitsPerBag || 2000;
+              const quantity = parseFloat(item.quantity?.toString() || '0') || 0;
+              const pricePerBag = parseFloat(newProduct.pricePerBag?.toString() || '0') || 0;
+              const pricePerPiece = pricePerBag / unitsPerBag;
+              const subtotal = quantity * pricePerBag;
+              onUpdate(index, { productId: newProduct.id, productName: newProduct.name, unitsPerBag, pricePerBag, pricePerPiece, subtotal, warehouse: newProduct.warehouse || 'other' });
+            }
+          }}
+          className="flex-1 text-sm font-medium text-slate-900 bg-white border border-slate-200 rounded-lg px-2 py-1.5 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none"
         >
-          <Trash2 className="w-4 h-4" />
+          {filteredProducts.map((p) => (
+            <option key={p.id} value={p.id}>{trData(p.name)}</option>
+          ))}
+        </select>
+        <button type="button" onClick={() => onRemove(index)}
+          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors flex-shrink-0">
+          <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <div className="space-y-2">
-        {/* Sale Type Toggle */}
-        <div className="flex gap-2 mb-2">
-          <button
-            type="button"
-            onClick={toggleSaleType}
-            className={`flex-1 py-1 px-2 rounded text-sm font-medium transition-all ${
-              item.saleType !== 'piece'
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
+      {/* Qator 2: Qop|Dona + barcha inputlar + subtotal */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {/* Qop / Dona toggle */}
+        <div className="flex rounded-lg overflow-hidden border border-slate-200 flex-shrink-0">
+          <button type="button" onClick={toggleSaleType}
+            className={`px-2 py-1 text-xs font-semibold transition-colors ${item.saleType !== 'piece' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
             {latinToCyrillic('Qop')}
           </button>
-          <button
-            type="button"
-            onClick={toggleSaleType}
-            className={`flex-1 py-1 px-2 rounded text-sm font-medium transition-all ${
-              item.saleType === 'piece'
-                ? 'bg-green-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
+          <button type="button" onClick={toggleSaleType}
+            className={`px-2 py-1 text-xs font-semibold transition-colors border-l border-slate-200 ${item.saleType === 'piece' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
             {latinToCyrillic('Dona')}
           </button>
         </div>
 
-        {/* Quantity and Price Inputs */}
-        <div className="grid grid-cols-4 gap-2">
-          <div>
-            <label htmlFor={`bag-${index}`} className="text-xs text-gray-500 block mb-1">{latinToCyrillic('Qop')}</label>
-            <input
-              id={`bag-${index}`}
-              type="text"
-              placeholder="0"
-              value={item.bagDisplayValue || item.quantity?.toString() || ''}
-              onChange={(e) => handleQuantityChange(e.target.value)}
-              className="w-full h-8 px-2 text-sm font-medium border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-            />
-          </div>
-          <div>
-            <label htmlFor={`units-${index}`} className="text-xs text-gray-500 block mb-1">{latinToCyrillic('1 qopda')}</label>
-            <input
-              id={`units-${index}`}
-              type="text"
-              placeholder="2000"
-              value={item.unitsPerBag?.toString() || ''}
-              onChange={(e) => {
-                console.log('🔄 unitsPerBag onChange:', e.target.value, '| index:', index);
-                const val = e.target.value.replace(/[^0-9.]/g, '');
-                const units = val === '' ? 0 : parseFloat(val) || 2000;
-                const quantity = parseFloat(item.bagDisplayValue || item.quantity?.toString() || '0') || 0;
-                const pricePerBag = item.pricePerBag || 0;
-                // Narxni qayta hisoblash - yangi unitsPerBag asosida
-                const pricePerPiece = units > 0 ? pricePerBag / units : 0;
-                const subtotal = quantity * pricePerBag;
+        {/* Qop soni */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <input type="text" placeholder="0"
+            value={item.bagDisplayValue || item.quantity?.toString() || ''}
+            onChange={(e) => handleQuantityChange(e.target.value)}
+            className="w-12 h-7 text-center text-xs font-medium border border-slate-200 rounded-lg focus:border-indigo-400 outline-none"
+            title={latinToCyrillic('Qop soni')} />
+          <span className="text-[10px] text-slate-400">qop</span>
+        </div>
 
-                console.log('   Updating:', { unitsPerBag: units, pricePerPiece, subtotal });
-                onUpdate(index, { unitsPerBag: units, pricePerPiece, subtotal });
-              }}
-              className="w-full h-8 px-2 text-sm font-medium border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">{latinToCyrillic('Jami dona')}</label>
-            <div className="w-full h-8 px-2 flex items-center bg-gray-50 border border-gray-300 rounded text-sm">
-              {totalPieces.toLocaleString()}
-            </div>
-          </div>
-          <div>
-            <label htmlFor={`price-${index}`} className="text-xs text-gray-500 block mb-1">
-              {item.saleType === 'piece'
-                ? `${latinToCyrillic('Narx')} (${getCurrencySymbol(currency)}/dona)`
-                : `${latinToCyrillic('Narx')} (${getCurrencySymbol(currency)}/qop)`}
-            </label>
-            <input
-              id={`price-${index}`}
-              type="number"
-              step="0.0001"
-              placeholder="0"
-              value={
-                item.saleType === 'piece'
-                  ? item.pricePerPiece || ''
-                  : item.pricePerBag || ''
-              }
-              onChange={(e) => handlePriceChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  (e.target as HTMLInputElement).blur();
-                }
-              }}
-              className="w-full h-8 px-2 text-sm font-medium border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-            />
-          </div>
+        {/* 1 qopda */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <input type="text" placeholder="2000"
+            value={item.unitsPerBag?.toString() || ''}
+            onChange={(e) => {
+              const val = e.target.value.replace(/[^0-9.]/g, '');
+              const units = val === '' ? 0 : parseFloat(val) || 2000;
+              const quantity = parseFloat(item.bagDisplayValue || item.quantity?.toString() || '0') || 0;
+              const pricePerBag = item.pricePerBag || 0;
+              const pricePerPiece = units > 0 ? pricePerBag / units : 0;
+              const subtotal = quantity * pricePerBag;
+              onUpdate(index, { unitsPerBag: units, pricePerPiece, subtotal });
+            }}
+            className="w-14 h-7 text-center text-xs font-medium border border-amber-300 bg-amber-50 rounded-lg focus:border-amber-500 outline-none"
+            title={latinToCyrillic('1 qopda nechta dona')} />
+          <span className="text-[10px] text-slate-400">/q</span>
+        </div>
+
+        {/* Jami dona */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <span className="text-[10px] text-slate-400">=</span>
+          <span className="text-xs font-medium text-slate-600 tabular-nums">{totalPieces.toLocaleString()}</span>
+          <span className="text-[10px] text-slate-400">{latinToCyrillic('dona')}</span>
+        </div>
+
+        {/* Narx */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <span className="text-[10px] text-slate-400">{getCurrencySymbol(currency)}</span>
+          <input type="number" step="0.0001" placeholder="0"
+            value={item.saleType === 'piece' ? item.pricePerPiece || '' : item.pricePerBag || ''}
+            onChange={(e) => handlePriceChange(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+            className="w-20 h-7 text-center text-xs font-medium border border-slate-200 rounded-lg focus:border-indigo-400 outline-none"
+            title={item.saleType === 'piece' ? latinToCyrillic('Dona narxi') : latinToCyrillic('Qop narxi')} />
+          <span className="text-[10px] text-slate-400">/{item.saleType === 'piece' ? latinToCyrillic('d') : latinToCyrillic('q')}</span>
         </div>
 
         {/* Subtotal */}
-        <div className="grid grid-cols-1 gap-2">
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">{latinToCyrillic('Jami narx')}</label>
-            <div className="w-full h-8 px-2 flex items-center bg-white border border-gray-300 rounded text-sm font-bold text-blue-600">
-              {getCurrencySymbol(currency)}
-              {getDisplayAmount(item.subtotal || 0, currency)}
-            </div>
-          </div>
-        </div>
+        <span className="ml-auto text-sm font-bold text-indigo-600 tabular-nums flex-shrink-0">
+          {getCurrencySymbol(currency)}{getDisplayAmount(item.subtotal || 0, currency)}
+        </span>
       </div>
     </div>
   );
