@@ -22,7 +22,7 @@ import { printReceipt } from '../lib/receiptPrinter';
 import { latinToCyrillic } from '../lib/transliterator';
 import { useSaleForm } from '../hooks/useSaleForm';
 import { ProductTypeCard, CartItem, GroupedCartItem, PaymentSection } from '../components/sales';
-import { filterProductsByCategory, getCurrencySymbol, getDisplayAmount } from '../lib/saleUtils';
+import { filterProductsByCategory } from '../lib/saleUtils';
 import { useRealtime } from '../hooks/useRealtime';
 import api from '../lib/professionalApi';
 import { extractArray } from '../lib/apiHelpers';
@@ -592,50 +592,6 @@ export default function AddSaleClean() {
           </div>
         </div>
 
-        {/* Hero: running TOTAL (the most prominent thing on screen) + currency toggle */}
-        <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-5 text-white">
-          <div className="absolute -top-16 -right-16 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl" />
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4 text-indigo-300" />
-                <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                  {latinToCyrillic('Jami summa')}
-                </p>
-              </div>
-              <p className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight tabular-nums">
-                {getCurrencySymbol(saleForm.form.currency)}
-                {getDisplayAmount(saleForm.totalAmount, saleForm.form.currency)}
-              </p>
-              <p className="mt-1 text-sm text-slate-400 tabular-nums">
-                {itemCount} {latinToCyrillic('ta mahsulot savatda')}
-              </p>
-            </div>
-
-            {/* Currency toggle */}
-            <div className="flex p-1 bg-white/10 rounded-xl self-start sm:self-auto">
-              <button
-                type="button"
-                onClick={() => saleForm.updateFormField('currency', 'UZS')}
-                className={`min-h-[40px] px-4 rounded-lg text-sm font-semibold transition-all active:scale-[0.97] ${
-                  saleForm.form.currency === 'UZS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                UZS
-              </button>
-              <button
-                type="button"
-                onClick={() => saleForm.updateFormField('currency', 'USD')}
-                className={`min-h-[40px] px-4 rounded-lg text-sm font-semibold transition-all active:scale-[0.97] ${
-                  saleForm.form.currency === 'USD' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                $
-              </button>
-            </div>
-          </div>
-        </div>
-
         {/* 2 ustunli grid: Chap=Mijoz+Yetkazib berish+Mahsulotlar | O'ng=Savat+To'lov */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
 
@@ -882,16 +838,39 @@ export default function AddSaleClean() {
                     <p className="text-xs text-slate-400 tabular-nums">{itemCount} {latinToCyrillic('ta mahsulot')}</p>
                   </div>
                 </div>
-                {itemCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={saleForm.clearItems}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors active:scale-[0.97]"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    {latinToCyrillic('Tozalash')}
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {/* Currency toggle */}
+                  <div className="flex p-0.5 bg-slate-100 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => saleForm.updateFormField('currency', 'UZS')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all active:scale-[0.97] ${
+                        saleForm.form.currency === 'UZS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      UZS
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => saleForm.updateFormField('currency', 'USD')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all active:scale-[0.97] ${
+                        saleForm.form.currency === 'USD' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      $
+                    </button>
+                  </div>
+                  {itemCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={saleForm.clearItems}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors active:scale-[0.97]"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {latinToCyrillic('Tozalash')}
+                    </button>
+                  )}
+                </div>
               </div>
               {itemCount > 0 ? (
                 <div className="p-4 sm:p-5 space-y-2 max-h-[calc(100vh-20rem)] overflow-y-auto">
