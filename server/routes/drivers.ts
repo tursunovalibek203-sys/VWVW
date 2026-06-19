@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Haydovchi yaratish
+// Haydovchi yaratish — ADMIN, MANAGER, CASHIER va boshqa autentifikatsiya bo'lgan foydalanuvchilar
 router.post('/', async (req: AuthRequest, res) => {
   try {
     const { 
@@ -84,7 +84,7 @@ router.post('/', async (req: AuthRequest, res) => {
   }
 });
 
-// Haydovchi ma'lumotlarini yangilash
+// Haydovchi ma'lumotlarini yangilash — barcha autentifikatsiya bo'lgan foydalanuvchilar
 router.put('/:id', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
