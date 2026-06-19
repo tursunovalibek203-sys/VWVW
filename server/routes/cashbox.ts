@@ -48,42 +48,42 @@ router.get('/summary', async (req, res) => {
       prisma.$queryRaw<Array<{
         type: string; currency: string; paymentMethod: string; total: number;
       }>>`
-        SELECT type, COALESCE(currency,'UZS') as currency,
-               COALESCE(paymentMethod,'CASH') as paymentMethod,
-               COALESCE(SUM(amount),0) as total
+        SELECT type, COALESCE("currency",'UZS') AS currency,
+               COALESCE("paymentMethod",'CASH') AS "paymentMethod",
+               COALESCE(SUM(amount),0) AS total
         FROM "CashboxTransaction"
-        GROUP BY type, currency, paymentMethod
+        GROUP BY type, "currency", "paymentMethod"
       `,
       // Haftalik kirim/chiqim (SQL da GROUP BY sana)
       prisma.$queryRaw<Array<{ day: string; type: string; total: number }>>`
-        SELECT DATE(createdAt) as day, type,
-               COALESCE(SUM(amount),0) as total
+        SELECT "createdAt"::date AS day, type,
+               COALESCE(SUM(amount),0) AS total
         FROM "CashboxTransaction"
-        WHERE createdAt >= ${weekAgo.toISOString()}
-        GROUP BY DATE(createdAt), type
+        WHERE "createdAt" >= ${weekAgo}::timestamptz
+        GROUP BY "createdAt"::date, type
         ORDER BY day ASC
       `,
       // Bugungi kirim/chiqim valyuta + usul bo'yicha
       prisma.$queryRaw<Array<{
         type: string; currency: string; paymentMethod: string; total: number;
       }>>`
-        SELECT type, COALESCE(currency,'UZS') as currency,
-               COALESCE(paymentMethod,'CASH') as paymentMethod,
-               COALESCE(SUM(amount),0) as total
+        SELECT type, COALESCE("currency",'UZS') AS currency,
+               COALESCE("paymentMethod",'CASH') AS "paymentMethod",
+               COALESCE(SUM(amount),0) AS total
         FROM "CashboxTransaction"
-        WHERE createdAt >= ${today.toISOString()}
-        GROUP BY type, currency, paymentMethod
+        WHERE "createdAt" >= ${today}::timestamptz
+        GROUP BY type, "currency", "paymentMethod"
       `,
       // Oylik kirim/chiqim valyuta + usul bo'yicha
       prisma.$queryRaw<Array<{
         type: string; currency: string; paymentMethod: string; total: number;
       }>>`
-        SELECT type, COALESCE(currency,'UZS') as currency,
-               COALESCE(paymentMethod,'CASH') as paymentMethod,
-               COALESCE(SUM(amount),0) as total
+        SELECT type, COALESCE("currency",'UZS') AS currency,
+               COALESCE("paymentMethod",'CASH') AS "paymentMethod",
+               COALESCE(SUM(amount),0) AS total
         FROM "CashboxTransaction"
-        WHERE createdAt >= ${monthStart.toISOString()}
-        GROUP BY type, currency, paymentMethod
+        WHERE "createdAt" >= ${monthStart}::timestamptz
+        GROUP BY type, "currency", "paymentMethod"
       `,
     ]);
 

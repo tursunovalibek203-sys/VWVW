@@ -126,10 +126,10 @@ router.get('/stats', async (req, res) => {
 
       // Kam qolgan mahsulotlar (cross-column — raw SQL kerak)
       prisma.$queryRaw<Array<{ id: string; name: string; currentStock: number; minStockLimit: number }>>`
-        SELECT id, name, currentStock, minStockLimit
+        SELECT id, name, "currentStock", "minStockLimit"
         FROM "Product"
-        WHERE currentStock <= minStockLimit AND active = 1
-        ORDER BY currentStock ASC
+        WHERE "currentStock" <= "minStockLimit" AND active = true
+        ORDER BY "currentStock" ASC
         LIMIT 10
       `,
 
@@ -185,17 +185,17 @@ router.get('/stats', async (req, res) => {
     const [debtRaw, customerCountRaw, topCustomersRaw] = await Promise.all([
       prisma.$queryRaw<[{ debtUZS: number; debtUSD: number; cnt: bigint }]>`
         SELECT
-          COALESCE(SUM(debtUZS), 0) as debtUZS,
-          COALESCE(SUM(debtUSD), 0) as debtUSD,
-          COUNT(*) as cnt
+          COALESCE(SUM("debtUZS"), 0) AS "debtUZS",
+          COALESCE(SUM("debtUSD"), 0) AS "debtUSD",
+          COUNT(*) AS cnt
         FROM "Customer"
       `,
-      prisma.$queryRaw<[{ cnt: bigint }]>`SELECT COUNT(*) as cnt FROM "Customer"`,
+      prisma.$queryRaw<[{ cnt: bigint }]>`SELECT COUNT(*) AS cnt FROM "Customer"`,
       prisma.$queryRaw<Array<{ id: string; name: string; debtUSD: number; debtUZS: number }>>`
-        SELECT id, name, debtUSD, debtUZS
+        SELECT id, name, "debtUSD", "debtUZS"
         FROM "Customer"
-        WHERE debtUSD > 0 OR debtUZS > 0
-        ORDER BY debtUSD DESC
+        WHERE "debtUSD" > 0 OR "debtUZS" > 0
+        ORDER BY "debtUSD" DESC
         LIMIT 5
       `,
     ]);
@@ -245,20 +245,20 @@ router.get('/stats', async (req, res) => {
     // ── Haftalik grafik (so'nggi 7 kun) ──────────────────────────────────────
     const weeklyDataRaw = await prisma.$queryRaw<Array<{ day: string; sales: number }>>`
       SELECT
-        DATE(createdAt) as day,
-        COALESCE(SUM(totalAmount), 0) as sales
+        "createdAt"::date AS day,
+        COALESCE(SUM("totalAmount"), 0) AS sales
       FROM "Sale"
-      WHERE createdAt >= ${weekAgo.toISOString()}
-      GROUP BY DATE(createdAt)
+      WHERE "createdAt" >= ${weekAgo}::timestamptz
+      GROUP BY "createdAt"::date
       ORDER BY day ASC
     `;
     const weeklyExpRaw = await prisma.$queryRaw<Array<{ day: string; total: number }>>`
       SELECT
-        DATE(createdAt) as day,
-        COALESCE(SUM(amount), 0) as total
+        "createdAt"::date AS day,
+        COALESCE(SUM(amount), 0) AS total
       FROM "Expense"
-      WHERE createdAt >= ${weekAgo.toISOString()}
-      GROUP BY DATE(createdAt)
+      WHERE "createdAt" >= ${weekAgo}::timestamptz
+      GROUP BY "createdAt"::date
     `;
 
     const weeklyTrend = [];

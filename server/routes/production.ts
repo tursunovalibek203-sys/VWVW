@@ -229,12 +229,12 @@ router.get('/batches/stats', async (req, res) => {
       }),
       // Haftalik grafik
       prisma.$queryRaw<Array<{ day: string; total: number; batches: number }>>`
-        SELECT DATE(productionDate) as day,
-               COALESCE(SUM(quantity),0) as total,
-               COUNT(*) as batches
+        SELECT "productionDate"::date AS day,
+               COALESCE(SUM(quantity),0) AS total,
+               COUNT(*) AS batches
         FROM "Batch"
-        WHERE productionDate >= ${weekAgo.toISOString()}
-        GROUP BY DATE(productionDate)
+        WHERE "productionDate" >= ${weekAgo}::timestamptz
+        GROUP BY "productionDate"::date
         ORDER BY day ASC
       `,
     ]);
