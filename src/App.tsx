@@ -77,12 +77,21 @@ const WarehouseReports = lazy(() => import('./pages/warehouse/WarehouseReports')
 
 function App() {
   const { theme } = useThemeStore();
-  
+
   useEffect(() => {
-    // Apply theme
     document.documentElement.classList.remove('dark');
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // Keep Render backend awake — ping every 9 minutes to prevent cold start
+  useEffect(() => {
+    const backendUrl = (import.meta as any).env?.VITE_API_BASE_URL ||
+      (window.location.hostname === 'localhost' ? 'http://localhost:5003/api' : '/api');
+    const ping = () => fetch(`${backendUrl}/health`, { method: 'GET' }).catch(() => {});
+    ping(); // immediate ping on load
+    const id = setInterval(ping, 9 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <ToastProvider>

@@ -252,7 +252,6 @@ class ProfessionalApi {
     const shouldCache = config.cache !== false;
     if (shouldCache && this.isCacheValid(cacheKey)) {
       const cached = this.cache.get(cacheKey)!;
-      console.log(`[API Cache] Returning cached data for ${url}`);
       return {
         data: cached.data,
         success: true,
@@ -278,9 +277,9 @@ class ProfessionalApi {
         }
       };
 
-      // Cache response if enabled
-      if (config.cache) {
-        const ttl = config.cacheTTL || 300000; // 5 minutes default
+      // Cache response by default for all GET requests (2 min TTL)
+      if (shouldCache) {
+        const ttl = config.cacheTTL || 120000; // 2 minutes default
         this.cache.set(cacheKey, {
           data: response.data,
           timestamp: Date.now(),
@@ -297,9 +296,25 @@ class ProfessionalApi {
     return request;
   }
 
+  // Invalidate all cache entries whose key contains the given path segment
+  invalidateCache(urlPattern: string) {
+    for (const key of this.cache.keys()) {
+      if (key.includes(urlPattern)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  clearAllCache() {
+    this.cache.clear();
+  }
+
   async post<T = any>(url: string, data?: any, config: RequestConfig = {}): Promise<ApiResponse<T>> {
     const response = await this.instance.post(url, data, config);
-    
+    // Invalidate related GET cache after mutation
+    const basePath = url.split('/')[1];
+    if (basePath) this.invalidateCache(basePath);
+
     return {
       data: response.data,
       success: true,
@@ -312,7 +327,9 @@ class ProfessionalApi {
 
   async put<T = any>(url: string, data?: any, config: RequestConfig = {}): Promise<ApiResponse<T>> {
     const response = await this.instance.put(url, data, config);
-    
+    const basePath = url.split('/')[1];
+    if (basePath) this.invalidateCache(basePath);
+
     return {
       data: response.data,
       success: true,
@@ -338,7 +355,9 @@ class ProfessionalApi {
 
   async delete<T = any>(url: string, config: RequestConfig = {}): Promise<ApiResponse<T>> {
     const response = await this.instance.delete(url, config);
-    
+    const basePath = url.split('/')[1];
+    if (basePath) this.invalidateCache(basePath);
+
     return {
       data: response.data,
       success: true,
