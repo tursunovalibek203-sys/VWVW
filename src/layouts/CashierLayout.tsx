@@ -8,6 +8,7 @@ import {
   Users,
   ClipboardList,
   Plus,
+  PlusCircle,
   MessageCircle,
   Shield,
   Truck,
@@ -41,6 +42,7 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
   // Bitta accent (indigo) — har element uchun alohida rang YO'Q (professional, izchil)
   const navItems = [
     { path: '/cashier/sales', icon: ShoppingCart, label: 'Sotuv' },
+    { path: '/cashier/sales/add', icon: PlusCircle, label: 'Yangi' },
     { path: '/cashier/products', icon: Package, label: 'Ombor' },
     { path: '/cashier/customers', icon: Users, label: 'Mijozlar' },
     { path: '/cashier/cashbox', icon: Calculator, label: 'Kassa' },
@@ -165,7 +167,7 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
       {/* Main content */}
       <main className="pt-16 pb-24 w-full">
         {/* Kontekstga mos suzuvchi tugma (FAB) */}
-        {!isActive('/cashier/sales') && (
+        {!isActive('/cashier/sales') && !isActive('/cashier/sales/add') && (
           <button
             type="button"
             onClick={() =>

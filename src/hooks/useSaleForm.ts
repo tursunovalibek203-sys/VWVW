@@ -55,10 +55,9 @@ function getKomplektAdditions(
     if (match) {
       const upb = match.unitsPerBag || 1;
       const rawPpb = parseFloat(match.pricePerBag?.toString() || '0') || 0;
-      // Bazada narx USD da saqlanadi — joriy valyutaga aylantirish (asosiy mahsulot bilan bir xil mantiq)
       const ppb = currency === 'UZS' ? Math.round(rawPpb * exchangeRate) : rawPpb;
-      // Dona / qop soni = preform dona soni / krishka(yoki ruchka) qopdagi dona soni
-      const kQty = Math.ceil(totalUnits / upb);
+      // Aniq kasr qiymat: 4500 preform / 2000 krishka-per-bag = 2.25 qop
+      const kQty = Math.round((totalUnits / upb) * 10000) / 10000;
       result.push({
         productId: match.id,
         productName: match.name,

@@ -18,7 +18,7 @@ model User {
   active    Boolean  @default(true)
   // Telegram MTProto session (gramjs StringSession)
   telegramPhone    String?
-  telegramSession  String?  @db.Text
+  telegramSession  String?
   telegramLinkedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -134,7 +134,7 @@ model Customer {
 
 model Sale {
   id             String   @id @default(uuid())
-  receiptNumber  Int?     @unique // Ketma-ket chek raqami — set by SalesService via MAX(receiptNumber)+1
+  receiptNumber  Int?     @unique // Ketma-ket chek raqami â€” set by SalesService via MAX(receiptNumber)+1
   customerId     String?
   customer       Customer? @relation(fields: [customerId], references: [id])
   productId      String?
@@ -1714,7 +1714,7 @@ model Loan {
   @@index([loanDate])
 }
 
-// ─── Daftar (Ledger) tizimi ──────────────────────────────────────────────────
+// â”€â”€â”€ Daftar (Ledger) tizimi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Haydovchilar, hodimlar, yetkazib beruvchilar va xarajat kategoriyalari bilan oldi-berdi
 
 model Ledger {

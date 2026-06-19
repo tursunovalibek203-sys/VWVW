@@ -17,6 +17,31 @@ export function setScript(script: UiScript): void {
   window.dispatchEvent(new CustomEvent(SCRIPT_CHANGE_EVENT, { detail: script }));
 }
 
+// Har doim (getScript() ga bog'liq bo'lmagan) lotin → kirill konvertatsiya.
+// Qidiruv funksiyalarida ishlatiladi — til sozlamasidan qat'i nazar ishlaydi.
+export function forceLatinToCyrillic(text: string): string {
+  if (!text) return text;
+  let r = text;
+  r = r.replace(/o'/g, 'ў').replace(/O'/g, 'Ў');
+  r = r.replace(/g'/g, 'ғ').replace(/G'/g, 'Ғ');
+  r = r.replace(/sh/g, 'ш').replace(/Sh/g, 'Ш').replace(/SH/g, 'Ш');
+  r = r.replace(/ch/g, 'ч').replace(/Ch/g, 'Ч').replace(/CH/g, 'Ч');
+  r = r.replace(/ng/g, 'нг').replace(/Ng/g, 'Нг').replace(/NG/g, 'НГ');
+  const m: Record<string, string> = {
+    'a':'а','b':'б','d':'д','e':'е','f':'ф','g':'г','h':'ҳ',
+    'i':'и','j':'ж','k':'к','l':'л','m':'м','n':'н',
+    'o':'о','p':'п','q':'қ','r':'р','s':'с','t':'т',
+    'u':'у','v':'в','x':'х','y':'й','z':'з',
+    'A':'А','B':'Б','D':'Д','E':'Е','F':'Ф','G':'Г','H':'Ҳ',
+    'I':'И','J':'Ж','K':'К','L':'Л','M':'М','N':'Н',
+    'O':'О','P':'П','Q':'Қ','R':'Р','S':'С','T':'Т',
+    'U':'У','V':'В','X':'Х','Y':'Й','Z':'З',
+  };
+  let out = '';
+  for (let i = 0; i < r.length; i++) out += m[r[i]] || r[i];
+  return out;
+}
+
 // Kod ichida qattiq yozilgan (hardcoded) lotincha matnni joriy yozuvda ko'rsatish.
 // Sayt bo'ylab minglab joyda shu funksiya bilan o'ralgan matnlar bor — script
 // 'latin' bo'lsa matn o'zgarishsiz qoladi, 'cyrillic' bo'lsa krilchaga o'giriladi.

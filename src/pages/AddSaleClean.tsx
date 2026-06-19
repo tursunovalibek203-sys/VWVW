@@ -19,7 +19,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, Package, ShoppingCart, User, WifiOff, AlertCircle, RefreshCw, Search, Trash2, Truck } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { printReceipt } from '../lib/receiptPrinter';
-import { latinToCyrillic } from '../lib/transliterator';
+import { latinToCyrillic, forceLatinToCyrillic } from '../lib/transliterator';
 import { useSaleForm } from '../hooks/useSaleForm';
 import { ProductTypeCard, CartItem, GroupedCartItem, PaymentSection } from '../components/sales';
 import { filterProductsByCategory } from '../lib/saleUtils';
@@ -350,6 +350,15 @@ export default function AddSaleClean() {
   const [drivers, setDrivers] = useState<{ id: string; name: string; phone?: string; debtToCompany?: number }[]>([]);
   const [driverSearch, setDriverSearch] = useState('');
 
+  // Inline new driver form
+  const [showNewDriverForm, setShowNewDriverForm] = useState(false);
+  const [newDriverPhone, setNewDriverPhone] = useState('');
+  const [addingDriver, setAddingDriver] = useState(false);
+
+  // Inline new customer form
+  const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
+
   // Real-time product sync
   const handleProductUpdate = useCallback((updatedProduct: Product) => {
     // Update products list
@@ -401,6 +410,39 @@ export default function AddSaleClean() {
     onSettingsChanged: handleProductUpdate,
     onError: () => console.warn('[Realtime] Connection error - will retry'),
   });
+
+  const handleAddNewDriver = useCallback(async () => {
+    const name = driverSearch.trim();
+    if (!name || addingDriver) return;
+    setAddingDriver(true);
+    try {
+      const res = await api.post('/drivers', { name, phone: newDriverPhone.trim() || undefined });
+      const created = res.data?.data || res.data;
+      const newDriver = { id: created.id, name: created.name, phone: created.phone };
+      setDrivers(prev => [...prev, newDriver]);
+      saleForm.updateFormField('driverId', created.id);
+      setDriverSearch('');
+      setNewDriverPhone('');
+      setShowNewDriverForm(false);
+      addToast({ type: 'success', title: latinToCyrillic("Haydovchi qo'shildi") });
+    } catch {
+      addToast({ type: 'error', title: latinToCyrillic("Xatolik"), message: latinToCyrillic("Haydovchi qo'shib bo'lmadi") });
+    } finally {
+      setAddingDriver(false);
+    }
+  }, [driverSearch, newDriverPhone, addingDriver, saleForm, addToast]);
+
+  const handleAddNewCustomer = useCallback(() => {
+    const name = saleForm.customerSearch.trim();
+    if (!name) return;
+    saleForm.updateFormField('manualCustomerName', name);
+    saleForm.updateFormField('manualCustomerPhone', newCustomerPhone.trim());
+    saleForm.updateFormField('isKocha', false);
+    saleForm.updateFormField('customerId', '');
+    saleForm.setCustomerSearch('');
+    setNewCustomerPhone('');
+    setShowNewCustomerForm(false);
+  }, [saleForm, newCustomerPhone]);
 
   // Load initial data - to'g'ridan-to'g'ri API dan
   const loadData = useCallback(async () => {
@@ -468,10 +510,12 @@ export default function AddSaleClean() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-  // Filter products
-  const searchFiltered = saleForm.products.filter((p) =>
-    p.name?.toLowerCase().includes(saleForm.productSearch.toLowerCase())
-  );
+  // Filter products — Latin yoki Kirill qidiruvda ham ishlaydi
+  const searchFiltered = saleForm.products.filter((p) => {
+    const n = p.name?.toLowerCase() || '';
+    const q = saleForm.productSearch.toLowerCase();
+    return !q || n.includes(q) || n.includes(forceLatinToCyrillic(q));
+  });
   const filteredProducts = filterProductsByCategory(searchFiltered, saleForm.activeCategory);
 
   // Faqat kerakli mahsulotlarni ko'rsatish
@@ -630,39 +674,80 @@ export default function AddSaleClean() {
                   <input
                     type="text"
                     value={saleForm.customerSearch}
-                    onChange={e => saleForm.setCustomerSearch(e.target.value)}
+                    onChange={e => { saleForm.setCustomerSearch(e.target.value); setShowNewCustomerForm(false); setNewCustomerPhone(''); }}
                     placeholder={latinToCyrillic('Mijozni qidiring...')}
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none"
                   />
                   {saleForm.customerSearch && (
-                    <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
-                      {saleForm.customers
-                        .filter(c => c.name.toLowerCase().includes(saleForm.customerSearch.toLowerCase()))
-                        .slice(0, 6)
-                        .map(c => (
-                          <button key={c.id} type="button"
-                            onClick={() => { saleForm.updateFormField('customerId', c.id); saleForm.updateFormField('isKocha', false); saleForm.setCustomerSearch(''); }}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors"
+                    <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+                      {(() => {
+                        const q = saleForm.customerSearch.toLowerCase();
+                        const qCyr = forceLatinToCyrillic(q);
+                        const filtered = saleForm.customers.filter(c => {
+                          const n = c.name.toLowerCase();
+                          return n.includes(q) || n.includes(qCyr);
+                        });
+                        if (filtered.length > 0) {
+                          return (
+                            <div className="max-h-36 overflow-y-auto">
+                              {filtered.slice(0, 6).map(c => (
+                                <button key={c.id} type="button"
+                                  onClick={() => { saleForm.updateFormField('customerId', c.id); saleForm.updateFormField('isKocha', false); saleForm.setCustomerSearch(''); }}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors"
+                                >
+                                  <span className="font-medium text-slate-900">{c.name}</span>
+                                  {c.phone && <span className="text-slate-400 ml-2 text-xs">{c.phone}</span>}
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        }
+                        return showNewCustomerForm ? (
+                          <div className="p-3 space-y-2 bg-slate-50">
+                            <p className="text-xs font-semibold text-slate-600">
+                              {latinToCyrillic("Yangi mijoz qo'shish")}
+                            </p>
+                            <input
+                              type="text"
+                              readOnly
+                              value={saleForm.customerSearch}
+                              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 font-medium"
+                            />
+                            <input
+                              type="tel"
+                              value={newCustomerPhone}
+                              onChange={e => setNewCustomerPhone(e.target.value)}
+                              placeholder={latinToCyrillic('Telefon raqami (ixtiyoriy)')}
+                              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={handleAddNewCustomer}
+                                className="flex-1 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors"
+                              >
+                                {latinToCyrillic("Qo'shish")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowNewCustomerForm(false)}
+                                className="px-3 py-2 text-sm text-slate-500 hover:text-slate-700 border border-slate-200 rounded-xl transition-colors"
+                              >
+                                {latinToCyrillic('Bekor')}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowNewCustomerForm(true)}
+                            className="w-full text-left px-3 py-2.5 text-sm hover:bg-indigo-50 transition-colors"
                           >
-                            <span className="font-medium text-slate-900">{c.name}</span>
-                            {c.phone && <span className="text-slate-400 ml-2 text-xs">{c.phone}</span>}
+                            <span className="text-slate-400">{latinToCyrillic('Topilmadi')} — </span>
+                            <span className="text-indigo-600 font-medium">+ "{saleForm.customerSearch}" {latinToCyrillic('nomida yangi mijoz')}</span>
                           </button>
-                        ))}
-                      {saleForm.customers.filter(c => c.name.toLowerCase().includes(saleForm.customerSearch.toLowerCase())).length === 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            saleForm.updateFormField('manualCustomerName', saleForm.customerSearch);
-                            saleForm.updateFormField('isKocha', false);
-                            saleForm.updateFormField('customerId', '');
-                            saleForm.setCustomerSearch('');
-                          }}
-                          className="w-full text-left px-3 py-2.5 text-sm hover:bg-indigo-50 transition-colors"
-                        >
-                          <span className="text-slate-400">{latinToCyrillic('Topilmadi')} — </span>
-                          <span className="text-indigo-600 font-medium">+ "{saleForm.customerSearch}" {latinToCyrillic('nomida yangi mijoz')}</span>
-                        </button>
-                      )}
+                        );
+                      })()}
                     </div>
                   )}
                   <button type="button" onClick={() => { saleForm.updateFormField('isKocha', true); saleForm.updateFormField('customerId', ''); saleForm.setCustomerSearch(''); }}
@@ -714,31 +799,86 @@ export default function AddSaleClean() {
                       <input
                         type="text"
                         value={driverSearch}
-                        onChange={e => setDriverSearch(e.target.value)}
+                        onChange={e => { setDriverSearch(e.target.value); setShowNewDriverForm(false); setNewDriverPhone(''); }}
                         placeholder={latinToCyrillic('Haydovchini qidiring...')}
                         className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none"
                       />
                       {driverSearch && (
-                        <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
-                          {drivers
-                            .filter(d => d.name.toLowerCase().includes(driverSearch.toLowerCase()) || (d.phone || '').includes(driverSearch))
-                            .map(d => (
-                              <button key={d.id} type="button"
-                                onClick={() => { saleForm.updateFormField('driverId', d.id); setDriverSearch(''); }}
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors"
+                        <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+                          {(() => {
+                            const q = driverSearch.toLowerCase();
+                            const qCyr = forceLatinToCyrillic(q);
+                            const filtered = drivers.filter(d => {
+                              const n = d.name.toLowerCase();
+                              return n.includes(q) || n.includes(qCyr) || (d.phone || '').includes(driverSearch);
+                            });
+                            if (filtered.length > 0) {
+                              return (
+                                <div className="max-h-40 overflow-y-auto">
+                                  {filtered.map(d => (
+                                    <button key={d.id} type="button"
+                                      onClick={() => { saleForm.updateFormField('driverId', d.id); setDriverSearch(''); }}
+                                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors"
+                                    >
+                                      <span className="font-medium text-slate-900">{d.name}</span>
+                                      {d.phone && <span className="text-slate-400 ml-2 text-xs">{d.phone}</span>}
+                                      {(d.debtToCompany || 0) > 0 && (
+                                        <span className="ml-2 text-xs text-amber-600 font-semibold">
+                                          {latinToCyrillic('Qarzi')}: {Math.round(d.debtToCompany!).toLocaleString()} UZS
+                                        </span>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return showNewDriverForm ? (
+                              <div className="p-3 space-y-2 bg-slate-50">
+                                <p className="text-xs font-semibold text-slate-600">
+                                  {latinToCyrillic("Yangi haydovchi qo'shish")}
+                                </p>
+                                <input
+                                  type="text"
+                                  readOnly
+                                  value={driverSearch}
+                                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 font-medium"
+                                />
+                                <input
+                                  type="tel"
+                                  value={newDriverPhone}
+                                  onChange={e => setNewDriverPhone(e.target.value)}
+                                  placeholder={latinToCyrillic('Telefon raqami (ixtiyoriy)')}
+                                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none"
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={handleAddNewDriver}
+                                    disabled={addingDriver}
+                                    className="flex-1 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors disabled:opacity-60"
+                                  >
+                                    {addingDriver ? latinToCyrillic('Qo\'shilmoqda...') : latinToCyrillic('Qo\'shish')}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowNewDriverForm(false)}
+                                    className="px-3 py-2 text-sm text-slate-500 hover:text-slate-700 border border-slate-200 rounded-xl transition-colors"
+                                  >
+                                    {latinToCyrillic('Bekor')}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setShowNewDriverForm(true)}
+                                className="w-full text-left px-3 py-2.5 text-sm hover:bg-indigo-50 transition-colors"
                               >
-                                <span className="font-medium text-slate-900">{d.name}</span>
-                                {d.phone && <span className="text-slate-400 ml-2 text-xs">{d.phone}</span>}
-                                {(d.debtToCompany || 0) > 0 && (
-                                  <span className="ml-2 text-xs text-amber-600 font-semibold">
-                                    {latinToCyrillic('Qarzi')}: {Math.round(d.debtToCompany!).toLocaleString()} UZS
-                                  </span>
-                                )}
+                                <span className="text-slate-400">{latinToCyrillic('Topilmadi')} — </span>
+                                <span className="text-indigo-600 font-medium">+ "{driverSearch}" {latinToCyrillic("nomida yangi haydovchi")}</span>
                               </button>
-                            ))}
-                          {drivers.filter(d => d.name.toLowerCase().includes(driverSearch.toLowerCase()) || (d.phone || '').includes(driverSearch)).length === 0 && (
-                            <p className="px-3 py-2.5 text-sm text-slate-400">{latinToCyrillic('Haydovchi topilmadi')}</p>
-                          )}
+                            );
+                          })()}
                         </div>
                       )}
                     </>

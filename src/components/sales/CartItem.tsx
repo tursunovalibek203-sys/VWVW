@@ -1,4 +1,5 @@
 import { Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import type { SaleItemForm, Product } from '../../types';
 import { getCurrencySymbol, getDisplayAmount } from '../../lib/saleUtils';
 import { trData } from '../../lib/transliterator';
@@ -64,6 +65,9 @@ export const CartItem = ({
   onUpdate,
   onRemove,
 }: CartItemProps) => {
+  // Narx inputi uchun mahalliy string state — "0.", "0.00", "0.002" yozishga imkon beradi
+  const [localPrice, setLocalPrice] = useState<string | null>(null);
+
   const cartProduct = products.find((p) => p.id === item.productId);
   
   // Faqat shu turdagi mahsulotlarni filterlash
@@ -274,11 +278,33 @@ export const CartItem = ({
             {latinToCyrillic('Narx')} / {item.saleType === 'piece' ? latinToCyrillic('dona') : latinToCyrillic('qop')}
           </label>
           <input
-            type="number"
-            step="0.0001"
+            type="text"
+            inputMode="decimal"
             placeholder="0"
-            value={item.saleType === 'piece' ? item.pricePerPiece || '' : item.pricePerBag || ''}
-            onChange={(e) => handlePriceChange(e.target.value)}
+            value={
+              localPrice !== null
+                ? localPrice
+                : (item.saleType === 'piece' ? item.pricePerPiece?.toString() || '' : item.pricePerBag?.toString() || '')
+            }
+            onFocus={(e) => {
+              const cur = item.saleType === 'piece' ? item.pricePerPiece?.toString() || '' : item.pricePerBag?.toString() || '';
+              setLocalPrice(cur);
+              e.target.select();
+            }}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/[^0-9.]/g, '');
+              setLocalPrice(raw);
+              // Agar haqiqiy raqam bo'lsa parent ni yangilaymiz
+              if (raw !== '' && raw !== '.' && !raw.endsWith('.')) {
+                handlePriceChange(raw);
+              }
+            }}
+            onBlur={() => {
+              if (localPrice !== null) {
+                handlePriceChange(localPrice === '' || localPrice === '.' ? '0' : localPrice);
+                setLocalPrice(null);
+              }
+            }}
             onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
             className="w-full h-9 text-center text-sm font-semibold border border-slate-200 rounded-lg focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none bg-slate-50 focus:bg-white transition-all"
           />
