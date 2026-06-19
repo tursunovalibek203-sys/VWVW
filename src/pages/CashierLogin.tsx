@@ -44,10 +44,8 @@ export default function CashierLogin() {
     setError('');
 
     try {
-      // Kassir logini - login orqali
-      const { data } = await api.post('/auth/cashier-login', { login, password });
+      const { data } = await api.post('/auth/cashier-login', { login, password }, { timeout: 60000 });
 
-      // Kassir roli tekshiruvi — setAuth DAN OLDIN
       const role = data.user?.role?.toLowerCase();
       if (role !== 'cashier' && role !== 'seller') {
         setError(latinToCyrillic('Faqat kassirlar uchun login!'));
@@ -55,15 +53,14 @@ export default function CashierLogin() {
       }
 
       setAuth(data.token, data.user);
-
-      // Sessiyani tozalash
       sessionStorage.removeItem('lastSession');
-
       navigate('/cashier/sales');
     } catch (error: any) {
-      const errorMsg =
-        error.response?.data?.error ||
-        latinToCyrillic('Kirish muvaffaqiyatsiz. Login yoki parol xato.');
+      const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+      const isNetwork = !error.response && !isTimeout;
+      const errorMsg = isTimeout || isNetwork
+        ? latinToCyrillic('Server uyg\'onmoqda, 30-60 soniya kuting va qayta urining...')
+        : error.response?.data?.error || latinToCyrillic('Login yoki parol xato.');
       setError(errorMsg);
     } finally {
       setLoading(false);

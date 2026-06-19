@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { checkPermission, PermissionType } from '../lib/permissions';
 
-const TOKEN_TTL = 12 * 60 * 60 * 1000; // 12 soat
+const TOKEN_TTL = 30 * 24 * 60 * 60 * 1000; // 30 kun (JWT bilan mos)
 
 interface User {
   id: string;

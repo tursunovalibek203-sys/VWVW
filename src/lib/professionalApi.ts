@@ -60,9 +60,9 @@ class ProfessionalApi {
     
     this.config = {
       baseURL: backendUrl,
-      timeout: 15000, // Reduced from 30000 to 15000ms
-      retryAttempts: 2, // Reduced from 3 to 2
-      retryDelay: 500, // Reduced from 1000 to 500ms
+      timeout: 45000,
+      retryAttempts: 2,
+      retryDelay: 1000,
       ...config
     };
 

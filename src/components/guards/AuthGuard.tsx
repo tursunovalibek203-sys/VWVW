@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 
-const TOKEN_TTL = 12 * 60 * 60 * 1000;
+const TOKEN_TTL = 30 * 24 * 60 * 60 * 1000; // 30 kun
 
 function readLocalToken(): { token: string | null; loginTime: number | null } {
   try {

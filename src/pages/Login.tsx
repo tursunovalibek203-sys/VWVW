@@ -48,16 +48,13 @@ export default function Login() {
         requestData = { login, password };
       }
 
-      const { data } = await api.post(endpoint, requestData);
+      const { data } = await api.post(endpoint, requestData, { timeout: 60000 });
 
       if (!data.token || !data.user) {
         throw new Error('Serverdan noto\'g\'ri ma\'lumot keldi');
       }
 
       setAuth(data.token, data.user);
-
-      // localStorage ga yozilishi uchun bir tick kutamiz
-      await new Promise(resolve => setTimeout(resolve, 50));
 
       const role = data.user.role?.toUpperCase();
       if (role === 'CASHIER' || role === 'SELLER') {
@@ -68,7 +65,11 @@ export default function Login() {
         navigate('/dashboard');
       }
     } catch (error: any) {
-      const errorMsg = error.details?.error || error.response?.data?.error || error.message || 'Кириш муваффақиятсиз. Фойдаланувчи номи ёки парол хато.';
+      const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+      const isNetwork = !error.response && !isTimeout;
+      const errorMsg = isTimeout || isNetwork
+        ? latinToCyrillic('Server uyg\'onmoqda, 30-60 soniya kuting va qayta urining...')
+        : error.response?.data?.error || latinToCyrillic('Foydalanuvchi nomi yoki parol xato.');
       setError(errorMsg);
     } finally {
       setLoading(false);
