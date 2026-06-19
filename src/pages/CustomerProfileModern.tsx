@@ -49,12 +49,20 @@ interface Customer {
 
 interface SaleItem {
   id: string;
-  productId: string;
-  productName?: string;
+  productId?: string;
   quantity: number;
   pricePerBag: number;
   product?: {
+    id: string;
     name: string;
+  };
+  variant?: {
+    id: string;
+    variantName: string;
+    parent?: {
+      id: string;
+      name: string;
+    };
   };
 }
 
@@ -261,11 +269,18 @@ export default function CustomerProfileModern() {
 
   const getProductNames = (sale: Sale) => {
     if (sale.items && sale.items.length > 0) {
-      return trData(sale.items.map(item => item.product?.name || item.productName || 'N/A').join(', '));
+      const names = sale.items.map(item => {
+        if (item.product?.name) return item.product.name;
+        if (item.variant?.parent?.name && item.variant?.variantName) {
+          return `${item.variant.parent.name} (${item.variant.variantName})`;
+        }
+        if (item.variant?.parent?.name) return item.variant.parent.name;
+        if (item.variant?.variantName) return item.variant.variantName;
+        return null;
+      }).filter(Boolean);
+      if (names.length > 0) return trData(names.join(', '));
     }
-    if (sale.product?.name) {
-      return trData(sale.product.name);
-    }
+    if (sale.product?.name) return trData(sale.product.name);
     return '-';
   };
 

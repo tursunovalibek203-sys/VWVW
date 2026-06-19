@@ -103,6 +103,18 @@ router.get('/', async (req: AuthRequest, res) => {
                   name: true,
                   pricePerBag: true,
                 }
+              },
+              variant: {
+                select: {
+                  id: true,
+                  variantName: true,
+                  parent: {
+                    select: {
+                      id: true,
+                      name: true,
+                    }
+                  }
+                }
               }
             }
           }
