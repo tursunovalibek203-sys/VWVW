@@ -155,7 +155,8 @@ app.use(cors({
     // Allow requests with no origin (mobile apps, curl, etc)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+    const isVercelApp = /^https:\/\/[a-zA-Z0-9-]+\.vercel\.app$/.test(origin);
+    if (allowedOrigins.includes(origin) || isVercelApp || process.env.NODE_ENV === 'development') {
       callback(null, true);
     } else {
       logger.warn('CORS blocked', { origin, allowed: allowedOrigins });

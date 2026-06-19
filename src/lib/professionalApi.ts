@@ -52,14 +52,12 @@ class ProfessionalApi {
   private pendingRequests: Map<string, Promise<any>> = new Map();
 
   constructor(config: Partial<ApiConfig> = {}) {
-    // Use absolute URL for backend API if not in production
-    const backendUrl = (import.meta as any).env?.VITE_API_BASE_URL ||
-                       (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-                         ? 'http://localhost:5003/api'
-                         : '/api');
-    
+    const defaultBase = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      ? (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5003/api')
+      : '/api';
+
     this.config = {
-      baseURL: backendUrl,
+      baseURL: defaultBase,
       timeout: 45000,
       retryAttempts: 2,
       retryDelay: 1000,
@@ -437,14 +435,9 @@ class ProfessionalApi {
 }
 
 // Create singleton instance
-// Localhost'da to'g'ridan-to'g'ri, production'da Vercel proxy (/api → Render)
-const _apiBase =
-  typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5004/api')
-    : '/api';
-
+// Production: always use Vercel proxy (/api → Render), never call Render directly from browser
+// Dev: use VITE_API_BASE_URL or localhost fallback
 export const api = new ProfessionalApi({
-  baseURL: _apiBase,
   timeout: 60000,
   retryAttempts: 3,
   retryDelay: 1000,
