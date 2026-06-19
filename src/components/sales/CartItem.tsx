@@ -177,10 +177,10 @@ export const CartItem = ({
     (parseFloat(item.unitsPerBag?.toString() || '2000') || 2000);
 
   return (
-    <div className={`rounded-xl border px-3 py-2.5 space-y-2 ${isEditing ? 'border-blue-400 bg-blue-50/40' : 'border-slate-200 bg-white'}`}>
+    <div className={`rounded-xl border overflow-hidden shadow-sm ${isEditing ? 'border-indigo-300 ring-1 ring-indigo-200' : 'border-slate-200'} bg-white`}>
 
-      {/* Qator 1: Mahsulot tanlash + o'chirish */}
-      <div className="flex items-center gap-2">
+      {/* Qator 1: Mahsulot + Qop|Dona toggle + o'chirish */}
+      <div className="flex items-center gap-2 px-3 pt-3 pb-2">
         <select
           aria-label="Mahsulot tanlash"
           value={item.productId}
@@ -195,45 +195,55 @@ export const CartItem = ({
               onUpdate(index, { productId: newProduct.id, productName: newProduct.name, unitsPerBag, pricePerBag, pricePerPiece, subtotal, warehouse: newProduct.warehouse || 'other' });
             }
           }}
-          className="flex-1 text-sm font-medium text-slate-900 bg-white border border-slate-200 rounded-lg px-2 py-1.5 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none"
+          className="flex-1 text-sm font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none"
         >
           {filteredProducts.map((p) => (
             <option key={p.id} value={p.id}>{trData(p.name)}</option>
           ))}
         </select>
-        <button type="button" onClick={() => onRemove(index)}
-          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors flex-shrink-0">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
 
-      {/* Qator 2: Qop|Dona + barcha inputlar + subtotal */}
-      <div className="flex items-center gap-1.5 flex-wrap">
         {/* Qop / Dona toggle */}
         <div className="flex rounded-lg overflow-hidden border border-slate-200 flex-shrink-0">
           <button type="button" onClick={toggleSaleType}
-            className={`px-2 py-1 text-xs font-semibold transition-colors ${item.saleType !== 'piece' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+            className={`px-3 py-2 text-xs font-bold transition-all ${item.saleType !== 'piece' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
             {latinToCyrillic('Qop')}
           </button>
           <button type="button" onClick={toggleSaleType}
-            className={`px-2 py-1 text-xs font-semibold transition-colors border-l border-slate-200 ${item.saleType === 'piece' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+            className={`px-3 py-2 text-xs font-bold transition-all border-l border-slate-200 ${item.saleType === 'piece' ? 'bg-emerald-500 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
             {latinToCyrillic('Dona')}
           </button>
         </div>
 
-        {/* Qop soni */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <input type="text" placeholder="0"
+        <button type="button" onClick={() => onRemove(index)}
+          className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors flex-shrink-0">
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Qator 2: 4 ta labelled input */}
+      <div className="grid grid-cols-4 gap-2 px-3 pb-3">
+        {/* Miqdor */}
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1 uppercase tracking-wide">
+            {latinToCyrillic('Miqdor')}
+          </label>
+          <input
+            type="text"
+            placeholder="0"
             value={item.bagDisplayValue || item.quantity?.toString() || ''}
             onChange={(e) => handleQuantityChange(e.target.value)}
-            className="w-12 h-7 text-center text-xs font-medium border border-slate-200 rounded-lg focus:border-indigo-400 outline-none"
-            title={latinToCyrillic('Qop soni')} />
-          <span className="text-[10px] text-slate-400">qop</span>
+            className="w-full h-9 text-center text-sm font-semibold border border-slate-200 rounded-lg focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none bg-slate-50 focus:bg-white transition-all"
+          />
         </div>
 
         {/* 1 qopda */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <input type="text" placeholder="2000"
+        <div>
+          <label className="block text-[11px] font-semibold text-amber-500 mb-1 uppercase tracking-wide">
+            1 {latinToCyrillic('qopda')}
+          </label>
+          <input
+            type="text"
+            placeholder="2000"
             value={item.unitsPerBag?.toString() || ''}
             onChange={(e) => {
               const val = e.target.value.replace(/[^0-9.]/g, '');
@@ -244,32 +254,41 @@ export const CartItem = ({
               const subtotal = quantity * pricePerBag;
               onUpdate(index, { unitsPerBag: units, pricePerPiece, subtotal });
             }}
-            className="w-14 h-7 text-center text-xs font-medium border border-amber-300 bg-amber-50 rounded-lg focus:border-amber-500 outline-none"
-            title={latinToCyrillic('1 qopda nechta dona')} />
-          <span className="text-[10px] text-slate-400">/q</span>
+            className="w-full h-9 text-center text-sm font-semibold border border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-100 outline-none bg-amber-50 focus:bg-white transition-all"
+          />
         </div>
 
         {/* Jami dona */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <span className="text-[10px] text-slate-400">=</span>
-          <span className="text-xs font-medium text-slate-600 tabular-nums">{totalPieces.toLocaleString()}</span>
-          <span className="text-[10px] text-slate-400">{latinToCyrillic('dona')}</span>
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1 uppercase tracking-wide">
+            {latinToCyrillic('Jami dona')}
+          </label>
+          <div className="w-full h-9 flex items-center justify-center bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-600 tabular-nums">
+            {totalPieces.toLocaleString()}
+          </div>
         </div>
 
         {/* Narx */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <span className="text-[10px] text-slate-400">{getCurrencySymbol(currency)}</span>
-          <input type="number" step="0.0001" placeholder="0"
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1 uppercase tracking-wide">
+            {latinToCyrillic('Narx')} / {item.saleType === 'piece' ? latinToCyrillic('dona') : latinToCyrillic('qop')}
+          </label>
+          <input
+            type="number"
+            step="0.0001"
+            placeholder="0"
             value={item.saleType === 'piece' ? item.pricePerPiece || '' : item.pricePerBag || ''}
             onChange={(e) => handlePriceChange(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-            className="w-20 h-7 text-center text-xs font-medium border border-slate-200 rounded-lg focus:border-indigo-400 outline-none"
-            title={item.saleType === 'piece' ? latinToCyrillic('Dona narxi') : latinToCyrillic('Qop narxi')} />
-          <span className="text-[10px] text-slate-400">/{item.saleType === 'piece' ? latinToCyrillic('d') : latinToCyrillic('q')}</span>
+            className="w-full h-9 text-center text-sm font-semibold border border-slate-200 rounded-lg focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none bg-slate-50 focus:bg-white transition-all"
+          />
         </div>
+      </div>
 
-        {/* Subtotal */}
-        <span className="ml-auto text-sm font-bold text-indigo-600 tabular-nums flex-shrink-0">
+      {/* Qator 3: Subtotal footer */}
+      <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-t border-slate-100">
+        <span className="text-xs text-slate-400 font-medium">{latinToCyrillic('Jami summa')}</span>
+        <span className="text-base font-bold text-indigo-600 tabular-nums">
           {getCurrencySymbol(currency)}{getDisplayAmount(item.subtotal || 0, currency)}
         </span>
       </div>

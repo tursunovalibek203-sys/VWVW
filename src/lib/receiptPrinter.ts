@@ -73,7 +73,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
       const label = type === 'uzs' ? "Naqd (so'm)" : type === 'usd' ? 'Dollar ($)' : 'Karta';
       const display = type === 'usd'
         ? `$${(amount! / data.exchangeRate).toFixed(2)}`
-        : isUSD ? fmtAmt(amount!) : `${Math.round(amount!).toLocaleString()} so'm`;
+        : `${Math.round(amount!).toLocaleString()} so'm`;
       return `<tr><td style="font-size:12px;padding:2px 0;">${label}:</td><td style="font-size:12px;text-align:right;font-weight:700;padding:2px 0;">${display}</td></tr>`;
     }).join('');
 
