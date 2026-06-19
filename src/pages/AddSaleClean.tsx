@@ -406,20 +406,13 @@ export default function AddSaleClean() {
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    // Add timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      setLoading(false);
-      setError(latinToCyrillic('Yuklash vaqti tugadi. Internet aloqasini tekshiring.'));
-      console.warn('Loading timeout reached for initial data');
-    }, 10000); // 10 second timeout
 
     try {
       const [productsRes, customersRes, driversRes] = await Promise.all([
-        api.get('/products'),
-        api.get('/customers'),
-        api.get('/drivers').catch(() => ({ data: [] })),
+        api.get('/products', { timeout: 60000 }),
+        api.get('/customers', { timeout: 60000 }),
+        api.get('/drivers', { timeout: 60000 }).catch(() => ({ data: [] })),
       ]);
-      clearTimeout(timeout);
 
       // ✅ Handle standardized API response format
       const productsData = extractArray<Product>(productsRes, []);
@@ -436,7 +429,6 @@ export default function AddSaleClean() {
         setDrivers(driversData.filter((d: any) => d.active !== false));
       }
     } catch (error: any) {
-      clearTimeout(timeout);
       console.error('Failed to load initial data:', error);
       if (error.code === 'NETWORK_ERROR' || !error.response) {
         setError(latinToCyrillic('Internet ulanmagan. Mahsulotlarni yuklab bo\'lmadi.'));
@@ -444,7 +436,6 @@ export default function AddSaleClean() {
         setError(latinToCyrillic('Ma\'lumotlarni yuklab bo\'lmadi. Qaytadan urinib ko\'ring.'));
       }
     } finally {
-      clearTimeout(timeout);
       setLoading(false);
     }
   }, [saleForm.setProducts, saleForm.setCustomers]);

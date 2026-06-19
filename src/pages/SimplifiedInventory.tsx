@@ -119,25 +119,15 @@ export default function SimplifiedInventory() {
   const loadProducts = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
-    // Add timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      setLoading(false);
-      setRefreshing(false);
-      console.warn('Loading timeout reached for products');
-    }, 10000); // 10 second timeout
 
     try {
-      const response = await api.get('/products');
-      clearTimeout(timeout);
-      // Handle standardized API response format { success, data }
+      const response = await api.get('/products', { timeout: 60000 });
       const productsData = extractArray<Product>(response, []);
       setProducts(productsData);
       setLastUpdated(new Date());
     } catch (error) {
-      clearTimeout(timeout);
       errorHandler.handleError(error, { action: 'loadProducts' });
     } finally {
-      clearTimeout(timeout);
       setLoading(false);
       setRefreshing(false);
     }

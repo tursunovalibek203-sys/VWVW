@@ -85,21 +85,11 @@ export default function Suppliers() {
 
   const loadSuppliers = async () => {
     setLoading(true);
-    // Add timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      setLoading(false);
-      setRefreshing(false);
-      setError('Loading timeout. Please try again.');
-      console.warn('Loading timeout reached for suppliers');
-    }, 10000); // 10 second timeout
-
     try {
-      const { data } = await api.get('/suppliers');
-      clearTimeout(timeout);
+      const { data } = await api.get('/suppliers', { timeout: 60000 });
       setSuppliers(data);
       setError(null);
     } catch (error: any) {
-      clearTimeout(timeout);
       console.error('Failed to load suppliers:', error);
       if (error.code === 'NETWORK_ERROR' || !error.response) {
         setError("Internet bilan aloqa yo'q. Ma'lumotlar yuklanmadi.");
@@ -107,7 +97,6 @@ export default function Suppliers() {
         setError('Failed to load suppliers. Please try again.');
       }
     } finally {
-      clearTimeout(timeout);
       setLoading(false);
       setRefreshing(false);
     }

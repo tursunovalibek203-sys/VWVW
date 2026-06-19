@@ -54,11 +54,9 @@ router.get('/', async (req: AuthRequest, res) => {
     // ADMIN, CASHIER, ACCOUNTANT barcha sotuvlarni ko'radi
     // (where o'zgarmaydi)
     
-    // Total count for pagination
-    total = await prisma.sale.count({ where });
-    
-    // Get sales with pagination and count items
-    const [sales, itemCounts] = await Promise.all([
+    // Total count + sales in parallel (2 queries instead of 4)
+    const [total, sales] = await Promise.all([
+      prisma.sale.count({ where }),
       prisma.sale.findMany({
         where,
         select: {
@@ -73,23 +71,13 @@ router.get('/', async (req: AuthRequest, res) => {
           manualCustomerName: true,
           quantity: true,
           customer: {
-            select: {
-              id: true,
-              name: true,
-              phone: true,
-            }
+            select: { id: true, name: true, phone: true }
           },
           user: {
-            select: {
-              id: true,
-              name: true,
-            }
+            select: { id: true, name: true }
           },
           driver: {
-            select: {
-              id: true,
-              name: true,
-            }
+            select: { id: true, name: true }
           },
           items: {
             select: {
@@ -98,22 +86,13 @@ router.get('/', async (req: AuthRequest, res) => {
               pricePerBag: true,
               subtotal: true,
               product: {
-                select: {
-                  id: true,
-                  name: true,
-                  pricePerBag: true,
-                }
+                select: { id: true, name: true, pricePerBag: true }
               },
               variant: {
                 select: {
                   id: true,
                   variantName: true,
-                  parent: {
-                    select: {
-                      id: true,
-                      name: true,
-                    }
-                  }
+                  parent: { select: { id: true, name: true } }
                 }
               }
             }
@@ -123,37 +102,13 @@ router.get('/', async (req: AuthRequest, res) => {
         take,
         skip,
       }),
-      prisma.saleItem.groupBy({
-        by: ['saleId'],
-        where: {
-          saleId: {
-            in: (await prisma.sale.findMany({
-              where,
-              orderBy: { createdAt: 'desc' },
-              take,
-              skip,
-              select: { id: true }
-            })).map(s => s.id)
-          }
-        },
-        _count: {
-          saleId: true,
-        },
-      })
     ]);
-    
-    // Create a map of saleId to item count
-    const itemCountMap = new Map(itemCounts.map(ic => [ic.saleId, ic._count.saleId]));
-    
-    // Calculate debt and add itemCount
-    const salesWithData = sales.map(sale => {
-      return {
-        ...sale,
-        // âœ… DECIMAL FIX: Use DecimalHelper for debt calculation
-        debtAmount: DecimalHelper.subtract(sale.totalAmount, sale.paidAmount),
-        itemCount: itemCountMap.get(sale.id) || sale.items?.length || 0,
-      };
-    });
+
+    const salesWithData = sales.map(sale => ({
+      ...sale,
+      debtAmount: DecimalHelper.subtract(sale.totalAmount, sale.paidAmount),
+      itemCount: sale.items?.length || 0,
+    }));
     
     // âœ… STANDARD API RESPONSE FORMAT
     res.json(paginatedResponse(
