@@ -300,24 +300,24 @@ router.get('/stats/monthly', async (req, res) => {
 
     const rows = await prisma.$queryRaw<Array<{
       customerId: string;
-      monthlySales: number;
+      monthlySales: bigint | number;
       lastSaleDate: string | null;
     }>>`
       SELECT
-        customerId,
-        COALESCE(SUM(totalAmount), 0)             AS monthlySales,
-        MAX(DATE(createdAt))                       AS lastSaleDate
+        "customerId",
+        COALESCE(SUM("totalAmount"), 0)             AS "monthlySales",
+        MAX("createdAt"::date)                      AS "lastSaleDate"
       FROM "Sale"
-      WHERE customerId IS NOT NULL
-        AND createdAt >= ${monthStart.toISOString()}
-      GROUP BY customerId
+      WHERE "customerId" IS NOT NULL
+        AND "createdAt" >= ${monthStart}::timestamptz
+      GROUP BY "customerId"
     `;
 
     const map: Record<string, { monthlySales: number; lastSaleDate: string | null }> = {};
     (rows as any[]).forEach(r => {
       map[r.customerId] = {
-        monthlySales: Number(r.monthlySales),
-        lastSaleDate: r.lastSaleDate ?? null,
+        monthlySales: Number(r.monthlySales ?? 0),
+        lastSaleDate: r.lastSaleDate ? String(r.lastSaleDate).slice(0, 10) : null,
       };
     });
     res.json(map);
