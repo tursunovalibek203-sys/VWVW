@@ -30,9 +30,7 @@ router.get('/', async (req: AuthRequest, res) => {
     
     const take = Math.min(parseInt(limit as string) || 100, 500);
     const skip = (Math.max(parseInt(page as string) || 1, 1) - 1) * take;
-    
-    let total = 0;
-    
+
     // Foydalanuvchi roli bo'yicha filter
     const userRole = req.user?.role;
     const userId = req.user?.id;
