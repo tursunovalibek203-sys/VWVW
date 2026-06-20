@@ -2,13 +2,14 @@ import { Router } from 'express';
 import { prisma } from '../utils/prisma';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { successResponse, errorResponse } from '../utils/response';
+import { withCache, invalidateCache } from '../middleware/responseCache';
 
 const router = Router();
 
 router.use(authenticate);
 
-// Get all active exchange rates
-router.get('/', async (req: AuthRequest, res) => {
+// Get all active exchange rates — 5 daqiqa cache
+router.get('/', withCache(5 * 60 * 1000), async (req: AuthRequest, res) => {
   try {
     const rates = await prisma.exchangeRate.findMany({
       where: { isActive: true },
@@ -21,8 +22,8 @@ router.get('/', async (req: AuthRequest, res) => {
   }
 });
 
-// Get specific exchange rate
-router.get('/pair', async (req: AuthRequest, res) => {
+// Get specific exchange rate pair — 5 daqiqa cache
+router.get('/pair', withCache(5 * 60 * 1000), async (req: AuthRequest, res) => {
   try {
     const { from, to } = req.query;
 
@@ -70,6 +71,7 @@ router.post('/', authorize('ADMIN'), async (req: AuthRequest, res) => {
       }
     });
 
+    invalidateCache('/api/exchange-rates');
     res.status(201).json(successResponse(newRate));
   } catch (error: any) {
     console.error('Error creating exchange rate:', error);
@@ -88,6 +90,7 @@ router.put('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
       data: { rate: parseFloat(rate) }
     });
 
+    invalidateCache('/api/exchange-rates');
     res.json(successResponse(updatedRate));
   } catch (error: any) {
     console.error('Error updating exchange rate:', error);
@@ -105,6 +108,7 @@ router.delete('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
       data: { isActive: false }
     });
 
+    invalidateCache('/api/exchange-rates');
     res.json(successResponse({ message: 'Exchange rate deactivated' }));
   } catch (error: any) {
     console.error('Error deactivating exchange rate:', error);

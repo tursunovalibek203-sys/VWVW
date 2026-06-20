@@ -7,6 +7,7 @@ import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { successResponse, errorResponse } from '../utils/response';
 import { DecimalHelper } from '../utils/decimal-helper';
 import { createCustomerTopic } from '../utils/telegram-forum';
+import { withCache, invalidateCache } from '../middleware/responseCache';
 
 
 
@@ -18,7 +19,7 @@ router.use(authenticate);
 
 
 
-router.get('/', async (req, res) => {
+router.get('/', withCache(30 * 1000), async (req, res) => {
 
   try {
 
@@ -272,7 +273,20 @@ router.post('/', async (req: AuthRequest, res) => {
 
     const customer = await prisma.customer.create({ data: customerData });
 
+    invalidateCache('/api/customers');
     res.json(customer);
+
+    // Background: forum topic yaratish (xatolik bo'lsa ham javobga ta'sir qilmasin)
+    setImmediate(async () => {
+      try {
+        const userId = (req as AuthRequest).user?.id;
+        if (!userId) return;
+        const { TelegramUserService } = await import('../services/TelegramUserService.js');
+        await TelegramUserService.createCustomerForumTopic(userId, customer.id);
+      } catch (e: any) {
+        console.warn('⚠️ Forum topic yaratishda xatolik:', e.message);
+      }
+    });
 
   } catch (error: any) {
 
@@ -447,6 +461,7 @@ router.put('/:id', authorize('ADMIN', 'CASHIER', 'SELLER'), async (req: AuthRequ
       data: safeBody,
     });
 
+    invalidateCache('/api/customers');
     res.json(customer);
   } catch (error: any) {
     console.error('❌ PUT /customers/:id xatolik:', error.message);
@@ -585,6 +600,7 @@ router.delete('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
 
     
 
+    invalidateCache('/api/customers');
     console.log(`✅ DELETE /customers/${customerId} - Mijoz muvaffaqiyatli o'chirildi`);
     res.json({ message: 'Customer deleted successfully' });
 
@@ -1073,6 +1089,87 @@ router.post('/create-all-topics', async (req: AuthRequest, res) => {
     res.json(successResponse(results, `${results.length} ta mijoz uchun topic yaratildi`));
   } catch (error: any) {
     res.status(500).json(errorResponse('Batch topic yaratishda xatolik', error.message));
+  }
+});
+
+// POST /customers/:id/reconcile-balance — Mijoz balansini haqiqiy savdo/to'lovlardan qayta hisoblash
+router.post('/:id/reconcile-balance', authorize('ADMIN'), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await prisma.customer.findUnique({ where: { id } });
+    if (!customer) return res.status(404).json(errorResponse('Mijoz topilmadi'));
+
+    // Barcha sotuvlarni olish
+    const sales = await prisma.sale.findMany({
+      where: { customerId: id },
+      select: { totalAmount: true, paidAmount: true, currency: true }
+    });
+
+    // Barcha to'lovlarni olish
+    const payments = await prisma.payment.findMany({
+      where: { customerId: id },
+      select: { amount: true, currency: true }
+    });
+
+    // UZS va USD uchun jami savdo va to'lovlarni hisoblash
+    let totalSalesUZS = 0, totalSalesUSD = 0;
+    let totalPaidInSalesUZS = 0, totalPaidInSalesUSD = 0;
+
+    for (const sale of sales) {
+      if (sale.currency === 'UZS') {
+        totalSalesUZS += sale.totalAmount || 0;
+        totalPaidInSalesUZS += sale.paidAmount || 0;
+      } else {
+        totalSalesUSD += sale.totalAmount || 0;
+        totalPaidInSalesUSD += sale.paidAmount || 0;
+      }
+    }
+
+    // Alohida to'lovlarni ham hisoblash
+    let extraPaymentsUZS = 0, extraPaymentsUSD = 0;
+    for (const p of payments) {
+      if (p.currency === 'UZS') extraPaymentsUZS += p.amount || 0;
+      else extraPaymentsUSD += p.amount || 0;
+    }
+
+    // Haqiqiy qarz = savdo - (savdodagi to'lov + alohida to'lovlar)
+    const totalPaymentsUZS = totalPaidInSalesUZS + extraPaymentsUZS;
+    const totalPaymentsUSD = totalPaidInSalesUSD + extraPaymentsUSD;
+
+    const netUZS = totalPaymentsUZS - totalSalesUZS; // musbat = avans, manfiy = qarz
+    const netUSD = totalPaymentsUSD - totalSalesUSD;
+
+    const newDebtUZS = netUZS < 0 ? Math.abs(netUZS) : 0;
+    const newBalanceUZS = netUZS > 0 ? netUZS : 0;
+    const newDebtUSD = netUSD < 0 ? Math.abs(netUSD) : 0;
+    const newBalanceUSD = netUSD > 0 ? netUSD : 0;
+
+    const old = {
+      debtUZS: customer.debtUZS, debtUSD: customer.debtUSD,
+      balanceUZS: customer.balanceUZS, balanceUSD: customer.balanceUSD
+    };
+
+    await prisma.customer.update({
+      where: { id },
+      data: {
+        debtUZS: Math.round(newDebtUZS),
+        debtUSD: parseFloat(newDebtUSD.toFixed(2)),
+        balanceUZS: Math.round(newBalanceUZS),
+        balanceUSD: parseFloat(newBalanceUSD.toFixed(2)),
+        balance: Math.round(newBalanceUZS), // eski maydonni ham yangilash
+        debt: Math.round(newDebtUZS),
+      }
+    });
+
+    res.json(successResponse({
+      customerId: id,
+      before: old,
+      after: { debtUZS: Math.round(newDebtUZS), debtUSD: newDebtUSD, balanceUZS: Math.round(newBalanceUZS), balanceUSD: newBalanceUSD },
+      sales: { uzs: { total: totalSalesUZS, paid: totalPaymentsUZS }, usd: { total: totalSalesUSD, paid: totalPaymentsUSD } }
+    }, 'Mijoz balansi qayta hisoblandi'));
+  } catch (error: any) {
+    res.status(500).json(errorResponse('Balansni qayta hisoblashda xatolik', error.message));
   }
 });
 

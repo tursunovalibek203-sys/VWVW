@@ -4,16 +4,17 @@ import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { notifyCustomerSale, notifyLowStock } from '../utils/telegram-notifications';
 import { createInvoiceForSale } from '../utils/invoice-generator';
 import { logger } from '../utils/logger';
-import { 
-  SaleCreateSchema, 
-  SaleUpdateSchema, 
+import {
+  SaleCreateSchema,
+  SaleUpdateSchema,
   validateBody,
-  parseMoney 
+  parseMoney
 } from '../utils/validation';
 import { logSalesAction } from '../utils/sales-audit';
 import { paginatedResponse, successResponse, errorResponse } from '../utils/response';
 import { DecimalHelper } from '../utils/decimal-helper';
 import { salesService } from '../services/SalesService';
+import { withCache, invalidateCache } from '../middleware/responseCache';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ const exchangeRates = {
 
 router.use(authenticate);
 
-router.get('/', async (req: AuthRequest, res) => {
+router.get('/', withCache(20 * 1000), async (req: AuthRequest, res) => {
   try {
     const { productId, customerId, limit = '100', page = '1' } = req.query;
     
@@ -80,6 +81,7 @@ router.get('/', async (req: AuthRequest, res) => {
           items: {
             select: {
               id: true,
+              productId: true,
               quantity: true,
               pricePerBag: true,
               subtotal: true,
@@ -216,7 +218,9 @@ router.post('/',
         logger.warn({ error: err }, 'Audit log failed');
       }
 
-      // âœ… STANDARD RESPONSE FORMAT
+      invalidateCache('/api/sales');
+      invalidateCache('/api/dashboard');
+      invalidateCache('/api/customers');
       res.json(successResponse(sale));
     } catch (error: any) {
       // #region debug-point D:sales-route-error

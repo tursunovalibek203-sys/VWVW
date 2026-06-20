@@ -63,6 +63,8 @@ const Shortcuts = lazy(() => import('./pages/Shortcuts'));
 const ModernChat = lazy(() => import('./pages/ModernChat'));
 
 const Settings = lazy(() => import('./pages/Settings'));
+const CashierTelegram = lazy(() => import('./pages/CashierTelegram'));
+const CashierChat = lazy(() => import('./pages/CashierChat'));
 
 // Layouts
 const ProfessionalLayout = lazy(() => import('./components/ProfessionalLayout'));
@@ -174,9 +176,10 @@ function AppRoutes() {
                 <Route path="customers" element={<Customers />} />
                 <Route path="customers/:id" element={<CustomerProfileModern />} />
                 <Route path="cashbox" element={<Cashbox />} />
-                <Route path="chat" element={<ModernChat />} />
+                <Route path="chat" element={<CashierChat />} />
                 <Route path="expenses" element={<Expenses />} />
                 <Route path="drivers" element={<Drivers />} />
+                <Route path="telegram" element={<CashierTelegram />} />
                 <Route path="*" element={<Navigate to="/cashier/sales" />} />
               </Routes>
             </CashierLayout>

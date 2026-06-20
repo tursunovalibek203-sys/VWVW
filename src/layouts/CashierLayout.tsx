@@ -12,6 +12,7 @@ import {
   MessageCircle,
   Shield,
   Truck,
+  Send,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
@@ -36,6 +37,7 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
   };
 
   const isActive = (path: string) => location.pathname === path;
+  const isChatPage = location.pathname === '/cashier/chat';
   const isInventoryPage =
     location.pathname === '/cashier/products' || location.pathname === '/cashier/inventory';
 
@@ -47,8 +49,17 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
     { path: '/cashier/customers', icon: Users, label: 'Mijozlar' },
     { path: '/cashier/cashbox', icon: Calculator, label: 'Kassa' },
     { path: '/cashier/drivers', icon: Truck, label: 'Haydovchi' },
-    { path: '/cashier/chat', icon: MessageCircle, label: 'Chat' },
+    { path: '/cashier/chat', icon: Send, label: 'Telegram' },
   ];
+
+  // Chat sahifasida faqat iframe ko'rinadi — header va nav yashiriladi
+  if (isChatPage) {
+    return (
+      <div className="min-h-screen bg-[#17212b]">
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans antialiased text-slate-900">
@@ -108,9 +119,14 @@ const CashierLayout = ({ children }: { children: React.ReactNode }) => {
                 {isAdmin() ? 'Admin' : 'Kassir'}
               </span>
             </div>
-            <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center">
-              <User className="w-5 h-5 text-slate-500" />
-            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/cashier/telegram')}
+              className="w-9 h-9 bg-slate-100 hover:bg-indigo-50 rounded-xl flex items-center justify-center transition-colors"
+              title="Telegram sozlamalari"
+            >
+              <Send className="w-4 h-4 text-slate-500 hover:text-indigo-600" />
+            </button>
             <button
               type="button"
               onClick={handleLogout}

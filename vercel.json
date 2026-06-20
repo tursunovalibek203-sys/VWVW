@@ -8,6 +8,14 @@
       "destination": "https://luxpetplast-api.onrender.com/api/:path*"
     },
     {
+      "source": "/telegram-web/:path*",
+      "destination": "https://luxpetplast-api.onrender.com/telegram-web/:path*"
+    },
+    {
+      "source": "/telegram-web",
+      "destination": "https://luxpetplast-api.onrender.com/telegram-web/"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

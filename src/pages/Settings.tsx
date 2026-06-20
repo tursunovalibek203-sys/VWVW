@@ -1,6 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DataBackup from '../components/DataBackup';
+import TelegramConnect from '../components/TelegramConnect';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/professionalApi';
 import { useToast } from '../components/ui/Toast';
@@ -23,6 +24,9 @@ import {
   Settings as SettingsIcon,
   Cloud,
   Plus,
+  Users,
+  CheckCircle,
+  XCircle,
   type LucideIcon
 } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
@@ -101,6 +105,12 @@ export default function Settings() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
+  const [forumGroupId, setForumGroupId] = useState('');
+  const [forumSaving, setForumSaving] = useState(false);
+  const [forumStatus, setForumStatus] = useState<'idle' | 'linked' | 'none'>('idle');
+  const [tgLinked, setTgLinked] = useState(false);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ created: number; failed: number; total: number; message: string } | null>(null);
   const [settings, setSettings] = useState({
     // Valyuta kurslari
     USD_TO_UZS_RATE: '12500',
@@ -195,7 +205,51 @@ export default function Settings() {
 
   useEffect(() => {
     loadSettings();
+    loadForumConfig();
   }, []);
+
+  const loadForumConfig = async () => {
+    try {
+      const [forumRes, tgRes] = await Promise.all([
+        api.get('/telegram-user/forum-config'),
+        api.get('/telegram-user/status'),
+      ]);
+      setForumGroupId(forumRes.data.groupId || '');
+      setForumStatus(forumRes.data.configured ? 'linked' : 'none');
+      setTgLinked(tgRes.data.linked);
+    } catch {
+      setForumStatus('none');
+    }
+  };
+
+  const handleSaveForumGroup = async () => {
+    if (!forumGroupId.trim()) return;
+    setForumSaving(true);
+    try {
+      await api.post('/telegram-user/forum-config', { groupId: forumGroupId.trim() });
+      setForumStatus('linked');
+      addToast({ type: 'success', title: t('Saqlandi'), message: t('Forum guruh ID saqlandi') });
+    } catch (e: any) {
+      addToast({ type: 'error', title: t('Xatolik'), message: e.response?.data?.error || e.message });
+    } finally {
+      setForumSaving(false);
+    }
+  };
+
+  const handleBulkCreateTopics = async () => {
+    setBulkRunning(true);
+    setBulkResult(null);
+    try {
+      const { data } = await api.post('/telegram-user/bulk-create-topics');
+      setBulkResult(data);
+      addToast({ type: 'success', title: t('Tayyor'), message: data.message });
+    } catch (e: any) {
+      const msg = e.response?.data?.error || e.message;
+      addToast({ type: 'error', title: t('Xatolik'), message: msg });
+    } finally {
+      setBulkRunning(false);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -243,6 +297,7 @@ export default function Settings() {
   const tabs = [
     { id: 'general', name: 'Umumiy', icon: SettingsIcon },
     { id: 'business', name: 'Biznes', icon: Factory },
+    { id: 'telegram', name: 'Telegram', icon: MessageSquare },
     { id: 'notifications', name: 'Bildirishnomalar', icon: Bell },
     { id: 'security', name: 'Xavfsizlik', icon: Lock },
     { id: 'backup', name: 'Backup', icon: Database }
@@ -501,6 +556,118 @@ export default function Settings() {
             </div>
           </div>
         )}
+
+      {activeTab === 'telegram' && (
+        <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+
+          {/* Shaxsiy akkaunt ulash */}
+          <SettingGroup
+            icon={MessageSquare}
+            iconTint="bg-sky-50 text-sky-600"
+            title={t('Shaxsiy Telegram akkaunt')}
+            description={t('Mijozlarga sizning akkauntingizdan chek va xabarlar yuboriladi')}
+          >
+            <div className="rounded-xl bg-slate-900 p-5">
+              <TelegramConnect />
+            </div>
+          </SettingGroup>
+
+          {/* Forum guruhi */}
+          <SettingGroup
+            icon={Users}
+            iconTint="bg-violet-50 text-violet-600"
+            title={t('Forum Guruhi')}
+            description={t('Barcha mijozlar shu guruh ichida alohida topicda boshqariladi')}
+          >
+            <div className="space-y-5">
+              <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium ${
+                !tgLinked
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                  : forumStatus === 'linked'
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-slate-50 text-slate-500 border border-slate-200'
+              }`}>
+                {!tgLinked ? (
+                  <><XCircle className="w-4 h-4 flex-shrink-0" />{t('Avval yuqoridagi shaxsiy akkauntingizni ulang')}</>
+                ) : forumStatus === 'linked' ? (
+                  <><CheckCircle className="w-4 h-4 flex-shrink-0" />{t('Guruh ulangan — yangi mijozlar uchun avtomatik topic yaratiladi')}</>
+                ) : (
+                  <><XCircle className="w-4 h-4 flex-shrink-0" />{t('Guruh ID kiritilmagan')}</>
+                )}
+              </div>
+
+              <Field
+                label={t('Guruh ID')}
+                description={t('Supergroup ID (manfiy raqam, masalan: -1001234567890). Akkauntingiz guruhda admin bo\'lishi kerak.')}
+                htmlFor="forum-group-id-tg"
+              >
+                <div className="flex gap-2">
+                  <input
+                    id="forum-group-id-tg"
+                    className={fieldClass + ' flex-1'}
+                    value={forumGroupId}
+                    onChange={(e) => setForumGroupId(e.target.value)}
+                    placeholder="-1001234567890"
+                    disabled={!tgLinked}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveForumGroup}
+                    disabled={!tgLinked || forumSaving || !forumGroupId.trim()}
+                    className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-colors flex items-center gap-1.5"
+                  >
+                    {forumSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    {t('Saqlash')}
+                  </button>
+                </div>
+              </Field>
+
+              <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-600 space-y-1">
+                <p className="font-semibold text-slate-700 mb-2">{t('Guruh ID ni qanday olish:')}</p>
+                <p>① {t('Telegramda supergroup yarating')}</p>
+                <p>② {t('Guruh Sozlamalari → Topics ni yoqing')}</p>
+                <p>③ {t("Guruhga @username_to_id_bot qo'shing")}</p>
+                <p>④ {t('Bot yuborgan ID ni bu yerga kiriting (manfiy raqam)')}</p>
+              </div>
+
+              {/* Bulk create */}
+              <div className="border-t border-slate-100 pt-5 space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">{t('Barcha mavjud mijozlar uchun topic yaratish')}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{t('Hali topici yo\'q mijozlar uchun bir martada yaratiladi')}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleBulkCreateTopics}
+                    disabled={!tgLinked || forumStatus !== 'linked' || bulkRunning}
+                    className="shrink-0 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-colors flex items-center gap-2"
+                  >
+                    {bulkRunning
+                      ? <><RefreshCw className="w-4 h-4 animate-spin" />{t('Yaratilmoqda...')}</>
+                      : <><Users className="w-4 h-4" />{t('Hammasi uchun topic yarat')}</>
+                    }
+                  </button>
+                </div>
+
+                {bulkResult && (
+                  <div className={`flex items-start gap-3 px-4 py-3 rounded-xl text-sm border ${
+                    bulkResult.failed > 0 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  }`}>
+                    {bulkResult.failed > 0 ? <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /> : <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />}
+                    <div>
+                      <p className="font-semibold">{bulkResult.message}</p>
+                      <p className="text-xs opacity-70 mt-0.5">
+                        {t('Jami')}: {bulkResult.total} · {t('Yaratildi')}: {bulkResult.created} · {t('Xatolik')}: {bulkResult.failed}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </SettingGroup>
+        </div>
+      )}
 
       {activeTab === 'notifications' && (
         <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">

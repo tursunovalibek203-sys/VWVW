@@ -21,6 +21,7 @@ import {
   Banknote,
   DollarSign,
   Magnet,
+  Wrench,
 } from 'lucide-react';
 import { latinToCyrillic, trData } from '../lib/transliterator';
 import { formatDate, formatCurrency } from '../lib/utils';
@@ -92,6 +93,7 @@ export default function CustomerProfileModern() {
   const [refreshing, setRefreshing] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReconciling, setIsReconciling] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ uzs: '', usd: '', karta: '', kurs: '12700', notes: '', debtTarget: 'UZS' as 'UZS' | 'USD' });
 
   const loadCustomerData = async () => {
@@ -199,6 +201,23 @@ export default function CustomerProfileModern() {
   const handleNewSale = () => {
     const base = location.pathname.startsWith('/cashier') ? '/cashier/sales/add' : '/sales/add';
     navigate(base, { state: { customerId: id } });
+  };
+
+  const handleReconcileBalance = async () => {
+    if (!id) return;
+    setIsReconciling(true);
+    try {
+      await api.post(`/customers/${id}/reconcile-balance`);
+      addToast(toast.success(
+        latinToCyrillic('Tuzatildi'),
+        latinToCyrillic("Mijoz balansi haqiqiy savdolardan qayta hisoblandi")
+      ));
+      await loadCustomerData();
+    } catch {
+      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic("Balansni tuzatishda xatolik yuz berdi")));
+    } finally {
+      setIsReconciling(false);
+    }
   };
 
   if (loading) {
@@ -424,6 +443,17 @@ export default function CustomerProfileModern() {
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">{latinToCyrillic('Yangilash')}</span>
             </button>
+            {((customer.balanceUZS || 0) > 0 || (customer.balanceUSD || 0) > 0) && (
+              <button
+                onClick={handleReconcileBalance}
+                disabled={isReconciling}
+                title={latinToCyrillic("Balansni savdolardan qayta hisoblash")}
+                className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 hover:bg-amber-100 disabled:opacity-60 rounded-xl px-3.5 py-2 text-sm font-semibold text-amber-700 transition-colors active:scale-[0.98]"
+              >
+                <Wrench className={`w-4 h-4 ${isReconciling ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{latinToCyrillic('Balansni tuzatish')}</span>
+              </button>
+            )}
             <button
               onClick={handleExportExcel}
               className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-600 transition-colors active:scale-[0.98]"

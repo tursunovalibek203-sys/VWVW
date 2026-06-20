@@ -12,12 +12,14 @@ import {
 } from '../utils/inventory-audit';
 import { emitProductChange, EVENT_TYPES } from '../utils/eventEmitter.js';
 import { successResponse, errorResponse } from '../utils/response';
+import { withCache, invalidateCache } from '../middleware/responseCache';
 
 const router = Router();
 
 router.use(authenticate);
 
-router.get('/', async (req, res) => {
+// 30 soniya cache — mahsulotlar ro'yxati tez-tez o'zgarmaydi
+router.get('/', withCache(30 * 1000), async (req, res) => {
   try {
     const { lowStock, search, includeVariants } = req.query;
     

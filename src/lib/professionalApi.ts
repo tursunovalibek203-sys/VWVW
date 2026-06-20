@@ -58,9 +58,9 @@ class ProfessionalApi {
 
     this.config = {
       baseURL: defaultBase,
-      timeout: 45000,
-      retryAttempts: 2,
-      retryDelay: 1000,
+      timeout: 60000,   // 60s — Render cold start uchun
+      retryAttempts: 5, // 5 marta urinish (cold start ~30-60s davom etadi)
+      retryDelay: 2000, // 2s, 4s, 8s, 16s, 32s = jami 62s
       ...config
     };
 
@@ -175,26 +175,26 @@ class ProfessionalApi {
     const status = error.response?.status;
     const method = error.config.method?.toLowerCase();
     const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+    const isNetworkError = !error.response && (error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED');
 
-    // Timeout bo'lsa — POST ham retry (Render cold start uchun)
-    if (isTimeout) return true;
+    // Timeout yoki network xatosi — barcha metodlar uchun retry
+    if (isTimeout || isNetworkError) return true;
 
-    // Don't retry on network errors (offline mode)
-    if (status === undefined && error.code === 'NETWORK_ERROR') {
-      console.warn('🌐 Network error - possibly offline');
-      return false;
-    }
+    // 503 Service Unavailable (Neon cold start / server restart) — barcha metodlar retry
+    if (status === 503) return true;
 
-    // Retry on 5xx server errors
-    if (status !== undefined && status >= 500) return true;
+    // 502 Bad Gateway (Render restart)
+    if (status === 502) return true;
 
-    // Don't retry on 4xx client errors (except 429 Too Many Requests)
+    // 4xx client errors — retry yo'q (429 dan tashqari)
     if (status !== undefined && status >= 400 && status < 500 && status !== 429) return false;
 
-    // Don't retry on POST/PUT/DELETE requests by default
-    if (method === 'post' || method === 'put' || method === 'delete') return false;
+    // 5xx server errors — faqat GET/PATCH uchun retry (POST/PUT/DELETE xavfli)
+    if (status !== undefined && status >= 500) {
+      return method === 'get' || method === 'patch';
+    }
 
-    return true;
+    return false;
   }
 
   private async handleUnauthorized() {
@@ -438,9 +438,9 @@ class ProfessionalApi {
 // Production: always use Vercel proxy (/api → Render), never call Render directly from browser
 // Dev: use VITE_API_BASE_URL or localhost fallback
 export const api = new ProfessionalApi({
-  timeout: 60000,
-  retryAttempts: 3,
-  retryDelay: 1000,
+  timeout: 60000,   // 60s — Neon cold start uchun yetarli
+  retryAttempts: 3, // 3 marta qayta urinish
+  retryDelay: 1500, // 1.5s asosiy kechikish (exponential: 1.5s → 3s → 6s)
 });
 
 // Default export

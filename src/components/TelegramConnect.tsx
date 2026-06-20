@@ -9,7 +9,7 @@ interface TelegramStatus {
   apiConfigured: boolean;
 }
 
-export default function TelegramConnect() {
+export default function TelegramConnect({ onLinkedChange }: { onLinkedChange?: (linked: boolean) => void } = {}) {
   const [status, setStatus] = useState<TelegramStatus | null>(null);
   const [step, setStep] = useState<'idle' | 'phone' | 'code' | 'done'>('idle');
   const [phone, setPhone] = useState('');
@@ -28,8 +28,10 @@ export default function TelegramConnect() {
       const res = await api.get('/telegram-user/status');
       setStatus(res.data);
       if (res.data.linked) setStep('done');
+      onLinkedChange?.(res.data.linked);
     } catch {
       setStatus(null);
+      onLinkedChange?.(false);
     }
   }
 

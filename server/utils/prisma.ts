@@ -14,6 +14,27 @@ function maskDatabaseUrl(url: string): string {
   }
 }
 
+// Neon cold-start uchun retry wrapper: 3 marta urinadi, har safar 1s kutadi
+export async function withDbRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+  let lastErr: any;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastErr = err;
+      const isConnErr = err?.code === 'P1001' || err?.code === 'P1002' || err?.code === 'P1008'
+        || err?.message?.includes('connect') || err?.message?.includes('timeout')
+        || err?.message?.includes('Can\'t reach database');
+      if (isConnErr && i < retries - 1) {
+        await new Promise(r => setTimeout(r, 1200 * (i + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+
 function validateDatabaseUrl(): string {
   const raw = process.env.DATABASE_URL;
   if (!raw || raw.trim().length === 0) {
@@ -103,11 +124,26 @@ function validateDatabaseUrl(): string {
 
 const VALIDATED_DATABASE_URL = validateDatabaseUrl();
 
+// Neon pooler uchun connection_limit va connect_timeout qo'shamiz (agar yo'q bo'lsa)
+function buildOptimizedUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    if (!u.searchParams.has('connection_limit')) u.searchParams.set('connection_limit', '5');
+    if (!u.searchParams.has('connect_timeout')) u.searchParams.set('connect_timeout', '30');
+    if (!u.searchParams.has('pool_timeout')) u.searchParams.set('pool_timeout', '30');
+    return u.toString();
+  } catch {
+    return raw;
+  }
+}
+
+const OPTIMIZED_URL = buildOptimizedUrl(VALIDATED_DATABASE_URL);
+
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   datasources: {
     db: {
-      url: VALIDATED_DATABASE_URL,
+      url: OPTIMIZED_URL,
     },
   },
 });
@@ -115,6 +151,16 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient({
 // Connection management
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
+}
+
+// DB ni uyg'otish va ulanishni tekshirish
+export async function warmupDb(): Promise<boolean> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Graceful shutdown

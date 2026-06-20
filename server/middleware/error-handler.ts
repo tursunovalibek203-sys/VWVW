@@ -76,28 +76,43 @@ const handlePrismaError = (err: any): AppError => {
     const field = err.meta?.target?.[0] || 'field';
     return new ConflictError(`Bu ${field} allaqachon mavjud`);
   }
-  
+
   // Foreign key constraint
   if (err.code === 'P2003') {
     return new ValidationError('Bog\'liq ma\'lumot topilmadi', {
       field: err.meta?.field_name
     });
   }
-  
+
   // Record not found
   if (err.code === 'P2025') {
     return new NotFoundError('Ma\'lumot');
   }
-  
+
   // Transaction conflict
   if (err.code === 'P2034') {
+    return new AppError('Ma\'lumotlar bazasi band, qayta urinib ko\'ring', 503, ErrorType.DATABASE);
+  }
+
+  // Neon / connection errors — server ulanolmadi
+  if (err.code === 'P1001' || err.code === 'P1002' || err.code === 'P1008' || err.code === 'P1009') {
     return new AppError(
-      'Ma\'lumotlar bazasi band, qayta urinib ko\'ring', 
-      503, 
+      'Ma\'lumotlar bazasiga ulanib bo\'lmadi. Iltimos biroz kuting va qayta urinib ko\'ring.',
+      503,
       ErrorType.DATABASE
     );
   }
-  
+
+  // Generic timeout
+  const msg: string = err?.message || '';
+  if (msg.includes('timeout') || msg.includes('timed out') || msg.includes('connect')) {
+    return new AppError(
+      'Server vaqtinchalik yuklanmoqda, qayta urinib ko\'ring.',
+      503,
+      ErrorType.DATABASE
+    );
+  }
+
   return new AppError('Ma\'lumotlar bazasi xatosi', 500, ErrorType.DATABASE);
 };
 

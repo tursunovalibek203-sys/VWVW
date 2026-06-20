@@ -173,23 +173,24 @@ export default function ProductDetail() {
       // Sotuv statistikasini yuklash
       try {
         const salesResponse = await api.get(`/sales?productId=${id}`);
-        const sales = extractArray<any>(salesResponse, []);
+        const salesData = extractData<any>(salesResponse, {});
+        const sales = Array.isArray(salesData) ? salesData : (salesData?.sales || []);
         setSalesHistory(sales);
 
         // Statistikani hisoblash
         const totalSold = sales.reduce((sum: number, sale: any) => {
-          const item = sale.items?.find((i: any) => i.productId === id);
+          const item = sale.items?.find((i: any) => i.productId === id || i.product?.id === id);
           return sum + (item?.quantity || 0);
         }, 0);
 
         const totalRevenue = sales.reduce((sum: number, sale: any) => {
-          const item = sale.items?.find((i: any) => i.productId === id);
-          return sum + (item?.totalPrice || 0);
+          const item = sale.items?.find((i: any) => i.productId === id || i.product?.id === id);
+          return sum + (item?.subtotal || 0);
         }, 0);
 
         const totalProfit = sales.reduce((sum: number, sale: any) => {
-          const item = sale.items?.find((i: any) => i.productId === id);
-          const profit = (item?.totalPrice || 0) - ((item?.quantity || 0) * data.pricePerBag);
+          const item = sale.items?.find((i: any) => i.productId === id || i.product?.id === id);
+          const profit = (item?.subtotal || 0) - ((item?.quantity || 0) * data.pricePerBag);
           return sum + profit;
         }, 0);
 
@@ -623,7 +624,7 @@ export default function ProductDetail() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {salesHistory.map((sale: any) => {
-                    const item = sale.items?.find((i: any) => i.productId === id);
+                    const item = sale.items?.find((i: any) => i.productId === id || i.product?.id === id);
                     const dateRaw = sale.createdAt || sale.date || sale.saleDate;
                     const dateStr = dateRaw ? new Date(dateRaw).toLocaleDateString() : '—';
                     const customerName = trData(sale.manualCustomerName || sale.customer?.name || sale.customerName || latinToCyrillic('Noma\'lum'));
@@ -645,10 +646,10 @@ export default function ProductDetail() {
                         </td>
                         <td className="px-5 py-4 text-right">
                           <span className="text-sm font-semibold text-gray-900">{(item?.quantity || 0).toLocaleString()}</span>
-                          <span className="text-xs text-gray-400 ml-1">{latinToCyrillic('dona')}</span>
+                          <span className="text-xs text-gray-400 ml-1">{latinToCyrillic('qop')}</span>
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <span className="text-sm font-bold text-emerald-600">{(item?.totalPrice || 0).toLocaleString()}</span>
+                          <span className="text-sm font-bold text-emerald-600">{(item?.subtotal || 0).toLocaleString()}</span>
                           <span className="text-xs text-gray-400 ml-1">UZS</span>
                         </td>
                       </tr>
@@ -661,7 +662,7 @@ export default function ProductDetail() {
             {/* Mobile cards */}
             <div className="md:hidden divide-y divide-gray-50">
               {salesHistory.map((sale: any) => {
-                const item = sale.items?.find((i: any) => i.productId === id);
+                const item = sale.items?.find((i: any) => i.productId === id || i.product?.id === id);
                 const dateRaw = sale.createdAt || sale.date || sale.saleDate;
                 const dateStr = dateRaw ? new Date(dateRaw).toLocaleDateString() : '—';
                 const customerName = trData(sale.manualCustomerName || sale.customer?.name || sale.customerName || latinToCyrillic('Noma\'lum'));
@@ -681,8 +682,8 @@ export default function ProductDetail() {
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="text-sm font-bold text-emerald-600">{(item?.totalPrice || 0).toLocaleString()} <span className="text-xs text-gray-400">UZS</span></p>
-                        <p className="text-xs text-gray-500">{(item?.quantity || 0).toLocaleString()} {latinToCyrillic('dona')}</p>
+                        <p className="text-sm font-bold text-emerald-600">{(item?.subtotal || 0).toLocaleString()} <span className="text-xs text-gray-400">UZS</span></p>
+                        <p className="text-xs text-gray-500">{(item?.quantity || 0).toLocaleString()} {latinToCyrillic('qop')}</p>
                       </div>
                     </div>
                   </div>
@@ -692,6 +693,50 @@ export default function ProductDetail() {
           </>
         )}
       </div>
+
+      {/* Mahsulot haqida ma'lumot */}
+      {(() => {
+        const firstAdd = stockMovements.find((m: any) => m.type === 'ADD' || m.type === 'PRODUCTION');
+        const addedBy = firstAdd?.userName || firstAdd?.user?.name || null;
+        const createdAt = product.createdAt
+          ? new Date(product.createdAt).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : null;
+        if (!createdAt && !addedBy) return null;
+        return (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-3 px-5 sm:px-6 py-4 border-b border-gray-100">
+              <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center">
+                <PackagePlus className="w-4 h-4 text-teal-600" />
+              </div>
+              <h2 className="text-base font-bold text-gray-900">{latinToCyrillic('Mahsulot haqida')}</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-gray-50">
+              {createdAt && (
+                <div className="flex items-center gap-3 px-5 py-4">
+                  <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
+                    <Calendar className="w-4 h-4 text-gray-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">{latinToCyrillic('Qo\'shilgan sana')}</p>
+                    <p className="text-sm font-semibold text-gray-900 mt-0.5">{createdAt}</p>
+                  </div>
+                </div>
+              )}
+              {addedBy && (
+                <div className="flex items-center gap-3 px-5 py-4">
+                  <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0">
+                    <User className="w-4 h-4 text-gray-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">{latinToCyrillic('Kim qo\'shgan')}</p>
+                    <p className="text-sm font-semibold text-gray-900 mt-0.5">{addedBy}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Stock harakat tarixi */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

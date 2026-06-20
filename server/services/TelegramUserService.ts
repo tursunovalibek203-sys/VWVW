@@ -21,6 +21,13 @@ function makeClient(session: string = '') {
   });
 }
 
+type CustomerContact = {
+  telegramChatId?: string | null;
+  telegramUsername?: string | null;
+  telegramTopicId?: number | null;
+  phone?: string | null;
+};
+
 export class TelegramUserService {
   // Step 1: send verification code
   static async sendCode(userId: string, phone: string) {
@@ -99,7 +106,6 @@ export class TelegramUserService {
 
   // Unlink telegram
   static async unlink(userId: string) {
-    // Try to terminate the session on Telegram side
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { telegramSession: true } });
     if (user?.telegramSession) {
       try {
@@ -116,24 +122,203 @@ export class TelegramUserService {
     return { unlinked: true };
   }
 
-  // Send a message to any chatId using userId's session
-  static async sendMessage(userId: string, chatId: string, text: string) {
+  // Returns peer identifiers to try in priority order: chatId → @username → +phone
+  static resolveCustomerPeers(customer: CustomerContact): string[] {
+    const peers: string[] = [];
+    if (customer.telegramChatId) peers.push(customer.telegramChatId);
+    if (customer.telegramUsername) {
+      const u = customer.telegramUsername.trim();
+      peers.push(u.startsWith('@') ? u : `@${u}`);
+    }
+    if (customer.phone) {
+      const p = customer.phone.replace(/\s+/g, '');
+      peers.push(p.startsWith('+') ? p : `+${p}`);
+    }
+    return peers;
+  }
+
+  // Find sender: cashier first, fall back to any admin with a linked session
+  static async findActiveSender(preferredUserId: string): Promise<{ id: string; name: string; session: string } | null> {
+    const cashier = await prisma.user.findUnique({
+      where: { id: preferredUserId },
+      select: { id: true, name: true, telegramSession: true },
+    });
+    if (cashier?.telegramSession) {
+      return { id: cashier.id, name: cashier.name, session: cashier.telegramSession };
+    }
+    const admin = await prisma.user.findFirst({
+      where: { telegramSession: { not: null } },
+      select: { id: true, name: true, telegramSession: true },
+    });
+    if (admin?.telegramSession) {
+      return { id: admin.id, name: admin.name, session: admin.telegramSession };
+    }
+    return null;
+  }
+
+  // Low-level: send text to a Telegram peer from an active session string.
+  // topicId: forum group message_thread_id (pass to send into a specific topic)
+  static async sendMessage(userId: string, chatId: string, text: string, topicId?: number) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { telegramSession: true, name: true },
     });
     if (!user?.telegramSession) throw new Error('Telegram ulanmagan');
+    await TelegramUserService._send(user.telegramSession, chatId, text, topicId);
+  }
 
-    const client = makeClient(user.telegramSession);
+  // Internal send (uses session string directly)
+  private static async _send(session: string, peer: string, text: string, topicId?: number) {
+    const client = makeClient(session);
     await client.connect();
     try {
-      await client.sendMessage(chatId, { message: text });
+      const opts: Parameters<typeof client.sendMessage>[1] = { message: text, parseMode: 'markdown' };
+      if (topicId) (opts as any).replyTo = topicId;
+      await client.sendMessage(peer, opts);
     } finally {
       await client.disconnect();
     }
   }
 
-  // Format receipt message
+  // Send to customer: tries all available identifiers (chatId → @username → +phone)
+  // Also supports forum group topics via telegramTopicId
+  static async sendToCustomer(
+    session: string,
+    customer: CustomerContact,
+    text: string,
+  ): Promise<{ peer: string }> {
+    const peers = this.resolveCustomerPeers(customer);
+    if (!peers.length) throw new Error('Mijozda Telegram kontakt yo\'q (chatId, username yoki telefon kerak)');
+
+    const topicId = customer.telegramTopicId ?? undefined;
+    let lastError: Error | undefined;
+
+    for (const peer of peers) {
+      try {
+        await this._send(session, peer, text, topicId);
+        return { peer };
+      } catch (e: any) {
+        lastError = e;
+        console.warn(`⚠️ Telegram peer ${peer} orqali yuborishda xatolik: ${e.message}`);
+      }
+    }
+    throw lastError || new Error('Xabar yuborib bo\'lmadi');
+  }
+
+  // Format full sale receipt with debt details in both currencies
+  static formatFullReceipt(opts: {
+    cashierName: string;
+    customerName: string;
+    items: Array<{ productName: string; bags: number; pricePerBag: number; subtotal: number }>;
+    totalAmount: number;
+    paidAmount: number;
+    debtFromSale: number;
+    currency: string;
+    paymentMethod: string;
+    previousDebtUZS: number;
+    previousDebtUSD: number;
+    currentDebtUZS: number;
+    currentDebtUSD: number;
+    exchangeRate: number;
+    receiptNumber?: number;
+  }): string {
+    const now = new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' });
+    const isUZS = opts.currency !== 'USD';
+
+    const payIcon: Record<string, string> = {
+      CARD: '💳 Karta',
+      CLICK: '📱 Click',
+      CASH: '💵 Naqd',
+      TRANSFER: '🏦 O\'tkazma',
+    };
+    const payLabel = payIcon[opts.paymentMethod] ?? '💵 Naqd';
+
+    const fmtUZS = (v: number) => `${Math.round(Math.abs(v)).toLocaleString()} so'm`;
+    const fmtUSD = (v: number) => `$${Math.abs(v).toFixed(2)}`;
+    const fmt = (v: number) => isUZS ? fmtUZS(v) : fmtUSD(v);
+
+    const itemLines = opts.items.map((i) =>
+      `  • ${i.productName}: ${i.bags} qop × ${fmtUZS(i.pricePerBag)} = *${fmt(i.subtotal)}*`
+    );
+
+    const lines: string[] = [
+      `🛍 *Xarid cheki* — LuxPetPlast`,
+      opts.receiptNumber ? `📄 Chek #${opts.receiptNumber}` : '',
+      `👤 *${opts.customerName}*  |  👩‍💼 ${opts.cashierName}`,
+      `🕐 ${now}`,
+      ``,
+      ...itemLines,
+      ``,
+      `💰 *Jami: ${fmt(opts.totalAmount)}*`,
+      `${payLabel}: ${fmt(opts.paidAmount)}`,
+    ];
+
+    if (opts.debtFromSale > 0) {
+      lines.push(`⚠️ Ushbu savdodan qarz: *${fmt(opts.debtFromSale)}*`);
+    }
+
+    lines.push(``);
+    lines.push(`📊 *Qarz holati:*`);
+    const hasOldDebt = opts.previousDebtUZS > 0 || opts.previousDebtUSD > 0;
+    if (hasOldDebt) {
+      lines.push(`  Oldingi: ${fmtUZS(opts.previousDebtUZS)} | ${fmtUSD(opts.previousDebtUSD)}`);
+    }
+
+    const hasDebt = opts.currentDebtUZS > 0 || opts.currentDebtUSD > 0;
+    if (hasDebt) {
+      lines.push(`  ⚠️ *Hozirgi: ${fmtUZS(opts.currentDebtUZS)} | ${fmtUSD(opts.currentDebtUSD)}*`);
+    } else {
+      lines.push(`  ✅ Qarz yo'q!`);
+    }
+
+    lines.push(``);
+    lines.push(`_powered by akm_`);
+
+    return lines.filter((l) => l !== undefined && l !== null).join('\n');
+  }
+
+  // Main entry point: find sender, format receipt, send to customer via all available channels
+  static async sendSaleReceipt(opts: {
+    preferredSenderId: string;
+    customer: CustomerContact & { name: string };
+    items: Array<{ productName: string; bags: number; pricePerBag: number; subtotal: number }>;
+    totalAmount: number;
+    paidAmount: number;
+    debtFromSale: number;
+    currency: string;
+    paymentMethod: string;
+    previousDebtUZS: number;
+    previousDebtUSD: number;
+    currentDebtUZS: number;
+    currentDebtUSD: number;
+    exchangeRate: number;
+    receiptNumber?: number;
+  }): Promise<{ peer: string; senderName: string }> {
+    const sender = await this.findActiveSender(opts.preferredSenderId);
+    if (!sender) throw new Error('Birorta kassir/admin Telegram ulamagan');
+
+    const text = this.formatFullReceipt({
+      cashierName: sender.name,
+      customerName: opts.customer.name,
+      items: opts.items,
+      totalAmount: opts.totalAmount,
+      paidAmount: opts.paidAmount,
+      debtFromSale: opts.debtFromSale,
+      currency: opts.currency,
+      paymentMethod: opts.paymentMethod,
+      previousDebtUZS: opts.previousDebtUZS,
+      previousDebtUSD: opts.previousDebtUSD,
+      currentDebtUZS: opts.currentDebtUZS,
+      currentDebtUSD: opts.currentDebtUSD,
+      exchangeRate: opts.exchangeRate,
+      receiptNumber: opts.receiptNumber,
+    });
+
+    const result = await this.sendToCustomer(sender.session, opts.customer, text);
+    return { peer: result.peer, senderName: sender.name };
+  }
+
+  // Legacy: simple format for backward compat
   static formatReceipt(opts: {
     cashierName: string;
     customerName: string;
@@ -161,6 +346,106 @@ export class TelegramUserService {
       `${pay}`,
       `🕐 ${new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}`,
     ].filter(Boolean).join('\n');
+  }
+
+  // --- Forum topic (supergroup) ---
+
+  // Get configured forum group ID from SystemSettings or env
+  static async getForumGroupId(): Promise<string | null> {
+    const fromEnv = process.env.TELEGRAM_SALES_CHANNEL_ID || process.env.TELEGRAM_FORUM_GROUP_ID || '';
+    if (fromEnv) return fromEnv;
+    try {
+      const row = await prisma.systemSettings.findUnique({ where: { key: 'telegram_forum_group_id' } });
+      return row?.value || null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Save forum group ID to SystemSettings
+  static async setForumGroupId(groupId: string, updatedBy: string): Promise<void> {
+    await (prisma.systemSettings as any).upsert({
+      where: { key: 'telegram_forum_group_id' },
+      create: { key: 'telegram_forum_group_id', value: groupId, description: 'Mijozlar forum guruhi ID', updatedBy },
+      update: { value: groupId, updatedBy },
+    });
+  }
+
+  // Create a forum topic for a customer using a personal gramjs session.
+  // Returns { topicId, groupId } and saves them to the customer record.
+  static async createCustomerForumTopic(
+    preferredSenderId: string,
+    customerId: string,
+    groupIdOverride?: string,
+  ): Promise<{ topicId: number; groupId: string } | null> {
+    const groupId = groupIdOverride || await this.getForumGroupId();
+    if (!groupId) {
+      console.warn('⚠️ Forum group ID sozlanmagan (telegram_forum_group_id)');
+      return null;
+    }
+
+    const sender = await this.findActiveSender(preferredSenderId);
+    if (!sender) {
+      console.warn('⚠️ Gramjs session topilmadi — forum topic yaratib bo\'lmadi');
+      return null;
+    }
+
+    const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) return null;
+
+    if (customer.telegramTopicId) {
+      return { topicId: customer.telegramTopicId, groupId: customer.telegramChatId || groupId };
+    }
+
+    const client = makeClient(sender.session);
+    await client.connect();
+    let topicId: number | null = null;
+    try {
+      const groupPeer = await client.getEntity(groupId);
+      const updates = await client.invoke(new Api.channels.CreateForumTopic({
+        channel: groupPeer as any,
+        title: customer.name,
+        randomId: BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)),
+      }));
+      // Extract topic ID from Updates result
+      const upd = updates as any;
+      for (const u of upd?.updates || []) {
+        if (u?.message?.id) { topicId = u.message.id; break; }
+        if (u?.id && typeof u.id === 'number' && u.id > 0) { topicId = u.id; break; }
+      }
+      if (!topicId && upd?.id) topicId = upd.id;
+    } finally {
+      await client.disconnect();
+    }
+
+    if (!topicId) {
+      console.error('⚠️ Forum topic ID olinmadi');
+      return null;
+    }
+
+    // Save to customer
+    await prisma.customer.update({
+      where: { id: customerId },
+      data: { telegramChatId: groupId, telegramTopicId: topicId },
+    });
+
+    // Send a welcome intro message to the new topic
+    try {
+      const intro = [
+        `👤 *${customer.name}*`,
+        `📞 ${customer.phone}`,
+        customer.telegramUsername ? `🔗 @${customer.telegramUsername}` : '',
+        customer.address ? `📍 ${customer.address}` : '',
+        `📂 Kategoriya: ${customer.category}`,
+        ``,
+        `_Bu topic avtomatik yaratildi — LuxPetPlast ERP_`,
+      ].filter(Boolean).join('\n');
+
+      await this._send(sender.session, groupId, intro, topicId);
+    } catch { /* intro xatoligi kritik emas */ }
+
+    console.log(`✅ ${customer.name} uchun forum topic yaratildi: topicId=${topicId}, group=${groupId}`);
+    return { topicId, groupId };
   }
 
   static formatPaymentConfirmation(opts: {

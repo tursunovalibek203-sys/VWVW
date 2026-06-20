@@ -99,20 +99,23 @@ export function generateReceiptHTML(data: ReceiptData): string {
 <style>
   @page { size: 80mm auto; margin: 0; }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 80mm !important;
+    margin: 0 !important;
+  }
   @media print {
-    html, body { margin: 0 !important; padding: 0 !important; width: 80mm !important; }
+    html, body { width: 80mm !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; }
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
-    * { page-break-inside: avoid; }
   }
   body {
     font-family: 'Courier New', Courier, monospace;
     font-size: 12px;
     line-height: 1.3;
-    width: 76mm;
-    margin: 0 auto;
+    width: 80mm;
+    margin: 0;
     background: #fff;
     color: #000;
-    padding: 1mm 5mm;
+    padding: 1mm 4mm 2mm 4mm;
   }
   table { width: 100%; border-collapse: collapse; }
   th { background: #333; color: #fff; font-size: 9px; padding: 3px 2px; border: 1px solid #000; text-align: center; }
@@ -122,7 +125,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
 <body>
   <!-- Header: Chap - logo, O'ng - nom va manzil -->
   <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:5px;border-bottom:2px solid #000;margin-bottom:5px;">
-    <img src="/logo.jpg" alt="Logo" style="width:18mm;height:auto;margin-right:3px;flex-shrink:0;" onerror="this.style.display='none'">
+    <img src="${window.location.origin}/logo.jpg" alt="Logo" style="width:18mm;height:auto;margin-right:3px;flex-shrink:0;" onerror="this.style.display='none'">
     <div style="flex:1;">
       <div style="font-size:19px;font-weight:900;letter-spacing:1px;line-height:1.1;">LUX PET PLAST</div>
       <div style="font-size:10px;margin-top:3px;">Buxoro viloyati, Vobkent tumani</div>
@@ -204,9 +207,31 @@ export function generateReceiptHTML(data: ReceiptData): string {
 
   ${ln2}
   <div style="text-align:center;font-size:11px;font-weight:bold;">Xaridingiz uchun rahmat!</div>
+  <div style="text-align:center;font-size:9px;color:#999;margin-top:4px;">powered by akm</div>
 
 <script>
-  window.onload = function() { setTimeout(function() { window.print(); }, 300); };
+  window.onload = function() {
+    setTimeout(function() {
+      var h = Math.max(
+        document.body.scrollHeight,
+        document.body.offsetHeight,
+        document.documentElement.scrollHeight,
+        document.documentElement.offsetHeight
+      ) + 40;
+      try {
+        for (var i = 0; i < document.styleSheets.length; i++) {
+          var rules = document.styleSheets[i].cssRules || [];
+          for (var j = rules.length - 1; j >= 0; j--) {
+            if (rules[j].type === 3) document.styleSheets[i].deleteRule(j);
+          }
+        }
+      } catch(e) {}
+      var s = document.createElement('style');
+      s.textContent = '@page { size: 80mm ' + h + 'px; margin: 0; }';
+      document.head.appendChild(s);
+      setTimeout(function() { window.print(); }, 200);
+    }, 500);
+  };
 </script>
 </body>
 </html>`;
@@ -646,7 +671,7 @@ function printToPopupWindow(data: ReceiptData): void {
   const html = generateReceiptHTML(data);
   
   // Yangi oyna ochish
-  const printWindow = window.open('', '_blank', 'width=800,height=600');
+  const printWindow = window.open('', '_blank', 'width=420,height=900,scrollbars=no');
   
   if (printWindow) {
     printWindow.document.write(html);
@@ -877,15 +902,22 @@ export function prepareSaleReceipt(
   
   const previousDebtUZS = customer?.debtUZS || 0;
   const previousDebtUSD = customer?.debtUSD || 0;
-  
-  // Jami qarzni hisoblash (valyutaga qarab)
-  let totalDebtUZS = previousDebtUZS;
-  let totalDebtUSD = previousDebtUSD;
 
-  if (isUZS) {
-    totalDebtUZS = previousDebtUZS + (sale.debtAmount > 0 ? sale.debtAmount : 0);
+  // Server qaytargan yangilangan mijoz balansini ishlatamiz (ikki valyuta ham to'g'ri bo'ladi)
+  // sale.customer — bu completeSale dan keladi va DB dagi haqiqiy yangilangan qiymat
+  let totalDebtUZS: number;
+  let totalDebtUSD: number;
+
+  if (sale.customer?.debtUZS != null) {
+    totalDebtUZS = Number(sale.customer.debtUZS);
   } else {
-    totalDebtUSD = previousDebtUSD + (sale.debtAmount > 0 ? sale.debtAmount : 0);
+    totalDebtUZS = previousDebtUZS + (isUZS && sale.debtAmount > 0 ? sale.debtAmount : 0);
+  }
+
+  if (sale.customer?.debtUSD != null) {
+    totalDebtUSD = Number(sale.customer.debtUSD);
+  } else {
+    totalDebtUSD = previousDebtUSD + (!isUZS && sale.debtAmount > 0 ? sale.debtAmount : 0);
   }
   
   // Haydovchi ma'lumotlari

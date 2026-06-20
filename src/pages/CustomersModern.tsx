@@ -73,6 +73,46 @@ import { Badge } from '../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import ConfirmDialog from '../components/ConfirmDialog';
 
+// Sof balans: so'm va dollar alohida-alohida, ikkisi ham bo'lishi mumkin
+function NetBalanceCell({ debtUZS, debtUSD, balanceUZS, balanceUSD }: {
+  debtUZS: number; debtUSD: number; balanceUZS: number; balanceUSD: number;
+}) {
+  // Har valyuta uchun sof hisob: manfiy = qarz (qizil), musbat = avans (yashil)
+  const netUZS = balanceUZS - debtUZS;
+  const netUSD = balanceUSD - debtUSD;
+
+  const showUZS = debtUZS > 0 || balanceUZS > 0;
+  const showUSD = debtUSD > 0 || balanceUSD > 0;
+
+  if (!showUZS && !showUSD) {
+    return <span className="text-sm text-slate-400 tabular-nums">0</span>;
+  }
+
+  const hasAnyDebt = netUZS < 0 || netUSD < 0;
+  const hasAnyCredit = (netUZS > 0 || netUSD > 0) && !hasAnyDebt;
+
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      {showUSD && (
+        <span className={`text-sm font-semibold tabular-nums ${netUSD < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+          {netUSD >= 0 ? '+' : '−'}${Math.abs(netUSD).toFixed(2)}
+        </span>
+      )}
+      {showUZS && (
+        <span className={`text-sm font-semibold tabular-nums ${netUZS < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+          {netUZS >= 0 ? '+' : '−'}{Math.abs(netUZS).toLocaleString('en-US')} so'm
+        </span>
+      )}
+      {hasAnyDebt
+        ? <span className="text-[10px] text-rose-400 font-medium">{latinToCyrillic('qarz')}</span>
+        : hasAnyCredit
+          ? <span className="text-[10px] text-emerald-400 font-medium">{latinToCyrillic('avans')}</span>
+          : null
+      }
+    </div>
+  );
+}
+
 interface Customer {
   id: string;
   name: string;
@@ -80,12 +120,14 @@ interface Customer {
   phone?: string;
   address?: string;
   category: string;
-  balance: number;  // UZS (backward compatibility)
+  balance: number;
   balanceUZS: number;
   balanceUSD: number;
-  debt: number;  // UZS (backward compatibility)
+  debt: number;
   debtUZS: number;
   debtUSD: number;
+  netUZS: number;   // sof balans UZS: balanceUZS - debtUZS
+  netUSD: number;   // sof balans USD: balanceUSD - debtUSD
   createdAt: string;
   // Qo'shimcha maydonlar
   monthlySales?: number; // Oylik savdo ($)
@@ -213,10 +255,15 @@ export default function CustomersModern() {
         const lastSaleDateValue = stat?.lastSaleDate
           ?? (c.lastPurchase ? c.lastPurchase : undefined);
 
-        const balanceUZS = c.balanceUZS || c.balance || 0;
+        // Faqat yangi maydonlarni ishlatamiz. c.balance — eski maydon, kredit emas!
+        const balanceUZS = c.balanceUZS || 0;
         const balanceUSD = c.balanceUSD || 0;
         const debtUZS    = c.debtUZS || 0;
         const debtUSD    = c.debtUSD || 0;
+
+        // Sof balans: musbat = avans (yashil), manfiy = qarz (qizil)
+        const netUZS = balanceUZS - debtUZS;
+        const netUSD = balanceUSD - debtUSD;
 
         let debtPeriod = 0;
         const totalDebt = debtUZS + debtUSD * 12500;
@@ -231,12 +278,14 @@ export default function CustomersModern() {
           phone: c.phone,
           address: c.address,
           category: c.category,
-          balance: balanceUZS,
+          balance: netUZS,
           balanceUZS,
           balanceUSD,
           debt: debtUZS,
           debtUZS,
           debtUSD,
+          netUZS,
+          netUSD,
           createdAt: c.createdAt,
           monthlySales,
           totalSales: 0,
@@ -315,12 +364,14 @@ export default function CustomersModern() {
           phone: createdCustomer.phone,
           address: createdCustomer.address,
           category: createdCustomer.category,
-          balance: createdCustomer.balanceUZS || createdCustomer.balance || 0,
-          balanceUZS: createdCustomer.balanceUZS || createdCustomer.balance || 0,
+          balanceUZS: createdCustomer.balanceUZS || 0,
           balanceUSD: createdCustomer.balanceUSD || 0,
           debt: createdCustomer.debtUZS || 0,
           debtUZS: createdCustomer.debtUZS || 0,
           debtUSD: createdCustomer.debtUSD || 0,
+          netUZS: (createdCustomer.balanceUZS || 0) - (createdCustomer.debtUZS || 0),
+          netUSD: (createdCustomer.balanceUSD || 0) - (createdCustomer.debtUSD || 0),
+          balance: (createdCustomer.balanceUZS || 0) - (createdCustomer.debtUZS || 0),
           createdAt: createdCustomer.createdAt
         };
 
@@ -473,7 +524,7 @@ export default function CustomersModern() {
           ((customer.debt || 0) / 12500).toFixed(2),
           (customer.monthlySales || 0).toFixed(2),
           (customer.totalSales || 0).toFixed(2),
-          trData(customer.address) || '-'
+          trData(customer.address || '') || '-'
         ];
       });
 
@@ -701,7 +752,6 @@ export default function CustomersModern() {
                   <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Aloqa')}</th>
                   <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Kategoriya')}</th>
                   <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Balans')}</th>
-                  <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Qarz')}</th>
                   <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Amallar')}</th>
                 </tr>
               </thead>
@@ -754,21 +804,7 @@ export default function CustomersModern() {
                       </Badge>
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <span className="text-sm font-semibold text-slate-900 tabular-nums">{customer.balance.toLocaleString('en-US')} so'm</span>
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      {customer.debtUSD > 0 || customer.debtUZS > 0 ? (
-                        <div className="flex flex-col items-end gap-0.5">
-                          {customer.debtUSD > 0 && (
-                            <Badge variant="error"><span className="tabular-nums">${customer.debtUSD.toFixed(2)}</span></Badge>
-                          )}
-                          {customer.debtUZS > 0 && (
-                            <Badge variant="error"><span className="tabular-nums">{customer.debtUZS.toLocaleString('en-US')} so'm</span></Badge>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-slate-400 tabular-nums">0</span>
-                      )}
+                      <NetBalanceCell debtUZS={customer.debtUZS} debtUSD={customer.debtUSD} balanceUZS={customer.balanceUZS} balanceUSD={customer.balanceUSD} />
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-1.5">
@@ -832,19 +868,10 @@ export default function CustomersModern() {
                 </Badge>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="mt-3">
                 <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic('Balans')}</p>
-                  <p className="mt-0.5 text-sm font-bold text-slate-900 tabular-nums">{customer.balance.toLocaleString('en-US')} so'm</p>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic('Qarz')}</p>
-                  <p className={`mt-0.5 text-sm font-bold tabular-nums ${customer.debtUZS > 0 || customer.debtUSD > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
-                    {customer.debtUSD > 0 && <span>${customer.debtUSD.toFixed(2)} </span>}
-                    {customer.debtUZS > 0
-                      ? `${customer.debtUZS.toLocaleString('en-US')} so'm`
-                      : !customer.debtUSD && '0'}
-                  </p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-1">{latinToCyrillic('Balans')}</p>
+                  <NetBalanceCell debtUZS={customer.debtUZS} debtUSD={customer.debtUSD} balanceUZS={customer.balanceUZS} balanceUSD={customer.balanceUSD} />
                 </div>
               </div>
 

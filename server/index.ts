@@ -7,7 +7,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import path from 'path';
 import jwt from 'jsonwebtoken';
-import { prisma } from './utils/prisma.js'; 
+import { prisma, warmupDb } from './utils/prisma.js';
 import { logger } from './utils/logger.js';
 import { setupSwagger } from './swagger.js';
 import { securityLogger, sanitizeInput, csrfProtection } from './middleware/security.js';
@@ -90,21 +90,20 @@ app.set('trust proxy', ['loopback', '127.0.0.1', '10.0.0.0/8']);
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 daqiqa
-  max: process.env.NODE_ENV === 'development' ? 1000 : 100, // Development uchun yuqori limit
+  max: process.env.NODE_ENV === 'development' ? 2000 : 500,
   message: {
-    error: 'Too many requests, please try again later.',
+    error: 'Juda ko\'p so\'rov yuborildi, iltimos bir oz kuting.',
     retryAfter: 15 * 60
   },
   standardHeaders: true,
   legacyHeaders: false,
-  // Skip successful requests from counting (optional optimization)
-  skipSuccessfulRequests: false,
+  skipSuccessfulRequests: true, // Muvaffaqiyatli so'rovlar hisoblanmaydi
 });
 
 // Stricter limit for auth endpoints (relaxed in development for E2E testing)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'development' ? 500 : 10,
+  max: process.env.NODE_ENV === 'development' ? 500 : 30,
   message: {
     error: 'Too many login attempts, please try again after 15 minutes.',
     retryAfter: 15 * 60
@@ -169,7 +168,8 @@ app.use(cors({
   preflightContinue: false,
   optionsSuccessStatus: 200
 }));
-app.use(express.json({ limit: '10mb' })); // Limit request body size
+app.use(compression()); // Gzip siqish — katta JSON javoblarni tezlashtiradi
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // 🔒 Security middleware - must be after body parsers but before routes
@@ -230,14 +230,15 @@ app.use('/api/ledger', ledgerRoutes);
 app.use('/api/warehouse', warehouseRoutes);
 app.use('/api/telegram-user', telegramUserRoutes);
 
-// Health check — always responds immediately (no DB query to avoid Neon cold start timeout)
-app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
+// Health check — DB ni ham tekshiradi va Neon ni uyg'otadi
+app.get('/api/health', async (_req, res) => {
+  const dbOk = await warmupDb();
+  res.status(dbOk ? 200 : 503).json({
+    status: dbOk ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
-    database: 'ok',
+    database: dbOk ? 'ok' : 'unavailable',
   });
 });
 
@@ -466,6 +467,14 @@ app.listen(PORT, async () => {
   logger.info(`API available at http://localhost:${PORT}/api`);
   logger.info(`Health check at http://localhost:${PORT}/api/health`);
 
+  // Neon DB ni startup da uyg'otish (cold start oldini olish)
+  try {
+    const ok = await warmupDb();
+    logger.info(`DB warmup: ${ok ? 'success ✅' : 'failed ⚠️ (will retry on first request)'}`);
+  } catch {
+    logger.warn('DB warmup failed — will retry on first request');
+  }
+
   await seedProducts();
   await migrateKapsulaToPreform();
 
@@ -477,12 +486,23 @@ app.listen(PORT, async () => {
     logger.warn('Admin bot ishga tushirishda xatolik: ' + err.message);
   }
 
-  // Render free tier uxlab qolmaslik uchun har 9 daqiqada o'zini ping qiladi
-  if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {
-    const selfUrl = process.env.RENDER_EXTERNAL_URL + '/api/health';
-    setInterval(() => {
-      fetch(selfUrl).catch(() => {});
-    }, 9 * 60 * 1000);
-    logger.info('Keep-alive ping started: ' + selfUrl);
+  if (process.env.NODE_ENV === 'production') {
+    // Neon DB — har 3 daqiqada keep-alive (Neon 5 daqiqada uxlaydi)
+    setInterval(async () => {
+      try { await prisma.$queryRaw`SELECT 1`; } catch { /* auto-reconnect */ }
+    }, 3 * 60 * 1000);
+    logger.info('Neon DB keep-alive: every 3 min');
+
+    // Render server — har 10 daqiqada o'ziga ping (free tier 15 daqiqada uxlaydi)
+    if (process.env.RENDER_EXTERNAL_URL) {
+      const selfUrl = process.env.RENDER_EXTERNAL_URL + '/api/health';
+      setInterval(async () => {
+        try { await fetch(selfUrl, { signal: AbortSignal.timeout(10000) }); } catch { /* ignore */ }
+      }, 10 * 60 * 1000);
+      logger.info('Render keep-alive ping: every 10 min → ' + selfUrl);
+    }
+
+    // UptimeRobot yoki cron.job.io kabi tashqi monitoring xizmatini ham ulashni tavsiya etamiz
+    // Xizmat: https://uptimerobot.com (bepul, 5 daqiqada bir ping)
   }
 });

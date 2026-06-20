@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { prisma } from '../utils/prisma';
 import { authenticate } from '../middleware/auth';
+import { withCache } from '../middleware/responseCache';
 
 const router = Router();
 router.use(authenticate);
 
-router.get('/stats', async (req, res) => {
+router.get('/stats', withCache(60 * 1000), async (req, res) => {
   try {
     const now   = new Date();
     const today = new Date(now); today.setHours(0, 0, 0, 0);
@@ -173,12 +174,15 @@ router.get('/stats', async (req, res) => {
         },
       }),
 
-      // Kassa balansi (oxirgi 2000 tranzaksiya)
-      prisma.cashboxTransaction.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 2000,
-        select: { type: true, amount: true, currency: true },
-      }),
+      // Kassa balansi — DB da aggregate (2000 row o'rniga bitta so'rov)
+      prisma.$queryRaw<Array<{ currency: string; income: number; expense: number }>>`
+        SELECT
+          COALESCE(currency, 'UZS') AS currency,
+          COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END), 0) AS income,
+          COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) AS expense
+        FROM "CashboxTransaction"
+        GROUP BY COALESCE(currency, 'UZS')
+      `,
     ]);
 
     // ── Mijozlar (raw SQL — telegramTopicId DB da yo'q) ────────────────────────
@@ -200,13 +204,13 @@ router.get('/stats', async (req, res) => {
       `,
     ]);
 
-    // ── Kassa balansi hisoblash ────────────────────────────────────────────────
+    // ── Kassa balansi hisoblash (SQL aggregate natijasidan) ───────────────────
     const cashBalanceUZS = cashboxTxns
-      .filter(t => t.currency === 'UZS' || !t.currency)
-      .reduce((sum, t) => sum + (t.type === 'INCOME' ? t.amount : -t.amount), 0);
+      .filter(t => t.currency === 'UZS')
+      .reduce((sum, t) => sum + (Number(t.income) - Number(t.expense)), 0);
     const cashBalanceUSD = cashboxTxns
       .filter(t => t.currency === 'USD')
-      .reduce((sum, t) => sum + (t.type === 'INCOME' ? t.amount : -t.amount), 0);
+      .reduce((sum, t) => sum + (Number(t.income) - Number(t.expense)), 0);
 
     // ── Bugungi hisoblash ─────────────────────────────────────────────────────
     const todayTotal   = todaySalesAgg._sum.totalAmount ?? 0;

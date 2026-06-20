@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { prisma } from '../utils/prisma';
 import { authenticate, authorize } from '../middleware/auth';
+import { withCache, invalidateCache } from '../middleware/responseCache';
 
 const router = Router();
 
-// Get all settings
-router.get('/', authenticate, async (req, res) => {
+// Get all settings — 2 daqiqa cache (sozlamalar tez-tez o'zgarmaydi)
+router.get('/', authenticate, withCache(2 * 60 * 1000), async (req, res) => {
   try {
     const settings = await prisma.systemSettings.findMany();
     
@@ -104,6 +105,7 @@ router.put('/', authenticate, authorize('ADMIN'), async (req, res) => {
       });
     }
 
+    invalidateCache('/api/settings');
     res.json({ message: 'Barcha sozlamalar yangilandi' });
   } catch (error: any) {
     console.error('Settings update error:', error);

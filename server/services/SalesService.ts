@@ -472,32 +472,48 @@ export class SalesService {
       } catch { /* silent */ }
     });
 
-    // Telegram receipt: mijoz chatId va kassir session bo'lsa yuborish
-    if (!isKocha && completeSale?.customer?.telegramChatId) {
+    // Telegram receipt: mijoz Telegram kontakti bo'lsa yuborish (chatId | @username | +phone)
+    const cust = completeSale?.customer;
+    const hasTgContact = !isKocha && cust && (cust.telegramChatId || cust.telegramUsername || cust.phone);
+    if (hasTgContact) {
       setImmediate(async () => {
         try {
           const { TelegramUserService } = await import('./TelegramUserService.js');
-          const cashierUser = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { name: true, telegramSession: true },
-          });
-          if (!cashierUser?.telegramSession) return;
 
-          const receiptText = TelegramUserService.formatReceipt({
-            cashierName: cashierUser.name,
-            customerName: completeSale.customer!.name,
-            items: completeSale.items.map((i) => ({
-              name: i.product?.name || 'Mahsulot',
-              qty: i.quantity,
-              price: i.pricePerBag,
-              currency: safeCurrency,
+          const isUZS = safeCurrency !== 'USD';
+          const debtFromSale = Math.max(0, completeSale!.totalAmount - (completeSale!.paidAmount ?? 0));
+          const currentDebtUZS = Number(cust!.debtUZS ?? 0);
+          const currentDebtUSD = Number(cust!.debtUSD ?? 0);
+          const previousDebtUZS = isUZS ? Math.max(0, currentDebtUZS - debtFromSale) : currentDebtUZS;
+          const previousDebtUSD = !isUZS ? Math.max(0, currentDebtUSD - debtFromSale) : currentDebtUSD;
+
+          await TelegramUserService.sendSaleReceipt({
+            preferredSenderId: userId,
+            customer: {
+              name: cust!.name,
+              telegramChatId: cust!.telegramChatId ?? null,
+              telegramUsername: cust!.telegramUsername ?? null,
+              telegramTopicId: (cust as any).telegramTopicId ?? null,
+              phone: cust!.phone ?? null,
+            },
+            items: completeSale!.items.map((i) => ({
+              productName: i.product?.name || 'Mahsulot',
+              bags: i.quantity,
+              pricePerBag: i.pricePerBag,
+              subtotal: i.subtotal,
             })),
-            total: completeSale.totalAmount,
+            totalAmount: completeSale!.totalAmount,
+            paidAmount: completeSale!.paidAmount ?? 0,
+            debtFromSale,
             currency: safeCurrency,
             paymentMethod: safePaymentMethod,
-            receiptNumber: completeSale.receiptNumber ?? undefined,
+            previousDebtUZS,
+            previousDebtUSD,
+            currentDebtUZS,
+            currentDebtUSD,
+            exchangeRate: Number(exchangeRate) || 12700,
+            receiptNumber: completeSale!.receiptNumber ?? undefined,
           });
-          await TelegramUserService.sendMessage(userId, completeSale.customer!.telegramChatId!, receiptText);
         } catch (e: any) {
           console.warn('⚠️ Telegram receipt yuborishda xatolik:', e.message);
         }
