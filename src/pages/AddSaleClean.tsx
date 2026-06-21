@@ -347,7 +347,7 @@ export default function AddSaleClean() {
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [drivers, setDrivers] = useState<{ id: string; name: string; phone?: string; debtToCompany?: number }[]>([]);
+  const [drivers, setDrivers] = useState<{ id: string; name: string; phone?: string; debtToCompany?: number; debtToCompanyUSD?: number }[]>([]);
   const [driverSearch, setDriverSearch] = useState('');
 
   // Inline new driver form
@@ -784,11 +784,17 @@ export default function AddSaleClean() {
                         {drivers.find(d => d.id === saleForm.form.driverId)?.phone && (
                           <span className="ml-2 text-xs text-slate-400">{drivers.find(d => d.id === saleForm.form.driverId)?.phone}</span>
                         )}
-                        {(drivers.find(d => d.id === saleForm.form.driverId)?.debtToCompany || 0) > 0 && (
-                          <span className="ml-2 text-xs text-amber-600 font-semibold">
-                            {latinToCyrillic('Qarzi')}: {Math.round(drivers.find(d => d.id === saleForm.form.driverId)!.debtToCompany!).toLocaleString()} UZS
-                          </span>
-                        )}
+                        {(() => {
+                          const drv = drivers.find(d => d.id === saleForm.form.driverId);
+                          const usdDebt = drv?.debtToCompanyUSD || 0;
+                          const uzsTotal = drv?.debtToCompany || 0;
+                          const pureUZS = Math.max(0, Math.round(uzsTotal - usdDebt * saleForm.exchangeRateNum));
+                          if (usdDebt <= 0 && pureUZS <= 0) return null;
+                          const parts: string[] = [];
+                          if (usdDebt > 0) parts.push(`$${usdDebt.toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`);
+                          if (pureUZS > 0) parts.push(`${pureUZS.toLocaleString()} UZS`);
+                          return <span className="ml-2 text-xs text-amber-600 font-semibold">{latinToCyrillic('Qarzi')}: {parts.join(' + ')}</span>;
+                        })()}
                       </div>
                       <button type="button" onClick={() => { saleForm.updateFormField('driverId', ''); setDriverSearch(''); }} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium flex-shrink-0">
                         {latinToCyrillic("O'zgartirish")}
@@ -822,11 +828,16 @@ export default function AddSaleClean() {
                                     >
                                       <span className="font-medium text-slate-900">{d.name}</span>
                                       {d.phone && <span className="text-slate-400 ml-2 text-xs">{d.phone}</span>}
-                                      {(d.debtToCompany || 0) > 0 && (
-                                        <span className="ml-2 text-xs text-amber-600 font-semibold">
-                                          {latinToCyrillic('Qarzi')}: {Math.round(d.debtToCompany!).toLocaleString()} UZS
-                                        </span>
-                                      )}
+                                      {(() => {
+                                        const usdDebt = d.debtToCompanyUSD || 0;
+                                        const uzsTotal = d.debtToCompany || 0;
+                                        const pureUZS = Math.max(0, Math.round(uzsTotal - usdDebt * saleForm.exchangeRateNum));
+                                        if (usdDebt <= 0 && pureUZS <= 0) return null;
+                                        const parts: string[] = [];
+                                        if (usdDebt > 0) parts.push(`$${usdDebt.toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`);
+                                        if (pureUZS > 0) parts.push(`${pureUZS.toLocaleString()} UZS`);
+                                        return <span className="ml-2 text-xs text-amber-600 font-semibold">{latinToCyrillic('Qarzi')}: {parts.join(' + ')}</span>;
+                                      })()}
                                     </button>
                                   ))}
                                 </div>

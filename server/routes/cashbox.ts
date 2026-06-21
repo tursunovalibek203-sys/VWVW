@@ -2,12 +2,13 @@
 import { prisma } from '../utils/prisma';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { DecimalHelper } from '../utils/decimal-helper';
+import { withCache, invalidateCache } from '../middleware/responseCache';
 
 const router = Router();
 
 router.use(authenticate);
 
-router.get('/summary', async (req, res) => {
+router.get('/summary', withCache(30 * 1000), async (req, res) => {
   try {
     const now   = new Date();
     const today = new Date(now); today.setHours(0, 0, 0, 0);
@@ -203,7 +204,7 @@ router.get('/summary', async (req, res) => {
   }
 });
 
-router.get('/transactions', async (req: AuthRequest, res) => {
+router.get('/transactions', withCache(20 * 1000), async (req: AuthRequest, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 200;
     const { type, paymentMethod, startDate, endDate } = req.query;
@@ -255,6 +256,8 @@ router.post('/add', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), async
         userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
       }
     });
+    invalidateCache('/api/cashbox');
+    invalidateCache('/api/dashboard');
     res.json({ success: true, message: 'Kassa muvaffaqiyatli toldirildi' });
   } catch (error) {
     console.error('Add money error:', error);
@@ -283,6 +286,8 @@ router.post('/withdraw', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), 
         userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
       }
     });
+    invalidateCache('/api/cashbox');
+    invalidateCache('/api/dashboard');
     res.json({ success: true, message: 'Chiqim muvaffaqiyatli amalga oshirildi' });
   } catch (error) {
     console.error('Withdraw error:', error);

@@ -308,6 +308,8 @@ export interface Driver {
   active: boolean;
   totalDeliveries: number;
   telegramChatId?: string;
+  debtToCompany?: number;
+  debtToCompanyUSD?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }

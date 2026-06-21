@@ -590,22 +590,32 @@ export function Drivers() {
                       </div>
                     </td>
                     <td className="px-5 py-4 text-center">
-                      {((driver.debtToCompanyUSD || 0) > 0 || (driver.debtToCompany || 0) > 0) ? (
-                        <div className="flex flex-col items-center gap-0.5">
-                          {(driver.debtToCompanyUSD || 0) > 0 && (
-                            <span className="text-sm font-bold text-amber-600 tabular-nums">
-                              ${driver.debtToCompanyUSD!.toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                            </span>
-                          )}
-                          {(driver.debtToCompany || 0) > (driver.debtToCompanyUSD || 0) * 10 && (
-                            <span className="text-xs font-semibold text-amber-500 tabular-nums">
-                              {Math.round(driver.debtToCompany!).toLocaleString()} UZS
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-slate-300 text-sm">—</span>
-                      )}
+                      {(() => {
+                        const usdDebt = driver.debtToCompanyUSD || 0;
+                        const uzsTotal = driver.debtToCompany || 0;
+                        const rate = parseFloat(paymentExchangeRate) || 12700;
+                        const pureUZS = Math.max(0, Math.round(uzsTotal - usdDebt * rate));
+                        if (usdDebt <= 0 && uzsTotal <= 0) return <span className="text-slate-300 text-sm">—</span>;
+                        return (
+                          <div className="flex flex-col items-center gap-0.5">
+                            {usdDebt > 0 && (
+                              <span className="text-sm font-bold text-amber-600 tabular-nums">
+                                ${usdDebt.toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                              </span>
+                            )}
+                            {pureUZS > 1000 && (
+                              <span className="text-xs font-semibold text-amber-500 tabular-nums">
+                                {pureUZS.toLocaleString()} UZS
+                              </span>
+                            )}
+                            {usdDebt <= 0 && uzsTotal > 0 && pureUZS <= 1000 && (
+                              <span className="text-xs font-semibold text-amber-500 tabular-nums">
+                                {Math.round(uzsTotal).toLocaleString()} UZS
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-5 py-4 text-center">
                       <Badge variant={getStatusVariant(driver.status)}>

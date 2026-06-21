@@ -2,14 +2,15 @@ import { Router } from 'express';
 import { prisma } from '../utils/prisma';
 import { authenticate, authorizeAnalytics } from '../middleware/auth';
 import { calculateAllMetrics } from '../utils/business-metrics';
+import { withCache } from '../middleware/responseCache';
 
 const router = Router();
 
 router.use(authenticate);
 router.use(authorizeAnalytics);
 
-// Keng qamrovli statistika
-router.get('/comprehensive', async (req, res) => {
+// Keng qamrovli statistika — 5 daqiqa cache
+router.get('/comprehensive', withCache(5 * 60 * 1000), async (req, res) => {
   try {
     const days = parseInt(req.query.days as string) || 30;
     const startDate = new Date();

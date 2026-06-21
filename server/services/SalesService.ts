@@ -336,65 +336,73 @@ export class SalesService {
         }
 
         // 8. UPDATE CUSTOMER DEBT/BALANCE (if not Ko'cha)
-        // actualDriverCollected hisobga olinadi — haydovchi tayinlansa mijoz qarz ko'rinmaydi
+        // QOIDA: haydovchi pul yig'sa (actualDriverCollected > 0) — mijoz HECH QACHON qarz bo'lmaydi.
+        // Qolgan summa (haydovchi to'liq yig'masa) mijozga EMAS, sotuvning "to'lanmagan" qoldig'iga kiradi.
         if (!isKocha && customerId) {
-          const effectivePaid = DecimalHelper.add(paidAmount, actualDriverCollected);
-          const debtAmount = DecimalHelper.subtract(totalAmount, effectivePaid);
-          
-          // Use DecimalHelper for comparisons
-          if (DecimalHelper.isGreaterThan(debtAmount, 0.01)) {
-            // Customer owes money - add to debt
-            if (currency === 'UZS') {
-              const roundedDebt = DecimalHelper.round(debtAmount, 0);
-              await tx.customer.update({
-                where: { id: customerId },
-                data: {
-                  debtUZS: { increment: roundedDebt },
-                  debt: { increment: DecimalHelper.divide(roundedDebt, parseInt(process.env.USD_TO_UZS_RATE || '12500', 10)) }, // Legacy USD
-                  lastPurchase: new Date()
-                }
-              });
-            } else {
-              const roundedDebt = DecimalHelper.round(debtAmount, 2);
-              await tx.customer.update({
-                where: { id: customerId },
-                data: {
-                  debtUSD: { increment: roundedDebt },
-                  debt: { increment: roundedDebt }, // Legacy USD
-                  lastPurchase: new Date()
-                }
-              });
-            }
-          } else if (DecimalHelper.isLessThan(debtAmount, -0.01)) {
-            // Overpayment - add to balance
-            const overpayment = new Decimal(debtAmount).abs().toNumber();
-            if (currency === 'UZS') {
-              const roundedBalance = DecimalHelper.round(overpayment, 0);
-              await tx.customer.update({
-                where: { id: customerId },
-                data: {
-                  balanceUZS: { increment: roundedBalance },
-                  balance: { increment: DecimalHelper.divide(roundedBalance, parseInt(process.env.USD_TO_UZS_RATE || '12500', 10)) }, // Legacy USD
-                  lastPurchase: new Date()
-                }
-              });
-            } else {
-              const roundedBalance = DecimalHelper.round(overpayment, 2);
-              await tx.customer.update({
-                where: { id: customerId },
-                data: {
-                  balanceUSD: { increment: roundedBalance },
-                  balance: { increment: roundedBalance }, // Legacy USD
-                  lastPurchase: new Date()
-                }
-              });
-            }
-          } else {
-            // Exact payment - just update lastPurchase
+          if (driverId && actualDriverCollected > 0) {
+            // Haydovchi pul yig'ayapti — mijoz qarz bo'lmaydi, faqat lastPurchase yangilanadi
             await tx.customer.update({
               where: { id: customerId },
               data: { lastPurchase: new Date() }
             });
+          } else {
+            // Haydovchi yo'q yoki pul yig'maydi — oddiy to'lov/qarz hisobi
+            const debtAmount = DecimalHelper.subtract(totalAmount, paidAmount);
+
+            if (DecimalHelper.isGreaterThan(debtAmount, 0.01)) {
+              // Customer owes money - add to debt
+              if (currency === 'UZS') {
+                const roundedDebt = DecimalHelper.round(debtAmount, 0);
+                await tx.customer.update({
+                  where: { id: customerId },
+                  data: {
+                    debtUZS: { increment: roundedDebt },
+                    debt: { increment: DecimalHelper.divide(roundedDebt, parseInt(process.env.USD_TO_UZS_RATE || '12500', 10)) }, // Legacy USD
+                    lastPurchase: new Date()
+                  }
+                });
+              } else {
+                const roundedDebt = DecimalHelper.round(debtAmount, 2);
+                await tx.customer.update({
+                  where: { id: customerId },
+                  data: {
+                    debtUSD: { increment: roundedDebt },
+                    debt: { increment: roundedDebt }, // Legacy USD
+                    lastPurchase: new Date()
+                  }
+                });
+              }
+            } else if (DecimalHelper.isLessThan(debtAmount, -0.01)) {
+              // Overpayment - add to balance
+              const overpayment = new Decimal(debtAmount).abs().toNumber();
+              if (currency === 'UZS') {
+                const roundedBalance = DecimalHelper.round(overpayment, 0);
+                await tx.customer.update({
+                  where: { id: customerId },
+                  data: {
+                    balanceUZS: { increment: roundedBalance },
+                    balance: { increment: DecimalHelper.divide(roundedBalance, parseInt(process.env.USD_TO_UZS_RATE || '12500', 10)) }, // Legacy USD
+                    lastPurchase: new Date()
+                  }
+                });
+              } else {
+                const roundedBalance = DecimalHelper.round(overpayment, 2);
+                await tx.customer.update({
+                  where: { id: customerId },
+                  data: {
+                    balanceUSD: { increment: roundedBalance },
+                    balance: { increment: roundedBalance }, // Legacy USD
+                    lastPurchase: new Date()
+                  }
+                });
+              }
+            } else {
+              // Exact payment - just update lastPurchase
+              await tx.customer.update({
+                where: { id: customerId },
+                data: { lastPurchase: new Date() }
+              });
+            }
           }
         }
         // 9. DRIVER DEBT — haydovchi mijozdan pul yig'sa, kompaniyaga qarzdor bo'ladi

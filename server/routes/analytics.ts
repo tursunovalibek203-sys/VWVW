@@ -10,14 +10,15 @@ import {
   generateStrategicRecommendations,
   calculateAIConfidence,
 } from '../ai/advanced-analytics';
+import { withCache } from '../middleware/responseCache';
 
 const router = Router();
 
 router.use(authenticate);
 router.use(authorizeAnalytics);
 
-// Advanced AI Insights - Kuchaytirilgan tahlil endpoint
-router.get('/ai-insights', async (req, res) => {
+// Advanced AI Insights — 5 daqiqa cache (AI analysis juda sekin)
+router.get('/ai-insights', withCache(5 * 60 * 1000), async (req, res) => {
   try {
     const days = parseInt(req.query.days as string) || 30;
     const startDate = new Date();
