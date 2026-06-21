@@ -624,7 +624,12 @@ export default function CustomerProfileModern() {
                           {formatCurrency(sale.totalAmount, sale.currency)}
                         </td>
                         <td className="px-5 py-4 text-sm text-emerald-600 font-medium text-right whitespace-nowrap tabular-nums">
-                          {formatCurrency(sale.paidAmount, sale.currency)}
+                          {formatCurrency(
+                            sale.driverId && (sale.driverPaymentStatus === 'PENDING' || sale.driverPaymentStatus === 'DELIVERED')
+                              ? (sale.driverCollectedAmount ?? sale.totalAmount)
+                              : sale.paidAmount,
+                            sale.currency
+                          )}
                         </td>
                         <td className="px-5 py-4 text-sm text-right whitespace-nowrap tabular-nums">
                           {sale.driverId && sale.driverPaymentStatus === 'PENDING' ? (
@@ -677,7 +682,12 @@ export default function CustomerProfileModern() {
                     <div className="bg-slate-50 rounded-xl p-3">
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic("To'langan")}</p>
                       <p className="mt-0.5 text-sm font-bold text-emerald-600 tabular-nums">
-                        {formatCurrency(sale.paidAmount, sale.currency)}
+                        {formatCurrency(
+                          sale.driverId && (sale.driverPaymentStatus === 'PENDING' || sale.driverPaymentStatus === 'DELIVERED')
+                            ? (sale.driverCollectedAmount ?? sale.totalAmount)
+                            : sale.paidAmount,
+                          sale.currency
+                        )}
                       </p>
                     </div>
                     <div className="bg-slate-50 rounded-xl p-3">
