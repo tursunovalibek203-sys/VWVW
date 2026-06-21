@@ -1042,9 +1042,10 @@ export function Drivers() {
 
       {/* Payment Modal */}
       {showPaymentModal && paymentDriver && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl flex flex-col" style={{maxHeight: '90vh'}}>
-            <div className="px-6 py-4 border-b border-slate-200/70 flex items-center justify-between flex-shrink-0">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) setShowPaymentModal(false); }}>
+          <div className="flex min-h-full items-start justify-center p-4 py-8">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl">
+            <div className="px-6 py-4 border-b border-slate-200/70 flex items-center justify-between">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0 text-emerald-600">
                   <Send className="w-[18px] h-[18px]" />
@@ -1062,7 +1063,7 @@ export function Drivers() {
               </button>
             </div>
 
-            <form id="driver-payment-form" onSubmit={handleDriverPayment} className="overflow-y-auto flex-1 p-6 space-y-4">
+            <form id="driver-payment-form" onSubmit={handleDriverPayment} className="p-6 space-y-4">
               {/* Joriy qarz */}
               <div className="flex items-center justify-between bg-amber-50 rounded-xl px-4 py-3">
                 <span className="text-sm font-medium text-amber-700">{latinToCyrillic('Joriy qarz')}</span>
@@ -1192,27 +1193,25 @@ export function Drivers() {
                 )}
               </div>
 
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentModal(false)}
+                  className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-colors"
+                >
+                  {latinToCyrillic('Bekor')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={paymentLoading || ((parseFloat(paymentUSD) || 0) <= 0 && (parseFloat(paymentUZS) || 0) <= 0 && (parseFloat(paymentKarta) || 0) <= 0)}
+                  className="flex-[2] inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {paymentLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {latinToCyrillic('Tasdiqlash')}
+                </button>
+              </div>
             </form>
-
-            {/* Sticky footer — har doim ko'rinadi */}
-            <div className="flex gap-3 px-6 py-4 border-t border-slate-100 flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowPaymentModal(false)}
-                className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-colors"
-              >
-                {latinToCyrillic('Bekor')}
-              </button>
-              <button
-                type="submit"
-                form="driver-payment-form"
-                disabled={paymentLoading || ((parseFloat(paymentUSD) || 0) <= 0 && (parseFloat(paymentUZS) || 0) <= 0 && (parseFloat(paymentKarta) || 0) <= 0)}
-                className="flex-[2] inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {paymentLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {latinToCyrillic('Tasdiqlash')}
-              </button>
-            </div>
+          </div>
           </div>
         </div>
       )}
