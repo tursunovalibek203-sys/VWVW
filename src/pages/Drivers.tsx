@@ -1042,10 +1042,9 @@ export function Drivers() {
 
       {/* Payment Modal */}
       {showPaymentModal && paymentDriver && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 overflow-y-auto">
-          <div className="min-h-full flex items-start justify-center p-4 py-6">
-          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl">
-            <div className="px-6 py-4 border-b border-slate-200/70 flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl flex flex-col" style={{maxHeight: '90vh'}}>
+            <div className="px-6 py-4 border-b border-slate-200/70 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0 text-emerald-600">
                   <Send className="w-[18px] h-[18px]" />
@@ -1063,7 +1062,7 @@ export function Drivers() {
               </button>
             </div>
 
-            <form onSubmit={handleDriverPayment} className="p-6 space-y-4">
+            <form onSubmit={handleDriverPayment} className="overflow-y-auto flex-1 p-6 space-y-4">
               {/* Joriy qarz */}
               <div className="flex items-center justify-between bg-amber-50 rounded-xl px-4 py-3">
                 <span className="text-sm font-medium text-amber-700">{latinToCyrillic('Joriy qarz')}</span>
@@ -1211,7 +1210,6 @@ export function Drivers() {
                 </button>
               </div>
             </form>
-          </div>
           </div>
         </div>
       )}
