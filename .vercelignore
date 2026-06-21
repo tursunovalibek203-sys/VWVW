@@ -1,0 +1,12 @@
+# Telegram Web Z fayllari — faqat Render serverida kerak, Vercel'ga yuklash shart emas
+i/
+
+# Server source (Vercel faqat dist/ ni serve qiladi)
+server/
+prisma/
+
+# Dev artifacts
+node_modules/
+*.log
+.env
+.env.*
