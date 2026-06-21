@@ -75,10 +75,16 @@ interface Sale {
   debtAmount: number;
   currency: string;
   paymentStatus: string;
+  paymentMethod?: string;
+  paymentType?: string;
+  driverId?: string;
+  driverPaymentStatus?: string;
+  driverCollectedAmount?: number;
+  driverName?: string;
+  driver?: { id: string; name: string };
+  deliveryFee?: number;
   items?: SaleItem[];
-  product?: {
-    name: string;
-  };
+  product?: { name: string };
   quantity?: number;
 }
 
@@ -303,11 +309,21 @@ export default function CustomerProfileModern() {
     return '-';
   };
 
-  const getStatusBadge = (status: string) => {
-    if (status === 'PAID') {
+  const getStatusBadge = (sale: Sale) => {
+    // Haydovchi yig'ayotgan bo'lsa — maxsus holat
+    if (sale.driverId && sale.driverPaymentStatus === 'PENDING') {
+      return <Badge variant="warning">{latinToCyrillic('Haydovchida')}</Badge>;
+    }
+    if (sale.driverId && sale.driverPaymentStatus === 'DELIVERED') {
+      return <Badge variant="success">{latinToCyrillic("To'landi")}</Badge>;
+    }
+    if (sale.driverId && sale.driverPaymentStatus === 'CANCELLED') {
+      return <Badge variant="error">{latinToCyrillic('Bekor qilindi')}</Badge>;
+    }
+    if (sale.paymentStatus === 'PAID') {
       return <Badge variant="success">{latinToCyrillic("To'langan")}</Badge>;
     }
-    if (status === 'PARTIAL') {
+    if (sale.paymentStatus === 'PARTIAL') {
       return <Badge variant="warning">{latinToCyrillic('Qisman')}</Badge>;
     }
     return <Badge variant="error">{latinToCyrillic('Qarz')}</Badge>;
@@ -327,7 +343,7 @@ export default function CustomerProfileModern() {
     {
       icon: MapPin,
       label: latinToCyrillic('Manzil'),
-      value: trData(customer.address) || '-',
+      value: trData(customer.address || '') || '-',
       tint: 'bg-sky-50 text-sky-600',
     },
     {
@@ -611,7 +627,9 @@ export default function CustomerProfileModern() {
                           {formatCurrency(sale.paidAmount, sale.currency)}
                         </td>
                         <td className="px-5 py-4 text-sm text-right whitespace-nowrap tabular-nums">
-                          {(sale.debtAmount || 0) > 0 ? (
+                          {sale.driverId && sale.driverPaymentStatus === 'PENDING' ? (
+                            <span className="text-amber-500 text-xs font-medium">{latinToCyrillic('Haydovchida')}</span>
+                          ) : (sale.debtAmount || 0) > 0 ? (
                             <span className="text-rose-600 font-semibold">
                               {formatCurrency(sale.debtAmount, sale.currency)}
                             </span>
@@ -620,7 +638,7 @@ export default function CustomerProfileModern() {
                           )}
                         </td>
                         <td className="px-5 py-4 text-center">
-                          {getStatusBadge(sale.paymentStatus)}
+                          {getStatusBadge(sale)}
                         </td>
                       </tr>
                     ))}
@@ -646,7 +664,7 @@ export default function CustomerProfileModern() {
                         {getProductNames(sale)}
                       </p>
                     </div>
-                    {getStatusBadge(sale.paymentStatus)}
+                    {getStatusBadge(sale)}
                   </div>
 
                   <div className="mt-3 grid grid-cols-3 gap-2.5">
@@ -664,10 +682,12 @@ export default function CustomerProfileModern() {
                     </div>
                     <div className="bg-slate-50 rounded-xl p-3">
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic('Qarz')}</p>
-                      <p className={`mt-0.5 text-sm font-bold tabular-nums ${(sale.debtAmount || 0) > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
-                        {(sale.debtAmount || 0) > 0
-                          ? formatCurrency(sale.debtAmount, sale.currency)
-                          : '—'}
+                      <p className={`mt-0.5 text-sm font-bold tabular-nums ${sale.driverId && sale.driverPaymentStatus === 'PENDING' ? 'text-amber-500' : (sale.debtAmount || 0) > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                        {sale.driverId && sale.driverPaymentStatus === 'PENDING'
+                          ? latinToCyrillic('Haydovchida')
+                          : (sale.debtAmount || 0) > 0
+                            ? formatCurrency(sale.debtAmount, sale.currency)
+                            : '—'}
                       </p>
                     </div>
                   </div>

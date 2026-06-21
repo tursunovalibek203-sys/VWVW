@@ -102,6 +102,8 @@ export function Drivers() {
   const [cancelDebtAmount, setCancelDebtAmount] = useState('');
   const [cancelDebtNote, setCancelDebtNote] = useState('');
   const [cancelDebtLoading, setCancelDebtLoading] = useState(false);
+  const [pendingSalesList, setPendingSalesList] = useState<Array<{id:string;currency:string;driverCollectedAmount:number;customerId?:string;customer?:{name:string};manualCustomerName?:string}>>([]);
+  const [selectedSaleIds, setSelectedSaleIds] = useState<string[]>([]);
 
   const [newDriver, setNewDriver] = useState({
     name: '',
@@ -308,12 +310,26 @@ export function Drivers() {
     }
   };
 
+  const loadPendingSales = async (driverId: string) => {
+    try {
+      const res = await api.get(`/drivers/${driverId}/debt-summary`);
+      const sales = res.data?.pendingSales || [];
+      setPendingSalesList(sales);
+      setSelectedSaleIds(sales.map((s: any) => s.id)); // default: barchasi tanlangan
+    } catch { setPendingSalesList([]); setSelectedSaleIds([]); }
+  };
+
   const handleCancelDebt = async () => {
     if (!paymentDriver) return;
     setCancelDebtLoading(true);
     try {
       const body: any = { note: cancelDebtNote };
-      if (cancelDebtMode === 'partial') {
+      // Tanlangan sotuvlar bo'yicha bekor qilish
+      if (selectedSaleIds.length > 0 && selectedSaleIds.length < pendingSalesList.length) {
+        body.saleIds = selectedSaleIds;
+      }
+      // amount (qisman) — eski logika saqlash uchun
+      if (cancelDebtMode === 'partial' && pendingSalesList.length === 0) {
         const amt = parseFloat(cancelDebtAmount);
         if (!amt || amt <= 0) { addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic("Summa kiriting"))); setCancelDebtLoading(false); return; }
         body.amount = amt;
@@ -1168,7 +1184,11 @@ export function Drivers() {
 
               {/* Qarzni bekor qilish */}
               <div className="border-t border-slate-100 pt-3">
-                <button type="button" onClick={() => setShowCancelDebt(!showCancelDebt)}
+                <button type="button" onClick={() => {
+                  const next = !showCancelDebt;
+                  setShowCancelDebt(next);
+                  if (next && paymentDriver) loadPendingSales(paymentDriver.id);
+                }}
                   className="text-xs font-semibold text-rose-500 hover:text-rose-700 transition-colors">
                   {showCancelDebt ? '▲' : '▼'} {latinToCyrillic('Qarzni bekor qilish (kassaga tushmaydi)')}
                 </button>
@@ -1176,39 +1196,38 @@ export function Drivers() {
                   <div className="mt-3 space-y-3">
                     <div className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2.5">
                       <p className="text-xs text-rose-600">
-                        {latinToCyrillic("Haydovchi qarz mijozlarga o'tkaziladi. Kassaga pul tushmaydi.")}
+                        {latinToCyrillic("Tanlangan sotuvlar qarz mijozlarga o'tkaziladi. Kassaga pul tushmaydi.")}
                       </p>
                     </div>
 
-                    {/* To'liq / Qisman toggle */}
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCancelDebtMode('full')}
-                        className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-colors ${cancelDebtMode === 'full' ? 'bg-rose-600 text-white border-rose-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-                      >
-                        {latinToCyrillic("To'liq bekor")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCancelDebtMode('partial')}
-                        className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-colors ${cancelDebtMode === 'partial' ? 'bg-rose-600 text-white border-rose-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-                      >
-                        {latinToCyrillic("Qisman bekor")}
-                      </button>
-                    </div>
-
-                    {/* Qisman: summa inputi */}
-                    {cancelDebtMode === 'partial' && (
-                      <input
-                        type="number"
-                        min="1"
-                        max={paymentDriver?.debtToCompany || 0}
-                        placeholder={`Maks: ${Math.round(paymentDriver?.debtToCompany || 0).toLocaleString()} UZS`}
-                        value={cancelDebtAmount}
-                        onChange={e => setCancelDebtAmount(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-rose-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-300 focus:bg-white transition-all"
-                      />
+                    {/* Har bir mijoz / sotuv ro'yxati */}
+                    {pendingSalesList.length > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-600">{latinToCyrillic('Sotuvlarni tanlang')}</span>
+                          <button type="button" onClick={() =>
+                            setSelectedSaleIds(selectedSaleIds.length === pendingSalesList.length ? [] : pendingSalesList.map(s => s.id))
+                          } className="text-xs text-indigo-500 hover:text-indigo-700">
+                            {selectedSaleIds.length === pendingSalesList.length ? latinToCyrillic("Hammasini olib tashlash") : latinToCyrillic("Hammasini tanlash")}
+                          </button>
+                        </div>
+                        {pendingSalesList.map(sale => {
+                          const cName = sale.customer?.name || sale.manualCustomerName || latinToCyrillic('Noma\'lum');
+                          const amt = sale.driverCollectedAmount || 0;
+                          const checked = selectedSaleIds.includes(sale.id);
+                          return (
+                            <label key={sale.id} className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-colors ${checked ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
+                              <input type="checkbox" checked={checked}
+                                onChange={() => setSelectedSaleIds(prev => checked ? prev.filter(id => id !== sale.id) : [...prev, sale.id])}
+                                className="w-4 h-4 rounded text-rose-600 accent-rose-600" />
+                              <span className="flex-1 text-xs font-medium text-slate-700">{trData(cName)}</span>
+                              <span className="text-xs tabular-nums text-rose-600 font-semibold">
+                                {sale.currency === 'USD' ? `$${amt.toLocaleString('en', {minimumFractionDigits:2,maximumFractionDigits:2})}` : `${Math.round(amt).toLocaleString()} UZS`}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     )}
 
                     <input type="text" placeholder={latinToCyrillic('Sabab (ixtiyoriy)')}
@@ -1218,13 +1237,11 @@ export function Drivers() {
                     />
 
                     <button type="button" onClick={handleCancelDebt}
-                      disabled={cancelDebtLoading}
+                      disabled={cancelDebtLoading || selectedSaleIds.length === 0}
                       className="w-full py-2 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-60 bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200">
                       {cancelDebtLoading
                         ? latinToCyrillic('Yuklanmoqda...')
-                        : cancelDebtMode === 'full'
-                          ? latinToCyrillic("To'liq bekor — qarz mijozlarga o'tkazilsin")
-                          : latinToCyrillic("Qisman bekor — mijozlarga o'tkazilsin")
+                        : `${latinToCyrillic("Bekor qil")} (${selectedSaleIds.length} ${latinToCyrillic('ta sotuv')})`
                       }
                     </button>
                   </div>

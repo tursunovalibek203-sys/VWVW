@@ -75,6 +75,9 @@ router.get('/', withCache(20 * 1000), async (req: AuthRequest, res) => {
           user: {
             select: { id: true, name: true }
           },
+          driverId: true,
+          driverPaymentStatus: true,
+          driverCollectedAmount: true,
           driver: {
             select: { id: true, name: true }
           },

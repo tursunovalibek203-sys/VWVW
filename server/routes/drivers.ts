@@ -578,19 +578,26 @@ router.post('/:id/payment', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req
 });
 
 // ── Haydovchi qarzini bekor qilish → qarz avtomatik mijozlarga o'tkaziladi ────
+// saleIds = [] → barcha pending; saleIds = ['id1','id2'] → faqat tanlangan sotuvlar
 router.post('/:id/cancel-debt', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { note = '' } = req.body;
+    const { note = '', saleIds } = req.body;
     const userId = req.user?.id;
     const userName = req.user?.name || req.user?.login || 'Admin';
 
     const driver = await prisma.driver.findUnique({ where: { id } });
     if (!driver) return res.status(404).json({ error: 'Haydovchi topilmadi' });
 
-    // Haydovchining barcha PENDING sotuvlarini topamiz
+    // Agar saleIds berilgan bo'lsa — faqat shu sotuvlar, aks holda barcha PENDING
+    const saleFilter: any = { driverId: id, driverPaymentStatus: 'PENDING' };
+    if (Array.isArray(saleIds) && saleIds.length > 0) {
+      saleFilter.id = { in: saleIds };
+    }
+
+    // Haydovchining PENDING sotuvlarini topamiz
     const pendingSales = await prisma.sale.findMany({
-      where: { driverId: id, driverPaymentStatus: 'PENDING' },
+      where: saleFilter,
       select: {
         id: true, currency: true, driverCollectedAmount: true,
         customerId: true, manualCustomerName: true,
@@ -638,10 +645,12 @@ router.post('/:id/cancel-debt', authorize('ADMIN', 'MANAGER', 'CASHIER'), async 
         });
       }
 
-      // Haydovchi qarzini nolga tushiramiz
+      // Haydovchi qarzini kamaytirish (o'tkazilgan summalar bo'yicha)
       await tx.$executeRaw`
         UPDATE "Driver"
-        SET "debtToCompany" = 0, "debtToCompanyUSD" = 0, "updatedAt" = NOW()
+        SET "debtToCompany"    = GREATEST(0, "debtToCompany"    - ${transferredUZS}),
+            "debtToCompanyUSD" = GREATEST(0, "debtToCompanyUSD" - ${transferredUSD}),
+            "updatedAt" = NOW()
         WHERE "id" = ${id}
       `;
 
