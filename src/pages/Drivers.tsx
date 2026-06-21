@@ -98,6 +98,8 @@ export function Drivers() {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [showCancelDebt, setShowCancelDebt] = useState(false);
+  const [cancelDebtMode, setCancelDebtMode] = useState<'full' | 'partial'>('full');
+  const [cancelDebtAmount, setCancelDebtAmount] = useState('');
   const [cancelDebtNote, setCancelDebtNote] = useState('');
   const [cancelDebtLoading, setCancelDebtLoading] = useState(false);
 
@@ -310,9 +312,13 @@ export function Drivers() {
     if (!paymentDriver) return;
     setCancelDebtLoading(true);
     try {
-      const result = await api.post(`/drivers/${paymentDriver.id}/cancel-debt`, {
-        note: cancelDebtNote,
-      });
+      const body: any = { note: cancelDebtNote };
+      if (cancelDebtMode === 'partial') {
+        const amt = parseFloat(cancelDebtAmount);
+        if (!amt || amt <= 0) { addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic("Summa kiriting"))); setCancelDebtLoading(false); return; }
+        body.amount = amt;
+      }
+      const result = await api.post(`/drivers/${paymentDriver.id}/cancel-debt`, body);
       setShowPaymentModal(false);
       fetchDrivers();
       const data = result.data;
@@ -1169,24 +1175,56 @@ export function Drivers() {
                 {showCancelDebt && (
                   <div className="mt-3 space-y-3">
                     <div className="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2.5">
-                      <p className="text-xs font-semibold text-rose-700">
-                        {latinToCyrillic('Diqqat!')}
-                      </p>
-                      <p className="text-xs text-rose-600 mt-0.5">
-                        {latinToCyrillic("Haydovchining barcha kutayotgan sotuvlari avtomatik ravishda mijozlarga o'tkaziladi. Kassaga pul tushmaydi.")}
+                      <p className="text-xs text-rose-600">
+                        {latinToCyrillic("Haydovchi qarz mijozlarga o'tkaziladi. Kassaga pul tushmaydi.")}
                       </p>
                     </div>
+
+                    {/* To'liq / Qisman toggle */}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCancelDebtMode('full')}
+                        className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-colors ${cancelDebtMode === 'full' ? 'bg-rose-600 text-white border-rose-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        {latinToCyrillic("To'liq bekor")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCancelDebtMode('partial')}
+                        className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-colors ${cancelDebtMode === 'partial' ? 'bg-rose-600 text-white border-rose-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        {latinToCyrillic("Qisman bekor")}
+                      </button>
+                    </div>
+
+                    {/* Qisman: summa inputi */}
+                    {cancelDebtMode === 'partial' && (
+                      <input
+                        type="number"
+                        min="1"
+                        max={paymentDriver?.debtToCompany || 0}
+                        placeholder={`Maks: ${Math.round(paymentDriver?.debtToCompany || 0).toLocaleString()} UZS`}
+                        value={cancelDebtAmount}
+                        onChange={e => setCancelDebtAmount(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-rose-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-300 focus:bg-white transition-all"
+                      />
+                    )}
+
                     <input type="text" placeholder={latinToCyrillic('Sabab (ixtiyoriy)')}
                       value={cancelDebtNote}
                       onChange={e => setCancelDebtNote(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-rose-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-300 focus:bg-white transition-all"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-300 focus:bg-white transition-all"
                     />
+
                     <button type="button" onClick={handleCancelDebt}
                       disabled={cancelDebtLoading}
                       className="w-full py-2 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-60 bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200">
                       {cancelDebtLoading
                         ? latinToCyrillic('Yuklanmoqda...')
-                        : latinToCyrillic("Bekor qil — qarz mijozlarga o'tkazilsin")
+                        : cancelDebtMode === 'full'
+                          ? latinToCyrillic("To'liq bekor — qarz mijozlarga o'tkazilsin")
+                          : latinToCyrillic("Qisman bekor — mijozlarga o'tkazilsin")
                       }
                     </button>
                   </div>
