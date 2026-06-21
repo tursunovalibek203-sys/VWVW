@@ -61,6 +61,7 @@ export default function SalesModern() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [todayExpenses, setTodayExpenses] = useState(0);
+  const [loadError, setLoadError] = useState<'timeout' | 'error' | null>(null);
   // UI-only: detail modal (replaces console.log())
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
@@ -70,8 +71,9 @@ export default function SalesModern() {
 
   const loadSales = async (pageNum = 1) => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const response = await api.get(`/sales?limit=${pageSize}&page=${pageNum}`, { timeout: 60000 });
+      const response = await api.get(`/sales?limit=${pageSize}&page=${pageNum}`);
       // Handle standardized API response format
       const { data: salesData, pagination } = extractPaginatedData<any>(
         response,
@@ -109,9 +111,9 @@ export default function SalesModern() {
         // expenses kelmasa 0 qoladi
       }
 
-    } catch (error) {
-      console.error('Sotuvlarni yuklashda xatolik:', error);
-      addToast(toast.error(latinToCyrillic('Xatolik'), latinToCyrillic('Sotuvlarni yuklashda xatolik yuz berdi')));
+    } catch (error: any) {
+      const isTimeout = error?.code === 'ECONNABORTED' || error?.message?.includes('timeout');
+      setLoadError(isTimeout ? 'timeout' : 'error');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -518,8 +520,39 @@ export default function SalesModern() {
           </div>
         )}
 
+        {/* Cold start / timeout error */}
+        {!loading && loadError && (
+          <div className="bg-white rounded-2xl border border-amber-200 p-8 text-center space-y-4">
+            {loadError === 'timeout' ? (
+              <>
+                <div className="w-12 h-12 mx-auto bg-amber-50 rounded-full flex items-center justify-center">
+                  <RefreshCw className="w-6 h-6 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-slate-800">{latinToCyrillic('Server uyg\'onmoqda...')}</p>
+                  <p className="mt-1 text-sm text-slate-500">{latinToCyrillic('Server bir necha daqiqa ishlamagan edi. Qayta yuklash bosing.')}</p>
+                </div>
+                <button
+                  onClick={() => loadSales(page)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  {latinToCyrillic('Qayta yuklash')}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-slate-500">{latinToCyrillic('Sotuvlarni yuklashda xatolik yuz berdi')}</p>
+                <button onClick={() => loadSales(page)} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-sm font-semibold">
+                  {latinToCyrillic('Qayta urinish')}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Empty state */}
-        {!loading && filteredSales.length === 0 && (
+        {!loading && !loadError && filteredSales.length === 0 && (
           <div className="bg-white rounded-2xl border border-slate-200/70">
             <EmptyState
               icon={ShoppingCart}

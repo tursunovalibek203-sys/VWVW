@@ -438,9 +438,9 @@ class ProfessionalApi {
 // Production: always use Vercel proxy (/api → Render), never call Render directly from browser
 // Dev: use VITE_API_BASE_URL or localhost fallback
 export const api = new ProfessionalApi({
-  timeout: 60000,   // 60s — Neon cold start uchun yetarli
-  retryAttempts: 3, // 3 marta qayta urinish
-  retryDelay: 1500, // 1.5s asosiy kechikish (exponential: 1.5s → 3s → 6s)
+  timeout: 90000,   // 90s — Render cold start uyg'onishi uchun (30-60s davom etadi)
+  retryAttempts: 3,
+  retryDelay: 2000, // 2s, 4s, 8s
 });
 
 // Default export
