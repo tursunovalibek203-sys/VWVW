@@ -486,13 +486,12 @@ router.post('/:id/payment', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req
 
     const desc = `Haydovchi to'lovi: ${driver.name}${notes ? ' (' + notes + ')' : ''}`;
 
-    // Atomik: driver qarz kamaytirish + kassaga kirim — barchasi bitta transaksiyada
+    // Atomik: driver qarz kamaytirish + kassaga kirim + sotuvlarni PAID belgilash
     await prisma.$transaction(async (tx) => {
-      // USD qarzni kamaytirish
+      // USD qarz: faqat USD to'lov bilan kamayadi
       const newDebtUSD = Math.max(0, (driver.debtToCompanyUSD || 0) - usd);
-      // UZS qarzni kamaytirish (USD to'lovi ham UZS ekvivalentida)
-      const uzsEquivalent = (usd * rate) + uzs + karta;
-      const newDebtUZS = Math.max(0, (driver.debtToCompany || 0) - uzsEquivalent);
+      // UZS qarz: faqat UZS + Karta to'lov bilan kamayadi (USD ekvivalenti EMAS)
+      const newDebtUZS = Math.max(0, (driver.debtToCompany || 0) - (uzs + karta));
 
       await tx.$executeRaw`
         UPDATE "Driver"
@@ -501,6 +500,48 @@ router.post('/:id/payment', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req
             "updatedAt"        = NOW()
         WHERE "id" = ${id}
       `;
+
+      // USD sotuvlarni DELIVERED + PAID belgilash (FIFO)
+      if (usd > 0) {
+        const usdSales = await tx.sale.findMany({
+          where: { driverId: id, driverPaymentStatus: 'PENDING', currency: 'USD' },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, driverCollectedAmount: true },
+        });
+        let remaining = usd;
+        for (const sale of usdSales) {
+          if (remaining <= 0) break;
+          const saleAmt = (sale.driverCollectedAmount as any) || 0;
+          if (saleAmt <= remaining) {
+            await tx.sale.update({
+              where: { id: sale.id },
+              data: { driverPaymentStatus: 'DELIVERED', paymentStatus: 'PAID' },
+            });
+            remaining -= saleAmt;
+          }
+        }
+      }
+
+      // UZS sotuvlarni DELIVERED + PAID belgilash (FIFO)
+      if (uzs + karta > 0) {
+        const uzsSales = await tx.sale.findMany({
+          where: { driverId: id, driverPaymentStatus: 'PENDING', currency: 'UZS' },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, driverCollectedAmount: true },
+        });
+        let remaining = uzs + karta;
+        for (const sale of uzsSales) {
+          if (remaining <= 0) break;
+          const saleAmt = (sale.driverCollectedAmount as any) || 0;
+          if (saleAmt <= remaining) {
+            await tx.sale.update({
+              where: { id: sale.id },
+              data: { driverPaymentStatus: 'DELIVERED', paymentStatus: 'PAID' },
+            });
+            remaining -= saleAmt;
+          }
+        }
+      }
 
       // Kassaga kirim — har valyuta alohida
       if (usd > 0) {
@@ -527,7 +568,7 @@ router.post('/:id/payment', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req
       success: true,
       driverName: driver.name,
       paid: { usd, uzs, karta },
-      remainingDebtUZS: Math.max(0, (driver.debtToCompany || 0) - ((usd * rate) + uzs + karta)),
+      remainingDebtUZS: Math.max(0, (driver.debtToCompany || 0) - (uzs + karta)),
       remainingDebtUSD: Math.max(0, (driver.debtToCompanyUSD || 0) - usd),
     });
   } catch (error: any) {
@@ -536,50 +577,94 @@ router.post('/:id/payment', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req
   }
 });
 
-// ── Haydovchi qarzini bekor qilish (kassaga pul tushmaydi) ────────────────
-// amount = undefined → to'liq bekor; amount > 0 → qisman bekor
-// customerId = optional → o'sha mijozning debtUZS iga qo'shiladi
+// ── Haydovchi qarzini bekor qilish → qarz avtomatik mijozlarga o'tkaziladi ────
 router.post('/:id/cancel-debt', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { note = '', amount, customerId } = req.body;
+    const { note = '' } = req.body;
     const userId = req.user?.id;
     const userName = req.user?.name || req.user?.login || 'Admin';
 
     const driver = await prisma.driver.findUnique({ where: { id } });
     if (!driver) return res.status(404).json({ error: 'Haydovchi topilmadi' });
 
-    const currentDebt = driver.debtToCompany || 0;
-    const partialAmount = amount !== undefined ? parseFloat(amount) || 0 : 0;
-    const cancelledAmount = partialAmount > 0 ? Math.min(partialAmount, currentDebt) : currentDebt;
-    const newDebt = Math.max(0, currentDebt - cancelledAmount);
+    // Haydovchining barcha PENDING sotuvlarini topamiz
+    const pendingSales = await prisma.sale.findMany({
+      where: { driverId: id, driverPaymentStatus: 'PENDING' },
+      select: {
+        id: true, currency: true, driverCollectedAmount: true,
+        customerId: true, manualCustomerName: true,
+        customer: { select: { id: true, name: true } },
+      },
+    });
 
-    await (prisma.driver as any).update({ where: { id }, data: { debtToCompany: newDebt } });
+    let transferredUZS = 0;
+    let transferredUSD = 0;
+    const affectedCustomers: string[] = [];
 
-    // Agar mijoz tanlangan bo'lsa — uning debtUZS ini oshiramiz
-    let customerName: string | null = null;
-    if (customerId) {
-      const customer = await prisma.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true } });
-      if (customer) {
-        await prisma.customer.update({
-          where: { id: customerId },
-          data: { debtUZS: { increment: cancelledAmount } },
+    await prisma.$transaction(async (tx) => {
+      for (const sale of pendingSales) {
+        const amt = (sale.driverCollectedAmount as any) || 0;
+        if (amt <= 0) continue;
+
+        if (sale.currency === 'USD') {
+          // USD qarzni mijozga o'tkazamiz
+          if (sale.customerId) {
+            await tx.customer.update({
+              where: { id: sale.customerId },
+              data: { debtUSD: { increment: amt } },
+            });
+            if (sale.customer?.name && !affectedCustomers.includes(sale.customer.name))
+              affectedCustomers.push(sale.customer.name);
+          }
+          transferredUSD += amt;
+        } else {
+          // UZS qarzni mijozga o'tkazamiz
+          if (sale.customerId) {
+            await tx.customer.update({
+              where: { id: sale.customerId },
+              data: { debtUZS: { increment: Math.round(amt) } },
+            });
+            if (sale.customer?.name && !affectedCustomers.includes(sale.customer.name))
+              affectedCustomers.push(sale.customer.name);
+          }
+          transferredUZS += amt;
+        }
+
+        // Sotuvni haydovchidan ajratamiz: UNPAID + CANCELLED status
+        await tx.sale.update({
+          where: { id: sale.id },
+          data: { driverPaymentStatus: 'CANCELLED', paymentStatus: 'UNPAID' },
         });
-        customerName = customer.name;
       }
-    }
 
-    const isPartial = newDebt > 0;
-    const customerNote = customerName ? ` → ${customerName} ga o'tkazildi` : '';
-    const desc = `Haydovchi qarzi ${isPartial ? "qisman" : "to'liq"} bekor: ${driver.name} — ${Math.round(cancelledAmount).toLocaleString()} UZS${customerNote}${note ? ' (' + note + ')' : ''}`;
+      // Haydovchi qarzini nolga tushiramiz
+      await tx.$executeRaw`
+        UPDATE "Driver"
+        SET "debtToCompany" = 0, "debtToCompanyUSD" = 0, "updatedAt" = NOW()
+        WHERE "id" = ${id}
+      `;
 
-    await prisma.cashboxTransaction.create({ data: {
-      type: 'EXPENSE', amount: 0.01, currency: 'UZS', category: 'ADJUSTMENT',
-      paymentMethod: 'CASH', description: desc,
-      userId: userId || '', userName, reference: id,
-    }});
+      const customerNote = affectedCustomers.length > 0
+        ? ` → ${affectedCustomers.join(', ')} ga o'tkazildi`
+        : '';
+      const desc = `Haydovchi qarzi bekor qilindi: ${driver.name}${customerNote}${note ? ' (' + note + ')' : ''}`;
 
-    res.json({ success: true, cancelledAmount, remainingDebt: newDebt, driverName: driver.name, customerName });
+      await tx.cashboxTransaction.create({ data: {
+        type: 'EXPENSE', amount: 0.01, currency: 'UZS', category: 'ADJUSTMENT',
+        paymentMethod: 'CASH', description: desc,
+        userId: userId || '', userName, reference: id,
+      }});
+    });
+
+    res.json({
+      success: true,
+      driverName: driver.name,
+      transferredUZS,
+      transferredUSD,
+      affectedCustomers,
+      affectedSales: pendingSales.length,
+    });
   } catch (error: any) {
     console.error('Driver cancel-debt error:', error);
     res.status(500).json({ error: 'Qarzni bekor qilishda xatolik: ' + error.message });
@@ -606,6 +691,28 @@ router.get('/:id/debt-summary', async (req, res) => {
     res.json({ driver, pendingSales });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ── DB migration: debtToCompany dan USD ekvivalentini tozalash ───────────────
+// Bu endpoint bir marta chaqiriladi: POST /api/drivers/migrate/fix-debt
+router.post('/migrate/fix-debt', authorize('ADMIN'), async (req: AuthRequest, res) => {
+  try {
+    const { exchangeRate = 12700 } = req.body;
+    const rate = parseFloat(exchangeRate) || 12700;
+
+    // Barcha driverlarning debtToCompany dan debtToCompanyUSD*rate ni ayiramiz
+    const result = await prisma.$executeRaw`
+      UPDATE "Driver"
+      SET "debtToCompany" = GREATEST(0, "debtToCompany" - ("debtToCompanyUSD" * ${rate})),
+          "updatedAt" = NOW()
+      WHERE "debtToCompanyUSD" > 0
+        AND "debtToCompany" > 0
+    `;
+
+    res.json({ success: true, updatedDrivers: result, rate });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Migration xatolik: ' + error.message });
   }
 });
 

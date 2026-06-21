@@ -18,6 +18,7 @@ import {
   Banknote,
   Smartphone,
   Printer,
+  Truck,
 } from 'lucide-react';
 import { printReceipt, prepareSaleReceipt } from '../lib/receiptPrinter';
 import { latinToCyrillic, trData } from '../lib/transliterator';
@@ -37,10 +38,12 @@ interface Sale {
   totalAmount: number;
   paidAmount: number;
   paymentType: string;
-  status: 'completed' | 'pending' | 'cancelled';
+  status: 'completed' | 'pending' | 'cancelled' | string;
   items: number;
   cashier: string;
   currency: 'UZS' | 'USD';
+  driverId?: string;
+  driverPaymentStatus?: string;
 }
 
 export default function SalesModern() {
@@ -92,6 +95,8 @@ export default function SalesModern() {
         items: s.itemCount || s.items?.length || 0,
         cashier: trData(s.user?.name || s.cashier?.name || s.cashierName || 'Admin'),
         currency: (s.currency === 'USD' ? 'USD' : 'UZS') as 'UZS' | 'USD',
+        driverId: s.driverId || null,
+        driverPaymentStatus: s.driverPaymentStatus || null,
       }));
 
       setSales(mappedSales);
@@ -626,9 +631,23 @@ export default function SalesModern() {
                         </span>
                       </td>
                       <td className="px-5 py-4">
-                        <Badge variant={getStatusVariant(sale.status)}>
-                          {getStatusText(sale.status)}
-                        </Badge>
+                        <div className="flex flex-col gap-1">
+                          <Badge variant={getStatusVariant(sale.status)}>
+                            {getStatusText(sale.status)}
+                          </Badge>
+                          {sale.driverId && sale.driverPaymentStatus === 'PENDING' && (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                              <Truck className="w-3 h-3" />
+                              {latinToCyrillic('Haydovchida')}
+                            </span>
+                          )}
+                          {sale.driverId && sale.driverPaymentStatus === 'DELIVERED' && (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                              <Truck className="w-3 h-3" />
+                              {latinToCyrillic("Haydovchi to'ladi")}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-4">
                         <span className="text-sm text-slate-600">{sale.cashier}</span>
@@ -696,9 +715,23 @@ export default function SalesModern() {
                       </p>
                     </div>
                   </div>
-                  <Badge variant={getStatusVariant(sale.status)}>
-                    {getStatusText(sale.status)}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge variant={getStatusVariant(sale.status)}>
+                      {getStatusText(sale.status)}
+                    </Badge>
+                    {sale.driverId && sale.driverPaymentStatus === 'PENDING' && (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                        <Truck className="w-3 h-3" />
+                        {latinToCyrillic('Haydovchida')}
+                      </span>
+                    )}
+                    {sale.driverId && sale.driverPaymentStatus === 'DELIVERED' && (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                        <Truck className="w-3 h-3" />
+                        {latinToCyrillic("Haydovchi to'ladi")}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-3 flex items-center justify-between">

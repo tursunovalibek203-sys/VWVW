@@ -412,7 +412,6 @@ export class SalesService {
             await tx.$executeRaw`
               UPDATE "Driver"
               SET "debtToCompanyUSD" = "debtToCompanyUSD" + ${actualDriverCollected},
-                  "debtToCompany"    = "debtToCompany" + ${actualDriverCollected * exchangeRate},
                   "updatedAt" = NOW()
               WHERE "id" = ${driverId}
             `;
