@@ -2,6 +2,12 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 
+// Vercel proxy /telegram-web/ → Render ni bypass qilamiz
+// To'g'ridan-to'g'ri Render URL ishlatamiz (server X-Frame-Options ni olib tashlagan)
+const TELEGRAM_URL = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+  ? 'https://luxpetplast-api.onrender.com/telegram-web/'
+  : 'http://localhost:5003/telegram-web/';
+
 export default function CashierChat() {
   const navigate = useNavigate();
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -11,7 +17,7 @@ export default function CashierChat() {
   const handleReload = () => {
     setError(false);
     setLoading(true);
-    if (iframeRef.current) iframeRef.current.src = '/telegram-web/';
+    if (iframeRef.current) iframeRef.current.src = TELEGRAM_URL;
   };
 
   return (
@@ -41,6 +47,7 @@ export default function CashierChat() {
         <div className="absolute inset-0 top-11 flex flex-col items-center justify-center bg-[#17212b] z-10">
           <Loader2 className="w-8 h-8 text-[#5288c1] animate-spin mb-3" />
           <p className="text-[#aab8c2] text-sm">Telegram yuklanmoqda...</p>
+          <p className="text-[#6c8fa8] text-xs mt-1">Server uyg'onayotgan bo'lishi mumkin (30s)</p>
         </div>
       )}
 
@@ -57,10 +64,10 @@ export default function CashierChat() {
         </div>
       )}
 
-      {/* Telegram Web Z iframe — to'liq ekran */}
+      {/* Telegram Web Z iframe — to'liq ekran, to'g'ridan-to'g'ri Render'dan */}
       <iframe
         ref={iframeRef}
-        src="/telegram-web/"
+        src={TELEGRAM_URL}
         title="Telegram"
         className="flex-1 w-full border-none"
         allow="camera; microphone; geolocation; clipboard-read; clipboard-write; fullscreen"
