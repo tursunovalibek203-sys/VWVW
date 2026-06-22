@@ -544,19 +544,24 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
         customerId: form.customerId || null,
         customerName: form.customerName || form.manualCustomerName,
         customerPhone: form.manualCustomerPhone,
-        items: form.items.map((item) => ({
-          productId: item.productId,
-          productName: item.productName,
-          quantity: typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity || '0'),
-          pricePerBag: item.pricePerBag,
-          pricePerPiece: item.pricePerPiece,
-          unitsPerBag: item.unitsPerBag,
-          subtotal: item.subtotal,
-          warehouse: item.warehouse,
-          saleType: item.saleType,
-          isDebtPayment: item.isDebtPayment,
-          productDebtId: item.productDebtId,
-        })),
+        items: form.items
+          .filter((item) => {
+            const qty = typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity || '0');
+            return qty > 0;
+          })
+          .map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            quantity: typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity || '0'),
+            pricePerBag: item.pricePerBag,
+            pricePerPiece: item.pricePerPiece,
+            unitsPerBag: item.unitsPerBag,
+            subtotal: item.subtotal,
+            warehouse: item.warehouse,
+            saleType: item.saleType,
+            isDebtPayment: item.isDebtPayment,
+            productDebtId: item.productDebtId,
+          })),
         komplektDebts: komplektDebts.length > 0 ? komplektDebts : undefined,
         debtPayments: debtPayments.length > 0 ? debtPayments : undefined,
         paymentDetails: {
