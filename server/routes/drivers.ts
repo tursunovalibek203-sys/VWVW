@@ -692,9 +692,12 @@ router.get('/:id/debt-summary', async (req, res) => {
     if (!driver) return res.status(404).json({ error: 'Haydovchi topilmadi' });
 
     const pendingSales = await prisma.sale.findMany({
-      where: { driverId: id, driverPaymentStatus: 'COLLECTED' },
-      select: { id: true, createdAt: true, driverCollectedAmount: true, currency: true,
-        customer: { select: { name: true } }, manualCustomerName: true },
+      where: { driverId: id, driverPaymentStatus: 'PENDING' },
+      select: {
+        id: true, createdAt: true, driverCollectedAmount: true, currency: true,
+        customerId: true, manualCustomerName: true,
+        customer: { select: { id: true, name: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
