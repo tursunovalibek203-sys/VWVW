@@ -1,6 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { prisma } from '../utils/prisma';
 import { generateDailyExcelBackup } from '../utils/daily-excel-backup';
+import { TelegramUserService } from '../services/TelegramUserService';
 
 let adminBot: TelegramBot | null = null;
 
@@ -30,6 +31,9 @@ function startDailyScheduler() {
       console.log(`⏰ Kunlik hisobot yuborilmoqda (UZT ${h}:${String(m).padStart(2,'0')})…`);
       try { await sendExcelBackupToAdmins('🕖 Kunlik avtomatik hisobot (19:00 UZT)'); }
       catch (err) { console.error('❌ Kunlik hisobot xatolik:', err); }
+      // Guruh "📊 Hisobotlar" topiciga ham yuborish
+      try { await sendExcelToGroupTopic(date); }
+      catch (err) { console.error('❌ Guruh hisobot xatolik:', err); }
     }
   }, 60_000);   // har 60 soniyada
 
@@ -57,6 +61,27 @@ export async function sendExcelBackupToAdmins(caption = '📊 Kunlik hisobot') {
       console.error(`❌ ${chatId} ga yuborishda xatolik:`, err.message);
     }
   }
+}
+
+/** Guruhning "📊 Hisobotlar" topiciga Excel yuborish */
+export async function sendExcelToGroupTopic(dateStr?: string): Promise<void> {
+  const [groupId, topicId] = await Promise.all([
+    TelegramUserService.getForumGroupId(),
+    TelegramUserService.getHisobotTopicId(),
+  ]);
+  if (!groupId || !topicId) { console.log('ℹ️ Guruh hisobot topic sozlanmagan — o\'tkazib yuborildi'); return; }
+  if (!adminBot) { console.warn('⚠️ Admin bot tayyor emas'); return; }
+
+  const { buffer, filename } = await generateDailyExcelBackup();
+  const d = dateStr || new Date().toISOString().slice(0, 10);
+  const caption = `📊 Kunlik hisobot — ${d} (19:00 UZT)\n_LuxPetPlast ERP tomonidan avtomatik yuborildi_`;
+
+  await adminBot.sendDocument(
+    groupId, buffer,
+    { caption, parse_mode: 'Markdown', message_thread_id: topicId } as any,
+    { filename, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+  );
+  console.log(`✅ Guruh hisobot topic (${topicId}) ga yuborildi`);
 }
 
 export async function sendBufferToAdmins(buffer: Buffer, filename: string, caption = '📊 Hisobot') {

@@ -28,6 +28,7 @@ import {
   CheckCircle,
   XCircle,
   Wallet,
+  BarChart,
   type LucideIcon
 } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
@@ -114,6 +115,8 @@ export default function Settings() {
   const [bulkResult, setBulkResult] = useState<{ created: number; failed: number; total: number; message: string } | null>(null);
   const [kassaTopicId, setKassaTopicId] = useState<number | null>(null);
   const [kassaCreating, setKassaCreating] = useState(false);
+  const [hisobotTopicId, setHisobotTopicId] = useState<number | null>(null);
+  const [hisobotCreating, setHisobotCreating] = useState(false);
   const [settings, setSettings] = useState({
     // Valyuta kurslari
     USD_TO_UZS_RATE: '12500',
@@ -213,15 +216,17 @@ export default function Settings() {
 
   const loadForumConfig = async () => {
     try {
-      const [forumRes, tgRes, kassaRes] = await Promise.all([
+      const [forumRes, tgRes, kassaRes, hisobotRes] = await Promise.all([
         api.get('/telegram-user/forum-config'),
         api.get('/telegram-user/status'),
         api.get('/telegram-user/kassa-status').catch(() => ({ data: { topicId: null } })),
+        api.get('/telegram-user/hisobot-status').catch(() => ({ data: { topicId: null } })),
       ]);
       setForumGroupId(forumRes.data.groupId || '');
       setForumStatus(forumRes.data.configured ? 'linked' : 'none');
       setTgLinked(tgRes.data.linked);
       setKassaTopicId(kassaRes.data.topicId || null);
+      setHisobotTopicId(hisobotRes.data.topicId || null);
     } catch {
       setForumStatus('none');
     }
@@ -253,6 +258,19 @@ export default function Settings() {
       addToast({ type: 'error', title: t('Xatolik'), message: msg });
     } finally {
       setBulkRunning(false);
+    }
+  };
+
+  const handleSetupHisobotTopic = async () => {
+    setHisobotCreating(true);
+    try {
+      const { data } = await api.post('/telegram-user/setup-hisobot-topic');
+      setHisobotTopicId(data.topicId);
+      addToast({ type: 'success', title: t('Tayyor'), message: t('Hisobotlar topici yaratildi') });
+    } catch (e: any) {
+      addToast({ type: 'error', title: t('Xatolik'), message: e.response?.data?.error || e.message });
+    } finally {
+      setHisobotCreating(false);
     }
   };
 
@@ -681,6 +699,44 @@ export default function Settings() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          </SettingGroup>
+
+          {/* Hisobotlar topici */}
+          <SettingGroup
+            icon={BarChart}
+            iconTint="bg-indigo-50 text-indigo-600"
+            title={t('Hisobotlar Topici')}
+            description={t('Har kuni soat 19:00 da kunlik Excel hisobot shu topicga avtomatik yuboriladi')}
+          >
+            <div className="space-y-4">
+              <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium ${
+                hisobotTopicId
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-slate-50 text-slate-500 border border-slate-200'
+              }`}>
+                {hisobotTopicId
+                  ? <><CheckCircle className="w-4 h-4 flex-shrink-0" />{t('Hisobotlar topici ulangan')} (topic ID: {hisobotTopicId})</>
+                  : <><XCircle className="w-4 h-4 flex-shrink-0" />{t('Hisobotlar topici yaratilmagan')}</>
+                }
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">{t('📊 Hisobotlar topicini yaratish')}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{t('Guruhda "📊 Hisobotlar" topic yaratiladi. Har kuni 19:00 da Excel fayl yuboriladi.')}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSetupHisobotTopic}
+                  disabled={!tgLinked || forumStatus !== 'linked' || hisobotCreating}
+                  className="shrink-0 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-colors flex items-center gap-2"
+                >
+                  {hisobotCreating
+                    ? <><RefreshCw className="w-4 h-4 animate-spin" />{t('Yaratilmoqda...')}</>
+                    : <><CheckCircle className="w-4 h-4" />{hisobotTopicId ? t('Qayta yaratish') : t('Yaratish')}</>
+                  }
+                </button>
               </div>
             </div>
           </SettingGroup>
