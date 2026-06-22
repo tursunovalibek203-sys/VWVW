@@ -34,12 +34,15 @@ function getKomplektAdditions(
   const gram = parseInt(gramMatch[1]);
 
   let toAdd: { size: number; type: 'krishka' | 'ruchka' }[] = [];
-  if ([52, 70].includes(gram)) {
+  if ([15, 21, 26, 30].includes(gram)) {
+    toAdd = [{ size: 28, type: 'krishka' }];
+  } else if ([36].includes(gram)) {
+    toAdd = [{ size: 28, type: 'krishka' }, { size: 28, type: 'ruchka' }];
+  } else if ([52, 70].includes(gram)) {
     toAdd = [{ size: 38, type: 'krishka' }, { size: 38, type: 'ruchka' }];
   } else if ([75, 80, 85, 86, 135].includes(gram)) {
     toAdd = [{ size: 48, type: 'krishka' }, { size: 48, type: 'ruchka' }];
   }
-  // 15гр, 21гр, 26гр, 30гр, 36gr va boshqalar: avtomatik qo'shilmaydi
 
   // Preform qancha dona beradi
   const preformUnitsPerBag = product.unitsPerBag || 1;
