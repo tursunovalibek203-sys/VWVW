@@ -313,26 +313,6 @@ export function GroupedCartItem({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {/* Tuliq / Soniga toggle */}
-          <div className="flex rounded-lg overflow-hidden border border-slate-300 mr-1">
-            <button
-              type="button"
-              onClick={() => !isFullMode && handleToggleMode()}
-              title={latinToCyrillic("To'liq komplekt narxi — yetishmagan mahsulot qarz bo'ladi")}
-              className={`px-2.5 py-1 text-[11px] font-bold transition-all ${isFullMode ? 'bg-amber-500 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
-            >
-              {latinToCyrillic('Tuliq')}
-            </button>
-            <button
-              type="button"
-              onClick={() => isFullMode && handleToggleMode()}
-              title={latinToCyrillic("Haqiqiy miqdorga qarab narx hisoblanadi")}
-              className={`px-2.5 py-1 text-[11px] font-bold transition-all border-l border-slate-300 ${!isFullMode ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
-            >
-              {latinToCyrillic('Soniga')}
-            </button>
-          </div>
-
           {/* Qop / Dona toggle */}
           <div className="flex rounded-lg overflow-hidden border border-blue-300 mr-1">
             <button
@@ -494,18 +474,29 @@ export function GroupedCartItem({
         </div>
       )}
 
-      {/* Footer — jami */}
+      {/* Footer — jami + Tuliq/Soniga toggle */}
       <div className={`flex items-center justify-between px-3 py-1.5 border-t ${hasDebt ? 'bg-amber-100/70 border-amber-200' : 'bg-blue-100/70 border-blue-200'}`}>
         <div className="flex items-center gap-2">
-          <span className={`text-xs font-medium ${hasDebt ? 'text-amber-700' : 'text-blue-600'}`}>
-            {isFullMode ? latinToCyrillic('Komplekt jami (to\'liq)') : latinToCyrillic('Komplekt jami')}
-            {!isBagMode && <span className="ml-1 text-emerald-600">({latinToCyrillic('dona narxida')})</span>}
-          </span>
-          {isFullMode && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500 text-white font-bold">
-              {latinToCyrillic('TULIQ')}
-            </span>
-          )}
+          {/* Tuliq / Soniga toggle */}
+          <div className="flex rounded-lg overflow-hidden border border-slate-300">
+            <button
+              type="button"
+              onClick={() => !isFullMode && handleToggleMode()}
+              title={latinToCyrillic("To'liq komplekt narxi — yetishmagan mahsulot qarz bo'ladi")}
+              className={`px-2.5 py-1 text-[11px] font-bold transition-all ${isFullMode ? 'bg-amber-500 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+            >
+              {latinToCyrillic('Tuliq')}
+            </button>
+            <button
+              type="button"
+              onClick={() => isFullMode && handleToggleMode()}
+              title={latinToCyrillic("Haqiqiy miqdorga qarab narx hisoblanadi")}
+              className={`px-2.5 py-1 text-[11px] font-bold transition-all border-l border-slate-300 ${!isFullMode ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+            >
+              {latinToCyrillic('Soniga')}
+            </button>
+          </div>
+          {!isBagMode && <span className="text-[10px] text-emerald-600 font-medium">({latinToCyrillic('dona narxida')})</span>}
         </div>
         <span className={`text-sm font-bold tabular-nums ${hasDebt ? 'text-amber-800' : 'text-blue-800'}`}>
           {sym}{groupTotal.toLocaleString()}
