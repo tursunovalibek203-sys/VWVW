@@ -63,8 +63,11 @@ export default function SalesModern() {
   const [pageSize, setPageSize] = useState(50);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [todayExpenses, setTodayExpenses] = useState(0);
+  const [statExpenses, setStatExpenses] = useState(0);
   const [loadError, setLoadError] = useState<'timeout' | 'error' | null>(null);
+  // Stat kartalar uchun period tanlash
+  const [statPeriod, setStatPeriod] = useState<'today' | 'week' | 'month' | 'date'>('today');
+  const [statDate, setStatDate] = useState(() => new Date().toISOString().slice(0, 10));
   // UI-only: detail modal (replaces console.log())
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
@@ -103,20 +106,7 @@ export default function SalesModern() {
       setTotalPages(pagination?.totalPages || 1);
       setTotal(pagination?.total || 0);
 
-      // Bugungi xarajatlarni yuklash
-      try {
-        const today = new Date();
-        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59).toISOString();
-        const expRes = await api.get(`/expenses?startDate=${startOfDay}&endDate=${endOfDay}&limit=1000`);
-        const expData = expRes.data?.data || expRes.data?.expenses || expRes.data || [];
-        const arr = Array.isArray(expData) ? expData : [];
-        setTodayExpenses(arr.reduce((s: number, e: any) => s + (e.amount || 0), 0));
-      } catch {
-        // expenses kelmasa 0 qoladi
-      }
-
-    } catch (error: any) {
+} catch (error: any) {
       const isTimeout = error?.code === 'ECONNABORTED' || error?.message?.includes('timeout');
       setLoadError(isTimeout ? 'timeout' : 'error');
     } finally {
@@ -292,24 +282,50 @@ export default function SalesModern() {
     return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
   };
 
-  const isToday = (dateStr: string) =>
-    new Date(dateStr).toDateString() === new Date().toDateString();
+  // Period date range helper
+  const getStatRange = () => {
+    const now = new Date();
+    const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+    const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (statPeriod === 'today') return { start: startOfDay(now), end: endOfDay(now) };
+    if (statPeriod === 'week') { const s = new Date(now); s.setDate(now.getDate() - 6); return { start: startOfDay(s), end: endOfDay(now) }; }
+    if (statPeriod === 'month') return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: endOfDay(now) };
+    // 'date'
+    const d = new Date(statDate);
+    return { start: startOfDay(d), end: endOfDay(d) };
+  };
 
-  const todaySales = sales.filter(s => isToday(s.date));
+  const periodSales = useMemo(() => {
+    const { start, end } = getStatRange();
+    return sales.filter(s => { const d = new Date(s.date); return d >= start && d <= end; });
+  }, [sales, statPeriod, statDate]);
 
-  const todayTotalUZS = todaySales.filter(s => s.currency === 'UZS').reduce((sum, s) => sum + s.totalAmount, 0);
-  const todayTotalUSD = todaySales.filter(s => s.currency === 'USD').reduce((sum, s) => sum + s.totalAmount, 0);
+  // Expenses ni period uchun yuklash
+  useEffect(() => {
+    const { start, end } = getStatRange();
+    api.get(`/expenses?startDate=${start.toISOString()}&endDate=${end.toISOString()}&limit=1000`)
+      .then(res => {
+        const arr = Array.isArray(res.data?.data || res.data?.expenses || res.data) ? (res.data?.data || res.data?.expenses || res.data) : [];
+        setStatExpenses(arr.reduce((s: number, e: any) => s + (e.amount || 0), 0));
+      })
+      .catch(() => setStatExpenses(0));
+  }, [statPeriod, statDate]);
 
-  const todayDebtUZS = todaySales.filter(s => s.currency === 'UZS').reduce((sum, s) => sum + Math.max(0, s.totalAmount - s.paidAmount), 0);
-  const todayDebtUSD = todaySales.filter(s => s.currency === 'USD').reduce((sum, s) => sum + Math.max(0, s.totalAmount - s.paidAmount), 0);
+  const statPeriodLabel = statPeriod === 'today' ? latinToCyrillic('Bugungi')
+    : statPeriod === 'week' ? latinToCyrillic('Haftalik')
+    : statPeriod === 'month' ? latinToCyrillic('Oylik')
+    : new Date(statDate).toLocaleDateString('uz-UZ', { day: 'numeric', month: 'short' });
 
-  // To'lov usuli bo'yicha breakdown
   const pm = (type: string) => type?.toUpperCase();
-  const todayCashUZS  = todaySales.filter(s => pm(s.paymentType) === 'CASH'  && s.currency === 'UZS').reduce((sum, s) => sum + s.paidAmount, 0);
-  const todayCashUSD  = todaySales.filter(s => pm(s.paymentType) === 'CASH'  && s.currency === 'USD').reduce((sum, s) => sum + s.paidAmount, 0);
-  const todayCardUZS  = todaySales.filter(s => pm(s.paymentType) === 'CARD'  && s.currency === 'UZS').reduce((sum, s) => sum + s.paidAmount, 0);
-  const todayCardUSD  = todaySales.filter(s => pm(s.paymentType) === 'CARD'  && s.currency === 'USD').reduce((sum, s) => sum + s.paidAmount, 0);
-  const todayClickUZS = todaySales.filter(s => pm(s.paymentType) === 'CLICK' && s.currency === 'UZS').reduce((sum, s) => sum + s.paidAmount, 0);
+  const todayTotalUZS = periodSales.filter(s => s.currency === 'UZS').reduce((sum, s) => sum + s.totalAmount, 0);
+  const todayTotalUSD = periodSales.filter(s => s.currency === 'USD').reduce((sum, s) => sum + s.totalAmount, 0);
+  const todayDebtUZS  = periodSales.filter(s => s.currency === 'UZS').reduce((sum, s) => sum + Math.max(0, s.totalAmount - s.paidAmount), 0);
+  const todayDebtUSD  = periodSales.filter(s => s.currency === 'USD').reduce((sum, s) => sum + Math.max(0, s.totalAmount - s.paidAmount), 0);
+  const todayCashUZS  = periodSales.filter(s => pm(s.paymentType) === 'CASH'  && s.currency === 'UZS').reduce((sum, s) => sum + s.paidAmount, 0);
+  const todayCashUSD  = periodSales.filter(s => pm(s.paymentType) === 'CASH'  && s.currency === 'USD').reduce((sum, s) => sum + s.paidAmount, 0);
+  const todayCardUZS  = periodSales.filter(s => pm(s.paymentType) === 'CARD'  && s.currency === 'UZS').reduce((sum, s) => sum + s.paidAmount, 0);
+  const todayCardUSD  = periodSales.filter(s => pm(s.paymentType) === 'CARD'  && s.currency === 'USD').reduce((sum, s) => sum + s.paidAmount, 0);
+  const todayClickUZS = periodSales.filter(s => pm(s.paymentType) === 'CLICK' && s.currency === 'UZS').reduce((sum, s) => sum + s.paidAmount, 0);
 
   const hasActiveFilters = !!debouncedSearchTerm || selectedStatus !== 'all' || selectedPeriod !== 'all';
 
@@ -354,6 +370,36 @@ export default function SalesModern() {
           </div>
         </div>
 
+        {/* Stat period tanlagich */}
+        <div className="flex flex-wrap items-center gap-2">
+          {(['today', 'week', 'month', 'date'] as const).map(p => (
+            <button
+              key={p}
+              onClick={() => setStatPeriod(p)}
+              className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition-all ${
+                statPeriod === p
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              {p === 'today' ? latinToCyrillic('Bugun')
+                : p === 'week' ? latinToCyrillic('Hafta')
+                : p === 'month' ? latinToCyrillic('Oy')
+                : latinToCyrillic('Kun')}
+            </button>
+          ))}
+          {statPeriod === 'date' && (
+            <input
+              type="date"
+              value={statDate}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={e => setStatDate(e.target.value)}
+              className="h-9 px-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+            />
+          )}
+          <span className="ml-auto text-xs text-slate-400 font-medium">{periodSales.length} {latinToCyrillic('ta sotuv')}</span>
+        </div>
+
         {/* Stats cards — ikki valyutada */}
         {loading ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
@@ -367,7 +413,7 @@ export default function SalesModern() {
             {/* 1. Bugungi savdo */}
             <div className="rounded-2xl bg-white border border-slate-200/70 p-4 hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{latinToCyrillic('Bugungi savdo')}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{statPeriodLabel} {latinToCyrillic('savdo')}</p>
                 <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
                   <ShoppingCart className="w-4 h-4 text-indigo-600" />
                 </div>
@@ -449,8 +495,8 @@ export default function SalesModern() {
               </div>
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">{latinToCyrillic('Bugun')}</span>
-                  <span className="font-bold tabular-nums text-rose-600">{fmt(Math.round(todayExpenses))} <span className="text-xs font-normal text-slate-400">so'm</span></span>
+                  <span className="text-slate-500">{statPeriodLabel}</span>
+                  <span className="font-bold tabular-nums text-rose-600">{fmt(Math.round(statExpenses))} <span className="text-xs font-normal text-slate-400">so'm</span></span>
                 </div>
               </div>
             </div>
