@@ -104,6 +104,7 @@ export function Drivers() {
   const [cancelDebtLoading, setCancelDebtLoading] = useState(false);
   const [pendingSalesList, setPendingSalesList] = useState<Array<{id:string;currency:string;driverCollectedAmount:number;customerId?:string;customer?:{name:string};manualCustomerName?:string}>>([]);
   const [selectedSaleIds, setSelectedSaleIds] = useState<string[]>([]);
+  const [selectedPaymentSaleIds, setSelectedPaymentSaleIds] = useState<string[]>([]);
 
   const [newDriver, setNewDriver] = useState({
     name: '',
@@ -277,32 +278,53 @@ export function Drivers() {
     setPaymentNotes('');
     setShowCancelDebt(false);
     setCancelDebtNote('');
+    setPendingSalesList([]);
+    setSelectedPaymentSaleIds([]);
+    setSelectedSaleIds([]);
     setShowPaymentModal(true);
+    loadPendingSales(driver.id);
   };
 
   const handleDriverPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!paymentDriver) return;
-    const usd = parseFloat(paymentUSD) || 0;
-    const uzs = parseFloat(paymentUZS) || 0;
-    const karta = parseFloat(paymentKarta) || 0;
-    if (usd <= 0 && uzs <= 0 && karta <= 0) return;
+
+    // Agar mijozlar tanlangan bo'lsa — saleIds rejimi
+    const useSaleIds = selectedPaymentSaleIds.length > 0 && pendingSalesList.length > 0;
+
+    if (!useSaleIds) {
+      const usd = parseFloat(paymentUSD) || 0;
+      const uzs = parseFloat(paymentUZS) || 0;
+      const karta = parseFloat(paymentKarta) || 0;
+      if (usd <= 0 && uzs <= 0 && karta <= 0) return;
+    }
+
     setPaymentLoading(true);
     try {
-      await api.post(`/drivers/${paymentDriver.id}/payment`, {
-        amountUSD: usd,
-        amountUZS: uzs,
-        amountKarta: karta,
+      const body: any = {
         exchangeRate: parseFloat(paymentExchangeRate) || 12700,
         notes: paymentNotes,
-      });
+      };
+
+      if (useSaleIds) {
+        body.saleIds = selectedPaymentSaleIds;
+      } else {
+        body.amountUSD = parseFloat(paymentUSD) || 0;
+        body.amountUZS = parseFloat(paymentUZS) || 0;
+        body.amountKarta = parseFloat(paymentKarta) || 0;
+      }
+
+      const result = await api.post(`/drivers/${paymentDriver.id}/payment`, body);
       setShowPaymentModal(false);
       fetchDrivers();
-      const parts = [];
-      if (usd > 0)   parts.push(`$${usd.toLocaleString()}`);
-      if (uzs > 0)   parts.push(`${uzs.toLocaleString()} UZS`);
-      if (karta > 0) parts.push(`${karta.toLocaleString()} UZS (${latinToCyrillic('karta')})`);
-      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), `${trData(paymentDriver.name)}: ${parts.join(' + ')} ${latinToCyrillic('qabul qilindi')}`));
+
+      const data = result.data;
+      const parts: string[] = [];
+      if ((data.paid?.usd || 0) > 0)   parts.push(`$${data.paid.usd.toLocaleString('en', {minimumFractionDigits:2,maximumFractionDigits:2})}`);
+      if ((data.paid?.uzs || 0) > 0)   parts.push(`${Math.round(data.paid.uzs).toLocaleString()} UZS`);
+      if ((data.paid?.karta || 0) > 0) parts.push(`${Math.round(data.paid.karta).toLocaleString()} UZS (${latinToCyrillic('karta')})`);
+      const countMsg = data.paidSalesCount ? ` (${data.paidSalesCount} ${latinToCyrillic('ta savdo')})` : '';
+      addToast(toast.success(latinToCyrillic('Muvaffaqiyatli'), `${trData(paymentDriver.name)}: ${parts.join(' + ')} ${latinToCyrillic('qabul qilindi')}${countMsg}`));
     } catch (error: any) {
       addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || latinToCyrillic("To'lovda xatolik yuz berdi")));
     } finally {
@@ -315,8 +337,9 @@ export function Drivers() {
       const res = await api.get(`/drivers/${driverId}/debt-summary`);
       const sales = res.data?.pendingSales || [];
       setPendingSalesList(sales);
-      setSelectedSaleIds(sales.map((s: any) => s.id)); // default: barchasi tanlangan
-    } catch { setPendingSalesList([]); setSelectedSaleIds([]); }
+      setSelectedSaleIds(sales.map((s: any) => s.id));
+      setSelectedPaymentSaleIds(sales.map((s: any) => s.id));
+    } catch { setPendingSalesList([]); setSelectedSaleIds([]); setSelectedPaymentSaleIds([]); }
   };
 
   const handleCancelDebt = async () => {
@@ -1122,6 +1145,69 @@ export function Drivers() {
                 )}
               </div>
 
+              {/* Har bir mijoz uchun to'lov tanlash */}
+              {pendingSalesList.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                      {latinToCyrillic('Pul topshirgan mijozlar')}
+                    </label>
+                    <button type="button" onClick={() =>
+                      setSelectedPaymentSaleIds(
+                        selectedPaymentSaleIds.length === pendingSalesList.length
+                          ? [] : pendingSalesList.map(s => s.id)
+                      )
+                    } className="text-xs text-emerald-600 hover:text-emerald-800 transition-colors">
+                      {selectedPaymentSaleIds.length === pendingSalesList.length
+                        ? latinToCyrillic('Hammasini olib tashlash')
+                        : latinToCyrillic('Hammasini tanlash')}
+                    </button>
+                  </div>
+                  <div className="space-y-1.5 max-h-52 overflow-y-auto pr-0.5">
+                    {pendingSalesList.map(sale => {
+                      const cName = sale.customer?.name || sale.manualCustomerName || latinToCyrillic("Noma'lum");
+                      const amt = sale.driverCollectedAmount || 0;
+                      const checked = selectedPaymentSaleIds.includes(sale.id);
+                      return (
+                        <label key={sale.id} className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-colors ${checked ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                          <input type="checkbox" checked={checked}
+                            onChange={() => setSelectedPaymentSaleIds(prev =>
+                              checked ? prev.filter(sid => sid !== sale.id) : [...prev, sale.id]
+                            )}
+                            className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 flex-shrink-0" />
+                          <span className="flex-1 text-xs font-medium text-slate-700 truncate">{trData(cName)}</span>
+                          <span className="text-xs tabular-nums text-emerald-700 font-bold flex-shrink-0">
+                            {sale.currency === 'USD'
+                              ? `$${amt.toLocaleString('en', {minimumFractionDigits:2,maximumFractionDigits:2})}`
+                              : `${Math.round(amt).toLocaleString()} UZS`}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {selectedPaymentSaleIds.length > 0 && (() => {
+                    const sel = pendingSalesList.filter(s => selectedPaymentSaleIds.includes(s.id));
+                    const totalUSD = sel.filter(s => s.currency === 'USD').reduce((sum, s) => sum + (s.driverCollectedAmount || 0), 0);
+                    const totalUZS = sel.filter(s => s.currency === 'UZS').reduce((sum, s) => sum + (s.driverCollectedAmount || 0), 0);
+                    return (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center justify-between">
+                        <span className="text-xs font-semibold text-emerald-700">
+                          {latinToCyrillic('Jami')} ({selectedPaymentSaleIds.length} {latinToCyrillic('ta mijoz')})
+                        </span>
+                        <span className="text-xs font-bold text-emerald-800 tabular-nums">
+                          {totalUSD > 0 && `$${totalUSD.toFixed(2)}`}
+                          {totalUSD > 0 && totalUZS > 0 && ' + '}
+                          {totalUZS > 0 && `${Math.round(totalUZS).toLocaleString()} UZS`}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Manual summa — faqat mijoz tanlalmagan holatda ko'rinadi */}
+              {selectedPaymentSaleIds.length === 0 && (
+              <>
               {/* Kurs */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-semibold text-slate-600">
@@ -1133,9 +1219,11 @@ export function Drivers() {
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-300 focus:bg-white transition-all"
                 />
               </div>
+              </>
+              )}
 
-              {/* 3 ta input */}
-              {(() => {
+              {/* 3 ta input — faqat mijoz tanlalmagan holatda */}
+              {selectedPaymentSaleIds.length === 0 && (() => {
                 const _rate = parseFloat(paymentExchangeRate) || 12700;
                 const _uzs = parseFloat(paymentUZS) || 0;
                 const _usd = parseFloat(paymentUSD) || 0;
@@ -1176,8 +1264,8 @@ export function Drivers() {
                 );
               })()}
 
-              {/* Jami va qolgan qarz */}
-              {(() => {
+              {/* Jami va qolgan qarz — faqat manual rejimda */}
+              {selectedPaymentSaleIds.length === 0 && (() => {
                 const usd   = parseFloat(paymentUSD)   || 0;
                 const uzs   = parseFloat(paymentUZS)   || 0;
                 const karta = parseFloat(paymentKarta) || 0;
@@ -1224,11 +1312,7 @@ export function Drivers() {
 
               {/* Qarzni bekor qilish */}
               <div className="border-t border-slate-100 pt-3">
-                <button type="button" onClick={() => {
-                  const next = !showCancelDebt;
-                  setShowCancelDebt(next);
-                  if (next && paymentDriver) loadPendingSales(paymentDriver.id);
-                }}
+                <button type="button" onClick={() => setShowCancelDebt(prev => !prev)}
                   className="text-xs font-semibold text-rose-500 hover:text-rose-700 transition-colors">
                   {showCancelDebt ? '▲' : '▼'} {latinToCyrillic('Qarzni bekor qilish (kassaga tushmaydi)')}
                 </button>
@@ -1298,7 +1382,12 @@ export function Drivers() {
                 </button>
                 <button
                   type="submit"
-                  disabled={paymentLoading || ((parseFloat(paymentUSD) || 0) <= 0 && (parseFloat(paymentUZS) || 0) <= 0 && (parseFloat(paymentKarta) || 0) <= 0)}
+                  disabled={paymentLoading || (
+                    selectedPaymentSaleIds.length === 0 &&
+                    (parseFloat(paymentUSD) || 0) <= 0 &&
+                    (parseFloat(paymentUZS) || 0) <= 0 &&
+                    (parseFloat(paymentKarta) || 0) <= 0
+                  )}
                   className="flex-[2] inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {paymentLoading && <Loader2 className="w-4 h-4 animate-spin" />}

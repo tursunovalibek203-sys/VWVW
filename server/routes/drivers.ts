@@ -471,30 +471,93 @@ router.post('/check-or-create', async (req, res) => {
 router.post('/:id/payment', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { amountUSD = 0, amountUZS = 0, amountKarta = 0, exchangeRate = 12500, notes } = req.body;
+    const { amountUSD = 0, amountUZS = 0, amountKarta = 0, exchangeRate = 12500, notes, saleIds } = req.body;
     const userId = req.user?.id || '';
     const userName = req.user?.name || 'Admin';
 
-    const usd   = parseFloat(amountUSD)   || 0;
-    const uzs   = parseFloat(amountUZS)   || 0;
-    const karta = parseFloat(amountKarta) || 0;
     const rate  = parseFloat(exchangeRate) || parseInt(process.env.USD_TO_UZS_RATE || '12500', 10);
-
-    if (usd <= 0 && uzs <= 0 && karta <= 0) {
-      return res.status(400).json({ error: 'Kamida bitta summa kiritilishi kerak' });
-    }
 
     const driver = await (prisma.driver as any).findUnique({ where: { id } });
     if (!driver) return res.status(404).json({ error: 'Haydovchi topilmadi' });
 
     const desc = `Haydovchi to'lovi: ${driver.name}${notes ? ' (' + notes + ')' : ''}`;
 
+    // ── Har bir mijoz uchun alohida to'lov rejimi ───────────────────────────
+    if (Array.isArray(saleIds) && saleIds.length > 0) {
+      const salesToPay = await prisma.sale.findMany({
+        where: { id: { in: saleIds }, driverId: id, driverPaymentStatus: 'PENDING' },
+        select: { id: true, currency: true, driverCollectedAmount: true, totalAmount: true },
+      });
+
+      if (salesToPay.length === 0) {
+        return res.status(400).json({ error: 'Tanlangan savdolar topilmadi' });
+      }
+
+      const paidUSD = salesToPay
+        .filter(s => s.currency === 'USD')
+        .reduce((sum, s) => sum + (Number(s.driverCollectedAmount) || Number(s.totalAmount) || 0), 0);
+      const paidUZS = salesToPay
+        .filter(s => s.currency === 'UZS')
+        .reduce((sum, s) => sum + (Number(s.driverCollectedAmount) || Number(s.totalAmount) || 0), 0);
+
+      await prisma.$transaction(async (tx) => {
+        // Tanlangan savdolarni DELIVERED + PAID qilish
+        await tx.sale.updateMany({
+          where: { id: { in: salesToPay.map(s => s.id) } },
+          data: { driverPaymentStatus: 'DELIVERED', paymentStatus: 'PAID' },
+        });
+
+        // Driver qarzini kamaytirish
+        const newDebtUSD = Math.max(0, (driver.debtToCompanyUSD || 0) - paidUSD);
+        const newDebtUZS = Math.max(0, (driver.debtToCompany || 0) - paidUZS);
+
+        await tx.$executeRaw`
+          UPDATE "Driver"
+          SET "debtToCompanyUSD" = ${newDebtUSD},
+              "debtToCompany"    = ${newDebtUZS},
+              "updatedAt"        = NOW()
+          WHERE "id" = ${id}
+        `;
+
+        // Kassaga kirim
+        if (paidUSD > 0) {
+          await tx.cashboxTransaction.create({ data: {
+            type: 'INCOME', amount: paidUSD, currency: 'USD', category: 'PAYMENT',
+            paymentMethod: 'CASH', description: desc, userId, userName, reference: id,
+          }});
+        }
+        if (paidUZS > 0) {
+          await tx.cashboxTransaction.create({ data: {
+            type: 'INCOME', amount: paidUZS, currency: 'UZS', category: 'PAYMENT',
+            paymentMethod: 'CASH', description: desc, userId, userName, reference: id,
+          }});
+        }
+      });
+
+      return res.json({
+        success: true,
+        driverName: driver.name,
+        paid: { usd: paidUSD, uzs: paidUZS, karta: 0 },
+        paidSalesCount: salesToPay.length,
+        remainingDebtUSD: Math.max(0, (driver.debtToCompanyUSD || 0) - paidUSD),
+        remainingDebtUZS: Math.max(0, (driver.debtToCompany || 0) - paidUZS),
+      });
+    }
+
+    // ── Eski rejim: manual summa kiritish (FIFO) ────────────────────────────
+    const usd   = parseFloat(amountUSD)   || 0;
+    const uzs   = parseFloat(amountUZS)   || 0;
+    const karta = parseFloat(amountKarta) || 0;
+
+    if (usd <= 0 && uzs <= 0 && karta <= 0) {
+      return res.status(400).json({ error: 'Kamida bitta summa kiritilishi kerak' });
+    }
+
     // Atomik: driver qarz kamaytirish + kassaga kirim + sotuvlarni PAID belgilash
     await prisma.$transaction(async (tx) => {
       // USD qarz kamayadi
       const newDebtUSD = Math.max(0, (driver.debtToCompanyUSD || 0) - usd);
       // UZS qarz: uzs + karta + USD ekvivalenti (eski data uchun backward-compatible)
-      // Eski bug: USD savdolarda debtToCompany ga ham usd*rate yozilgan edi
       const newDebtUZS = Math.max(0, (driver.debtToCompany || 0) - (uzs + karta + usd * rate));
 
       await tx.$executeRaw`
