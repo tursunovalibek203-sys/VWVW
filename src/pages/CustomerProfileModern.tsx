@@ -98,6 +98,7 @@ export default function CustomerProfileModern() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [productDebts, setProductDebts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [salesLoading, setSalesLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -106,43 +107,56 @@ export default function CustomerProfileModern() {
   const [paymentForm, setPaymentForm] = useState({ uzs: '', usd: '', karta: '', kurs: '12700', notes: '', debtTarget: 'UZS' as 'UZS' | 'USD' });
   const [deletingSaleId, setDeletingSaleId] = useState<string | null>(null);
 
-  const loadCustomerData = async () => {
+  // Faza 1: mijoz ma'lumoti + qarzlar (tez)
+  const loadCustomerInfo = async () => {
     try {
-      setRefreshing(true);
-      const [customerRes, salesRes, debtsRes] = await Promise.all([
+      const [customerRes, debtsRes] = await Promise.all([
         api.get(`/customers/${id}`),
-        api.get(`/sales?customerId=${id}`),
         api.get(`/customers/${id}/product-debts`).catch(() => ({ data: { data: [] } })),
       ]);
-
-      // Handle standardized API response format
-      const customerData = extractData<Customer | null>(customerRes, null);
-      const { data: salesData } = extractPaginatedData<Sale>(salesRes, 'sales', []);
-
-      setCustomer(customerData);
-      setSales(salesData);
+      setCustomer(extractData<Customer | null>(customerRes, null));
       setProductDebts(debtsRes.data?.data || []);
     } catch (error) {
       console.error('Mijoz ma\'lumotlarini yuklashda xatolik:', error);
-      addToast(
-        toast.error(
-          latinToCyrillic('Xatolik'),
-          latinToCyrillic("Mijoz ma'lumotlarini yuklashda xatolik yuz berdi")
-        )
-      );
+      addToast(toast.error(
+        latinToCyrillic('Xatolik'),
+        latinToCyrillic("Mijoz ma'lumotlarini yuklashda xatolik yuz berdi")
+      ));
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Faza 2: sotuvlar (sekin, fon)
+  const loadSales = async () => {
+    try {
+      setSalesLoading(true);
+      const salesRes = await api.get(`/sales?customerId=${id}&limit=50&page=1`);
+      const { data: salesData } = extractPaginatedData<Sale>(salesRes, 'sales', []);
+      setSales(salesData);
+    } catch {
+      setSales([]);
+    } finally {
+      setSalesLoading(false);
+    }
+  };
+
+  const loadCustomerData = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([loadCustomerInfo(), loadSales()]);
+    } finally {
       setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    loadCustomerData();
+    // Faza 1 birinchi — mijoz darhol ko'rinadi
+    loadCustomerInfo().then(() => {
+      // Faza 2 keyin — sotuvlar fon da
+      loadSales();
+    });
   }, [id]);
-
-  const handleRefresh = () => {
-    loadCustomerData();
-  };
 
   const handleExportExcel = () => {
     if (!customer || sales.length === 0) return;
@@ -506,7 +520,7 @@ export default function CustomerProfileModern() {
 
           <div className="flex flex-wrap items-center gap-2.5 self-start">
             <button
-              onClick={handleRefresh}
+              onClick={loadCustomerData}
               disabled={refreshing}
               className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-60 rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-600 transition-colors active:scale-[0.98]"
             >
@@ -675,9 +689,9 @@ export default function CustomerProfileModern() {
         </div>
 
         {/* Loading */}
-        {refreshing && sales.length === 0 ? (
+        {salesLoading ? (
           <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-6">
-            <TableSkeleton rows={6} cols={6} />
+            <TableSkeleton rows={5} cols={4} />
           </div>
         ) : sales.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200/70">
