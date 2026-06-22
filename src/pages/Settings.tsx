@@ -836,6 +836,35 @@ export default function Settings() {
                   <DataBackup />
                 </div>
               )}
+
+              {/* VAQTINCHALIK: Test ma'lumotlarini o'chirish */}
+              {user?.role === 'ADMIN' && (
+                <div className="mt-6 pt-6 border-t border-red-100">
+                  <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                    <p className="text-sm font-bold text-red-700 mb-1">⚠️ Test ma'lumotlarini o'chirish</p>
+                    <p className="text-xs text-red-600 mb-3">
+                      Barcha savdolar, kassa tarixi, haydovchilar o'chiriladi. Mahsulotlar va mijozlar saqlanib qoladi.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!window.confirm("DIQQAT! Barcha savdolar, kassa tarixi va haydovchilar O'CHIRILADI. Davom etasizmi?")) return;
+                        if (!window.confirm("Ikkinchi marta tasdiqlang: Hamma tarix o'chirilsin?")) return;
+                        try {
+                          const res = await api.post('/settings/clear-test-data');
+                          alert('Muvaffaqiyatli!\n' + res.data.results.join('\n'));
+                          window.location.reload();
+                        } catch (err: any) {
+                          alert('Xato: ' + (err.response?.data?.error || err.message));
+                        }
+                      }}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition-colors"
+                    >
+                      Barcha test ma'lumotlarini o'chir
+                    </button>
+                  </div>
+                </div>
+              )}
             </SettingGroup>
           </div>
         )}
