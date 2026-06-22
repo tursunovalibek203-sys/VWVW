@@ -136,4 +136,57 @@ router.get('/exchange-rates', authenticate, async (req, res) => {
   }
 });
 
+// ── VAQTINCHALIK: test ma'lumotlarini o'chirish (FAQAT ADMIN) ────────────────
+router.post('/clear-test-data', authenticate, authorize('ADMIN'), async (_req, res) => {
+  try {
+    const results: string[] = [];
+
+    // Invoice
+    try {
+      const r = await prisma.invoice.deleteMany({});
+      results.push(`Invoice: ${r.count} ta`);
+    } catch { results.push('Invoice: skip'); }
+
+    // SaleItem
+    try {
+      const r = await prisma.saleItem.deleteMany({});
+      results.push(`SaleItem: ${r.count} ta`);
+    } catch { results.push('SaleItem: skip'); }
+
+    // Sale
+    try {
+      const r = await prisma.sale.deleteMany({});
+      results.push(`Sale: ${r.count} ta`);
+    } catch (e: any) { results.push('Sale xato: ' + e.message); }
+
+    // CashboxTransaction
+    try {
+      const r = await prisma.cashboxTransaction.deleteMany({});
+      results.push(`CashboxTransaction: ${r.count} ta`);
+    } catch (e: any) { results.push('CashboxTransaction xato: ' + e.message); }
+
+    // Mijoz qarzlarini 0 ga reset
+    try {
+      const r = await prisma.customer.updateMany({ data: { debtUZS: 0, debtUSD: 0 } });
+      results.push(`Mijoz balans reset: ${r.count} ta`);
+    } catch (e: any) { results.push('Mijoz reset xato: ' + e.message); }
+
+    // Haydovchi qarzlarini 0 ga reset
+    try {
+      const r = await prisma.driver.updateMany({ data: { debtToCompany: 0, debtToCompanyUSD: 0 } });
+      results.push(`Haydovchi balans reset: ${r.count} ta`);
+    } catch (e: any) { results.push('Haydovchi reset xato: ' + e.message); }
+
+    // Haydovchilarni o'chirish
+    try {
+      const r = await prisma.driver.deleteMany({});
+      results.push(`Haydovchilar o'chirildi: ${r.count} ta`);
+    } catch (e: any) { results.push('Haydovchi o\'chirish xato: ' + e.message); }
+
+    res.json({ success: true, results });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
