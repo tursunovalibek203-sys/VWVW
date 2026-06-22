@@ -32,6 +32,7 @@ import { Badge } from '../components/ui/Badge';
 import { TableSkeleton } from '../components/ui/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useAuthStore } from '../store/authStore';
 
 interface Product {
   id: string;
@@ -55,6 +56,8 @@ export default function SimplifiedInventory() {
   const isCashierRoute = window.location.pathname.startsWith('/cashier');
   const isWarehouseRoute = window.location.pathname.startsWith('/warehouse');
   const { addToast } = useToast();
+  const { isAdmin } = useAuthStore();
+  const isAdminUser = isAdmin();
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<CategoryId>('all');
@@ -183,12 +186,20 @@ export default function SimplifiedInventory() {
     const productId = deleteTarget.id;
     setDeleting(true);
     try {
-      await api.delete(`/products/${productId}`);
+      const res = await api.delete(`/products/${productId}`);
+      const data = res.data as { action?: string; message?: string };
       loadProducts(true);
-      addToast(toast.success(
-        latinToCyrillic('Muvaffaqiyatli'),
-        latinToCyrillic('Mahsulot o\'chirildi!')
-      ));
+      if (data?.action === 'archived') {
+        addToast(toast.success(
+          latinToCyrillic('Arxivlandi'),
+          latinToCyrillic(data.message || 'Mahsulot arxivlandi (savdo tarixi saqlandi)')
+        ));
+      } else {
+        addToast(toast.success(
+          latinToCyrillic('O\'chirildi'),
+          latinToCyrillic(data.message || 'Mahsulot o\'chirildi')
+        ));
+      }
     } catch (error) {
       errorHandler.handleError(error, { action: 'deleteProduct', productId });
       addToast(toast.error(
@@ -692,15 +703,17 @@ export default function SimplifiedInventory() {
       >
         <Pencil className="w-4 h-4" />
       </button>
-      <button
-        type="button"
-        onClick={() => requestDelete(product)}
-        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-        aria-label={latinToCyrillic('O\'chirish')}
-        title={latinToCyrillic('O\'chirish')}
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+      {isAdminUser && (
+        <button
+          type="button"
+          onClick={() => requestDelete(product)}
+          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+          aria-label={latinToCyrillic('O\'chirish')}
+          title={latinToCyrillic('O\'chirish')}
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 
@@ -1604,7 +1617,7 @@ export default function SimplifiedInventory() {
         title={latinToCyrillic('Mahsulotni o\'chirish')}
         message={
           deleteTarget
-            ? `"${trData(deleteTarget.name)}" ${latinToCyrillic('mahsulotini o\'chirmoqchimisiz? Bu amalni qaytarib bo\'lmaydi.')}`
+            ? `"${trData(deleteTarget.name)}" ${latinToCyrillic('mahsulotini o\'chirmoqchimisiz? Savdo tarixi bo\'lsa arxivlanadi, bo\'lmasa to\'liq o\'chiriladi.')}`
             : ''
         }
         confirmText={latinToCyrillic('O\'chirish')}

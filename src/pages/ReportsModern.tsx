@@ -16,6 +16,7 @@ import {
   FileArchive,
   Send,
   Loader2,
+  BarChart3,
 } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
 import api from '../lib/professionalApi';
@@ -23,6 +24,7 @@ import { TableSkeleton } from '../components/ui/LoadingSpinner';
 import { Badge } from '../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import { useToast, toast } from '../components/ui/Toast';
+import ReportsDashboard from '../components/ReportsDashboard';
 
 // ---------------------------------------------------------------------------
 // Report types. Each tab maps 1:1 to an existing backend endpoint. The
@@ -30,9 +32,9 @@ import { useToast, toast } from '../components/ui/Toast';
 //   GET /reports/sales, /reports/inventory,
 //   GET /reports/customer-analysis, /reports/profit-loss
 // ---------------------------------------------------------------------------
-type ReportType = 'sales' | 'inventory' | 'customers' | 'financial' | 'excel';
+type ReportType = 'dashboard' | 'sales' | 'inventory' | 'customers' | 'financial' | 'excel';
 
-const REPORT_ENDPOINT: Record<Exclude<ReportType, 'excel'>, string> = {
+const REPORT_ENDPOINT: Record<Exclude<ReportType, 'excel' | 'dashboard'>, string> = {
   sales: '/reports/sales',
   inventory: '/reports/inventory',
   customers: '/reports/customer-analysis',
@@ -46,6 +48,7 @@ interface ReportTab {
 }
 
 const REPORT_TABS: ReportTab[] = [
+  { id: 'dashboard', label: latinToCyrillic('Dashboard'), icon: BarChart3 },
   { id: 'sales', label: latinToCyrillic('Sotuvlar'), icon: ShoppingCart },
   { id: 'inventory', label: latinToCyrillic('Ombor'), icon: Package },
   { id: 'customers', label: latinToCyrillic('Mijozlar'), icon: Users },
@@ -108,9 +111,9 @@ const periodToRange = (period: Period): { startDate?: string; endDate?: string }
 
 export default function ReportsModern() {
   const { addToast } = useToast();
-  const [activeTab, setActiveTab] = useState<ReportType>('sales');
+  const [activeTab, setActiveTab] = useState<ReportType>('dashboard');
   const [period, setPeriod] = useState<Period>('all');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   // Raw payload for the active report. Each report has a different shape so we
   // keep it as `any` here and narrow at render time.
@@ -176,7 +179,7 @@ export default function ReportsModern() {
 
   const loadReport = useCallback(
     async (type: ReportType, selectedPeriod: Period) => {
-      if (type === 'excel') return;
+      if (type === 'excel' || type === 'dashboard') return;
       setLoading(true);
       setError(false);
 
@@ -189,7 +192,8 @@ export default function ReportsModern() {
 
       try {
         const params = periodToRange(selectedPeriod);
-        const res = await api.get(REPORT_ENDPOINT[type], { params });
+        const endpoint = REPORT_ENDPOINT[type as Exclude<ReportType, 'excel' | 'dashboard'>];
+        const res = await api.get(endpoint, { params });
         clearTimeout(timeout);
         setData(res.data ?? null);
       } catch (err) {
@@ -214,7 +218,7 @@ export default function ReportsModern() {
   );
 
   useEffect(() => {
-    if (activeTab !== 'excel') loadReport(activeTab, period);
+    if (activeTab !== 'excel' && activeTab !== 'dashboard') loadReport(activeTab, period);
   }, [activeTab, period, loadReport]);
 
   useEffect(() => {
@@ -246,6 +250,8 @@ export default function ReportsModern() {
   const isEmpty = useMemo(() => {
     if (loading || error) return false;
     switch (activeTab) {
+      case 'dashboard':
+        return false;
       case 'sales':
         return salesRows.length === 0;
       case 'inventory':
@@ -262,7 +268,7 @@ export default function ReportsModern() {
   }, [activeTab, loading, error, salesRows, inventoryRows, customerRows, data]);
 
   const kpiCards: KpiCard[] = useMemo(() => {
-    if (activeTab === 'excel') return [];
+    if (activeTab === 'excel' || activeTab === 'dashboard') return [];
     if (activeTab === 'sales') {
       const s = data?.summary ?? {};
       const uzs = s.totalRevenueUZS ?? s.totalRevenue ?? 0;
@@ -358,8 +364,8 @@ export default function ReportsModern() {
         </div>
 
         <div className="flex items-center gap-2 self-start">
-          {/* Period selector — hidden on Excel tab */}
-          {activeTab !== 'excel' && (
+          {/* Period selector — hidden on Excel and Dashboard tabs */}
+          {activeTab !== 'excel' && activeTab !== 'dashboard' && (
             <div className="relative">
               <label htmlFor="reports-period" className="sr-only">
                 {latinToCyrillic('Davr')}
@@ -380,7 +386,7 @@ export default function ReportsModern() {
             </div>
           )}
 
-          {activeTab !== 'excel' && (
+          {activeTab !== 'excel' && activeTab !== 'dashboard' && (
             <button
               onClick={handleRefresh}
               disabled={loading}
@@ -391,8 +397,8 @@ export default function ReportsModern() {
             </button>
           )}
 
-          {/* Honest export: disabled with explanatory tooltip — hidden on Excel tab */}
-          {activeTab !== 'excel' && (
+          {/* Honest export: disabled with explanatory tooltip — hidden on Excel/Dashboard tabs */}
+          {activeTab !== 'excel' && activeTab !== 'dashboard' && (
             <button
               type="button"
               disabled
@@ -430,8 +436,15 @@ export default function ReportsModern() {
         })}
       </div>
 
-      {/* Summary KPI cards — hidden on Excel tab */}
-      {activeTab !== 'excel' && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      {/* Dashboard tab — full replacement view */}
+      {activeTab === 'dashboard' && (
+        <div className="animate-in fade-in duration-300">
+          <ReportsDashboard />
+        </div>
+      )}
+
+      {/* Summary KPI cards — hidden on Excel and Dashboard tabs */}
+      {activeTab !== 'excel' && activeTab !== 'dashboard' && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {loading
           ? Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="rounded-2xl bg-white border border-slate-200/70 p-5 h-[116px] animate-pulse" />
@@ -458,14 +471,14 @@ export default function ReportsModern() {
       </div>}
 
       {/* Loading state */}
-      {loading && activeTab !== 'excel' && (
+      {loading && activeTab !== 'excel' && activeTab !== 'dashboard' && (
         <div className="bg-white rounded-2xl border border-slate-200/70 p-4 sm:p-6">
           <TableSkeleton rows={8} cols={5} />
         </div>
       )}
 
       {/* Error state */}
-      {!loading && error && activeTab !== 'excel' && (
+      {!loading && error && activeTab !== 'excel' && activeTab !== 'dashboard' && (
         <div className="bg-white rounded-2xl border border-slate-200/70">
           <EmptyState
             icon={AlertTriangle}
@@ -485,7 +498,7 @@ export default function ReportsModern() {
       )}
 
       {/* Empty state */}
-      {!loading && !error && isEmpty && activeTab !== 'excel' && (
+      {!loading && !error && isEmpty && activeTab !== 'excel' && activeTab !== 'dashboard' && (
         <div className="bg-white rounded-2xl border border-slate-200/70">
           <EmptyState
             icon={activeTabMeta.icon}

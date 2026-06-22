@@ -72,6 +72,7 @@ import { TableSkeleton } from '../components/ui/LoadingSpinner';
 import { Badge } from '../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useAuthStore } from '../store/authStore';
 
 // Sof balans: so'm va dollar alohida-alohida, ikkisi ham bo'lishi mumkin
 function NetBalanceCell({ debtUZS, debtUSD, balanceUZS, balanceUSD }: {
@@ -142,6 +143,8 @@ export default function CustomersModern() {
   const location = useLocation();
   const isCashier = location.pathname.startsWith('/cashier');
   const { addToast } = useToast();
+  const { isAdmin } = useAuthStore();
+  const isAdminUser = isAdmin();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -817,15 +820,17 @@ export default function CustomersModern() {
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setCustomerToDelete(customer)}
-                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                          aria-label={latinToCyrillic("Mijozni o'chirish")}
-                          title={latinToCyrillic("O'chirish")}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {isAdminUser && (
+                          <button
+                            type="button"
+                            onClick={() => setCustomerToDelete(customer)}
+                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            aria-label={latinToCyrillic("Mijozni o'chirish")}
+                            title={latinToCyrillic("O'chirish")}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -891,14 +896,16 @@ export default function CustomersModern() {
                     <Eye className="w-4 h-4" />
                     {latinToCyrillic("Ko'rish")}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setCustomerToDelete(customer)}
-                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                    aria-label={latinToCyrillic("Mijozni o'chirish")}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {isAdminUser && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomerToDelete(customer)}
+                      className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      aria-label={latinToCyrillic("Mijozni o'chirish")}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

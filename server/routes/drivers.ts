@@ -412,22 +412,68 @@ router.get('/:id', async (req, res) => {
 });
 
 // Haydovchini o'chirish
-router.delete('/:id', async (req: AuthRequest, res) => {
+router.delete('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
-    // Botni to'xtatish
-    DriverBotManager.stopDriverBot(id);
+    const driver = await (prisma.driver as any).findUnique({
+      where: { id },
+      include: {
+        sales: {
+          where: { driverPaymentStatus: 'PENDING' },
+          select: { id: true, currency: true, driverCollectedAmount: true, totalAmount: true, customerId: true },
+        },
+      },
+    });
+    if (!driver) return res.status(404).json({ error: 'Haydovchi topilmadi' });
 
-    // Haydovchini o'chirish
-    await prisma.driver.delete({
-      where: { id }
+    await prisma.$transaction(async (tx) => {
+      // PENDING savdolarni bekor qilish: driverPaymentStatus → 'CANCELLED'
+      // va mijozlarga qarz o'tkazish
+      for (const sale of (driver as any).sales) {
+        const debt = Number(sale.driverCollectedAmount) || Number(sale.totalAmount) || 0;
+
+        // Savdoni haydovchisiz qilib, CANCELLED belgilash
+        await tx.sale.update({
+          where: { id: sale.id },
+          data: { driverPaymentStatus: 'CANCELLED', driverId: null },
+        });
+
+        // Mijozga qarz o'tkazish
+        if (sale.customerId && debt > 0) {
+          if (sale.currency === 'USD') {
+            await tx.customer.update({ where: { id: sale.customerId }, data: { debtUSD: { increment: debt } } });
+          } else {
+            await tx.customer.update({ where: { id: sale.customerId }, data: { debtUZS: { increment: debt } } });
+          }
+        }
+      }
+
+      // Driver qarzini nolga tushirish
+      await tx.$executeRaw`UPDATE "Driver" SET "debtToCompany" = 0, "debtToCompanyUSD" = 0 WHERE "id" = ${id}`;
+
+      // Bot va bog'liq yozuvlarni o'chirish
+      await tx.driverChat.deleteMany({ where: { driverId: id } });
+      await tx.driverLocation.deleteMany({ where: { driverId: id } });
+
+      // Haydovchini o'chirish
+      await tx.driver.delete({ where: { id } });
     });
 
-    res.json({ success: true, message: 'Haydovchi o\'chirildi' });
-  } catch (error) {
+    DriverBotManager.stopDriverBot(id);
+
+    const pendingCount = (driver as any).sales.length;
+    res.json({
+      success: true,
+      message: `Haydovchi o'chirildi`,
+      cancelledSales: pendingCount,
+      info: pendingCount > 0
+        ? `${pendingCount} ta PENDING savdo bekor qilindi, mijozlarga qarz o'tkazildi`
+        : "Pending savdolar yo'q edi",
+    });
+  } catch (error: any) {
     console.error('Delete driver error:', error);
-    res.status(500).json({ error: 'Failed to delete driver' });
+    res.status(500).json({ error: "Haydovchini o'chirishda xatolik: " + error.message });
   }
 });
 

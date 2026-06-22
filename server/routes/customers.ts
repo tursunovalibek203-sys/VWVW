@@ -476,149 +476,73 @@ router.put('/:id', authorize('ADMIN', 'CASHIER', 'SELLER'), async (req: AuthRequ
 
 // DELETE /customers/:id - Mijozni o'chirish (faqat ADMIN)
 router.delete('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
-
   try {
-
     const customerId = req.params.id;
-    console.log(`🗑️ DELETE /customers/${customerId} - Mijoz o'chirish boshlandi`);
 
-    
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
+      include: {
+        sales: {
+          select: {
+            id: true, currency: true, paymentStatus: true,
+            driverPaymentStatus: true, driverId: true,
+            driverCollectedAmount: true, totalAmount: true, paidAmount: true,
+          },
+        },
+      },
+    });
+    if (!customer) return res.status(404).json({ error: "Mijoz topilmadi" });
 
-    // Transaction ichida barcha operatsiyalarni bajarish
+    let cancelledDriverSales = 0;
 
     await prisma.$transaction(async (tx) => {
-
-      // 1. Avval bog'liq yozuvlarni o'chirish (to'g'ri tartibda)
-
-      
-
-      // CustomerChat xabarlarini o'chirish
-
-      await tx.customerChat.deleteMany({
-
-        where: { customerId }
-
-      });
-
-      
-
-      // OrderItem larni o'chirish (Order lar bilan birga)
-
-      await tx.orderItem.deleteMany({
-
-        where: {
-
-          order: {
-
-            customerId
-
+      // 1. Haydovchi PENDING savdolarini bekor qilish
+      // Haydovchi qarziga yig'ilgan pul driver dan olib tashlanadi
+      for (const sale of customer.sales) {
+        if (sale.driverId && (sale.driverPaymentStatus === "PENDING")) {
+          const debt = Number(sale.driverCollectedAmount) || Number(sale.totalAmount) || 0;
+          await tx.sale.update({ where: { id: sale.id }, data: { driverPaymentStatus: "CANCELLED", driverId: null } });
+          if (debt > 0) {
+            if (sale.currency === "USD") {
+              await tx.driver.update({ where: { id: sale.driverId }, data: { debtToCompanyUSD: { decrement: debt } } });
+            } else {
+              await tx.driver.update({ where: { id: sale.driverId }, data: { debtToCompany: { decrement: debt } } });
+            }
           }
-
+          cancelledDriverSales++;
         }
+      }
 
-      });
+      // 2. Bog'liq yozuvlarni to'g'ri tartibda o'chirish
+      await tx.customerChat.deleteMany({ where: { customerId } });
+      await tx.orderItem.deleteMany({ where: { order: { customerId } } });
+      await tx.order.deleteMany({ where: { customerId } });
+      await tx.saleItem.deleteMany({ where: { sale: { customerId } } });
+      await tx.invoice.deleteMany({ where: { customerId } });
+      await tx.sale.deleteMany({ where: { customerId } });
+      try { await tx.payment.deleteMany({ where: { customerId } }); } catch { /* skip */ }
+      try { await tx.contract.deleteMany({ where: { customerId } }); } catch { /* skip */ }
 
-      
-
-      // Order larni o'chirish
-
-      await tx.order.deleteMany({
-
-        where: { customerId }
-
-      });
-
-      
-
-      // SaleItem larni o'chirish (Sale lar bilan birga)
-
-      await tx.saleItem.deleteMany({
-
-        where: {
-
-          sale: {
-
-            customerId
-
-          }
-
-        }
-
-      });
-
-      
-
-      // Invoice larni o'chirish
-
-      await tx.invoice.deleteMany({
-
-        where: { customerId }
-
-      });
-
-      
-
-      // Sale larni o'chirish
-
-      await tx.sale.deleteMany({
-
-        where: { customerId }
-
-      });
-
-      
-
-      // Payment larni o'chirish
-
-      await tx.payment.deleteMany({
-
-        where: { customerId }
-
-      });
-
-      
-
-      // Contract larni o'chirish
-
-      await tx.contract.deleteMany({
-
-        where: { customerId }
-
-      });
-
-      
-
-      // 2. Oxirida mijozni o'chirish
-
-      await tx.customer.delete({
-
-        where: { id: customerId }
-
-      });
-
+      // 3. Mijozni o'chirish
+      await tx.customer.delete({ where: { id: customerId } });
     });
-
-    
 
     invalidateCache('/api/customers');
-    console.log(`✅ DELETE /customers/${customerId} - Mijoz muvaffaqiyatli o'chirildi`);
-    res.json({ message: 'Customer deleted successfully' });
-
-  } catch (error: any) {
-
-    console.error('❌ DELETE /customers/:id xatolik:', error);
-
-    res.status(500).json({ 
-
-      error: 'Failed to delete customer',
-
-      details: error.message 
-
+    res.json({
+      success: true,
+      message: `Mijoz o'chirildi`,
+      cancelledDriverSales,
+      info: cancelledDriverSales > 0
+        ? `${cancelledDriverSales} ta haydovchi savdosi bekor qilindi, haydovchi qarzlari kamaytirildi`
+        : "Faol haydovchi savdolari yo'q edi",
     });
-
+  } catch (error: any) {
+    console.error("Delete customer error:", error);
+    res.status(500).json({ error: "Mijozni o'chirishda xatolik: " + error.message });
   }
-
 });
+
+
 
 
 

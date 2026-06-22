@@ -29,6 +29,7 @@ import { TableSkeleton } from '../components/ui/LoadingSpinner';
 import { Badge } from '../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useAuthStore } from '../store/authStore';
 
 interface Driver {
   id: string;
@@ -72,6 +73,8 @@ interface Assignment {
 
 export function Drivers() {
   const { addToast } = useToast();
+  const { isAdmin } = useAuthStore();
+  const isAdminUser = isAdmin();
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -701,15 +704,17 @@ export function Drivers() {
                             ? <Loader2 className="w-4 h-4 animate-spin" />
                             : <RefreshCw className="w-4 h-4" />}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setDriverToDelete(driver)}
-                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                          aria-label={latinToCyrillic("Haydovchini o'chirish")}
-                          title={latinToCyrillic("O'chirish")}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {isAdminUser && (
+                          <button
+                            type="button"
+                            onClick={() => setDriverToDelete(driver)}
+                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            aria-label={latinToCyrillic("Haydovchini o'chirish")}
+                            title={latinToCyrillic("O'chirish")}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -825,14 +830,16 @@ export function Drivers() {
                     ? <Loader2 className="w-4 h-4 animate-spin" />
                     : <RefreshCw className="w-4 h-4" />}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setDriverToDelete(driver)}
-                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                  aria-label={latinToCyrillic("Haydovchini o'chirish")}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {isAdminUser && (
+                  <button
+                    type="button"
+                    onClick={() => setDriverToDelete(driver)}
+                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                    aria-label={latinToCyrillic("Haydovchini o'chirish")}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           ))}

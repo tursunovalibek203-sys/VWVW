@@ -1178,137 +1178,59 @@ router.get('/:id/expense', async (req: AuthRequest, res) => {
 // DELETE /products/:id - Mahsulotni o'chirish
 router.delete('/:id', authorize('ADMIN', 'WAREHOUSE_MANAGER'), async (req: AuthRequest, res) => {
   try {
-    console.log('Delete product request:', {
-      productId: req.params.id,
-      userRole: req.user?.role,
-      userId: req.user?.id
-    });
+    const productId = req.params.id;
+    const userId = req.user!.id;
+    const userName = (req.user as any)?.name || req.user!.email || 'Admin';
 
-    const product = await prisma.product.findUnique({
-      where: { id: req.params.id },
-    });
+    const product = await prisma.product.findUnique({ where: { id: productId } });
+    if (!product) return res.status(404).json({ error: 'Mahsulot topilmadi' });
 
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
-    // Bog'liq ma'lumotlarni tekshirish
-    const relatedData = await prisma.$transaction([
-      // Order items
-      prisma.orderItem.count({ where: { productId: req.params.id } }),
-      // Production batches
-      prisma.batch.count({ where: { productId: req.params.id } }),
-      // Stock movements
-      prisma.stockMovement.count({ where: { productId: req.params.id } }),
-      // Stock alerts
-      prisma.stockAlert.count({ where: { productId: req.params.id } }),
-      // Sales forecasts
-      prisma.salesForecast.count({ where: { productId: req.params.id } }),
-      // Price levels
-      prisma.priceLevel.count({ where: { productId: req.params.id } }),
-      // Production orders
-      prisma.productionOrder.count({ where: { productId: req.params.id } }),
-      // Quality checks
-      prisma.qualityCheck.count({ where: { productId: req.params.id } }),
-      // Sales with this product
-      prisma.sale.count({ where: { productId: req.params.id } }),
-      // Sale items
-      prisma.saleItem.count({ where: { productId: req.params.id } })
+    // Savdo tarixi bormi?
+    const [salesCount, saleItemsCount] = await Promise.all([
+      prisma.sale.count({ where: { productId } }),
+      prisma.saleItem.count({ where: { productId } }),
     ]);
 
-    const [orderItemsCount, batchesCount, movementsCount, alertsCount, 
-          forecastsCount, priceLevelsCount, productionOrdersCount, 
-          qualityChecksCount, salesCount, saleItemsCount] = relatedData;
+    const hasSalesHistory = salesCount > 0 || saleItemsCount > 0;
 
-    console.log('Related data check:', {
-      orderItemsCount,
-      batchesCount,
-      movementsCount,
-      alertsCount,
-      forecastsCount,
-      priceLevelsCount,
-      productionOrdersCount,
-      qualityChecksCount,
-      salesCount,
-      saleItemsCount
-    });
-
-    // Agar bog'liq ma'lumotlar bo'lsa, ularni o'chirish
-    if (orderItemsCount > 0 || batchesCount > 0 || movementsCount > 0 || alertsCount > 0 ||
-        forecastsCount > 0 || priceLevelsCount > 0 || productionOrdersCount > 0 || 
-        qualityChecksCount > 0 || salesCount > 0 || saleItemsCount > 0) {
-      console.log('Cleaning up related data before deleting product...');
-      
-      await prisma.$transaction([
-        // Order items larni o'chirish
-        ...(orderItemsCount > 0 ? [prisma.orderItem.deleteMany({ where: { productId: req.params.id } })] : []),
-        // Production batches larni o'chirish
-        ...(batchesCount > 0 ? [prisma.batch.deleteMany({ where: { productId: req.params.id } })] : []),
-        // Stock movements larni o'chirish
-        ...(movementsCount > 0 ? [prisma.stockMovement.deleteMany({ where: { productId: req.params.id } })] : []),
-        // Stock alerts larni o'chirish
-        ...(alertsCount > 0 ? [prisma.stockAlert.deleteMany({ where: { productId: req.params.id } })] : []),
-        // Sales forecasts larni o'chirish
-        ...(forecastsCount > 0 ? [prisma.salesForecast.deleteMany({ where: { productId: req.params.id } })] : []),
-        // Price levels larni o'chirish
-        ...(priceLevelsCount > 0 ? [prisma.priceLevel.deleteMany({ where: { productId: req.params.id } })] : []),
-        // Production orders larni o'chirish
-        ...(productionOrdersCount > 0 ? [prisma.productionOrder.deleteMany({ where: { productId: req.params.id } })] : []),
-        // Quality checks larni o'chirish
-        ...(qualityChecksCount > 0 ? [prisma.qualityCheck.deleteMany({ where: { productId: req.params.id } })] : []),
-        // Sales larni o'chirish
-        ...(salesCount > 0 ? [prisma.sale.deleteMany({ where: { productId: req.params.id } })] : []),
-        // Sale items larni o'chirish
-        ...(saleItemsCount > 0 ? [prisma.saleItem.deleteMany({ where: { productId: req.params.id } })] : [])
-      ]);
-      
-      console.log('Related data cleaned successfully');
+    if (hasSalesHistory) {
+      // Soft-delete: savdo tarixi saqlangan holda mahsulotni arxivlash
+      await prisma.product.update({
+        where: { id: productId },
+        data: { active: false, name: product.name + ' [ARXIV]' },
+      });
+      try { emitProductChange(EVENT_TYPES.PRODUCT_UPDATED, { id: productId, name: product.name }); } catch { /* skip */ }
+      return res.json({
+        success: true,
+        action: 'archived',
+        message: `"${product.name}" arxivlandi (${salesCount} ta savdo tarixi saqlandi)`,
+        info: 'Savdo tarixi bo'lgan mahsulot o'chirilmaydi — arxivlandi. Yangi savdolarda ko'rinmaydi.',
+      });
     }
 
-    // Endi mahsulotni o'chirish
-    await prisma.product.delete({
-      where: { id: req.params.id },
+    // Hard-delete: savdo tarixi yo'q — to'liq o'chirish
+    await prisma.$transaction(async (tx) => {
+      try { await tx.stockAlert.deleteMany({ where: { productId } }); } catch { /* skip */ }
+      try { await tx.stockMovement.deleteMany({ where: { productId } }); } catch { /* skip */ }
+      try { await tx.priceLevel.deleteMany({ where: { productId } }); } catch { /* skip */ }
+      try { await tx.salesForecast.deleteMany({ where: { productId } }); } catch { /* skip */ }
+      try { await tx.batch.deleteMany({ where: { productId } }); } catch { /* skip */ }
+      try { await tx.orderItem.deleteMany({ where: { productId } }); } catch { /* skip */ }
+      try { await tx.productionOrder.deleteMany({ where: { productId } }); } catch { /* skip */ }
+      try { await tx.qualityCheck.deleteMany({ where: { productId } }); } catch { /* skip */ }
+      await tx.product.delete({ where: { id: productId } });
     });
 
-    // Audit log
-    await logInventoryAction({
-      userId: req.user!.id,
-      userName: (req.user as any).name || req.user!.email,
-      action: 'MAHSULOT_OCHIRISH',
-      entity: 'INVENTORY',
-      entityId: req.params.id,
-      productId: req.params.id,
-      productName: product.name,
-      details: {
-        type: 'DELETE',
-        notes: 'Mahsulot o\'chirildi',
-        newValue: {
-          orderItemsCount,
-          batchesCount,
-          movementsCount,
-          alertsCount,
-          forecastsCount,
-          priceLevelsCount,
-          productionOrdersCount,
-          qualityChecksCount,
-          salesCount,
-          saleItemsCount
-        }
-      },
-      ipAddress: req.ip,
-      userAgent: req.get('user-agent'),
-    });
+    try { await logInventoryAction({ userId, userName, action: 'MAHSULOT_OCHIRISH', entity: 'INVENTORY', entityId: productId, productId, productName: product.name, details: { type: 'DELETE' }, ipAddress: req.ip, userAgent: req.get('user-agent') }); } catch { /* skip */ }
+    try { emitProductChange(EVENT_TYPES.PRODUCT_DELETED, { id: productId, name: product.name }); } catch { /* skip */ }
 
-    // Real-time event emit
-    emitProductChange(EVENT_TYPES.PRODUCT_DELETED, { id: req.params.id, name: product.name });
-
-    console.log('Product deleted successfully:', product.name);
-    res.json({ message: 'Product deleted successfully' });
-  } catch (error) {
+    res.json({ success: true, action: 'deleted', message: `"${product.name}" o'chirildi` });
+  } catch (error: any) {
     console.error('Delete product error:', error);
-    res.status(500).json({ error: 'Failed to delete product' });
+    res.status(500).json({ error: "Mahsulotni o'chirishda xatolik: " + error.message });
   }
 });
+
 
 // GET /products/:id/komplekt - Komplektni olish
 router.get('/:id/komplekt', async (req, res) => {
