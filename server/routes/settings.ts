@@ -5,8 +5,8 @@ import { withCache, invalidateCache } from '../middleware/responseCache';
 
 const router = Router();
 
-// Get all settings — 2 daqiqa cache (sozlamalar tez-tez o'zgarmaydi)
-router.get('/', authenticate, withCache(2 * 60 * 1000), async (req, res) => {
+// Get all settings — auth shart emas (exchange rate, company name public ma'lumot)
+router.get('/', withCache(2 * 60 * 1000), async (req, res) => {
   try {
     const settings = await prisma.systemSettings.findMany();
     

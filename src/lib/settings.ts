@@ -1,26 +1,41 @@
 import api from './api';
 
 // Settings cache
-let settingsCache: Record<string, string> = {};
+const DEFAULTS: Record<string, string> = {
+  USD_TO_UZS_RATE: '12700',
+  EUR_TO_UZS_RATE: '13500',
+  COMPANY_NAME: 'Lux Pet Plast',
+  COMPANY_ADDRESS: "Toshkent, O'zbekiston",
+  COMPANY_PHONE: '+998901234567',
+  COMPANY_EMAIL: 'info@luxpetplast.uz',
+  TAX_RATE: '12',
+  INVOICE_PREFIX: 'INV',
+  LOW_STOCK_THRESHOLD: '10',
+  DEBT_ALERT_DAYS: '30',
+};
+let settingsCache: Record<string, string> = { ...DEFAULTS };
 let lastFetch = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+let lastError = 0;
+const CACHE_DURATION = 5 * 60 * 1000;  // 5 min
+const ERROR_COOLDOWN = 30 * 1000;       // 30 sec — xato bo'lsa 30 sekunddan keyin qayta uradi
 
 export const getSettings = async (): Promise<Record<string, string>> => {
   const now = Date.now();
-  
-  // Return cached settings if still valid
-  if (now - lastFetch < CACHE_DURATION && Object.keys(settingsCache).length > 0) {
-    return settingsCache;
-  }
+
+  // Cache hali yangi — qaytaramiz
+  if (now - lastFetch < CACHE_DURATION && lastFetch > 0) return settingsCache;
+  // Xato bo'lgan — cooldown tugamaguncha default qaytaramiz
+  if (now - lastError < ERROR_COOLDOWN) return settingsCache;
 
   try {
     const { data } = await api.get('/settings');
-    settingsCache = data;
+    settingsCache = { ...DEFAULTS, ...data };
     lastFetch = now;
-    return data;
-  } catch (error) {
-    console.error('Failed to fetch settings:', error);
-    return settingsCache; // Return cached version if available
+    lastError = 0;
+    return settingsCache;
+  } catch {
+    lastError = now;
+    return settingsCache; // defaults yoki eski cache
   }
 };
 
