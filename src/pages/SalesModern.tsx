@@ -19,7 +19,9 @@ import {
   Smartphone,
   Printer,
   Truck,
+  Trash2,
 } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
 import { printReceipt, prepareSaleReceipt } from '../lib/receiptPrinter';
 import { latinToCyrillic, trData } from '../lib/transliterator';
 import api from '../lib/professionalApi';
@@ -51,6 +53,9 @@ export default function SalesModern() {
   const location = useLocation();
   const isCashier = location.pathname.startsWith('/cashier');
   const { addToast } = useToast();
+  const { isAdmin } = useAuthStore();
+  const isAdminUser = isAdmin();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -146,6 +151,32 @@ export default function SalesModern() {
   const handleRefresh = () => {
     setRefreshing(true);
     loadSales(page);
+  };
+
+  const handleDeleteSale = async (sale: Sale) => {
+    const label = sale.customerName;
+    const amtStr = sale.currency === 'USD' ? `$${sale.totalAmount}` : `${sale.totalAmount.toLocaleString()} UZS`;
+    if (!window.confirm(
+      latinToCyrillic(`Sotuvni o'chirish: ${label} — ${amtStr}\n\nQuyidagilar avtomatik qaytariladi:\n• Ombor: mahsulot qaytadi\n• Mijoz/haydovchi qarzi kamayadi\n• Kassada teskari tranzaksiya yaratiladi\n\nDavom etasizmi?`)
+    )) return;
+    setDeletingId(sale.id);
+    try {
+      const res = await api.delete(`/sales/${sale.id}`);
+      const data = res.data;
+      setSales(prev => prev.filter(s => s.id !== sale.id));
+      setFilteredSales(prev => prev.filter(s => s.id !== sale.id));
+      if (selectedSale?.id === sale.id) setSelectedSale(null);
+      const parts: string[] = [];
+      if (data.reversed?.stock) parts.push(latinToCyrillic('ombor qaytdi'));
+      if (data.reversed?.customerDebt) parts.push(latinToCyrillic('mijoz qarzi kamaydi'));
+      if (data.reversed?.driverDebt) parts.push(latinToCyrillic('haydovchi qarzi kamaydi'));
+      if (data.reversed?.cashbox) parts.push(latinToCyrillic('kassa teskari yozildi'));
+      addToast(toast.success(latinToCyrillic("Sotuv o'chirildi"), parts.join(', ')));
+    } catch (error: any) {
+      addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || latinToCyrillic("O'chirishda xatolik")));
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handlePrintSale = async (saleId: string) => {
@@ -730,6 +761,18 @@ export default function SalesModern() {
                               <Plus className="w-4 h-4" />
                             </button>
                           )}
+                          {isAdminUser && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSale(sale)}
+                              disabled={deletingId === sale.id}
+                              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40"
+                              aria-label={latinToCyrillic("Sotuvni o'chirish")}
+                              title={latinToCyrillic("O'chirish (ombor va qarz qaytariladi)")}
+                            >
+                              <Trash2 className={`w-4 h-4 ${deletingId === sale.id ? 'animate-pulse' : ''}`} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -817,6 +860,17 @@ export default function SalesModern() {
                       <Eye className="w-4 h-4" />
                       {latinToCyrillic("Ko'rish")}
                     </button>
+                    {isAdminUser && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSale(sale)}
+                        disabled={deletingId === sale.id}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40"
+                        title={latinToCyrillic("O'chirish")}
+                      >
+                        <Trash2 className={`w-4 h-4 ${deletingId === sale.id ? 'animate-pulse' : ''}`} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

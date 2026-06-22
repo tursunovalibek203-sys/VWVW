@@ -1,4 +1,4 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import { prisma } from '../utils/prisma';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { notifyCustomerSale, notifyLowStock } from '../utils/telegram-notifications';
@@ -548,146 +548,84 @@ router.put('/:id',
 router.delete('/:id', authorize('ADMIN'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?.id || 'system';
+    const userName = (req.user as any)?.name || req.user?.email || 'Admin';
 
-    console.log('ðŸ—‘ï¸ DELETE /sales - ID:', id);
-
-    // 1. Sotuvni va uning mahsulotlarini olish
     const sale = await prisma.sale.findUnique({
       where: { id },
-      include: {
-        items: {
-          include: {
-            product: true
-          }
-        },
-        customer: true
+      include: { items: { include: { product: true, variant: true } }, customer: true, driver: true }
+    });
+    if (!sale) return res.status(404).json({ error: 'Sotuv topilmadi' });
+
+    const customerName = sale.isKocha ? (sale.manualCustomerName || "Ko'cha mijoz") : (sale.customer?.name || "Noma'lum");
+    const receiptLabel = sale.receiptNumber ? `#${sale.receiptNumber}` : id.slice(-6);
+    const isDriverSale = !!sale.driverId;
+    const driverPending   = isDriverSale && (sale as any).driverPaymentStatus === 'PENDING';
+    const driverDelivered = isDriverSale && (sale as any).driverPaymentStatus === 'DELIVERED';
+
+    await prisma.$transaction(async (tx) => {
+      // 1. OMBOR: mahsulotlarni qaytarish
+      for (const item of sale.items) {
+        if (item.variantId) {
+          await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { increment: item.quantity } } });
+          continue;
+        }
+        if (!item.productId || !item.product) continue;
+        const p = item.product;
+        const isPiece = (item as any).saleType === 'piece';
+        const bagsBack  = isPiece ? item.quantity / (p.unitsPerBag || 1) : item.quantity;
+        const unitsBack = isPiece ? item.quantity : item.quantity * (p.unitsPerBag || 1);
+        await tx.product.update({ where: { id: item.productId }, data: { currentStock: { increment: bagsBack }, currentUnits: { increment: unitsBack } } });
+        try {
+          await tx.stockMovement.create({ data: { productId: item.productId, type: 'SALE_CANCEL', quantity: bagsBack, units: unitsBack, previousStock: p.currentStock, previousUnits: p.currentUnits, newStock: p.currentStock + bagsBack, newUnits: p.currentUnits + unitsBack, userId, userName, reason: `Sotuv bekor: ${receiptLabel}`, notes: `Mijoz: ${customerName}` } });
+        } catch { /* optional */ }
       }
+      // Eski uslub (SaleItem yo'q)
+      if (sale.items.length === 0 && (sale as any).productId) {
+        try { await tx.product.update({ where: { id: (sale as any).productId }, data: { currentStock: { increment: (sale as any).quantity || 0 } } }); } catch { /* skip */ }
+      }
+
+      // 2. MIJOZ QARZI (driver yo'q holatda)
+      if (!isDriverSale && sale.customerId) {
+        const debtRemove = Math.max(0, (sale.totalAmount || 0) - (sale.paidAmount || 0));
+        if (debtRemove > 0) {
+          if (sale.currency === 'USD') { await tx.customer.update({ where: { id: sale.customerId }, data: { debtUSD: { decrement: debtRemove } } }); }
+          else { await tx.customer.update({ where: { id: sale.customerId }, data: { debtUZS: { decrement: debtRemove } } }); }
+        }
+      }
+
+      // 3. HAYDOVCHI QARZI (faqat PENDING)
+      if (driverPending && sale.driverId) {
+        const driverDebt = (sale as any).driverCollectedAmount || sale.totalAmount || 0;
+        if (driverDebt > 0) {
+          if (sale.currency === 'USD') { await tx.driver.update({ where: { id: sale.driverId }, data: { debtToCompanyUSD: { decrement: driverDebt } } }); }
+          else { await tx.driver.update({ where: { id: sale.driverId }, data: { debtToCompany: { decrement: driverDebt } } }); }
+        }
+      }
+
+      // 4. KASSA teskari tranzaksiya
+      if (!isDriverSale && (sale.paidAmount || 0) > 0) {
+        await tx.cashboxTransaction.create({ data: { type: 'OUTCOME', amount: sale.paidAmount, currency: sale.currency, category: 'SALE_CANCEL', paymentMethod: sale.paymentMethod || 'CASH', description: `Sotuv bekor: ${receiptLabel} — ${customerName}`, userId, userName, reference: id } });
+      }
+      if (driverDelivered) {
+        const paidByDriver = (sale as any).driverCollectedAmount || sale.totalAmount || 0;
+        if (paidByDriver > 0) {
+          await tx.cashboxTransaction.create({ data: { type: 'OUTCOME', amount: paidByDriver, currency: sale.currency, category: 'SALE_CANCEL', paymentMethod: 'CASH', description: `Sotuv bekor (haydovchi): ${receiptLabel} — ${customerName}`, userId, userName, reference: id } });
+        }
+      }
+
+      // 5. O'chirish
+      await tx.invoice.deleteMany({ where: { saleId: id } });
+      await tx.saleItem.deleteMany({ where: { saleId: id } });
+      await tx.sale.delete({ where: { id } });
     });
 
-    if (!sale) {
-      return res.status(404).json({ error: 'Sotuv topilmadi' });
-    }
+    try { await prisma.auditLog.create({ data: { userId, action: 'DELETE_SALE', entity: 'Sale', entityId: id, changes: JSON.stringify({ receiptNumber: sale.receiptNumber, customer: customerName, totalAmount: sale.totalAmount, paidAmount: sale.paidAmount, currency: sale.currency, driverPending, driverDelivered }) } }); } catch { /* skip */ }
 
-    // 2. Omborda mahsulotlarni qaytarish (saleType ni hisobga olish)
-    for (const item of sale.items) {
-      if (!item.productId) continue;
-      
-      const product = await prisma.product.findUnique({ where: { id: item.productId } });
-      if (!product) continue;
-      
-      // Dona savdo bo'lsa, quantity ni dona hisoblaymiz
-      const isPieceSale = (item as any).saleType === 'piece';
-      let bagsToReturn = item.quantity;
-      let unitsToReturn = item.quantity * product.unitsPerBag;
-      
-      if (isPieceSale) {
-        bagsToReturn = item.quantity / product.unitsPerBag;
-        unitsToReturn = item.quantity;
-      }
-      
-      await prisma.product.update({
-        where: { id: item.productId },
-        data: {
-          currentStock: { increment: bagsToReturn },
-          currentUnits: { increment: unitsToReturn }
-        }
-      });
-
-      // Stock movement yaratish
-      try {
-        await prisma.stockMovement.create({
-          data: {
-            productId: item.productId,
-            type: 'SALE_CANCEL',
-            quantity: bagsToReturn,
-            units: unitsToReturn,
-            previousStock: product.currentStock,
-            previousUnits: product.currentUnits,
-            newStock: product.currentStock + bagsToReturn,
-            newUnits: product.currentUnits + unitsToReturn,
-            userId: userId || 'system',
-            userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
-            reason: `Sotuv o'chirildi: ${id}`,
-            notes: `Mijoz: ${sale.isKocha ? sale.manualCustomerName || 'Ko\'cha' : sale.customer?.name || 'Noma\'lum'}, Mahsulot: ${product.name}, Tip: ${isPieceSale ? 'dona' : 'qop'}`
-          }
-        });
-      } catch (error) {
-        console.log(`âš ï¸ ${product.name} StockMovement yaratilmadi:`, error);
-      }
-    }
-
-    // 3. Mijoz qarzini kamaytirish
-    // âœ… DECIMAL FIX: Use DecimalHelper for debt calculation
-    const debtToReduce = DecimalHelper.subtract(sale.totalAmount, sale.paidAmount);
-    if (debtToReduce !== 0 && sale.customerId) {
-      try {
-        if (sale.currency === 'UZS') {
-          await prisma.customer.update({
-            where: { id: sale.customerId },
-            data: {
-              debtUZS: {
-                decrement: debtToReduce
-              }
-            }
-          });
-        } else {
-          await prisma.customer.update({
-            where: { id: sale.customerId },
-            data: {
-              debtUSD: {
-                decrement: debtToReduce
-              }
-            }
-          });
-        }
-        console.log(`âœ… Mijoz qarzi kamaytirildi: -${debtToReduce} ${sale.currency}`);
-      } catch (error) {
-        logger.error('Sale deleted but customer debt reduction FAILED - manual reconciliation required', { error: error instanceof Error ? error.message : String(error) });
-      }
-    }
-
-    // 4. Audit log
-    try {
-      await prisma.auditLog.create({
-        data: {
-          userId: userId || 'system',
-          action: 'DELETE_SALE',
-          entity: 'Sale',
-          entityId: id,
-          changes: JSON.stringify({
-            deletedSale: {
-              id: sale.id,
-              customerId: sale.customerId,
-              totalAmount: sale.totalAmount,
-              paidAmount: sale.paidAmount,
-              items: sale.items.map(item => ({
-                productName: item.product?.name || 'Noma\'lum mahsulot',
-                quantity: item.quantity,
-                subtotal: item.subtotal
-              }))
-            }
-          })
-        }
-      });
-    } catch (error) {
-      console.log(`âš ï¸ Audit log xatolik:`, error);
-    }
-
-    // 5. Sotuvni o'chirish (saleItems cascade delete bo'lishi kerak, bo'lmasa deleteMany qilish kerak)
-    // Prisma-da odatda onDelete: Cascade bo'ladi, lekin ishonch uchun:
-    await prisma.saleItem.deleteMany({
-      where: { saleId: id }
-    });
-
-    await prisma.sale.delete({
-      where: { id }
-    });
-
-    res.json({ message: 'Sotuv muvaffaqiyatli o\'chirildi' });
+    res.json({ success: true, message: `Sotuv ${receiptLabel} bekor qilindi`, reversed: { stock: true, customerDebt: !isDriverSale, driverDebt: driverPending, cashbox: !isDriverSale ? (sale.paidAmount || 0) > 0 : driverDelivered } });
   } catch (error: any) {
     console.error('Delete sale error:', error);
-    res.status(500).json({ error: 'Sotuvni o\'chirishda xatolik', details: error.message });
+    res.status(500).json({ error: "Sotuvni o'chirishda xatolik: " + error.message });
   }
 });
 
