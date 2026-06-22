@@ -22,6 +22,7 @@ import {
   DollarSign,
   Magnet,
   Wrench,
+  Trash2,
 } from 'lucide-react';
 import { latinToCyrillic, trData } from '../lib/transliterator';
 import { formatDate, formatCurrency } from '../lib/utils';
@@ -101,6 +102,7 @@ export default function CustomerProfileModern() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReconciling, setIsReconciling] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ uzs: '', usd: '', karta: '', kurs: '12700', notes: '', debtTarget: 'UZS' as 'UZS' | 'USD' });
+  const [deletingSaleId, setDeletingSaleId] = useState<string | null>(null);
 
   const loadCustomerData = async () => {
     try {
@@ -161,6 +163,22 @@ export default function CustomerProfileModern() {
       fileName: `${trData(customer.name)} - savdolar`,
       sheetName: latinToCyrillic('Savdolar'),
     });
+  };
+
+  const handleDeleteSale = async (sale: Sale) => {
+    const amtStr = sale.currency === 'USD' ? `$${sale.totalAmount}` : `${sale.totalAmount?.toLocaleString()} UZS`;
+    if (!window.confirm(latinToCyrillic(`"${amtStr}" savdoni o'chirmoqchimisiz?\n\nOmbor, qarz va kassa avtomatik qaytariladi.`))) return;
+    setDeletingSaleId(sale.id);
+    try {
+      await api.delete(`/sales/${sale.id}`);
+      setSales(prev => prev.filter(s => s.id !== sale.id));
+      addToast(toast.success(latinToCyrillic("Sotuv o'chirildi"), latinToCyrillic('Ombor va qarz qaytarildi')));
+      loadCustomerData();
+    } catch (error: any) {
+      addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || latinToCyrillic("O'chirishda xatolik")));
+    } finally {
+      setDeletingSaleId(null);
+    }
   };
 
   const handlePayment = () => {
@@ -604,6 +622,7 @@ export default function CustomerProfileModern() {
                       <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic("To'langan")}</th>
                       <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Qarz')}</th>
                       <th className="text-center text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5">{latinToCyrillic('Holat')}</th>
+                      <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wide px-5 py-3.5"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -645,6 +664,17 @@ export default function CustomerProfileModern() {
                         <td className="px-5 py-4 text-center">
                           {getStatusBadge(sale)}
                         </td>
+                        <td className="px-5 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSale(sale)}
+                            disabled={deletingSaleId === sale.id}
+                            className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40"
+                            title={latinToCyrillic("Sotuvni o'chirish")}
+                          >
+                            <Trash2 className={`w-4 h-4 ${deletingSaleId === sale.id ? 'animate-pulse' : ''}`} />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -672,6 +702,17 @@ export default function CustomerProfileModern() {
                     {getStatusBadge(sale)}
                   </div>
 
+                  <div className="flex justify-end mt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSale(sale)}
+                      disabled={deletingSaleId === sale.id}
+                      className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40"
+                      title={latinToCyrillic("O'chirish")}
+                    >
+                      <Trash2 className={`w-4 h-4 ${deletingSaleId === sale.id ? 'animate-pulse' : ''}`} />
+                    </button>
+                  </div>
                   <div className="mt-3 grid grid-cols-3 gap-2.5">
                     <div className="bg-slate-50 rounded-xl p-3">
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic('Jami')}</p>
