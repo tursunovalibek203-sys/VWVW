@@ -79,7 +79,6 @@ export function generateReceiptHTML(data: ReceiptData): string {
 
   const hasDebt    = data.debt > 0;
   const hasPrevDebt  = (data.customer.previousBalanceUZS ?? 0) > 0 || (data.customer.previousBalanceUSD ?? 0) > 0;
-  const hasTotalDebt = (data.customer.totalDebtUZS ?? 0) > 0 || (data.customer.totalDebtUSD ?? 0) > 0;
 
   const row = (l: string, r: string, bold = false, red = false) =>
     `<div style="display:flex;justify-content:space-between;margin:2px 0;font-size:12px;${red ? 'color:#c00;' : ''}${bold ? 'font-weight:700;' : ''}">`
@@ -814,7 +813,7 @@ export function prepareSaleReceipt(
   sale: any,
   customer: any,
   user: any,
-  driver?: any,
+  _driver?: any,
   exchangeRate: number = 12500
 ): ReceiptData {
   const now = new Date();
@@ -900,33 +899,32 @@ export function prepareSaleReceipt(
   const totalPaid = sale.paidAmount;
   const debt = Math.max(0, sale.debtAmount || 0);
   
-  const previousDebtUZS = customer?.debtUZS || 0;
-  const previousDebtUSD = customer?.debtUSD || 0;
+  // Bu savdodan kelib chiqqan yangi qarz (savdo valyutasiga qarab)
+  const newDebtFromSaleUZS = isUZS  ? Math.max(0, sale.debtAmount || (sale.totalAmount - sale.paidAmount) || 0) : 0;
+  const newDebtFromSaleUSD = !isUZS ? Math.max(0, sale.debtAmount || (sale.totalAmount - sale.paidAmount) || 0) : 0;
 
-  // Server qaytargan yangilangan mijoz balansini ishlatamiz (ikki valyuta ham to'g'ri bo'ladi)
-  // sale.customer — bu completeSale dan keladi va DB dagi haqiqiy yangilangan qiymat
+  // Jami qarz = server qaytargan aktual yangilangan mijoz balansi (savdodan keyin)
   let totalDebtUZS: number;
   let totalDebtUSD: number;
 
   if (sale.customer?.debtUZS != null) {
     totalDebtUZS = Number(sale.customer.debtUZS);
   } else {
-    totalDebtUZS = previousDebtUZS + (isUZS && sale.debtAmount > 0 ? sale.debtAmount : 0);
+    totalDebtUZS = (customer?.debtUZS || 0) + newDebtFromSaleUZS;
   }
 
   if (sale.customer?.debtUSD != null) {
     totalDebtUSD = Number(sale.customer.debtUSD);
   } else {
-    totalDebtUSD = previousDebtUSD + (!isUZS && sale.debtAmount > 0 ? sale.debtAmount : 0);
+    totalDebtUSD = (customer?.debtUSD || 0) + newDebtFromSaleUSD;
   }
+
+  // Oldingi qarz = jami qarz - bu savdodan yangi qarz
+  const previousDebtUZS = Math.max(0, totalDebtUZS - newDebtFromSaleUZS);
+  const previousDebtUSD = Math.max(0, totalDebtUSD - newDebtFromSaleUSD);
   
-  // Haydovchi ma'lumotlari
-  const driverInfo = driver ? {
-    name: driver.name || 'Haydovchi',
-    phone: driver.phone,
-    factoryShare: (driver.factoryShare || 0) * exchangeRate,
-    customerShare: (driver.customerShare || 0) * exchangeRate
-  } : undefined;
+  // Haydovchi chekda ko'rsatilmaydi
+  const driverInfo = undefined;
   
   return {
     saleId: sale.id,
