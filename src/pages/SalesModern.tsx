@@ -54,7 +54,10 @@ export default function SalesModern() {
   const isCashier = location.pathname.startsWith('/cashier');
   const { addToast } = useToast();
   const authUser = useAuthStore(state => state.user);
-  const isAdminUser = authUser?.role?.toUpperCase() === 'ADMIN';
+  const userRole = authUser?.role?.toUpperCase() ?? '';
+  // Delete tugmasi: admin panelida (/sales) ko'rinadi, kassir (/cashier/sales) da ko'rinmaydi
+  // Backend o'zi ADMIN rolini tekshiradi
+  const canDeleteSale = !isCashier && userRole !== 'CASHIER' && userRole !== 'SELLER';
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
@@ -761,7 +764,7 @@ export default function SalesModern() {
                               <Plus className="w-4 h-4" />
                             </button>
                           )}
-                          {isAdminUser && (
+                          {canDeleteSale && (
                             <button
                               type="button"
                               onClick={() => handleDeleteSale(sale)}
@@ -860,7 +863,7 @@ export default function SalesModern() {
                       <Eye className="w-4 h-4" />
                       {latinToCyrillic("Ko'rish")}
                     </button>
-                    {isAdminUser && (
+                    {canDeleteSale && (
                       <button
                         type="button"
                         onClick={() => handleDeleteSale(sale)}
