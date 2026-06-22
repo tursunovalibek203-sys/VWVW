@@ -24,6 +24,8 @@ export const SaleItemSchema = z.object({
   // Frontenddan keladigan qo'shimcha maydonlar (optional)
   subtotal: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
   warehouse: z.string().optional(),
+  isDebtPayment: z.boolean().optional(),
+  productDebtId: z.string().optional(),
 });
 
 export const SaleCreateSchema = z.object({
@@ -65,6 +67,15 @@ export const SaleCreateSchema = z.object({
   driverCollectedAmount: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
   deliveryFee: z.union([z.string(), z.number()]).transform(parseMoney).optional(),
   deliveryFeePaidBy: z.enum(['CUSTOMER', 'COMPANY']).default('COMPANY').optional(),
+  komplektDebts: z.array(z.object({
+    productId: z.string(),
+    productName: z.string(),
+    quantity: z.union([z.string(), z.number()]).transform(v => parseFloat(String(v))),
+    unitsPerBag: z.union([z.string(), z.number()]).transform(v => parseFloat(String(v))).optional().default(1),
+  })).optional(),
+  debtPayments: z.array(z.object({
+    productDebtId: z.string(),
+  })).optional(),
 }).refine((data) => {
   // Ko'cha, yangi mijoz (manualCustomerName), yoki mavjud mijoz (customerId) — birortasi bo'lsa o'tadi
   if (data.isKocha) return true;

@@ -11,6 +11,8 @@ export interface CreateSaleInput {
     quantity: number;
     pricePerBag: number;
     saleType?: 'bag' | 'piece';
+    isDebtPayment?: boolean;
+    productDebtId?: string;
   }>;
   totalAmount: number;
   paidAmount: number;
@@ -18,15 +20,23 @@ export interface CreateSaleInput {
   paymentMethod?: 'CASH' | 'CARD';
   paymentDetails?: { uzs?: number; usd?: number; karta?: number };
   driverId?: string;
-  driverCollectedAmount?: number;   // Haydovchi mijozdan yig'adigan summa
-  deliveryFee?: number;             // Yetkazib berish narxi
-  deliveryFeePaidBy?: 'CUSTOMER' | 'COMPANY'; // Kim to'laydi
+  driverCollectedAmount?: number;
+  deliveryFee?: number;
+  deliveryFeePaidBy?: 'CUSTOMER' | 'COMPANY';
   isKocha?: boolean;
   manualCustomerName?: string;
   manualCustomerPhone?: string;
   userId: string;
   userName: string;
   exchangeRate?: number;
+  // Komplekt qarz tizimi
+  komplektDebts?: Array<{
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitsPerBag: number;
+  }>;
+  debtPayments?: Array<{ productDebtId: string }>;
 }
 
 export interface UpdateSaleInput {
@@ -140,6 +150,8 @@ export class SalesService {
       deliveryFee = 0,
       deliveryFeePaidBy = 'COMPANY',
       exchangeRate = 12700,
+      komplektDebts = [],
+      debtPayments = [],
     } = input;
 
     // paidAmount undefined bo'lmasligi uchun (Zod .optional() bo'lgani sababli)
@@ -453,6 +465,35 @@ export class SalesService {
           }
         }
 
+        // 11. KOMPLEKT MAHSULOT QARZLARI — yetishmagan mahsulotlar qarz sifatida saqlanadi
+        if (!isKocha && customerId && komplektDebts && komplektDebts.length > 0) {
+          for (const debt of komplektDebts) {
+            if (debt.quantity > 0.0001) {
+              await (tx as any).customerProductDebt.create({
+                data: {
+                  customerId,
+                  saleId: sale.id,
+                  productId: debt.productId,
+                  productName: debt.productName,
+                  quantity: debt.quantity,
+                  unitsPerBag: debt.unitsPerBag || 1,
+                  status: 'ACTIVE',
+                },
+              });
+            }
+          }
+        }
+
+        // 12. QARZ TO'LOVLARI — oldingi mahsulot qarzlarini yopish
+        if (debtPayments && debtPayments.length > 0) {
+          for (const dp of debtPayments) {
+            await (tx as any).customerProductDebt.updateMany({
+              where: { id: dp.productDebtId, status: 'ACTIVE' },
+              data: { status: 'PAID', paidAt: new Date(), paidSaleId: sale.id },
+            });
+          }
+        }
+
         return { saleId: sale.id };
       } catch (e) {
         throw e;
@@ -526,6 +567,40 @@ export class SalesService {
         }
       });
     }
+
+    // Sotuvlar topicga xabar yuborish (forum guruh)
+    setImmediate(async () => {
+      try {
+        const { TelegramUserService } = await import('./TelegramUserService.js');
+        const isUZS = safeCurrency !== 'USD';
+        const fmtUZS = (v: number) => `${Math.round(Math.abs(v)).toLocaleString()} so'm`;
+        const fmtUSD = (v: number) => `$${Math.abs(v).toFixed(2)}`;
+        const fmt = (v: number) => isUZS ? fmtUZS(v) : fmtUSD(v);
+        const payIcon: Record<string, string> = { CARD: '💳 Karta', CLICK: '📱 Click', CASH: '💵 Naqd', TRANSFER: '🏦 O\'tkazma' };
+        const payLabel = payIcon[safePaymentMethod] ?? '💵 Naqd';
+        const customerName = isKocha
+          ? (input.manualCustomerName || 'Ko\'cha mijoz')
+          : (completeSale?.customer?.name || 'Noma\'lum');
+        const total = completeSale?.totalAmount ?? 0;
+        const paid = completeSale?.paidAmount ?? 0;
+        const debt = Math.max(0, total - paid);
+        const now = new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' });
+        const itemLines = completeSale?.items?.map(i =>
+          `  • ${i.product?.name || 'Mahsulot'}: ${i.quantity} qop × ${fmtUZS(i.pricePerBag)}`
+        ).join('\n') || '';
+        const lines = [
+          `🛍 *Yangi sotuv*${completeSale?.receiptNumber ? ` #${completeSale.receiptNumber}` : ''}`,
+          `👤 ${customerName}  |  👩‍💼 ${userName}`,
+          `🕐 ${now}`,
+          ``,
+          itemLines,
+          ``,
+          `💰 *Jami: ${fmt(total)}*  |  ${payLabel}: ${fmt(paid)}`,
+          debt > 0 ? `⚠️ Qarz: *${fmt(debt)}*` : `✅ To'liq to'landi`,
+        ].filter(Boolean).join('\n');
+        await TelegramUserService.sendToSotuvlarTopic(lines);
+      } catch { /* silent */ }
+    });
 
     return completeSale as SaleWithRelations;
   }

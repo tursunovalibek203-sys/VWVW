@@ -343,6 +343,9 @@ export default function AddSaleClean() {
   const orderData = location.state?.orderData;
   const { isOnline } = useOnlineStatus();
 
+  const debtItem = location.state?.debtItem; // CustomerProfile dan kelgan qarz ma'lumoti
+  const presetCustomerId = location.state?.customerId;
+
   const saleForm = useSaleForm({ editSale, orderData });
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -358,6 +361,9 @@ export default function AddSaleClean() {
   // Inline new customer form
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
+
+  // Mijoz mahsulot qarzlari
+  const [customerProductDebts, setCustomerProductDebts] = useState<any[]>([]);
 
   // Real-time product sync
   const handleProductUpdate = useCallback((updatedProduct: Product) => {
@@ -485,6 +491,49 @@ export default function AddSaleClean() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Mijoz qarzlarini yuklash
+  useEffect(() => {
+    const customerId = saleForm.form.customerId;
+    if (!customerId) {
+      setCustomerProductDebts([]);
+      return;
+    }
+    api.get(`/customers/${customerId}/product-debts`)
+      .then(res => setCustomerProductDebts(res.data?.data || []))
+      .catch(() => setCustomerProductDebts([]));
+  }, [saleForm.form.customerId]);
+
+  // CustomerProfile dan kelgan qarz ma'lumotini o'rnatish
+  useEffect(() => {
+    if (presetCustomerId && !saleForm.form.customerId) {
+      saleForm.updateFormField('customerId', presetCustomerId);
+    }
+  }, [presetCustomerId]);
+
+  // Qarz to'lash uchun debtItem ni savatga qo'shish (mahsulotlar yuklangandan keyin)
+  useEffect(() => {
+    if (!debtItem || saleForm.products.length === 0) return;
+    const product = saleForm.products.find(p => p.id === debtItem.productId);
+    if (!product) return;
+    saleForm.updateFormField('items', [
+      ...saleForm.form.items,
+      {
+        productId: debtItem.productId,
+        productName: debtItem.productName,
+        quantity: debtItem.quantity,
+        bagDisplayValue: debtItem.quantity.toString(),
+        pricePerBag: 0,
+        pricePerPiece: 0,
+        unitsPerBag: debtItem.unitsPerBag || 1,
+        subtotal: 0,
+        warehouse: product.warehouse || 'other',
+        saleType: 'bag' as const,
+        isDebtPayment: true,
+        productDebtId: debtItem.debtId,
+      }
+    ]);
+  }, [debtItem, saleForm.products.length]);
 
   // Sahifa ko'rinib qolganda maxsulotlarni yangilash (bir xil tabda)
   useEffect(() => {
@@ -758,6 +807,66 @@ export default function AddSaleClean() {
                 </div>
               )}
             </div>
+
+            {/* Mijoz mahsulot qarzlari banneri */}
+            {customerProductDebts.length > 0 && (
+              <div className="bg-amber-50 rounded-2xl border border-amber-300 p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <p className="text-sm font-semibold text-amber-800">
+                    {latinToCyrillic('Bu mijozga mahsulot qarzingiz bor')}:
+                  </p>
+                </div>
+                {customerProductDebts.map((debt: any) => {
+                  const totalUnits = Math.round(debt.quantity * (debt.unitsPerBag || 1));
+                  const alreadyInCart = saleForm.form.items.some(
+                    i => i.productDebtId === debt.id && i.isDebtPayment
+                  );
+                  return (
+                    <div key={debt.id} className="flex items-center justify-between gap-2 bg-white rounded-xl border border-amber-200 px-3 py-2">
+                      <div>
+                        <span className="text-sm font-semibold text-slate-900">{debt.productName}</span>
+                        <span className="ml-2 text-xs text-amber-700 font-medium">
+                          {totalUnits.toLocaleString()} {latinToCyrillic('dona')} ({debt.quantity.toLocaleString()} {latinToCyrillic('qop')})
+                        </span>
+                      </div>
+                      {alreadyInCart ? (
+                        <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-2 py-1 rounded-lg">
+                          ✓ {latinToCyrillic('Savatda')}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const product = saleForm.products.find(p => p.id === debt.productId);
+                            saleForm.updateFormField('items', [
+                              ...saleForm.form.items,
+                              {
+                                productId: debt.productId,
+                                productName: debt.productName,
+                                quantity: debt.quantity,
+                                bagDisplayValue: debt.quantity.toString(),
+                                pricePerBag: 0,
+                                pricePerPiece: 0,
+                                unitsPerBag: debt.unitsPerBag || 1,
+                                subtotal: 0,
+                                warehouse: product?.warehouse || 'other',
+                                saleType: 'bag' as const,
+                                isDebtPayment: true,
+                                productDebtId: debt.id,
+                              }
+                            ]);
+                          }}
+                          className="flex-shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold transition-colors active:scale-95"
+                        >
+                          {latinToCyrillic("Savatga (0 so'm)")}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Haydovchi / Yetkazib berish */}
             <div className="bg-white rounded-2xl border border-slate-200/70 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden">
@@ -1041,6 +1150,7 @@ export default function AddSaleClean() {
                             mainIndex={main.i}
                             subIndices={subs.map(({ i }) => i)}
                             currency={saleForm.form.currency}
+                            products={saleForm.products}
                             onUpdate={(idx, updates) => {
                               saleForm.updateItem(idx, updates);
                               setEditingItemIndex(idx);

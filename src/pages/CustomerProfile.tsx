@@ -54,6 +54,7 @@ export default function CustomerProfile() {
     notes: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [productDebts, setProductDebts] = useState<any[]>([]);
 
   useEffect(() => {
     loadCustomerData();
@@ -61,11 +62,13 @@ export default function CustomerProfile() {
 
   const loadCustomerData = async () => {
     try {
-      const [customerRes, salesRes] = await Promise.all([
+      const [customerRes, salesRes, debtsRes] = await Promise.all([
         api.get(`/customers/${id}`),
-        api.get(`/sales?customerId=${id}`)
+        api.get(`/sales?customerId=${id}`),
+        api.get(`/customers/${id}/product-debts`).catch(() => ({ data: { data: [] } })),
       ]);
       setCustomer(customerRes.data);
+      setProductDebts(debtsRes.data?.data || []);
 
       // API dan kelgan ma'lumotni to'g'ri parse qilish
       const salesData = salesRes.data?.sales || salesRes.data || [];
@@ -437,6 +440,61 @@ export default function CustomerProfile() {
           <p className="text-xs text-gray-400">{latinToCyrillic('Har bir sotuv')}</p>
         </div>
       </div>
+
+      {/* Mahsulot qarzlari bo'limi */}
+      {productDebts.length > 0 && (
+        <div className="bg-amber-50 rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-amber-200 flex items-center justify-between gap-3">
+            <h2 className="text-base sm:text-lg font-bold text-amber-900 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              {latinToCyrillic('Mahsulot qarzlari')}
+            </h2>
+            <span className="text-xs font-medium text-amber-700 bg-amber-100 rounded-full px-2.5 py-1">
+              {productDebts.length} {latinToCyrillic('ta qarz')}
+            </span>
+          </div>
+          <div className="p-4 sm:p-5 space-y-3">
+            {productDebts.map((debt: any) => {
+              const totalUnits = Math.round(debt.quantity * (debt.unitsPerBag || 1));
+              return (
+                <div key={debt.id} className="flex items-center justify-between gap-3 bg-white rounded-xl border border-amber-200 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{trData(debt.productName)}</p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      <span className="font-bold">{totalUnits.toLocaleString()} {latinToCyrillic('dona')}</span>
+                      {' '}({debt.quantity.toLocaleString()} {latinToCyrillic('qop')})
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {latinToCyrillic('Sana')}: {new Date(debt.createdAt).toLocaleDateString('uz-UZ')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const path = isCashier ? '/cashier/sales/add' : '/sales/add';
+                      navigate(path, {
+                        state: {
+                          debtItem: {
+                            productId: debt.productId,
+                            productName: debt.productName,
+                            quantity: debt.quantity,
+                            unitsPerBag: debt.unitsPerBag || 1,
+                            debtId: debt.id,
+                          },
+                          customerId: id,
+                        }
+                      });
+                    }}
+                    className="flex-shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold transition-colors active:scale-95"
+                  >
+                    {latinToCyrillic("To'lash")}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Sales history */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

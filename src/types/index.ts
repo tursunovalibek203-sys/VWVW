@@ -399,8 +399,13 @@ export interface SaleItemForm {
   warehouse?: string;
   subType?: string;
   saleType: 'bag' | 'piece' | 'komplekt';
-  komplektGroupId?: string; // Bir komplektdagi barcha mahsulotlar uchun bir xil ID
-  isKomplektMain?: boolean;  // Asosiy mahsulot (preform/kapsula)
+  komplektGroupId?: string;
+  isKomplektMain?: boolean;
+  // Komplekt qarz tizimi uchun
+  komplektMode?: 'full' | 'actual'; // Faqat isKomplektMain=true itemlarda
+  originalQuantity?: number; // Sub-itemlarda: to'liq set miqdori (qop)
+  isDebtPayment?: boolean; // Bu item mijoz qarzini to'lash uchun
+  productDebtId?: string;  // Qaysi qarz to'lanayotgani
 }
 
 export interface SaleFormData {

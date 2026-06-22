@@ -130,6 +130,26 @@ model Customer {
   contracts       Contract[]
   orders          Order[]
   chatMessages    CustomerChat[]
+  productDebts    CustomerProductDebt[]
+}
+
+model CustomerProductDebt {
+  id          String   @id @default(uuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  saleId      String?
+  productId   String
+  productName String
+  quantity    Float    // Qop miqdori (bags)
+  unitsPerBag Float    @default(1)
+  status      String   @default("ACTIVE") // ACTIVE | PAID
+  notes       String?
+  createdAt   DateTime @default(now())
+  paidAt      DateTime?
+  paidSaleId  String?
+
+  @@index([customerId])
+  @@index([status])
 }
 
 model Sale {

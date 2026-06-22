@@ -1097,5 +1097,19 @@ router.post('/:id/reconcile-balance', authorize('ADMIN'), async (req: AuthReques
   }
 });
 
+// Mijozning mahsulot qarzlarini olish
+router.get('/:id/product-debts', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const debts = await (prisma as any).customerProductDebt.findMany({
+      where: { customerId: id, status: 'ACTIVE' },
+      orderBy: { createdAt: 'asc' },
+    });
+    res.json({ data: debts });
+  } catch (error: any) {
+    res.status(500).json(errorResponse('Mahsulot qarzlarini yuklab bo\'lmadi', error.message));
+  }
+});
+
 export default router;
 

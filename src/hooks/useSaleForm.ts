@@ -354,10 +354,12 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
       }
 
       for (const kItem of komplektItems) {
+        const kQty = typeof kItem.quantity === 'number' ? kItem.quantity : parseFloat(kItem.quantity || '0');
         items.push({
           ...kItem,
           komplektGroupId: groupId,
           isKomplektMain: false,
+          originalQuantity: kQty, // To'liq komplektdagi asl miqdor
         });
       }
 
@@ -507,6 +509,34 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
     setIsSubmitting(true);
 
     try {
+      // Komplekt qarzlarini hisoblash (full mode da yetishmagan sub-itemlar)
+      const komplektDebts: { productId: string; productName: string; quantity: number; unitsPerBag: number }[] = [];
+      const debtPayments: { productDebtId: string }[] = [];
+
+      for (const item of form.items) {
+        if (item.isKomplektMain && item.komplektMode === 'full') {
+          const groupSubs = form.items.filter(
+            s => s.komplektGroupId === item.komplektGroupId && !s.isKomplektMain
+          );
+          for (const sub of groupSubs) {
+            const origQty = sub.originalQuantity ?? (typeof sub.quantity === 'number' ? sub.quantity : parseFloat(sub.quantity || '0'));
+            const actualQty = typeof sub.quantity === 'number' ? sub.quantity : parseFloat(sub.quantity || '0');
+            const debtBags = origQty - actualQty;
+            if (debtBags > 0.0001) {
+              komplektDebts.push({
+                productId: sub.productId,
+                productName: sub.productName,
+                quantity: debtBags,
+                unitsPerBag: sub.unitsPerBag || 1,
+              });
+            }
+          }
+        }
+        if (item.isDebtPayment && item.productDebtId) {
+          debtPayments.push({ productDebtId: item.productDebtId });
+        }
+      }
+
       const saleData = {
         customerId: form.customerId || null,
         customerName: form.customerName || form.manualCustomerName,
@@ -521,7 +551,11 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
           subtotal: item.subtotal,
           warehouse: item.warehouse,
           saleType: item.saleType,
+          isDebtPayment: item.isDebtPayment,
+          productDebtId: item.productDebtId,
         })),
+        komplektDebts: komplektDebts.length > 0 ? komplektDebts : undefined,
+        debtPayments: debtPayments.length > 0 ? debtPayments : undefined,
         paymentDetails: {
           uzs: parseFloat(form.paidUZS || '0'),
           usd: parseFloat(form.paidUSD || '0'),
