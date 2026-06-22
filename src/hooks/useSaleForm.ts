@@ -541,7 +541,7 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
       }
 
       const saleData = {
-        customerId: form.customerId || null,
+        customerId: form.customerId || undefined,
         customerName: form.customerName || form.manualCustomerName,
         customerPhone: form.manualCustomerPhone,
         items: form.items
