@@ -625,7 +625,7 @@ export function Drivers() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-1.5">
-                        {(driver.debtToCompany || 0) > 0 && (
+                        {((driver.debtToCompany || 0) > 0 || (driver.debtToCompanyUSD || 0) > 0) && (
                           <button
                             type="button"
                             onClick={() => openPaymentModal(driver)}
@@ -728,12 +728,21 @@ export function Drivers() {
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{latinToCyrillic('Yetkazishlar')}</p>
                   <p className="mt-0.5 text-sm font-bold text-slate-900 tabular-nums">{driver.totalDeliveries}</p>
                 </div>
-                <div className={`rounded-xl p-3 ${(driver.debtToCompany || 0) > 0 ? 'bg-amber-50' : 'bg-slate-50'}`}>
-                  <p className={`text-xs font-medium uppercase tracking-wide ${(driver.debtToCompany || 0) > 0 ? 'text-amber-500' : 'text-slate-400'}`}>{latinToCyrillic('Qarz (UZS)')}</p>
-                  <p className={`mt-0.5 text-sm font-bold tabular-nums ${(driver.debtToCompany || 0) > 0 ? 'text-amber-700' : 'text-slate-400'}`}>
-                    {(driver.debtToCompany || 0) > 0 ? Math.round(driver.debtToCompany!).toLocaleString() : '—'}
-                  </p>
-                </div>
+                {(() => {
+                  const hasDebt = (driver.debtToCompany || 0) > 0 || (driver.debtToCompanyUSD || 0) > 0;
+                  const usdD = driver.debtToCompanyUSD || 0;
+                  const uzsD = driver.debtToCompany || 0;
+                  const rate = parseFloat(paymentExchangeRate) || 12700;
+                  const pureUZS = Math.max(0, Math.round(uzsD - usdD * rate));
+                  return (
+                    <div className={`rounded-xl p-3 ${hasDebt ? 'bg-amber-50' : 'bg-slate-50'}`}>
+                      <p className={`text-xs font-medium uppercase tracking-wide ${hasDebt ? 'text-amber-500' : 'text-slate-400'}`}>{latinToCyrillic('Qarz')}</p>
+                      {!hasDebt && <p className="mt-0.5 text-sm font-bold text-slate-400">—</p>}
+                      {usdD > 0 && <p className="mt-0.5 text-sm font-bold text-amber-700 tabular-nums">${usdD.toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>}
+                      {pureUZS > 1000 && <p className={`${usdD > 0 ? '' : 'mt-0.5 '}text-xs font-semibold text-amber-600 tabular-nums`}>{pureUZS.toLocaleString()} UZS</p>}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-500">
@@ -748,7 +757,7 @@ export function Drivers() {
               </div>
 
               <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-end gap-1 flex-wrap">
-                {(driver.debtToCompany || 0) > 0 && (
+                {((driver.debtToCompany || 0) > 0 || (driver.debtToCompanyUSD || 0) > 0) && (
                   <button
                     type="button"
                     onClick={() => openPaymentModal(driver)}
