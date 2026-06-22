@@ -488,10 +488,11 @@ router.post('/:id/payment', authorize('ADMIN', 'MANAGER', 'CASHIER'), async (req
 
     // Atomik: driver qarz kamaytirish + kassaga kirim + sotuvlarni PAID belgilash
     await prisma.$transaction(async (tx) => {
-      // USD qarz: faqat USD to'lov bilan kamayadi
+      // USD qarz kamayadi
       const newDebtUSD = Math.max(0, (driver.debtToCompanyUSD || 0) - usd);
-      // UZS qarz: faqat UZS + Karta to'lov bilan kamayadi (USD ekvivalenti EMAS)
-      const newDebtUZS = Math.max(0, (driver.debtToCompany || 0) - (uzs + karta));
+      // UZS qarz: uzs + karta + USD ekvivalenti (eski data uchun backward-compatible)
+      // Eski bug: USD savdolarda debtToCompany ga ham usd*rate yozilgan edi
+      const newDebtUZS = Math.max(0, (driver.debtToCompany || 0) - (uzs + karta + usd * rate));
 
       await tx.$executeRaw`
         UPDATE "Driver"

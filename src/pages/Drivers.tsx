@@ -1086,12 +1086,31 @@ export function Drivers() {
             </div>
 
             <form id="driver-payment-form" onSubmit={handleDriverPayment} className="p-6 space-y-4">
-              {/* Joriy qarz */}
-              <div className="flex items-center justify-between bg-amber-50 rounded-xl px-4 py-3">
-                <span className="text-sm font-medium text-amber-700">{latinToCyrillic('Joriy qarz')}</span>
-                <span className="text-sm font-bold text-amber-800 tabular-nums">
-                  {Math.round(paymentDriver.debtToCompany || 0).toLocaleString()} UZS
-                </span>
+              {/* Joriy qarz — USD va UZS alohida */}
+              <div className="bg-amber-50 rounded-xl px-4 py-3 space-y-1.5">
+                <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">{latinToCyrillic('Joriy qarz')}</span>
+                {(paymentDriver.debtToCompanyUSD || 0) > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-amber-600">💵 USD</span>
+                    <span className="text-sm font-bold text-amber-800 tabular-nums">
+                      ${(paymentDriver.debtToCompanyUSD || 0).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                {(() => {
+                  const _rate = parseFloat(paymentExchangeRate) || 12700;
+                  const usdEquiv = (paymentDriver.debtToCompanyUSD || 0) * _rate;
+                  const pureUZS = Math.max(0, Math.round((paymentDriver.debtToCompany || 0) - usdEquiv));
+                  return pureUZS > 0 ? (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-amber-600">💴 UZS</span>
+                      <span className="text-sm font-bold text-amber-800 tabular-nums">{pureUZS.toLocaleString()} UZS</span>
+                    </div>
+                  ) : null;
+                })()}
+                {(paymentDriver.debtToCompanyUSD || 0) === 0 && (paymentDriver.debtToCompany || 0) === 0 && (
+                  <span className="text-sm font-bold text-emerald-600">{latinToCyrillic("Qarz yo'q")}</span>
+                )}
               </div>
 
               {/* Kurs */}
@@ -1112,10 +1131,12 @@ export function Drivers() {
                 const _uzs = parseFloat(paymentUZS) || 0;
                 const _usd = parseFloat(paymentUSD) || 0;
                 const _karta = parseFloat(paymentKarta) || 0;
-                const totalDebt = paymentDriver?.debtToCompany || 0;
-                const fUSD  = () => { const r = Math.max(0, (totalDebt - _uzs - _karta) / _rate); setPaymentUSD(r > 0 ? r.toFixed(2) : '0'); };
-                const fUZS  = () => setPaymentUZS(String(Math.max(0, Math.round(totalDebt - _usd * _rate - _karta))));
-                const fKarta = () => setPaymentKarta(String(Math.max(0, Math.round(totalDebt - _uzs - _usd * _rate))));
+                const usdDebt  = paymentDriver?.debtToCompanyUSD || 0;
+                const usdEquiv = usdDebt * _rate;
+                const pureUZS  = Math.max(0, (paymentDriver?.debtToCompany || 0) - usdEquiv);
+                const fUSD   = () => setPaymentUSD(usdDebt > 0 ? usdDebt.toFixed(2) : '0');
+                const fUZS   = () => setPaymentUZS(pureUZS > 0 ? String(Math.round(pureUZS - _karta)) : '0');
+                const fKarta = () => setPaymentKarta(pureUZS > 0 ? String(Math.round(pureUZS - _uzs)) : '0');
                 return (
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">{latinToCyrillic('Topshirilgan summalar')}</label>
@@ -1148,25 +1169,35 @@ export function Drivers() {
 
               {/* Jami va qolgan qarz */}
               {(() => {
-                const usd = parseFloat(paymentUSD) || 0;
-                const uzs = parseFloat(paymentUZS) || 0;
+                const usd   = parseFloat(paymentUSD)   || 0;
+                const uzs   = parseFloat(paymentUZS)   || 0;
                 const karta = parseFloat(paymentKarta) || 0;
-                const rate = parseFloat(paymentExchangeRate) || 12700;
-                const totalUZS = usd * rate + uzs + karta;
-                if (totalUZS <= 0) return null;
-                const remaining = Math.max(0, Math.round((paymentDriver.debtToCompany || 0) - totalUZS));
+                const rate  = parseFloat(paymentExchangeRate) || 12700;
+                if (usd <= 0 && uzs <= 0 && karta <= 0) return null;
+                const remUSD = Math.max(0, (paymentDriver.debtToCompanyUSD || 0) - usd);
+                const remUZS = Math.max(0, Math.round((paymentDriver.debtToCompany || 0) - (uzs + karta + usd * rate)));
+                const allClear = remUSD === 0 && remUZS === 0;
                 return (
-                  <div className="bg-emerald-50 rounded-xl px-4 py-3 space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-emerald-700 font-medium">{latinToCyrillic('Jami (UZS)')}</span>
-                      <span className="font-bold text-emerald-800 tabular-nums">{Math.round(totalUZS).toLocaleString()} UZS</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">{latinToCyrillic('Qolgan qarz')}</span>
-                      <span className={`font-semibold tabular-nums ${remaining === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                        {remaining.toLocaleString()} UZS
-                      </span>
-                    </div>
+                  <div className={`rounded-xl px-4 py-3 space-y-1 ${allClear ? 'bg-emerald-50' : 'bg-amber-50'}`}>
+                    {usd > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">{latinToCyrillic("Qolgan USD qarz")}</span>
+                        <span className={`font-semibold tabular-nums ${remUSD === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          ${remUSD.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {(uzs > 0 || karta > 0) && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">{latinToCyrillic("Qolgan UZS qarz")}</span>
+                        <span className={`font-semibold tabular-nums ${remUZS === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {remUZS.toLocaleString()} UZS
+                        </span>
+                      </div>
+                    )}
+                    {allClear && (
+                      <p className="text-xs text-emerald-600 font-semibold text-center">{latinToCyrillic("✓ Qarz to'liq uziladi")}</p>
+                    )}
                   </div>
                 );
               })()}
