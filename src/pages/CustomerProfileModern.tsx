@@ -149,7 +149,7 @@ export default function CustomerProfileModern() {
       [latinToCyrillic('Sana')]:                 formatDate(s.createdAt),
       [latinToCyrillic('Mahsulotlar')]:           getProductNames(s),
       [latinToCyrillic('Jami')]:                  s.totalAmount,
-      [latinToCyrillic("To'langan")]:             s.paidAmount,
+      [latinToCyrillic("To'langan")]:             s.driverId && (s.driverPaymentStatus === 'PENDING' || s.driverPaymentStatus === 'DELIVERED') ? (s.driverCollectedAmount || s.totalAmount) : s.paidAmount,
       [latinToCyrillic('Qarz')]:                  s.debtAmount || 0,
       [latinToCyrillic('Valyuta')]:               s.currency,
       [latinToCyrillic("To'lov turi")]:           paymentLabel(s.paymentMethod || s.paymentType || 'CASH'),
@@ -626,7 +626,7 @@ export default function CustomerProfileModern() {
                         <td className="px-5 py-4 text-sm text-emerald-600 font-medium text-right whitespace-nowrap tabular-nums">
                           {formatCurrency(
                             sale.driverId && (sale.driverPaymentStatus === 'PENDING' || sale.driverPaymentStatus === 'DELIVERED')
-                              ? (sale.driverCollectedAmount ?? sale.totalAmount)
+                              ? (sale.driverCollectedAmount || sale.totalAmount)
                               : sale.paidAmount,
                             sale.currency
                           )}
@@ -684,7 +684,7 @@ export default function CustomerProfileModern() {
                       <p className="mt-0.5 text-sm font-bold text-emerald-600 tabular-nums">
                         {formatCurrency(
                           sale.driverId && (sale.driverPaymentStatus === 'PENDING' || sale.driverPaymentStatus === 'DELIVERED')
-                            ? (sale.driverCollectedAmount ?? sale.totalAmount)
+                            ? (sale.driverCollectedAmount || sale.totalAmount)
                             : sale.paidAmount,
                           sale.currency
                         )}
