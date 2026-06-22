@@ -34,53 +34,56 @@ router.get('/', async (req, res) => {
 // Haydovchi yaratish — ADMIN, MANAGER, CASHIER va boshqa autentifikatsiya bo'lgan foydalanuvchilar
 router.post('/', async (req: AuthRequest, res) => {
   try {
-    const { 
-      name, 
-      phone, 
-      licenseNumber, 
-      vehicleNumber, 
-      login, 
-      password,
-      telegramBotToken 
-    } = req.body;
+    const { name, phone, licenseNumber, vehicleNumber, login, password, telegramBotToken } = req.body;
 
-    // Avval User yaratish
+    if (!name?.trim()) return res.status(400).json({ error: 'Ism kiritilishi shart' });
+
+    // Phone: bo'sh bo'lsa unique placeholder yaratamiz
+    const phoneValue = phone?.trim() || `auto-${Date.now()}`;
+    // vehicleNumber: ixtiyoriy
+    const vehicleValue = vehicleNumber?.trim() || '';
+
+    // Avval User yaratish (ixtiyoriy)
     let user = null;
-    if (login && password) {
-      user = await prisma.user.create({
-        data: {
-          login,
-          password, // Haqiqiy loyihada hash qilish kerak
-          name,
-          role: 'DRIVER'
-        }
+    if (login?.trim() && password?.trim()) {
+      const existing = await prisma.user.findFirst({ where: { login: login.trim() } });
+      if (existing) return res.status(400).json({ error: "Bu login band, boshqa login tanlang" });
+      user = await (prisma.user as any).create({
+        data: { login: login.trim(), password: password.trim(), name: name.trim(), role: 'CASHIER' }
       });
     }
 
-    // Haydovchi yaratish
-    const driver = await prisma.driver.create({
+    // Telefon allaqachon mavjudligini tekshirish
+    if (phone?.trim()) {
+      const existingPhone = await (prisma.driver as any).findUnique({ where: { phone: phone.trim() } });
+      if (existingPhone) return res.status(400).json({ error: "Bu telefon raqam allaqachon mavjud" });
+    }
+
+    const driver = await (prisma.driver as any).create({
       data: {
         userId: user?.id,
-        name,
-        phone,
-        licenseNumber,
-        vehicleNumber,
-        status: 'AVAILABLE'
+        name: name.trim(),
+        phone: phoneValue,
+        licenseNumber: licenseNumber?.trim() || null,
+        vehicleNumber: vehicleValue,
+        status: 'AVAILABLE',
+        debtToCompany: 0,
+        debtToCompanyUSD: 0,
       },
-      include: {
-        user: { select: { name: true, login: true } }
-      }
+      include: { user: { select: { name: true, login: true } } }
     });
 
-    // Agar bot token berilgan bo'lsa, botni ishga tushirish
     if (telegramBotToken) {
-      await DriverBotManager.initDriverBot(driver.id, telegramBotToken);
+      try { await DriverBotManager.initDriverBot(driver.id, telegramBotToken); } catch {}
     }
 
     res.json(driver);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create driver error:', error);
-    res.status(500).json({ error: 'Failed to create driver' });
+    if (error?.code === 'P2002') {
+      return res.status(400).json({ error: "Bu ma'lumot allaqachon mavjud (telefon yoki login)" });
+    }
+    res.status(500).json({ error: 'Haydovchi qo\'shishda xatolik: ' + error.message });
   }
 });
 
