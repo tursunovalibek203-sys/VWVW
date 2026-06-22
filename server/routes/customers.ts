@@ -1111,5 +1111,40 @@ router.get('/:id/product-debts', async (req, res) => {
   }
 });
 
+// Mahsulot qarzini yopish (yetkazib berish)
+router.patch('/:customerId/product-debts/:debtId/deliver', async (req, res) => {
+  try {
+    const { customerId, debtId } = req.params;
+    const { deliveredQuantity } = req.body;
+
+    const debt = await (prisma as any).customerProductDebt.findFirst({
+      where: { id: debtId, customerId, status: 'ACTIVE' },
+    });
+    if (!debt) {
+      return res.status(404).json(errorResponse('Qarz topilmadi yoki allaqachon yopilgan'));
+    }
+
+    const delivered = deliveredQuantity !== undefined ? Number(deliveredQuantity) : debt.quantity;
+
+    if (delivered >= debt.quantity) {
+      // To'liq yetkazildi — yopish
+      await (prisma as any).customerProductDebt.update({
+        where: { id: debtId },
+        data: { status: 'PAID', paidAt: new Date(), deliveredQuantity: debt.quantity },
+      });
+    } else {
+      // Qisman yetkazildi — miqdorni kamaytirish
+      await (prisma as any).customerProductDebt.update({
+        where: { id: debtId },
+        data: { quantity: debt.quantity - delivered, deliveredQuantity: (debt.deliveredQuantity || 0) + delivered },
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json(errorResponse('Qarzni yopishda xatolik', error.message));
+  }
+});
+
 export default router;
 

@@ -96,20 +96,23 @@ export default function CustomerProfileModern() {
   const { addToast } = useToast();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
+  const [productDebts, setProductDebts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReconciling, setIsReconciling] = useState(false);
+  const [deliveringDebtId, setDeliveringDebtId] = useState<string | null>(null);
   const [paymentForm, setPaymentForm] = useState({ uzs: '', usd: '', karta: '', kurs: '12700', notes: '', debtTarget: 'UZS' as 'UZS' | 'USD' });
   const [deletingSaleId, setDeletingSaleId] = useState<string | null>(null);
 
   const loadCustomerData = async () => {
     try {
       setRefreshing(true);
-      const [customerRes, salesRes] = await Promise.all([
+      const [customerRes, salesRes, debtsRes] = await Promise.all([
         api.get(`/customers/${id}`),
-        api.get(`/sales?customerId=${id}`)
+        api.get(`/sales?customerId=${id}`),
+        api.get(`/customers/${id}/product-debts`).catch(() => ({ data: { data: [] } })),
       ]);
 
       // Handle standardized API response format
@@ -118,6 +121,7 @@ export default function CustomerProfileModern() {
 
       setCustomer(customerData);
       setSales(salesData);
+      setProductDebts(debtsRes.data?.data || []);
     } catch (error) {
       console.error('Mijoz ma\'lumotlarini yuklashda xatolik:', error);
       addToast(
@@ -225,6 +229,38 @@ export default function CustomerProfileModern() {
   const handleNewSale = () => {
     const base = location.pathname.startsWith('/cashier') ? '/cashier/sales/add' : '/sales/add';
     navigate(base, { state: { customerId: id } });
+  };
+
+  const handleDeliverDebt = async (debt: any) => {
+    setDeliveringDebtId(debt.id);
+    try {
+      await api.patch(`/customers/${id}/product-debts/${debt.id}/deliver`);
+      addToast(toast.success(
+        latinToCyrillic('Yetkazildi'),
+        latinToCyrillic(`${trData(debt.productName)} qarzi yopildi`)
+      ));
+      await loadCustomerData();
+    } catch (e: any) {
+      addToast(toast.error(latinToCyrillic('Xatolik'), e?.response?.data?.error || latinToCyrillic('Xatolik yuz berdi')));
+    } finally {
+      setDeliveringDebtId(null);
+    }
+  };
+
+  const handleGoToSaleDebt = (debt: any) => {
+    const base = location.pathname.startsWith('/cashier') ? '/cashier/sales/add' : '/sales/add';
+    navigate(base, {
+      state: {
+        debtItem: {
+          productId: debt.productId,
+          productName: debt.productName,
+          quantity: debt.quantity,
+          unitsPerBag: debt.unitsPerBag || 1,
+          debtId: debt.id,
+        },
+        customerId: id,
+      }
+    });
   };
 
   const handleReconcileBalance = async () => {
@@ -573,6 +609,58 @@ export default function CustomerProfileModern() {
           })}
         </div>
       </div>
+
+      {/* Mahsulot qarzlari */}
+      {productDebts.length > 0 && (
+        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-amber-200 bg-amber-100">
+            <h2 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+              {latinToCyrillic('Mahsulot qarzlari')}
+            </h2>
+            <span className="text-xs font-semibold text-amber-700 bg-amber-200 rounded-full px-2.5 py-0.5">
+              {productDebts.length} {latinToCyrillic('ta')}
+            </span>
+          </div>
+          <div className="divide-y divide-amber-100">
+            {productDebts.map((debt: any) => {
+              const totalUnits = Math.round(debt.quantity * (debt.unitsPerBag || 1));
+              const isDelivering = deliveringDebtId === debt.id;
+              return (
+                <div key={debt.id} className="flex items-center justify-between gap-3 px-4 py-3 bg-white/60">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{trData(debt.productName)}</p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      <span className="font-bold">{totalUnits.toLocaleString()} {latinToCyrillic('dona')}</span>
+                      {' '}({debt.quantity.toLocaleString()} {latinToCyrillic('qop')})
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {new Date(debt.createdAt).toLocaleDateString('uz-UZ')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleGoToSaleDebt(debt)}
+                      className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold transition-colors"
+                    >
+                      {latinToCyrillic('Sotuvga')}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isDelivering}
+                      onClick={() => handleDeliverDebt(debt)}
+                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors"
+                    >
+                      {isDelivering ? '...' : latinToCyrillic('Berildi')}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Sales history */}
       <div>
