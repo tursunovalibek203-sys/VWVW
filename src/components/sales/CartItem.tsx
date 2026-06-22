@@ -1,7 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { SaleItemForm, Product } from '../../types';
-import { getCurrencySymbol, getDisplayAmount } from '../../lib/saleUtils';
 import { trData } from '../../lib/transliterator';
 
 const getProductTypeKey = (product: Product): string | null => {
@@ -9,38 +8,22 @@ const getProductTypeKey = (product: Product): string | null => {
   const bagType = product.bagType?.toLowerCase() || '';
   const warehouse = product.warehouse?.toLowerCase() || '';
 
-  // Preform - gram bo'yicha
   if (warehouse === 'preform' || name.includes('preform') || /\d+\s*(gr|g|гр|г)/i.test(name + ' ' + bagType)) {
     const gramMatch = (bagType + ' ' + name).match(/(\d+)\s*(?:гр|г|gr|g)/i);
-    if (gramMatch) {
-      return `preform-${gramMatch[1]}gr`;
-    }
+    if (gramMatch) return `preform-${gramMatch[1]}gr`;
     return 'preform-other';
   }
-
-  // Krishka - mm bo'yicha
   if (warehouse === 'krishka' || name.includes('krishka') || name.includes('qopqoq') || name.includes('cap')) {
     const sizeMatch = name.match(/(\d{2,3})/);
-    if (sizeMatch && [28, 38, 48, 55].includes(parseInt(sizeMatch[1]))) {
-      return `krishka-${sizeMatch[1]}mm`;
-    }
+    if (sizeMatch && [28, 38, 48, 55].includes(parseInt(sizeMatch[1]))) return `krishka-${sizeMatch[1]}mm`;
     return 'krishka-other';
   }
-
-  // Ruchka - mm bo'yicha
   if (warehouse === 'ruchka' || name.includes('ruchka') || name.includes('handle')) {
     const sizeMatch = name.match(/(\d{2,3})/);
-    if (sizeMatch && [28, 38, 48].includes(parseInt(sizeMatch[1]))) {
-      return `ruchka-${sizeMatch[1]}mm`;
-    }
+    if (sizeMatch && [28, 38, 48].includes(parseInt(sizeMatch[1]))) return `ruchka-${sizeMatch[1]}mm`;
     return 'ruchka-other';
   }
-
-  // Custom warehouse
-  if (warehouse.startsWith('custom-')) {
-    return warehouse;
-  }
-
+  if (warehouse.startsWith('custom-')) return warehouse;
   return 'other';
 };
 
@@ -50,6 +33,7 @@ interface CartItemProps {
   isEditing: boolean;
   products: Product[];
   currency: string;
+  exchangeRate: number;
   latinToCyrillic: (text: string) => string;
   onUpdate: (index: number, updates: Partial<SaleItemForm>) => void;
   onRemove: (index: number) => void;
@@ -61,16 +45,16 @@ export const CartItem = ({
   isEditing,
   products,
   currency,
+  exchangeRate,
   latinToCyrillic,
   onUpdate,
   onRemove,
 }: CartItemProps) => {
-  // Narx inputi uchun mahalliy string state — "0.", "0.00", "0.002" yozishga imkon beradi
   const [localPrice, setLocalPrice] = useState<string | null>(null);
+  // Per-card currency toggle: false = $, true = UZS
+  const [showInUZS, setShowInUZS] = useState(currency === 'UZS');
 
   const cartProduct = products.find((p) => p.id === item.productId);
-  
-  // Faqat shu turdagi mahsulotlarni filterlash
   const filteredProducts = (() => {
     if (!cartProduct) return products;
     const typeKey = getProductTypeKey(cartProduct);
@@ -78,96 +62,83 @@ export const CartItem = ({
     return products.filter(p => getProductTypeKey(p) === typeKey);
   })();
 
+  // Convert: stored global-currency price → display price
+  const toDisplay = (val: number): number => {
+    if (showInUZS && currency !== 'UZS') return val * exchangeRate;   // USD stored → UZS display
+    if (!showInUZS && currency === 'UZS') return val / exchangeRate;   // UZS stored → USD display
+    return val;
+  };
+
+  // Convert: display price → stored global-currency price
+  const fromDisplay = (val: number): number => {
+    if (showInUZS && currency !== 'UZS') return val / exchangeRate;   // UZS entered → USD stored
+    if (!showInUZS && currency === 'UZS') return val * exchangeRate;   // USD entered → UZS stored
+    return val;
+  };
+
+  const displaySym = showInUZS ? "so'm " : '$';
+
   const handleQuantityChange = (val: string) => {
     const cleanVal = val.replace(/[^0-9.]/g, '');
     if (cleanVal === '') {
       onUpdate(index, { quantity: '', bagDisplayValue: '', subtotal: 0 });
       return;
     }
-
     const bagQuantity = parseFloat(cleanVal) || 0;
-
-    // unitsPerBag calculation - agar bo'sh bo'lsa 2000 ishlatiladi
-    const unitsPerBagValue = item.unitsPerBag?.toString() || '';
-    const unitsPerBag = unitsPerBagValue === '' ? 2000 : parseFloat(unitsPerBagValue) || 2000;
+    const unitsPerBag = parseFloat(item.unitsPerBag?.toString() || '2000') || 2000;
     const pricePerBag = item.pricePerBag || 0;
     const pricePerPiece = item.pricePerPiece || pricePerBag / unitsPerBag;
     const totalPieces = bagQuantity * unitsPerBag;
-
     let subtotal;
     if (item.saleType === 'piece') {
       subtotal = totalPieces * pricePerPiece;
     } else {
       subtotal = bagQuantity * pricePerBag;
     }
-
-    onUpdate(index, {
-      quantity: cleanVal,
-      bagDisplayValue: cleanVal,
-      subtotal,
-    });
+    onUpdate(index, { quantity: cleanVal, bagDisplayValue: cleanVal, subtotal });
   };
 
   const handlePriceChange = (val: string) => {
     const cleanVal = val.replace(/[^0-9.]/g, '');
-    console.log('💰 handlePriceChange:', { val, cleanVal, saleType: item.saleType });
-    
     if (cleanVal === '') {
       onUpdate(index, { pricePerBag: 0, pricePerPiece: 0, subtotal: 0 });
       return;
     }
-
-    const newPrice = parseFloat(cleanVal) || 0;
+    const displayedPrice = parseFloat(cleanVal) || 0;
+    const storedPrice = fromDisplay(displayedPrice);
     const bagQuantity = parseFloat(item.bagDisplayValue || item.quantity?.toString() || '0') || 0;
     const unitsPerBag = parseFloat(item.unitsPerBag?.toString() || '2000') || 2000;
-
-    console.log('💰 Calculating:', { newPrice, bagQuantity, unitsPerBag, currentPricePerBag: item.pricePerBag, currentPricePerPiece: item.pricePerPiece });
-
     const updateData: Partial<SaleItemForm> = {};
-
     if (item.saleType === 'piece') {
-      updateData.pricePerPiece = newPrice;
-      updateData.pricePerBag = newPrice * unitsPerBag;
-      const totalPieces = bagQuantity * unitsPerBag;
-      updateData.subtotal = totalPieces * newPrice;
+      updateData.pricePerPiece = storedPrice;
+      updateData.pricePerBag = storedPrice * unitsPerBag;
+      updateData.subtotal = bagQuantity * unitsPerBag * storedPrice;
     } else {
-      updateData.pricePerBag = newPrice;
-      updateData.pricePerPiece = newPrice / unitsPerBag;
-      updateData.subtotal = bagQuantity * newPrice;
+      updateData.pricePerBag = storedPrice;
+      updateData.pricePerPiece = storedPrice / unitsPerBag;
+      updateData.subtotal = bagQuantity * storedPrice;
     }
-
-    console.log('💰 Update data:', updateData);
     onUpdate(index, updateData);
   };
 
   const toggleSaleType = () => {
     const unitsPerBag = parseFloat(item.unitsPerBag?.toString() || '2000') || 2000;
     const bagQuantity = parseFloat(item.bagDisplayValue || item.quantity?.toString() || '0') || 0;
-
     let newPricePerBag = item.pricePerBag || 0;
     let newPricePerPiece = item.pricePerPiece || 0;
-
     if (item.saleType === 'piece') {
-      // Donadan qopga o'tish - dona narxini qop narxiga aylantirish
       newPricePerBag = (item.pricePerPiece || 0) * unitsPerBag;
       newPricePerPiece = item.pricePerPiece || 0;
     } else {
-      // Qopdan donaga o'tish - qop narxini dona narxiga aylantirish
       newPricePerPiece = (item.pricePerBag || 0) / unitsPerBag;
       newPricePerBag = item.pricePerBag || 0;
     }
-
-    // Subtotalni hisoblash
     let subtotal;
     if (item.saleType === 'piece') {
-      // Donadan qopga o'tganda
       subtotal = bagQuantity * newPricePerBag;
     } else {
-      // Qopdan donaga o'tganda
-      const totalPieces = bagQuantity * unitsPerBag;
-      subtotal = totalPieces * newPricePerPiece;
+      subtotal = bagQuantity * unitsPerBag * newPricePerPiece;
     }
-
     onUpdate(index, {
       saleType: item.saleType === 'piece' ? 'bag' : 'piece',
       pricePerBag: newPricePerBag,
@@ -180,11 +151,26 @@ export const CartItem = ({
     (parseFloat(item.bagDisplayValue || item.quantity?.toString() || '0') || 0) *
     (parseFloat(item.unitsPerBag?.toString() || '2000') || 2000);
 
+  const storedDisplayPrice = item.saleType === 'piece' ? item.pricePerPiece || 0 : item.pricePerBag || 0;
+
   return (
     <div className={`rounded-xl border overflow-hidden shadow-sm ${isEditing ? 'border-indigo-300 ring-1 ring-indigo-200' : 'border-slate-200'} bg-white`}>
 
-      {/* Qator 1: Mahsulot + Qop|Dona toggle + o'chirish */}
+      {/* Qator 1: $ / UZS + Mahsulot + Qop|Dona toggle + o'chirish */}
       <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+
+        {/* Per-card $ / UZS toggle */}
+        <div className="flex rounded-lg overflow-hidden border border-slate-200 flex-shrink-0">
+          <button type="button" onClick={() => setShowInUZS(false)}
+            className={`px-2.5 py-1.5 text-xs font-bold transition-all ${!showInUZS ? 'bg-green-600 text-white' : 'bg-white text-slate-400 hover:bg-slate-50'}`}>
+            $
+          </button>
+          <button type="button" onClick={() => setShowInUZS(true)}
+            className={`px-2.5 py-1.5 text-xs font-bold transition-all border-l border-slate-200 ${showInUZS ? 'bg-violet-600 text-white' : 'bg-white text-slate-400 hover:bg-slate-50'}`}>
+            UZS
+          </button>
+        </div>
+
         <select
           aria-label="Mahsulot tanlash"
           value={item.productId}
@@ -275,7 +261,7 @@ export const CartItem = ({
         {/* Narx */}
         <div>
           <label className="block text-[11px] font-semibold text-slate-400 mb-1 uppercase tracking-wide">
-            {latinToCyrillic('Narx')} / {item.saleType === 'piece' ? latinToCyrillic('dona') : latinToCyrillic('qop')}
+            {latinToCyrillic('Narx')} ({displaySym}{item.saleType === 'piece' ? latinToCyrillic('dona') : latinToCyrillic('qop')})
           </label>
           <input
             type="text"
@@ -284,17 +270,15 @@ export const CartItem = ({
             value={
               localPrice !== null
                 ? localPrice
-                : (item.saleType === 'piece' ? item.pricePerPiece?.toString() || '' : item.pricePerBag?.toString() || '')
+                : toDisplay(storedDisplayPrice).toString()
             }
             onFocus={(e) => {
-              const cur = item.saleType === 'piece' ? item.pricePerPiece?.toString() || '' : item.pricePerBag?.toString() || '';
-              setLocalPrice(cur);
+              setLocalPrice(toDisplay(storedDisplayPrice).toString());
               e.target.select();
             }}
             onChange={(e) => {
               const raw = e.target.value.replace(/[^0-9.]/g, '');
               setLocalPrice(raw);
-              // Agar haqiqiy raqam bo'lsa parent ni yangilaymiz
               if (raw !== '' && raw !== '.' && !raw.endsWith('.')) {
                 handlePriceChange(raw);
               }
@@ -315,7 +299,7 @@ export const CartItem = ({
       <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-t border-slate-100">
         <span className="text-xs text-slate-400 font-medium">{latinToCyrillic('Jami summa')}</span>
         <span className="text-base font-bold text-indigo-600 tabular-nums">
-          {getCurrencySymbol(currency)}{getDisplayAmount(item.subtotal || 0, currency)}
+          {displaySym}{toDisplay(item.subtotal || 0).toLocaleString()}
         </span>
       </div>
     </div>

@@ -1150,6 +1150,7 @@ export default function AddSaleClean() {
                             mainIndex={main.i}
                             subIndices={subs.map(({ i }) => i)}
                             currency={saleForm.form.currency}
+                            exchangeRate={saleForm.exchangeRateNum}
                             products={saleForm.products}
                             onUpdate={(idx, updates) => {
                               saleForm.updateItem(idx, updates);
@@ -1174,6 +1175,7 @@ export default function AddSaleClean() {
                             isEditing={editingItemIndex === index}
                             products={saleForm.products}
                             currency={saleForm.form.currency}
+                            exchangeRate={saleForm.exchangeRateNum}
                             latinToCyrillic={latinToCyrillic}
                             onUpdate={(idx, updates) => {
                               saleForm.updateItem(idx, updates);

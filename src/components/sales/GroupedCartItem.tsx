@@ -1,7 +1,6 @@
 import { Trash2, Package, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import type { SaleItemForm, Product } from '../../types';
-import { getCurrencySymbol } from '../../lib/saleUtils';
 import { latinToCyrillic, trData } from '../../lib/transliterator';
 
 const getProductTypeKey = (product: Product): string | null => {
@@ -38,6 +37,7 @@ interface GroupedCartItemProps {
   mainIndex: number;
   subIndices: number[];
   currency: string;
+  exchangeRate: number;
   products: Product[];
   onUpdate: (index: number, updates: Partial<SaleItemForm>) => void;
   onRemoveGroup: (groupId: string) => void;
@@ -58,13 +58,27 @@ export function GroupedCartItem({
   mainIndex,
   subIndices,
   currency,
+  exchangeRate,
   products,
   onUpdate,
   onRemoveGroup,
 }: GroupedCartItemProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const sym = getCurrencySymbol(currency);
+  // Per-card currency toggle: false = $, true = UZS
+  const [showInUZS, setShowInUZS] = useState(currency === 'UZS');
   const isBagMode = mainItem.saleType !== 'piece';
+
+  const toDisplay = (val: number): number => {
+    if (showInUZS && currency !== 'UZS') return val * exchangeRate;
+    if (!showInUZS && currency === 'UZS') return val / exchangeRate;
+    return val;
+  };
+  const fromDisplay = (val: number): number => {
+    if (showInUZS && currency !== 'UZS') return val / exchangeRate;
+    if (!showInUZS && currency === 'UZS') return val * exchangeRate;
+    return val;
+  };
+  const displaySym = showInUZS ? "so'm " : '$';
 
   // "full" = to'liq komplekt narxi, "actual" = real miqdorga qarab
   const isFullMode = mainItem.komplektMode === 'full';
@@ -79,7 +93,8 @@ export function GroupedCartItem({
   }, []);
 
   const priceInputProps = (key: number, item: SaleItemForm, onCommit: (val: string) => void) => {
-    const stored = isBagMode ? item.pricePerBag?.toString() || '' : item.pricePerPiece?.toString() || '';
+    const storedRaw = isBagMode ? item.pricePerBag || 0 : item.pricePerPiece || 0;
+    const stored = toDisplay(storedRaw).toString();
     const local = localPrices[key];
     return {
       type: 'text' as const,
@@ -241,7 +256,8 @@ export function GroupedCartItem({
 
   const handleMainPriceChange = (val: string) => {
     const clean = val.replace(/[^0-9.]/g, '');
-    const price = parseFloat(clean) || 0;
+    const displayedPrice = parseFloat(clean) || 0;
+    const price = fromDisplay(displayedPrice);
     const qty = qtyNum(mainItem.quantity);
     const upb = mainItem.unitsPerBag || 1;
     if (isBagMode) {
@@ -282,7 +298,8 @@ export function GroupedCartItem({
 
   const handleSubPriceChange = (idx: number, item: SaleItemForm, val: string) => {
     const clean = val.replace(/[^0-9.]/g, '');
-    const price = parseFloat(clean) || 0;
+    const displayedPrice = parseFloat(clean) || 0;
+    const price = fromDisplay(displayedPrice);
     const qty = isFullMode
       ? (item.originalQuantity ?? qtyNum(item.quantity))
       : qtyNum(item.quantity);
@@ -374,7 +391,7 @@ export function GroupedCartItem({
           <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{latinToCyrillic('Nomi')}</span>
           <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{latinToCyrillic('Qop')}</span>
           <span className="text-[10px] font-semibold text-amber-500 uppercase tracking-wide">1 {latinToCyrillic('qopda')}</span>
-          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{priceLabel} ({sym})</span>
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{priceLabel} ({displaySym})</span>
           <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide text-right">{latinToCyrillic('Summa')}</span>
         </div>
       )}
@@ -412,7 +429,7 @@ export function GroupedCartItem({
             />
 
             <span className="text-xs font-bold text-slate-700 text-right tabular-nums">
-              {sym}{mainItem.subtotal.toLocaleString()}
+              {displaySym}{toDisplay(mainItem.subtotal).toLocaleString()}
             </span>
           </div>
 
@@ -464,9 +481,9 @@ export function GroupedCartItem({
                 />
 
                 <span className="text-xs font-bold text-slate-700 text-right tabular-nums">
-                  {sym}{isFullMode
-                    ? ((sub.originalQuantity ?? qtyNum(sub.quantity)) * sub.pricePerBag).toLocaleString()
-                    : sub.subtotal.toLocaleString()}
+                  {displaySym}{isFullMode
+                    ? toDisplay((sub.originalQuantity ?? qtyNum(sub.quantity)) * sub.pricePerBag).toLocaleString()
+                    : toDisplay(sub.subtotal).toLocaleString()}
                 </span>
               </div>
             );
@@ -474,9 +491,20 @@ export function GroupedCartItem({
         </div>
       )}
 
-      {/* Footer — jami + Tuliq/Soniga toggle */}
+      {/* Footer — jami + Tuliq/Soniga toggle + $ / UZS toggle */}
       <div className={`flex items-center justify-between px-3 py-1.5 border-t ${hasDebt ? 'bg-amber-100/70 border-amber-200' : 'bg-blue-100/70 border-blue-200'}`}>
         <div className="flex items-center gap-2">
+          {/* Per-card $ / UZS toggle */}
+          <div className="flex rounded-lg overflow-hidden border border-slate-300">
+            <button type="button" onClick={() => setShowInUZS(false)}
+              className={`px-2.5 py-1 text-[11px] font-bold transition-all ${!showInUZS ? 'bg-green-600 text-white' : 'bg-white text-slate-400 hover:bg-slate-50'}`}>
+              $
+            </button>
+            <button type="button" onClick={() => setShowInUZS(true)}
+              className={`px-2.5 py-1 text-[11px] font-bold transition-all border-l border-slate-300 ${showInUZS ? 'bg-violet-600 text-white' : 'bg-white text-slate-400 hover:bg-slate-50'}`}>
+              UZS
+            </button>
+          </div>
           {/* Tuliq / Soniga toggle */}
           <div className="flex rounded-lg overflow-hidden border border-slate-300">
             <button
@@ -499,7 +527,7 @@ export function GroupedCartItem({
           {!isBagMode && <span className="text-[10px] text-emerald-600 font-medium">({latinToCyrillic('dona narxida')})</span>}
         </div>
         <span className={`text-sm font-bold tabular-nums ${hasDebt ? 'text-amber-800' : 'text-blue-800'}`}>
-          {sym}{groupTotal.toLocaleString()}
+          {displaySym}{toDisplay(groupTotal).toLocaleString()}
         </span>
       </div>
     </div>
