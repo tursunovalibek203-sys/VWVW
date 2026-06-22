@@ -3,6 +3,28 @@ import { prisma } from '../utils/prisma';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { DecimalHelper } from '../utils/decimal-helper';
 import { withCache, invalidateCache } from '../middleware/responseCache';
+import { TelegramUserService } from '../services/TelegramUserService';
+
+function fmtAmt(amount: number, currency: string) {
+  return currency === 'USD' ? `$${amount.toLocaleString()}` : `${amount.toLocaleString()} UZS`;
+}
+
+function notifyKassa(type: 'INCOME' | 'EXPENSE', amount: number, currency: string, method: string, description: string, userName: string) {
+  const emoji = type === 'INCOME' ? '📥' : '📤';
+  const label = type === 'INCOME' ? 'Kirim' : 'Chiqim';
+  const methodMap: Record<string, string> = { CASH: 'Naqd', CARD: 'Karta', USD: 'Dollar', CLICK: 'Click', PAYME: 'Payme', TRANSFER: "O'tkazma" };
+  const text = [
+    `${emoji} *${label}* — LuxPetPlast`,
+    ``,
+    `💵 Summa: ${fmtAmt(amount, currency)}`,
+    `💳 Usul: ${methodMap[method] || method}`,
+    description ? `📝 Izoh: ${description}` : '',
+    `👤 ${userName}`,
+    `🕐 ${new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}`,
+  ].filter(Boolean).join('\n');
+
+  TelegramUserService.sendToKassaTopic(text).catch(() => {});
+}
 
 const router = Router();
 
@@ -244,6 +266,7 @@ router.post('/add', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), async
     }
     const method = paymentMethod || type || 'CASH';
     const resolvedCurrency = method === 'CARD' ? 'UZS' : (currency || 'UZS');
+    const userName = (req.user as any)?.name || req.user?.email || 'Noma\'lum';
     await prisma.cashboxTransaction.create({
       data: {
         type: 'INCOME',
@@ -253,11 +276,12 @@ router.post('/add', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), async
         category: 'DEPOSIT',
         description: description || `Kassa kirim: ${method} ${resolvedCurrency}`,
         userId: req.user!.id,
-        userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
+        userName,
       }
     });
     invalidateCache('/api/cashbox');
     invalidateCache('/api/dashboard');
+    notifyKassa('INCOME', parsedAmt, resolvedCurrency, method, description || '', userName);
     res.json({ success: true, message: 'Kassa muvaffaqiyatli toldirildi' });
   } catch (error) {
     console.error('Add money error:', error);
@@ -274,6 +298,7 @@ router.post('/withdraw', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), 
     }
     const method = paymentMethod || type || 'CASH';
     const resolvedCurrency = method === 'CARD' ? 'UZS' : (currency || 'UZS');
+    const userName = (req.user as any)?.name || req.user?.email || 'Noma\'lum';
     await prisma.cashboxTransaction.create({
       data: {
         type: 'EXPENSE',
@@ -283,11 +308,12 @@ router.post('/withdraw', authorize('ADMIN', 'ACCOUNTANT', 'CASHIER', 'SELLER'), 
         category: 'WITHDRAWAL',
         description: description || `Kassa chiqim: ${method} ${resolvedCurrency}`,
         userId: req.user!.id,
-        userName: (req.user as any)?.name || req.user?.email || 'Noma\'lum',
+        userName,
       }
     });
     invalidateCache('/api/cashbox');
     invalidateCache('/api/dashboard');
+    notifyKassa('EXPENSE', parsedAmt, resolvedCurrency, method, description || '', userName);
     res.json({ success: true, message: 'Chiqim muvaffaqiyatli amalga oshirildi' });
   } catch (error) {
     console.error('Withdraw error:', error);

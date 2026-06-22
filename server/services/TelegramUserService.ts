@@ -448,6 +448,80 @@ export class TelegramUserService {
     return { topicId, groupId };
   }
 
+  // ─── KASSA TOPIC ──────────────────────────────────────────────────────────
+
+  static async getKassaTopicId(): Promise<number | null> {
+    try {
+      const row = await prisma.systemSettings.findUnique({ where: { key: 'telegram_kassa_topic_id' } });
+      return row?.value ? parseInt(row.value) : null;
+    } catch { return null; }
+  }
+
+  /** "💰 Kassa" nomli topic yaratadi va ID ni saqlaydi */
+  static async createKassaTopic(preferredSenderId: string): Promise<{ topicId: number; groupId: string } | null> {
+    const groupId = await this.getForumGroupId();
+    if (!groupId) { console.warn('⚠️ Forum group ID sozlanmagan'); return null; }
+
+    const sender = await this.findActiveSender(preferredSenderId);
+    if (!sender) { console.warn('⚠️ Gramjs session topilmadi'); return null; }
+
+    const client = makeClient(sender.session);
+    await client.connect();
+    let topicId: number | null = null;
+    try {
+      const groupPeer = await client.getEntity(groupId);
+      const updates = await client.invoke(new Api.channels.CreateForumTopic({
+        channel: groupPeer as any,
+        title: '💰 Kassa',
+        randomId: BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)),
+      }));
+      const upd = updates as any;
+      for (const u of upd?.updates || []) {
+        if (u?.message?.id) { topicId = u.message.id; break; }
+        if (u?.id && typeof u.id === 'number' && u.id > 0) { topicId = u.id; break; }
+      }
+      if (!topicId && upd?.id) topicId = upd.id;
+    } finally {
+      await client.disconnect();
+    }
+
+    if (!topicId) { console.error('⚠️ Kassa topic ID olinmadi'); return null; }
+
+    await (prisma.systemSettings as any).upsert({
+      where: { key: 'telegram_kassa_topic_id' },
+      create: { key: 'telegram_kassa_topic_id', value: String(topicId), description: 'Kassa forum topic ID', updatedBy: preferredSenderId },
+      update: { value: String(topicId), updatedBy: preferredSenderId },
+    });
+
+    try {
+      await this._send(sender.session, groupId,
+        `💰 *Kassa* — LuxPetPlast\n\n_Barcha kassa kirim va chiqimlari shu yerda ko'rinadi._`,
+        topicId
+      );
+    } catch { /* skip */ }
+
+    console.log(`✅ Kassa topic yaratildi: topicId=${topicId}`);
+    return { topicId, groupId };
+  }
+
+  /** Kassa topicga xabar yuborish */
+  static async sendToKassaTopic(text: string): Promise<void> {
+    try {
+      const [groupId, kassaTopicId] = await Promise.all([
+        this.getForumGroupId(),
+        this.getKassaTopicId(),
+      ]);
+      if (!groupId || !kassaTopicId) return;
+
+      const sender = await this.findActiveSender('');
+      if (!sender) return;
+
+      await this._send(sender.session, groupId, text, kassaTopicId);
+    } catch (e: any) {
+      console.warn('Kassa topicga yuborishda xatolik:', e.message);
+    }
+  }
+
   static formatPaymentConfirmation(opts: {
     cashierName: string;
     customerName: string;

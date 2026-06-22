@@ -207,4 +207,35 @@ router.post('/bulk-create-topics', async (req: AuthRequest, res) => {
   }
 });
 
+// GET /api/telegram-user/kassa-status
+router.get('/kassa-status', async (req: AuthRequest, res) => {
+  try {
+    const [groupId, topicId] = await Promise.all([
+      TelegramUserService.getForumGroupId(),
+      TelegramUserService.getKassaTopicId(),
+    ]);
+    res.json({ configured: !!topicId, topicId: topicId || null, groupId: groupId || null });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/telegram-user/setup-kassa-topic
+router.post('/setup-kassa-topic', async (req: AuthRequest, res) => {
+  try {
+    const sender = await TelegramUserService.findActiveSender(req.user!.id);
+    if (!sender) return res.status(400).json({ error: 'Telegram ulanmagan. Avval shaxsiy akkauntingizni ulang.' });
+
+    const groupId = await TelegramUserService.getForumGroupId();
+    if (!groupId) return res.status(400).json({ error: 'Forum guruh ID sozlanmagan.' });
+
+    const result = await TelegramUserService.createKassaTopic(req.user!.id);
+    if (!result) return res.status(400).json({ error: 'Kassa topic yaratib bo\'lmadi.' });
+
+    res.json({ created: true, topicId: result.topicId, groupId: result.groupId });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 export default router;

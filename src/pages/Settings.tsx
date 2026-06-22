@@ -27,6 +27,7 @@ import {
   Users,
   CheckCircle,
   XCircle,
+  Wallet,
   type LucideIcon
 } from 'lucide-react';
 import { latinToCyrillic } from '../lib/transliterator';
@@ -111,6 +112,8 @@ export default function Settings() {
   const [tgLinked, setTgLinked] = useState(false);
   const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkResult, setBulkResult] = useState<{ created: number; failed: number; total: number; message: string } | null>(null);
+  const [kassaTopicId, setKassaTopicId] = useState<number | null>(null);
+  const [kassaCreating, setKassaCreating] = useState(false);
   const [settings, setSettings] = useState({
     // Valyuta kurslari
     USD_TO_UZS_RATE: '12500',
@@ -210,13 +213,15 @@ export default function Settings() {
 
   const loadForumConfig = async () => {
     try {
-      const [forumRes, tgRes] = await Promise.all([
+      const [forumRes, tgRes, kassaRes] = await Promise.all([
         api.get('/telegram-user/forum-config'),
         api.get('/telegram-user/status'),
+        api.get('/telegram-user/kassa-status').catch(() => ({ data: { topicId: null } })),
       ]);
       setForumGroupId(forumRes.data.groupId || '');
       setForumStatus(forumRes.data.configured ? 'linked' : 'none');
       setTgLinked(tgRes.data.linked);
+      setKassaTopicId(kassaRes.data.topicId || null);
     } catch {
       setForumStatus('none');
     }
@@ -248,6 +253,19 @@ export default function Settings() {
       addToast({ type: 'error', title: t('Xatolik'), message: msg });
     } finally {
       setBulkRunning(false);
+    }
+  };
+
+  const handleSetupKassaTopic = async () => {
+    setKassaCreating(true);
+    try {
+      const { data } = await api.post('/telegram-user/setup-kassa-topic');
+      setKassaTopicId(data.topicId);
+      addToast({ type: 'success', title: t('Tayyor'), message: t('Kassa topici yaratildi') });
+    } catch (e: any) {
+      addToast({ type: 'error', title: t('Xatolik'), message: e.response?.data?.error || e.message });
+    } finally {
+      setKassaCreating(false);
     }
   };
 
@@ -663,6 +681,44 @@ export default function Settings() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          </SettingGroup>
+
+          {/* Kassa topici */}
+          <SettingGroup
+            icon={Wallet}
+            iconTint="bg-emerald-50 text-emerald-600"
+            title={t('Kassa Topici')}
+            description={t('Kassa kirim/chiqimlari alohida topic orqali guruhda ko\'rinadi')}
+          >
+            <div className="space-y-4">
+              <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium ${
+                kassaTopicId
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-slate-50 text-slate-500 border border-slate-200'
+              }`}>
+                {kassaTopicId
+                  ? <><CheckCircle className="w-4 h-4 flex-shrink-0" />{t('Kassa topici ulangan')} (topic ID: {kassaTopicId})</>
+                  : <><XCircle className="w-4 h-4 flex-shrink-0" />{t('Kassa topici yaratilmagan')}</>
+                }
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">{t('💰 Kassa topicini yaratish')}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{t('Guruhda "💰 Kassa" topic yaratiladi. Har bir kirim/chiqim o\'sha yerda ko\'rinadi.')}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSetupKassaTopic}
+                  disabled={!tgLinked || forumStatus !== 'linked' || kassaCreating}
+                  className="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-colors flex items-center gap-2"
+                >
+                  {kassaCreating
+                    ? <><RefreshCw className="w-4 h-4 animate-spin" />{t('Yaratilmoqda...')}</>
+                    : <><CheckCircle className="w-4 h-4" />{kassaTopicId ? t('Qayta yaratish') : t('Yaratish')}</>
+                  }
+                </button>
               </div>
             </div>
           </SettingGroup>
