@@ -56,8 +56,8 @@ export default function SimplifiedInventory() {
   const isCashierRoute = window.location.pathname.startsWith('/cashier');
   const isWarehouseRoute = window.location.pathname.startsWith('/warehouse');
   const { addToast } = useToast();
-  const { isAdmin } = useAuthStore();
-  const isAdminUser = isAdmin();
+  const authUser = useAuthStore(state => state.user);
+  const isAdminUser = authUser?.role?.toUpperCase() === 'ADMIN';
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<CategoryId>('all');

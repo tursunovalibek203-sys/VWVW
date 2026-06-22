@@ -73,8 +73,8 @@ interface Assignment {
 
 export function Drivers() {
   const { addToast } = useToast();
-  const { isAdmin } = useAuthStore();
-  const isAdminUser = isAdmin();
+  const authUser = useAuthStore(state => state.user);
+  const isAdminUser = authUser?.role?.toUpperCase() === 'ADMIN';
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

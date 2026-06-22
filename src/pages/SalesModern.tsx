@@ -53,8 +53,8 @@ export default function SalesModern() {
   const location = useLocation();
   const isCashier = location.pathname.startsWith('/cashier');
   const { addToast } = useToast();
-  const { isAdmin } = useAuthStore();
-  const isAdminUser = isAdmin();
+  const authUser = useAuthStore(state => state.user);
+  const isAdminUser = authUser?.role?.toUpperCase() === 'ADMIN';
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);

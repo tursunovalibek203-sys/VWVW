@@ -143,8 +143,8 @@ export default function CustomersModern() {
   const location = useLocation();
   const isCashier = location.pathname.startsWith('/cashier');
   const { addToast } = useToast();
-  const { isAdmin } = useAuthStore();
-  const isAdminUser = isAdmin();
+  const authUser = useAuthStore(state => state.user);
+  const isAdminUser = authUser?.role?.toUpperCase() === 'ADMIN';
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
