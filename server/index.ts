@@ -462,6 +462,14 @@ async function migrateKapsulaToPreform() {
   }
 }
 
+// Server crash bo'lmasligi uchun global error handlers
+process.on('uncaughtException', (err) => {
+  logger.error('uncaughtException (server davom etadi): ' + err.message);
+});
+process.on('unhandledRejection', (reason: any) => {
+  logger.error('unhandledRejection (server davom etadi): ' + (reason?.message || String(reason)));
+});
+
 app.listen(PORT, async () => {
   logger.info('Server started successfully');
   logger.info(`API available at http://localhost:${PORT}/api`);
