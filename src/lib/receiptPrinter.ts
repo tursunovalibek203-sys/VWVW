@@ -39,6 +39,14 @@ export interface ReceiptData {
     pricePerUnit: number;
     pricePerPiece?: number;
     subtotal: number;
+    isKomplektMain?: boolean;
+    isKomplektDebt?: boolean;
+    debtQty?: number;
+  }>;
+  komplektDebts?: Array<{
+    productName: string;
+    quantity: number;
+    unitsPerBag: number;
   }>;
   subtotal: number;
   tax: number;
@@ -161,8 +169,13 @@ export function generateReceiptHTML(data: ReceiptData): string {
     ${data.items.map((item) => {
       const ppb = item.piecesPerBag || 1;
       const narx = item.pricePerPiece != null ? item.pricePerPiece : (item.pricePerUnit / ppb);
-      return `<tr>
-        <td style="word-break:break-word;white-space:normal;">${trData(item.name)}</td>
+      const nameLabel = item.isKomplektMain
+        ? `<b>${trData(item.name)}</b> <span style="font-size:9px;color:#555;">&#x2605; To'liq komplekt</span>`
+        : item.isKomplektDebt
+          ? `${trData(item.name)} <span style="font-size:9px;color:#c00;">(qarz)</span>`
+          : trData(item.name);
+      return `<tr${item.isKomplektDebt ? ' style="background:#fff8f0;"' : ''}>
+        <td style="word-break:break-word;white-space:normal;">${nameLabel}</td>
         <td style="text-align:center;">${item.quantity}</td>
         <td style="text-align:center;">${item.piecesPerBag != null ? item.piecesPerBag : '-'}</td>
         <td style="text-align:right;">${fmtAmt(narx)}</td>
@@ -171,6 +184,18 @@ export function generateReceiptHTML(data: ReceiptData): string {
     }).join('')}
     </tbody>
   </table>
+
+  ${data.komplektDebts && data.komplektDebts.length > 0 ? `
+  <div style="border:1px dashed #c00;border-radius:4px;padding:4px 6px;margin:4px 0;background:#fff8f0;">
+    <div style="font-size:11px;font-weight:900;color:#c00;margin-bottom:3px;">&#9888; QARZGA BERILMAGAN:</div>
+    ${data.komplektDebts.map(d => {
+      const units = Math.round(d.quantity * (d.unitsPerBag || 1));
+      return `<div style="font-size:11px;display:flex;justify-content:space-between;">
+        <span>${trData(d.productName)}</span>
+        <span style="font-weight:700;">${units.toLocaleString()} dona (${d.quantity.toLocaleString()} qop)</span>
+      </div>`;
+    }).join('')}
+  </div>` : ''}
 
   ${ln2}
 
@@ -876,6 +901,9 @@ export function prepareSaleReceipt(
       pricePerUnit,
       pricePerPiece,
       subtotal: parseFloat(item.subtotal) || 0,
+      isKomplektMain: item.isKomplektMain || false,
+      isKomplektDebt: item.isKomplektDebt || false,
+      debtQty: item.debtQty,
     };
   });
 
@@ -949,6 +977,7 @@ export function prepareSaleReceipt(
     },
     driver: driverInfo,
     items,
+    komplektDebts: sale.komplektDebts || [],
     subtotal,
     tax,
     taxRate,

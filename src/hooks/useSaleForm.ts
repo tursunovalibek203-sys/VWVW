@@ -608,10 +608,52 @@ export const useSaleForm = (options: UseSaleFormOptions = {}) => {
         name: form.manualCustomerName || "Ko'chaga",
         phone: form.manualCustomerPhone,
       };
+
+      // Chek uchun to'liq komplekt itemlari: qty=0 bo'lsa ham originalQty bilan ko'rsatiladi
+      const receiptItems = form.items.map(item => {
+        const isFullModeSub = item.komplektGroupId && !item.isKomplektMain &&
+          form.items.find(m => m.komplektGroupId === item.komplektGroupId && m.isKomplektMain)?.komplektMode === 'full';
+        if (isFullModeSub) {
+          const origQty = item.originalQuantity ?? (typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity || '0'));
+          const actualQty = typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity || '0');
+          if (origQty > 0) {
+            return {
+              productId: item.productId,
+              productName: item.productName,
+              quantity: origQty,
+              pricePerBag: item.pricePerBag,
+              pricePerPiece: item.pricePerPiece,
+              unitsPerBag: item.unitsPerBag,
+              subtotal: origQty * (item.pricePerBag || 0),
+              saleType: item.saleType,
+              isKomplektDebt: actualQty < origQty - 0.0001,
+              debtQty: Math.max(0, origQty - actualQty),
+            };
+          }
+        }
+        const qty = typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity || '0');
+        if (qty <= 0) return null;
+        return {
+          productId: item.productId,
+          productName: item.productName,
+          quantity: qty,
+          pricePerBag: item.pricePerBag,
+          pricePerPiece: item.pricePerPiece,
+          unitsPerBag: item.unitsPerBag,
+          subtotal: item.subtotal,
+          saleType: item.saleType,
+          isKomplektMain: item.isKomplektMain,
+          komplektMode: item.komplektMode,
+          isKomplektDebt: false,
+          debtQty: 0,
+        };
+      }).filter(Boolean);
+
       const receiptData = prepareSaleReceipt(
         {
           ...saleResult,
-          items: saleData.items,
+          items: receiptItems,
+          komplektDebts,
           totalAmount: totalAmount,
           paidAmount: paidAmount,
           debtAmount: debtAmount,
