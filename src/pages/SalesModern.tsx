@@ -20,6 +20,7 @@ import {
   Printer,
   Truck,
   Trash2,
+  Pencil,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { printReceipt, prepareSaleReceipt } from '../lib/receiptPrinter';
@@ -55,10 +56,11 @@ export default function SalesModern() {
   const { addToast } = useToast();
   const authUser = useAuthStore(state => state.user);
   const userRole = authUser?.role?.toUpperCase() ?? '';
-  // Delete tugmasi: admin panelida (/sales) ko'rinadi, kassir (/cashier/sales) da ko'rinmaydi
-  // Backend o'zi ADMIN rolini tekshiradi
-  const canDeleteSale = !isCashier && userRole !== 'CASHIER' && userRole !== 'SELLER';
+  // Backend authorize('ADMIN') tekshiradi — frontend faqat kassir panelida yashiradi
+  const canDeleteSale = !isCashier;
+  const canEditSale = !isCashier;
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,6 +181,50 @@ export default function SalesModern() {
       addToast(toast.error(latinToCyrillic('Xatolik'), error.response?.data?.error || latinToCyrillic("O'chirishda xatolik")));
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleEditSale = async (saleId: string) => {
+    setEditingId(saleId);
+    try {
+      const { data: resp } = await api.get(`/sales/${saleId}`);
+      const full = resp?.data ?? resp;
+      // editSale format — useSaleForm kutadigan structure
+      const editSale = {
+        id: full.id,
+        customerId: full.customerId || '',
+        customerName: full.customer?.name || full.manualCustomerName || '',
+        isKocha: full.isKocha || false,
+        manualCustomerName: full.manualCustomerName || '',
+        manualCustomerPhone: full.manualCustomerPhone || '',
+        currency: full.currency || 'USD',
+        paidUZS: full.paidUZS?.toString() || '',
+        paidUSD: full.paidUSD?.toString() || '',
+        paidKARTA: full.paidKARTA?.toString() || '',
+        paymentType: full.paymentType || full.paymentMethod || 'cash',
+        items: (full.items || []).map((item: any) => ({
+          productId: item.productId || item.product?.id || '',
+          productName: item.product?.name || item.productName || '',
+          quantity: item.quantity,
+          bagDisplayValue: item.quantity?.toString() || '',
+          pricePerBag: item.pricePerBag || 0,
+          pricePerPiece: item.pricePerPiece || (item.pricePerBag / (item.unitsPerBag || 1)),
+          unitsPerBag: item.unitsPerBag || item.product?.unitsPerBag || 1,
+          subtotal: item.subtotal || item.quantity * item.pricePerBag,
+          warehouse: item.product?.warehouse || 'other',
+          saleType: item.saleType || 'bag',
+          komplektGroupId: item.komplektGroupId || undefined,
+          komplektMode: item.komplektMode || undefined,
+          isKomplektMain: item.isKomplektMain || false,
+          originalQuantity: item.originalQuantity || undefined,
+        })),
+      };
+      const base = isCashier ? '/cashier/sales/add' : '/sales/add';
+      navigate(base, { state: { editSale } });
+    } catch (e: any) {
+      addToast(toast.error(latinToCyrillic('Xatolik'), e?.response?.data?.error || latinToCyrillic('Sotuvni yuklab bo\'lmadi')));
+    } finally {
+      setEditingId(null);
     }
   };
 
@@ -764,6 +810,18 @@ export default function SalesModern() {
                               <Plus className="w-4 h-4" />
                             </button>
                           )}
+                          {canEditSale && (
+                            <button
+                              type="button"
+                              onClick={() => handleEditSale(sale.id)}
+                              disabled={editingId === sale.id}
+                              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-40"
+                              aria-label={latinToCyrillic('Tahrirlash')}
+                              title={latinToCyrillic('Tahrirlash')}
+                            >
+                              <Pencil className={`w-4 h-4 ${editingId === sale.id ? 'animate-pulse' : ''}`} />
+                            </button>
+                          )}
                           {canDeleteSale && (
                             <button
                               type="button"
@@ -863,6 +921,17 @@ export default function SalesModern() {
                       <Eye className="w-4 h-4" />
                       {latinToCyrillic("Ko'rish")}
                     </button>
+                    {canEditSale && (
+                      <button
+                        type="button"
+                        onClick={() => handleEditSale(sale.id)}
+                        disabled={editingId === sale.id}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-40"
+                        title={latinToCyrillic('Tahrirlash')}
+                      >
+                        <Pencil className={`w-4 h-4 ${editingId === sale.id ? 'animate-pulse' : ''}`} />
+                      </button>
+                    )}
                     {canDeleteSale && (
                       <button
                         type="button"
@@ -964,6 +1033,26 @@ export default function SalesModern() {
         title={latinToCyrillic("Sotuv ma'lumotlari")}
         footer={
           <div className="flex items-center gap-2">
+            {selectedSale && canEditSale && (
+              <Button
+                variant="secondary"
+                onClick={() => { handleEditSale(selectedSale.id); setSelectedSale(null); }}
+                disabled={editingId === selectedSale?.id}
+                leftIcon={<Pencil className="w-4 h-4" />}
+              >
+                {latinToCyrillic('Tahrirlash')}
+              </Button>
+            )}
+            {selectedSale && canDeleteSale && (
+              <Button
+                variant="danger"
+                onClick={() => { handleDeleteSale(selectedSale); setSelectedSale(null); }}
+                disabled={deletingId === selectedSale?.id}
+                leftIcon={<Trash2 className="w-4 h-4" />}
+              >
+                {latinToCyrillic("O'chirish")}
+              </Button>
+            )}
             {selectedSale && (
               <Button
                 variant="secondary"
