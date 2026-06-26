@@ -56,8 +56,6 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [showPriceModal, setShowPriceModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showAdjustModal, setShowAdjustModal] = useState(false);
-  const [adjustType, setAdjustType] = useState<'units' | 'bags'>('units');
   const [salesStats, setSalesStats] = useState({
     totalSold: 0,
     totalRevenue: 0,
@@ -66,13 +64,6 @@ export default function ProductDetail() {
   });
   const [salesHistory, setSalesHistory] = useState<any[]>([]);
   const [stockMovements, setStockMovements] = useState<any[]>([]);
-
-  const [adjustForm, setAdjustForm] = useState({
-    value: '',
-    type: 'ADD',
-    reason: '',
-    notes: '',
-  });
   const [exchangeRates, setExchangeRates] = useState({ USD_TO_UZS: 12500 });
   const [settingsForm, setSettingsForm] = useState({
     unitsPerBag: '',
@@ -282,45 +273,6 @@ export default function ProductDetail() {
   };
 
 
-  const handleAdjust = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validation
-    const value = parseInt(adjustForm.value);
-    if (isNaN(value) || value <= 0) {
-      addToast(toast.warning(
-        latinToCyrillic('Diqqat'),
-        latinToCyrillic('Iltimos, musbat son kiriting')
-      ));
-      return;
-    }
-
-    // Agar sabab tanlanmagan bo'lsa, "Boshqa" deb o'rnatish
-    const reason = adjustForm.reason || 'Boshqa';
-
-    try {
-      const endpoint = adjustType === 'units' ? 'adjust-units' : 'adjust-bags';
-      const payload = adjustType === 'units'
-        ? { units: value, type: adjustForm.type, reason, notes: adjustForm.notes }
-        : { bags: value, type: adjustForm.type, reason, notes: adjustForm.notes };
-
-      await api.post(`/products/${id}/${endpoint}`, payload);
-
-      setShowAdjustModal(false);
-      setAdjustForm({ value: '', type: 'ADD', reason: '', notes: '' });
-      loadProduct();
-      addToast(toast.success(
-        latinToCyrillic('Muvaffaqiyatli'),
-        latinToCyrillic('Zaxira yangilandi!')
-      ));
-    } catch (error: any) {
-      addToast(toast.error(
-        latinToCyrillic('Xatolik'),
-        latinToCyrillic(error.response?.data?.error || 'Xatolik yuz berdi')
-      ));
-    }
-  };
-
   const getStockLevel = (): StockLevel => {
     const stock = product?.currentStock || 0;
     const min = product?.minStockLimit || 0;
@@ -476,35 +428,6 @@ export default function ProductDetail() {
       {/* Action bar */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setAdjustType('bags');
-              setAdjustForm({ ...adjustForm, type: 'ADD' });
-              setShowAdjustModal(true);
-            }}
-            title={latinToCyrillic('Omborga qop qo\'shish')}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-xl text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200 active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            {latinToCyrillic('Qop qo\'shish')}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAdjustType('bags');
-              setAdjustForm({ ...adjustForm, type: 'REMOVE' });
-              setShowAdjustModal(true);
-            }}
-            title={latinToCyrillic('Ombordan qop ayirish')}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-100 transition-all duration-200 active:scale-95"
-          >
-            <Minus className="w-4 h-4" />
-            {latinToCyrillic('Qop ayirish')}
-          </button>
-
-          <div className="hidden sm:block w-px h-7 bg-gray-200 mx-1" />
-
           <button
             type="button"
             onClick={() => setShowPriceModal(true)}
@@ -806,75 +729,6 @@ export default function ProductDetail() {
           </div>
         )}
       </div>
-
-      {/* Adjust Modal */}
-      <Modal
-        isOpen={showAdjustModal}
-        onClose={() => setShowAdjustModal(false)}
-        title={`${adjustType === 'units' ? latinToCyrillic('Dona') : latinToCyrillic('Qop')} ${adjustForm.type === 'ADD' ? latinToCyrillic('Qo\'shish') : latinToCyrillic('Ayirish')}`}
-      >
-        <form onSubmit={handleAdjust} className="space-y-4">
-          <Input
-            label={adjustType === 'units' ? latinToCyrillic('Dona soni') : latinToCyrillic('Qop soni')}
-            type="number"
-            min="1"
-            value={adjustForm.value}
-            onChange={(e) => setAdjustForm({ ...adjustForm, value: e.target.value })}
-            required
-            autoFocus
-          />
-
-          {/* Sabab tanlash (ixtiyoriy) */}
-          <div>
-            <label htmlFor="adjust-reason" className="block text-sm font-medium text-gray-700 mb-1">
-              {latinToCyrillic('Sabab (ixtiyoriy)')}
-            </label>
-            <select
-              id="adjust-reason"
-              value={adjustForm.reason}
-              onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              aria-label={latinToCyrillic('Sabab tanlash')}
-            >
-              <option value="">{latinToCyrillic('-- Boshqa --')}</option>
-              <option value="Ishlab chiqarish">{latinToCyrillic('Ishlab chiqarish')}</option>
-              <option value="Import">{latinToCyrillic('Import')}</option>
-              <option value="Yaroqsiz">{latinToCyrillic('Yaroqsiz (brak)')}</option>
-              <option value="Yo'qotish">{latinToCyrillic('Yo\'qotish')}</option>
-              <option value="Tuzatish">{latinToCyrillic('Tuzatish')}</option>
-              <option value="Sotuv qaytarish">{latinToCyrillic('Sotuv qaytarish')}</option>
-            </select>
-          </div>
-
-          {/* Izoh (ixtiyoriy) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {latinToCyrillic('Izoh (ixtiyoriy)')}
-            </label>
-            <textarea
-              value={adjustForm.notes}
-              onChange={(e) => setAdjustForm({ ...adjustForm, notes: e.target.value })}
-              placeholder={latinToCyrillic('Qo\'shimcha ma\'lumot...')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              rows={2}
-            />
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            <Button type="submit" className="flex-1">
-              {latinToCyrillic('Tasdiqlash')}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowAdjustModal(false)}
-              className="flex-1"
-            >
-              {latinToCyrillic('Bekor qilish')}
-            </Button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Settings Modal */}
       <Modal
