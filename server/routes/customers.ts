@@ -1130,13 +1130,13 @@ router.patch('/:customerId/product-debts/:debtId/deliver', async (req, res) => {
       // To'liq yetkazildi — yopish
       await (prisma as any).customerProductDebt.update({
         where: { id: debtId },
-        data: { status: 'PAID', paidAt: new Date(), deliveredQuantity: debt.quantity },
+        data: { status: 'PAID', paidAt: new Date() },
       });
     } else {
       // Qisman yetkazildi — miqdorni kamaytirish
       await (prisma as any).customerProductDebt.update({
         where: { id: debtId },
-        data: { quantity: debt.quantity - delivered, deliveredQuantity: (debt.deliveredQuantity || 0) + delivered },
+        data: { quantity: debt.quantity - delivered },
       });
     }
 
